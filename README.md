@@ -69,6 +69,3 @@ JSON over `http://127.0.0.1:8765`: `GET /status`, `GET /devices`, `GET /log`, `P
 One measurement at a time; a command sent during a measurement gets code 409 ("instrument busy"). Adding an
 instrument: a sub-folder with a class exposing `move`, `count`, `scan`, `status`, `devices`, `log_file`, `number`,
 `folder`, `mode`, `last_image`, and one line in `INSTRUMENTS` of `twin_server.py`.
-
-## Language
-Everything in `twin/` is in English (code, names, pages, figures, READMEs), unlike the French notebook series.
