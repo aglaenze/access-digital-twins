@@ -1,5 +1,5 @@
 # Builds the container image (container/Containerfile), runs its smoke test, and publishes it to the GitHub
-# container registry (ghcr.io/aglaenze/access-digital-twins, private like the repository) when the test passes.
+# container registry (ghcr.io/aglaenze/access-digital-twins) when the test passes.
 name: container
 
 on:

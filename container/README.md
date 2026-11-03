@@ -28,18 +28,16 @@ and runs identically on a laptop, a DTU server, UCloud or ESS's VISA.
 The upstream part of each chopper mode (ESS source → guides → choppers → guide exit, MCPL file) takes minutes to an
 hour to compute and weighs up to 0.7 GB: too big for git, too slow to compute at each start. They are attached to the
 GitHub release `fronts-v1` (one `.tar` per mode, ~1.5 GB in total, with SHA-256 checksums) and downloaded on the first
-start of a container into `/data/twin/odin/front/` (a volume: kept between containers). The repository is private,
-so the download needs a GitHub token with read access (`GITHUB_TOKEN`); in GitHub Actions the token of the workflow
-is used. To compute them yourself instead: `odin_mcstas.front(...)` (see `../odin/README.md` § 2).
+start of a container into `/data/twin/odin/front/` (a volume: kept between containers). The repository is public:
+no token is needed. To compute them yourself instead: `odin_mcstas.front(...)` (see `../odin/README.md` § 2).
 
 ## Use
 
 ```
-docker run --rm -p 8888:8888 -e GITHUB_TOKEN=<token> -v twin-data:/data ghcr.io/aglaenze/access-digital-twins
+docker run --rm -p 8888:8888 -v twin-data:/data ghcr.io/aglaenze/access-digital-twins
 ```
 then open the address printed by JupyterLab. Other entry points: `... access-digital-twins voila` (student page,
 port 8866), `... nicos` (NICOS daemon, port 1301), `... test`. Results and NICOS data are in the volume (`/data/twin`).
-Pulling the private image needs `docker login ghcr.io` with a token that can read packages.
 
 The image is built by GitHub Actions on every push to `main` (about 30–60 min the first time, faster afterwards
 thanks to the build cache); the run, its logs and the smoke test are in the "Actions" tab of the repository.
@@ -49,4 +47,3 @@ thanks to the build cache); the run, its logs and the smoke test are in the "Act
 - NICOS clients from outside the container: the daemon listens on `localhost` only; a NICOS GUI in the browser
   (noVNC) or on the student computer.
 - JupyterHub (one container per student, accounts) for a course; where to run it (DTU server, UCloud, VISA).
-- Make the image work without a token (public repository, or upstream parts on another server).

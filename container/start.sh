@@ -8,7 +8,7 @@
 # The upstream McStas parts are downloaded on first start into $TWIN_RUN_ROOT (a volume, so only once).
 set -e
 cd "$HOME/twin"
-fetch() { python container/fetch_fronts.py || echo "WARNING: upstream parts not downloaded (GITHUB_TOKEN set?)"; }
+fetch() { python container/fetch_fronts.py || echo "WARNING: upstream parts not downloaded (network?)"; }
 case "${1:-jupyter}" in
   jupyter) fetch; exec jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --ServerApp.root_dir="$HOME/twin" ;;
   voila)   fetch; exec voila odin/ODIN_virtual.ipynb --Voila.ip=0.0.0.0 --port=8866 --no-browser ;;

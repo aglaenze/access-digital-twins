@@ -7,8 +7,8 @@
 
 The upstream parts (source -> guides -> choppers -> guide exit) take from minutes to an hour to compute
 (odin_mcstas.front), so they are computed once and published as release assets (tag RELEASE). An upstream part that
-is already complete on disk is not downloaded again. The repository is private: the download needs a GitHub token
-with read access (environment variable GITHUB_TOKEN or GH_TOKEN); without a token, only a public repository works.
+is already complete on disk is not downloaded again. The repository is public: no token is needed (a GitHub token
+in GITHUB_TOKEN or GH_TOKEN is used if present: higher API rate limit, or a private fork).
 Variables: TWIN_ASSETS_REPO (default aglaenze/access-digital-twins), TWIN_FRONTS_RELEASE (default fronts-v1).
 """
 import hashlib

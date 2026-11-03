@@ -3,7 +3,7 @@
 *Created 2026-11-03.* Virtual instruments for teaching (ACCESS project, DTU / UCPH / ESS): each twin is operated like
 the real instrument (NICOS, or a console, or a web page), writes data files in the ESS NeXus format, and its data go
 through the official ESS reduction software. Everything is explained and every approximation is stated and checked.
-Repository: https://github.com/aglaenze/access-digital-twins (private).
+Repository: https://github.com/aglaenze/access-digital-twins (public).
 
 ## Instruments
 

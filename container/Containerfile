@@ -1,7 +1,7 @@
 # Container image of the ACCESS digital twins: McStas + official ESS instrument models + twins + NICOS + JupyterLab.
 # Built and tested by GitHub Actions (.github/workflows/container.yml); also builds with Docker or Podman:
 #   docker build -f container/Containerfile -t access-twins .
-#   docker run --rm -p 8888:8888 -e GITHUB_TOKEN=... -v twin-data:/data access-twins
+#   docker run --rm -p 8888:8888 -v twin-data:/data access-twins
 # Linux base with micromamba (conda-forge); runs as the unprivileged user "mambauser".
 FROM mambaorg/micromamba:1.5.10
 
