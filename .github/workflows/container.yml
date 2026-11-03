@@ -20,6 +20,16 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 150
     steps:
+      - name: Free disk space on the runner
+        # The image (McStas, two conda environments, NICOS) needs more than the ~20 GB left on a standard runner
+        # during the build: remove preinstalled tools that are not used here (~30 GB).
+        run: |
+          df -h /
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup \
+                      /opt/hostedtoolcache/CodeQL /usr/local/share/boost /usr/local/share/powershell
+          sudo docker image prune --all --force
+          df -h /
+
       - uses: actions/checkout@v4
 
       - uses: docker/setup-buildx-action@v3
@@ -35,7 +45,10 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Smoke test (tools, one measurement compared with NCrystal, NICOS services)
-        run: docker run --rm -e GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }} -e TWIN_MPI=4 twin:test test
+        run: |
+          docker image ls twin:test
+          df -h /
+          docker run --rm -e GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }} -e TWIN_MPI=4 twin:test test
 
       - name: Log in to ghcr.io
         if: github.event_name != 'pull_request'
