@@ -10,7 +10,9 @@ Repository: https://github.com/aglaenze/access-digital-twins (public).
 | Instrument | Folder | Technique | Status |
 |---|---|---|---|
 | ODIN | `odin/` — **read `odin/README.md`** | neutron imaging (Bragg edges, tomography, chopper modes) | working (hybrid and mcstas modes, NICOS) |
-| LoKI | — | SANS | to do (McStas series in `../LOKI_formation/`) |
+| LoKI | — | small-angle neutron scattering (SANS) | to do |
+| DREAM | — | powder diffraction (bispectral, time-of-flight; also single-crystal) | to do |
+| BIFROST | — | inelastic scattering: indirect-geometry time-of-flight spectrometer (cold neutrons, multiplexing analysers) | to do |
 
 ## Layout
 
