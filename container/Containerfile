@@ -7,7 +7,7 @@ FROM mambaorg/micromamba:1.5.10
 
 USER root
 RUN apt-get update \
- && apt-get install -y --no-install-recommends git ca-certificates \
+ && apt-get install -y --no-install-recommends git ca-certificates openssh-client \
  && rm -rf /var/lib/apt/lists/* \
  && mkdir -p /data && chown "$MAMBA_USER:$MAMBA_USER" /data
 USER $MAMBA_USER
