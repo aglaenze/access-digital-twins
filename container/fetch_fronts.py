@@ -1,0 +1,107 @@
+"""Downloads the precomputed McStas upstream parts of ODIN (GitHub release of this repository) into
+<TWIN_RUN_ROOT>/odin/front/.
+
+    python container/fetch_fronts.py                 # all the upstream parts used by the twin (~1.5 GB)
+    python container/fetch_fronts.py wfm_delta0.10_N2e+08 natural_delta0.30_N2e+08
+    python container/fetch_fronts.py --list
+
+The upstream parts (source -> guides -> choppers -> guide exit) take from minutes to an hour to compute
+(odin_mcstas.front), so they are computed once and published as release assets (tag RELEASE). An upstream part that
+is already complete on disk is not downloaded again. The repository is private: the download needs a GitHub token
+with read access (environment variable GITHUB_TOKEN or GH_TOKEN); without a token, only a public repository works.
+Variables: TWIN_ASSETS_REPO (default aglaenze/access-digital-twins), TWIN_FRONTS_RELEASE (default fronts-v1).
+"""
+import hashlib
+import json
+import os
+import sys
+import tarfile
+import urllib.request
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(HERE, "..", "odin"))
+import odin_paths  # noqa: E402
+
+REPO = os.environ.get("TWIN_ASSETS_REPO", "aglaenze/access-digital-twins")
+RELEASE = os.environ.get("TWIN_FRONTS_RELEASE", "fronts-v1")
+FRONT_DIR = f"{odin_paths.RUN_ROOT}/front"
+
+
+def wanted():
+    """Folder names of the upstream parts used by the twin (odin_virtual.FRONTS)."""
+    import odin_mcstas as tw
+    import odin_virtual as ov
+    return [os.path.basename(tw.front_folder(mode, n, delta)) for (mode, _), (delta, n) in ov.FRONTS.items()]
+
+
+def complete(folder):
+    f = os.path.join(folder, "mccode.sim")
+    return os.path.isfile(f) and "begin data" in open(f, errors="ignore").read()
+
+
+def _request(url, accept):
+    h = {"Accept": accept, "User-Agent": "access-digital-twins"}
+    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+    if token:
+        h["Authorization"] = f"Bearer {token}"
+    return urllib.request.urlopen(urllib.request.Request(url, headers=h), timeout=60)
+
+
+def assets():
+    with _request(f"https://api.github.com/repos/{REPO}/releases/tags/{RELEASE}", "application/vnd.github+json") as r:
+        return {a["name"]: a["url"] for a in json.load(r)["assets"]}
+
+
+def download(url, dest):
+    sha = hashlib.sha256()
+    with _request(url, "application/octet-stream") as r, open(dest + ".part", "wb") as f:
+        size, done = int(r.headers.get("Content-Length", 0)), 0
+        while chunk := r.read(1 << 22):
+            f.write(chunk)
+            sha.update(chunk)
+            done += len(chunk)
+            if size:
+                print(f"\r  {done / 1e6:7.0f} / {size / 1e6:.0f} MB", end="", flush=True)
+    print()
+    os.replace(dest + ".part", dest)
+    return sha.hexdigest()
+
+
+def main():
+    args = sys.argv[1:]
+    names = wanted()
+    if args[:1] == ["--list"]:
+        print("\n".join(names))
+        return
+    names = args or names
+    todo = [n for n in names if not complete(os.path.join(FRONT_DIR, n))]
+    if not todo:
+        print(f"upstream parts already present in {FRONT_DIR}")
+        return
+    available = assets()
+    sums = {}
+    if "SHA256SUMS" in available:
+        tmp = os.path.join(FRONT_DIR, "SHA256SUMS")
+        os.makedirs(FRONT_DIR, exist_ok=True)
+        download(available["SHA256SUMS"], tmp)
+        sums = {l.split()[1]: l.split()[0] for l in open(tmp) if l.strip()}
+    for n in todo:
+        asset = f"front_{n.replace('+', '')}.tar"
+        if asset not in available:
+            raise SystemExit(f"{asset} is not in release {RELEASE} of {REPO}")
+        print(f"downloading {asset} ...")
+        tar = os.path.join(FRONT_DIR, asset)
+        digest = download(available[asset], tar)
+        if asset in sums and sums[asset] != digest:
+            os.remove(tar)
+            raise SystemExit(f"checksum mismatch for {asset}")
+        with tarfile.open(tar) as t:
+            t.extractall(FRONT_DIR, filter="data")
+        os.remove(tar)
+        if not complete(os.path.join(FRONT_DIR, n)):
+            raise SystemExit(f"{n}: incomplete after extraction")
+        print(f"  -> {FRONT_DIR}/{n}")
+
+
+if __name__ == "__main__":
+    main()

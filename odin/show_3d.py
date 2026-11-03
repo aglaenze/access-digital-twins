@@ -34,7 +34,7 @@ def generate(mode, n, inspect=None):
     model.write_full_instrument()
     instr = model.name + ".instr"
     shutil.rmtree(os.path.join(folder, "view"), ignore_errors=True)
-    mcdisplay = os.path.join(os.path.dirname(sys.executable), "share", "mcstas", "tools", "Python", "mcdisplay",
+    mcdisplay = os.path.join(sys.prefix, "share", "mcstas", "tools", "Python", "mcdisplay",
                              "webgl", "mcdisplay.py")
     cmd = [sys.executable, mcdisplay, instr, "--nobrowse", "--default", "-n", str(n), "--dirname", "view",
            "--timeout", "1"] + (["--inspect", inspect] if inspect else [])

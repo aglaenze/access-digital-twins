@@ -1,0 +1,58 @@
+# Container image of the ACCESS digital twins: McStas + official ESS instrument models + twins + NICOS + JupyterLab.
+# Built and tested by GitHub Actions (.github/workflows/container.yml); also builds with Docker or Podman:
+#   docker build -f container/Containerfile -t access-twins .
+#   docker run --rm -p 8888:8888 -e GITHUB_TOKEN=... -v twin-data:/data access-twins
+# Linux base with micromamba (conda-forge); runs as the unprivileged user "mambauser".
+FROM mambaorg/micromamba:1.5.10
+
+USER root
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends git ca-certificates \
+ && rm -rf /var/lib/apt/lists/* \
+ && mkdir -p /data && chown "$MAMBA_USER:$MAMBA_USER" /data
+USER $MAMBA_USER
+
+# Conda environments (pinned versions): "mcstas" for the twins, "nicos" for NICOS (numpy < 2)
+COPY --chown=$MAMBA_USER:$MAMBA_USER container/environment-mcstas.yml container/environment-nicos.yml /tmp/
+RUN micromamba create -y -f /tmp/environment-mcstas.yml \
+ && micromamba create -y -f /tmp/environment-nicos.yml \
+ && micromamba clean -a -y
+
+# The entry point of the base image activates this environment; RUN steps too
+ENV ENV_NAME=mcstas
+ARG MAMBA_DOCKERFILE_ACTIVATE=1
+
+# Official McStas model of ODIN (ESS/DMSC), fixed commit
+ARG ODIN_REPO=https://git.esss.dk/dmsc-instrumentmodels/odin.git
+ARG ODIN_COMMIT=ea4fc94e7f961beb9a51564078c966db8db794f0
+RUN git clone --quiet "$ODIN_REPO" "$HOME/odin_model" \
+ && git -C "$HOME/odin_model" checkout --quiet "$ODIN_COMMIT" \
+ && pip install --no-deps -e "$HOME/odin_model/instrpy" -e "$HOME/odin_model/extra"
+
+# NICOS sources, fixed commit; a shallow checkout has no version tag, so the version is written by hand
+ARG NICOS_COMMIT=44bec9c74fea00406a936ae327b2fd71253e3138
+ARG NICOS_VERSION=3.13.2.dev0+g44bec9c
+RUN git init --quiet "$HOME/nicos_src" \
+ && cd "$HOME/nicos_src" \
+ && git fetch --quiet --depth 1 https://github.com/mlz-ictrl/nicos "$NICOS_COMMIT" \
+ && git checkout --quiet FETCH_HEAD \
+ && echo "$NICOS_VERSION" > nicos/RELEASE-VERSION \
+ && micromamba run -n nicos pip install --no-cache-dir -r requirements.txt
+
+# Real ODIN file used as template for the NeXus files (downloaded by essimaging; kept in the image)
+RUN python -c "import ess.odin.data as d; print(d.iron_simulation_ob_small())"
+
+# The twins (this repository)
+COPY --chown=$MAMBA_USER:$MAMBA_USER . /home/mambauser/twin
+WORKDIR /home/mambauser/twin
+
+ENV TWIN_RUN_ROOT=/data/twin \
+    NICOS_ROOT=/home/mambauser/nicos_src \
+    CONDA_ROOT=/opt/conda \
+    OMPI_MCA_rmaps_base_oversubscribe=1 \
+    OMPI_MCA_btl_vader_single_copy_mechanism=none
+VOLUME /data
+EXPOSE 8888 8866 8765 1301
+
+ENTRYPOINT ["/usr/local/bin/_entrypoint.sh", "bash", "/home/mambauser/twin/container/start.sh"]
+CMD ["jupyter"]

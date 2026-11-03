@@ -20,6 +20,7 @@ twin/
 ├── twin_server.py       server: one virtual instrument in its own process, driven over HTTP (local)
 ├── twin_console.py      provisional console with the NICOS commands (standard library only)
 ├── nicos/               NICOS setup package (nicos_twin) + launcher — read nicos/README.md
+├── container/           container image (McStas + twins + NICOS + JupyterLab), built by GitHub Actions — read container/README.md
 └── odin/                everything specific to ODIN — read odin/README.md
 ```
 Results (outside the repository and OneDrive, no spaces in the path: McStas needs it): `<TWIN_RUN_ROOT>/<instrument>/`,

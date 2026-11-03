@@ -1,0 +1,38 @@
+# Conda environment of the twins (McStas, reduction, pages): same versions as on the development computer
+# (Windows, 2026-11-03), with the Linux equivalents of the compiler and MPI (gcc and Open MPI instead of MSVC and
+# MS-MPI).
+name: mcstas
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.14
+  - mcstas=3.9.2
+  - mcstasscript=0.0.91
+  - ncrystal=4.4.6
+  - mcpl=2.2.8
+  - c-compiler          # McStas compiles each instrument to C
+  - make
+  - openmpi             # mpiexec / mpicc for McStas
+  - numpy=2.5
+  - scipy=1.18
+  - h5py=3.16
+  - hdf5=1.14.6         # also provides h5repack (recompression of the NeXus template)
+  - scipp=26.9.0
+  - scippneutron=26.10.0
+  - scippnexus=26.1.1
+  - tof=26.9.0
+  - plopp=26.9.0
+  - mcstastox=0.0.12
+  - pooch
+  - ipywidgets=8.1.9
+  - ipympl=0.10.0
+  - jupyterlab=4.6
+  - nbformat
+  - pip
+  - pip:
+      - matplotlib==3.11.1
+      - essimaging==26.10.1
+      - essreduce==26.10.1
+      - sciline==26.9.0
+      - voila==0.5.13
