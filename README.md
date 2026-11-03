@@ -5,12 +5,15 @@ the real instrument (NICOS, or a console, or a web page), writes data files in t
 through the official ESS reduction software. Everything is explained and every approximation is stated and checked.
 Repository: https://github.com/aglaenze/access-digital-twins (public).
 
+**New here? Start with the step-by-step guide [TUTORIAL.md](TUTORIAL.md)** (installation, then your first
+measurement in each of the three ways described below).
+
 ## Instruments
 
 | Instrument | Folder | Technique | Status |
 |---|---|---|---|
 | ODIN | `odin/` — **read `odin/README.md`** | neutron imaging (Bragg edges, tomography, chopper modes) | working (hybrid and mcstas modes, NICOS) |
-| LoKI | — | small-angle neutron scattering (SANS) | to do |
+| LoKI | `loki/` — read `loki/README.md` | small-angle neutron scattering (SANS) | first version: Python, easy test case (silica spheres) |
 | DREAM | — | powder diffraction (bispectral, time-of-flight; also single-crystal) | to do |
 | BIFROST | — | inelastic scattering: indirect-geometry time-of-flight spectrometer (cold neutrons, multiplexing analysers) | to do |
 
@@ -23,7 +26,8 @@ twin/
 ├── twin_console.py      provisional console with the NICOS commands (standard library only)
 ├── nicos/               NICOS setup package (nicos_twin) + launcher — read nicos/README.md
 ├── container/           container image (McStas + twins + NICOS + JupyterLab), built by GitHub Actions — read container/README.md
-└── odin/                everything specific to ODIN — read odin/README.md
+├── odin/                everything specific to ODIN — read odin/README.md
+└── loki/                LoKI (first version) — read loki/README.md
 ```
 Results (outside the repository and OneDrive, no spaces in the path: McStas needs it): `<TWIN_RUN_ROOT>/<instrument>/`,
 NICOS data in `<TWIN_RUN_ROOT>/nicos/`; environment variable `TWIN_RUN_ROOT`, default `~/McStas_runs/twin`

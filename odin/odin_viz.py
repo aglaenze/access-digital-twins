@@ -59,13 +59,53 @@ def chopper_diagram(mode="wfm", wfm_delta=0.30, distance=60.55, neutrons=60_000,
     import odin_mcstas as tw
     choppers = tw.chopper_table(mode, wfm_delta) if mode != "white" else {}
     res = tw.tof_run(choppers, distance, neutrons=neutrons, seed=seed)
+    import matplotlib.transforms as mtransforms
+    from matplotlib.ticker import FuncFormatter
     if ax is None:
         _, ax = plt.subplots(figsize=(9, 5))
+    fig = ax.figure
+    before = set(fig.axes)
     res.plot(visible_rays=600, blocked_rays=3000, ax=ax)
+    # Readability: tof writes one label per chopper, on top of each other where choppers are paired (WFM 1-2, FO + BP,
+    # T0 alpha-beta). They are replaced by one short label per group, spread vertically, on the empty right side.
+    for t in list(ax.texts):
+        if t.get_text() not in ("detector", "Pulse"):
+            t.remove()
+    groups = []
+    for c in sorted(choppers.values(), key=lambda c: c["distance"]):
+        if groups and c["distance"] - groups[-1][0] < 1.0:
+            groups[-1][1].append(_short_name(c["name"]))
+        else:
+            groups.append([c["distance"], [_short_name(c["name"])]])
+    y_prev = -np.inf
+    tr = mtransforms.blended_transform_factory(ax.transAxes, ax.transData)
+    for d, names in groups:
+        y = max(d, y_prev + 2.3)                      # at least 2.3 m between two labels
+        ax.text(0.98, y, " + ".join(names) + f"  ({d:.1f} m)", transform=tr, ha="right", va="center", fontsize=7,
+                bbox=dict(boxstyle="round,pad=0.15", fc="white", ec="none", alpha=0.85))
+        y_prev = y
+    ax.xaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v / 1000:g}"))
+    ax.set_xlabel("Time [ms]")
+    for cax in set(fig.axes) - before:                # colour bar: tof places its label over the plot -> short title
+        cax.set_ylabel("")
+        cax.set_title("λ [Å]", fontsize=9)
     label = {"wfm": f"WFM, δ = {wfm_delta:.2f} m", "natural": "natural (band-pass + T0)", "white": "white beam (no chopper)"}
     ax.set_title(f"Time–distance diagram\n{label[mode]}")
-    ax.tick_params(axis="x", labelrotation=30)
     return ax
+
+
+def _short_name(name):
+    """Short chopper names for the diagrams: wfmc_1 -> WFM 1, fo_chopper_3 -> FO 3, bp_chopper2 -> BP 2, ..."""
+    n = name.lower()
+    if n.startswith("wfm"):
+        return "WFM " + n[-1]
+    if n.startswith("fo"):
+        return "FO " + n[-1]
+    if n.startswith("bp"):
+        return "BP " + ("1" if "1" in n else "2")
+    if n.startswith("t0"):
+        return "T0 " + ("α" if "alpha" in n else "β")
+    return name
 
 
 def interleaved_order(n):

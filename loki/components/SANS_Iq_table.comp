@@ -1,0 +1,134 @@
+/*******************************************************************************
+* Component: SANS_Iq_table
+*
+* %I
+* Written by: ACCESS training (DTU Energy), 2026
+* Origin: DTU
+*
+* Isotropic small-angle scatterer in ABSOLUTE units, from a tabulated
+* differential cross-section dSigma/dOmega(Q) [cm^-1 sr^-1].
+*
+* %D
+* Box-shaped sample (xwidth x yheight x zdepth), single scattering.
+* Each neutron that hits the sample is either
+*  - scattered (probability p_scatter): scattering point uniform along the path,
+*    scattering angle 2theta sampled log-uniformly in [tth_min, tth_max] around
+*    the incoming direction (so that small and large angles both get rays),
+*    azimuth uniform. Weight factor:
+*       l_full * dSigma/dOmega(Q) * (dOmega / pdf) * exp(-mu (l_in + l_out)) / p_scatter
+*    with dOmega/pdf = 2 pi sin(2theta) 2theta ln(tth_max/tth_min);
+*  - transmitted (probability 1 - p_scatter): straight on, weight
+*       exp(-mu * l_full) / (1 - p_scatter).
+* mu [1/m] = mu_abs * lambda / 1.798 + mu_rem  (absorption + other removal, e.g. incoherent).
+* The tabulated curve is interpolated linearly in log(Q)-log(I); a flat term iflat
+* [cm^-1 sr^-1] (incoherent background) is added. Outside the table: constant extrapolation.
+* The removal of neutrons by the small-angle scattering itself is NOT included in mu
+* (it is a few % for the samples of this series; see notebook 03).
+*
+* %P
+* Iq_file:   []           two columns: Q [1/AA], dSigma/dOmega [cm^-1 sr^-1]
+* xwidth:    [m]          sample width
+* yheight:   [m]          sample height
+* zdepth:    [m]          sample thickness
+* mu_abs:    [1/m]        macroscopic absorption cross-section at 1.798 AA
+* mu_rem:    [1/m]        wavelength-independent removal (incoherent scattering ...)
+* iflat:     [cm^-1/sr]   flat background added to the table
+* tth_min:   [deg]        smallest scattering angle simulated
+* tth_max:   [deg]        largest scattering angle simulated
+* p_scatter: [1]          fraction of rays sent into the scattering branch
+*
+* %E
+*******************************************************************************/
+DEFINE COMPONENT SANS_Iq_table
+
+SETTING PARAMETERS (string Iq_file = "Iq.dat", xwidth = 0.01, yheight = 0.01, zdepth = 0.001,
+  mu_abs = 0.0, mu_rem = 0.0, iflat = 0.0, tth_min = 0.05, tth_max = 60.0, p_scatter = 0.9)
+
+SHARE
+%{
+  %include "read_table-lib"
+%}
+
+DECLARE
+%{
+  t_Table table;
+  double lq_min;
+  double lq_max;
+%}
+
+INITIALIZE
+%{
+  if (Table_Read (&table, Iq_file, 0) <= 0 || table.columns < 2) {
+    fprintf (stderr, "SANS_Iq_table %s: cannot read %s\n", NAME_CURRENT_COMP, Iq_file);
+    exit (-1);
+  }
+  lq_min = log (Table_Index (table, 0, 0));
+  lq_max = log (Table_Index (table, table.rows - 1, 0));
+%}
+
+TRACE
+%{
+  double t0, t1, t2, t3, v, l_full, l_in, l_out, lam, mu, dt;
+  double ux, uy, uz, ax, ay, az, e1x, e1y, e1z, e2x, e2y, e2z, n;
+  double tth, phi, s, c, q, lq, dsdo, i0, i1, q0, q1;
+  int i;
+
+  if (box_intersect (&t0, &t1, x, y, z, vx, vy, vz, xwidth, yheight, zdepth)) {
+    if (t0 < 0) ABSORB;
+    v = sqrt (vx * vx + vy * vy + vz * vz);
+    l_full = v * (t1 - t0);
+    lam = 2 * PI / (V2K * v);
+    mu = mu_abs * lam / 1.798 + mu_rem;
+
+    if (rand01 () < p_scatter) {
+      dt = rand01 () * (t1 - t0) + t0;
+      PROP_DT (dt);
+      l_in = v * (dt - t0);
+      /* orthonormal basis (u, e1, e2) around the incoming direction u */
+      ux = vx / v; uy = vy / v; uz = vz / v;
+      if (fabs (ux) < 0.9) { ax = 1; ay = 0; az = 0; } else { ax = 0; ay = 1; az = 0; }
+      vec_prod (e1x, e1y, e1z, ax, ay, az, ux, uy, uz);
+      n = sqrt (e1x * e1x + e1y * e1y + e1z * e1z);
+      e1x /= n; e1y /= n; e1z /= n;
+      vec_prod (e2x, e2y, e2z, ux, uy, uz, e1x, e1y, e1z);
+      /* scattering angle: log-uniform in [tth_min, tth_max] */
+      tth = DEG2RAD * tth_min * exp (rand01 () * log (tth_max / tth_min));
+      phi = 2 * PI * rand01 ();
+      s = sin (tth); c = cos (tth);
+      vx = v * (c * ux + s * (cos (phi) * e1x + sin (phi) * e2x));
+      vy = v * (c * uy + s * (cos (phi) * e1y + sin (phi) * e2y));
+      vz = v * (c * uz + s * (cos (phi) * e1z + sin (phi) * e2z));
+      /* momentum transfer and tabulated cross-section (log-log interpolation) */
+      q = 4 * PI / lam * sin (tth / 2);
+      lq = log (q);
+      if (lq <= lq_min) dsdo = Table_Index (table, 0, 1);
+      else if (lq >= lq_max) dsdo = Table_Index (table, table.rows - 1, 1);
+      else {
+        i = 1;
+        while (i < table.rows - 1 && Table_Index (table, i, 0) < q) i++;
+        q0 = log (Table_Index (table, i - 1, 0)); q1 = log (Table_Index (table, i, 0));
+        i0 = Table_Index (table, i - 1, 1); i1 = Table_Index (table, i, 1);
+        if (i0 > 0 && i1 > 0)
+          dsdo = exp (log (i0) + (lq - q0) * (log (i1) - log (i0)) / (q1 - q0));
+        else
+          dsdo = i0 + (lq - q0) * (i1 - i0) / (q1 - q0);
+      }
+      dsdo += iflat;
+      /* path to the sample surface along the new direction */
+      l_out = 0;
+      if (box_intersect (&t2, &t3, x, y, z, vx, vy, vz, xwidth, yheight, zdepth) && t3 > 0)
+        l_out = v * t3;
+      p *= l_full * (100.0 * dsdo) * 2 * PI * s * tth * log (tth_max / tth_min) * exp (-mu * (l_in + l_out)) / p_scatter;
+      SCATTER;
+    } else {
+      p *= exp (-mu * l_full) / (1 - p_scatter);
+    }
+  }
+%}
+
+MCDISPLAY
+%{
+  box (0, 0, 0, xwidth, yheight, zdepth, 0, 0, 1, 0);
+%}
+
+END

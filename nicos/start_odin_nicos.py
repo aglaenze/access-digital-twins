@@ -5,7 +5,7 @@
     python start_odin_nicos.py --session my_group --mode mcstas
     python start_odin_nicos.py --no-gui --background    # services only, no console needed (stop the process to end)
 
-Two Python environments are used, on purpose: the twin (McStas, essimaging, numpy 2) in the conda env "mcstas", NICOS
+Two Python environments are used, on purpose: the twin (McStas, essimaging, numpy 2) in the Python running this launcher, NICOS
 (numpy < 2) in the conda env "nicos". They talk over HTTP on this computer only. Press Enter (or Ctrl+C) to stop all.
 Paths can be changed with the environment variables CONDA_ROOT, MCSTAS_PYTHON, NICOS_PYTHON, NICOS_ROOT,
 TWIN_RUN_ROOT.
@@ -22,15 +22,17 @@ import urllib.request
 HERE = os.path.dirname(os.path.abspath(__file__))
 TWIN = os.path.dirname(HERE)
 HOME = os.path.expanduser("~")
-CONDA = os.environ.get("CONDA_ROOT", os.path.join(HOME, "AppData", "Local", "miniforge3") if os.name == "nt"
-                       else os.path.join(HOME, "miniforge3"))
+# conda installation holding the "nicos" environment: CONDA_ROOT, else the one of the Python running this launcher
+_here = os.path.dirname(os.path.dirname(sys.prefix)) if os.path.basename(os.path.dirname(sys.prefix)) == "envs" else sys.prefix
+CONDA = os.environ.get("CONDA_ROOT", _here)
 
 
 def conda_python(env):
     return os.path.join(CONDA, "envs", env, "python.exe" if os.name == "nt" else os.path.join("bin", "python"))
 
 
-MCSTAS_PY = os.environ.get("MCSTAS_PYTHON", conda_python("mcstas"))
+# The twin server runs with the Python of this launcher (start it from the activated twin environment)
+MCSTAS_PY = os.environ.get("MCSTAS_PYTHON", sys.executable)
 NICOS_PY = os.environ.get("NICOS_PYTHON", conda_python("nicos"))
 NICOS_ROOT = os.environ.get("NICOS_ROOT", os.path.join(HOME, "McStas_runs", "nicos_src"))
 RUN_ROOT = os.environ.get("TWIN_RUN_ROOT", os.path.join(HOME, "McStas_runs", "twin")).replace(os.sep, "/")

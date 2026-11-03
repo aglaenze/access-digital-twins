@@ -5,6 +5,7 @@ __pycache__/
 
 # McStas instruments written and compiled at run time
 odin/build/
+loki/build/
 
 # Results live outside the repository (TWIN_RUN_ROOT)
 *.nxs

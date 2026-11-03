@@ -34,9 +34,12 @@ def step(title):
 step("tools")
 for exe in ("mcrun", "mpiexec", "h5repack"):
     check(shutil.which(exe), f"{exe} found: {shutil.which(exe)}")
-nicos_py = os.path.join(os.environ.get("CONDA_ROOT", "/opt/conda"), "envs", "nicos", "bin", "python")
-r = subprocess.run([nicos_py, "-c", "import nicos, nicospyctl, numpy; print(nicos.__version__, numpy.__version__)"],
-                   cwd=os.environ.get("NICOS_ROOT", "."), capture_output=True, text=True)
+NO_NICOS = "--no-nicos" in sys.argv                    # python container/smoke_test.py --no-nicos: twin only
+conda_root = os.environ.get("CONDA_ROOT", os.path.dirname(os.path.dirname(sys.prefix)))
+nicos_py = os.path.join(conda_root, "envs", "nicos", "python.exe" if os.name == "nt" else os.path.join("bin", "python"))
+r = subprocess.CompletedProcess([], 0, "skipped (--no-nicos)", "") if NO_NICOS else subprocess.run([nicos_py, "-c", "import nicos, nicospyctl, numpy; print(nicos.__version__, numpy.__version__)"],
+                   cwd=os.environ.get("NICOS_ROOT", os.path.join(os.path.expanduser("~"), "McStas_runs", "nicos_src")),
+                   capture_output=True, text=True)
 check(r.returncode == 0, f"NICOS environment: {r.stdout.strip() or r.stderr.strip()[-300:]}")
 
 step("upstream part")
@@ -71,6 +74,9 @@ print(f"transmission 2.2–3.8 Å: measured {np.mean(T):.3f}, NCrystal {np.mean(
 check(abs(dev) < 0.03, f"iron plate transmission agrees with NCrystal (difference {dev:+.3f})")
 
 step("NICOS services (headless)")
+if NO_NICOS:
+    print("skipped (--no-nicos)")
+    sys.exit(0 if ok else 1)
 p = subprocess.Popen([sys.executable, os.path.join(TWIN, "nicos", "start_odin_nicos.py"), "--no-gui", "--background",
                       "--session", "ci_nicos"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
 ready, lines, t0 = False, [], time.time()
@@ -84,7 +90,17 @@ while time.time() - t0 < 300:
         ready = True
         break
 check(ready, "NICOS cache, poller and daemon started with the twin server")
-p.send_signal(signal.SIGINT)
+if ready:   # a measurement driven through NICOS, as a student would do (login student / student)
+    r = subprocess.run([nicos_py, os.path.join(TWIN, "nicos", "run_nicos_script.py"), "-c",
+                        "move(choppers, 'wfm', wfm_delta, 0.1); move(shutter, 'open', stage_x, 500); "
+                        "det.title = 'open beam via NICOS'; count(t=5)"],
+                       capture_output=True, text=True, timeout=900)
+    print("  " + r.stdout.replace("\n", "\n  ") + r.stderr[-2000:], flush=True)
+    check(r.returncode == 0 and "file written" in r.stdout, "measurement driven through NICOS (file written)")
+if os.name == "nt":                                  # Windows: no SIGINT; stop the whole process tree
+    subprocess.run(["taskkill", "/T", "/F", "/PID", str(p.pid)], capture_output=True)
+else:
+    p.send_signal(signal.SIGINT)
 try:
     p.wait(60)
 except subprocess.TimeoutExpired:
