@@ -1,0 +1,104 @@
+/*******************************************************************************
+* Component: Graphite_Diffuser_focus
+*
+* Same physics as Graphite_Diffuser (ODIN_instr localcomps): small-angle broadening
+* of the beam by a graphite diffuser, with an angular width that grows as lambda^2,
+* and the same absorption factor.
+*
+* Variance reduction (importance sampling) for imaging with a small field of view:
+* the outgoing direction is drawn from a MIXTURE of
+*   - the physical distribution of the original component (probability f_phys), and
+*   - a uniform distribution of aiming points on a rectangle (focus_xw x focus_yh)
+*     centred on the beam axis at a distance focus_z downstream (probability 1 - f_phys).
+* The neutron weight is multiplied by p_phys / q_mix, so all tallies stay unbiased
+* (q_mix > 0 wherever p_phys > 0, and the weight factor is bounded by 1/f_phys).
+*
+* Physical angular distribution (small angles), as in Graphite_Diffuser:
+*   deflection vector d = theta (cos a, sin a), theta ~ N(0, s), a uniform in [0, 2 pi)
+*   with s = 0.5 * std [deg], std = lambda^2 (0.5908 * path + 0.002874242).
+*   => density in the 2D angle plane: p(d) = phi(|d|/s) / (pi s |d|), phi = N(0,1) pdf.
+* Aiming density in the same angle plane: u(d) = focus_z'^2 / (focus_xw * focus_yh)
+* inside the rectangle (focus_z' = distance from the interaction point), 0 outside.
+*
+* Parameters:
+*   xwidth, ywidth, thick, abs : as in Graphite_Diffuser
+*   focus_xw, focus_yh [m]     : size of the aiming rectangle
+*   focus_z [m]                : distance of the aiming rectangle from the diffuser entrance
+*   f_phys                     : minimum probability of using the physical distribution (0 < f_phys <= 1).
+*                                The probability actually used is max(f_phys, min(0.95, P0)), where
+*                                P0 = erf(a / (s sqrt 2)) estimates the fraction of the physical distribution
+*                                that already reaches the rectangle (a = equivalent-disc radius in angle).
+*                                Any choice keeps the result unbiased (the mixture density is recomputed).
+*******************************************************************************/
+DEFINE COMPONENT Graphite_Diffuser_focus
+SETTING PARAMETERS (xwidth=0.1, ywidth=0.1, thick=0.01, abs=1,
+                    focus_xw=0.02, focus_yh=0.02, focus_z=10.0, f_phys=0.1)
+SHARE
+%{
+  double GDF_gauss(double sigma, _class_particle* _particle)
+  {
+    double r1 = rand01(), r2 = rand01();
+    if (r1 < 1e-100) r1 = 1e-100;
+    return sigma * sqrt(-2 * log(r1)) * cos(6.2831853071795864769252866 * r2);
+  }
+  /* density of the physical deflection in the 2D small-angle plane (rad^-2) */
+  double GDF_pdf(double dx, double dy, double s)
+  {
+    double r = sqrt(dx * dx + dy * dy);
+    if (r < 1e-12) r = 1e-12;
+    return exp(-0.5 * r * r / (s * s)) / sqrt(2 * PI) / (PI * s * r);
+  }
+%}
+TRACE
+%{
+  double V2, V, L2, T, r, dt, eff_thick, std, s, sx0, sy0, sx1, sy1, dx, dy, pp, qq, zt, tx, ty, ux, uy, inside, f, a_eq;
+  PROP_Z0;
+  V2 = vx * vx + vy * vy + vz * vz;
+  V = sqrt(V2);
+  L2 = 15650205.135673 / V2;               /* lambda^2 [AA^2] */
+  T = thick / vz;
+  r = rand01();
+  dt = T * r;
+  PROP_DT(dt);                             /* random interaction depth, as in the original */
+  SCATTER;
+  eff_thick = V * T;
+  std = L2 * (0.5908 * eff_thick + 0.002874242);
+  s = DEG2RAD * 0.5 * std;                 /* [rad] */
+  sx0 = vx / vz; sy0 = vy / vz;            /* incoming slopes */
+  zt = focus_z - z;                        /* distance from the interaction point to the aiming plane */
+  a_eq = sqrt(focus_xw * focus_yh / PI) / zt;
+  f = erf(a_eq / (s * sqrt(2.0)));
+  if (f > 0.95) f = 0.95;
+  if (f < f_phys) f = f_phys;
+  if (rand01() < f) {
+    /* physical branch: same sampling as Graphite_Diffuser (small-angle form) */
+    double theta = GDF_gauss(s, _particle), a = 2 * PI * rand01();
+    sx1 = sx0 + tan(theta) * cos(a);
+    sy1 = sy0 + tan(theta) * sin(a);
+  } else {
+    /* focused branch: aim at a uniform point of the rectangle */
+    tx = (rand01() - 0.5) * focus_xw;
+    ty = (rand01() - 0.5) * focus_yh;
+    sx1 = (tx - x) / zt;
+    sy1 = (ty - y) / zt;
+  }
+  dx = sx1 - sx0; dy = sy1 - sy0;
+  pp = GDF_pdf(dx, dy, s);
+  ux = x + sx1 * zt; uy = y + sy1 * zt;    /* where this direction crosses the aiming plane */
+  inside = (fabs(ux) <= focus_xw / 2 && fabs(uy) <= focus_yh / 2) ? 1.0 : 0.0;
+  qq = f * pp + (1 - f) * inside * zt * zt / (focus_xw * focus_yh);
+  /* new velocity: same speed (elastic), new direction */
+  {
+    double n = sqrt(sx1 * sx1 + sy1 * sy1 + 1.0);
+    vz = V / n; vx = sx1 * vz; vy = sy1 * vz;
+  }
+  p *= pp / qq;                            /* importance weight factor (<= 1/f) */
+  if (abs == 1) p *= exp(-eff_thick * 0.030004501);   /* absorption, as in the original */
+  dt = T * (1 - r);                        /* finish propagation, as in the original */
+  PROP_DT(dt);
+%}
+MCDISPLAY
+%{
+  rectangle("xy", 0, 0, 0, xwidth, ywidth);
+%}
+END

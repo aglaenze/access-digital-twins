@@ -1,0 +1,215 @@
+"""Hybrid mode of the ODIN digital twin: counting times as long as on the real instrument.
+
+Why: the real ODIN counts ~10⁵ neutrons/s in 6 mm × 6 mm. Drawing each count from a McStas event ("mcstas" mode of
+odin_virtual) reuses the same simulated neutrons after a few tenths of a second at short λ (see README, mc_factor).
+Here we separate what McStas must compute from what can be computed exactly.
+
+Open beam, in the detector field of view:
+    I_O(x, y, t, λ) = S(t, λ) · a(λ) · f(x, y)
+  * S(t, λ): ALL neutrons of the McStas upstream part (guide exit) that pass the pinhole D, with their arrival time
+    at the detector (free flight from the guide exit; the diffuser is elastic and deflects by a few degrees at most:
+    path lengthening < 10⁻³, neglected). ~2·10⁷ distinct neutrons for the 1e10 upstream file;
+  * a(λ): fraction of these neutrons reaching the field of view (diffuser, divergence): ratio between the full McStas
+    simulation of the open beam (focused diffuser) and S, smoothed by a spline (χ²/n ≈ 1);
+  * f(x, y): spatial profile in the field of view, fitted (degree-2 polynomial) on the same simulation.
+Sample (attenuation of the direct beam, Beer-Lambert law):
+    T(x, y, λ) = exp(-Σ_i Σ_tot,i(λ) · L_i(x, y)),
+  Σ_tot,i: total macroscopic cross-section of material i (NCrystal, same files as in McStas);
+  L_i: path length through volume i along the beam (geometry, stage translation and rotation).
+
+Neglected (but included in "mcstas" mode): neutrons scattered by the sample that still reach the detector, and the
+variation of the spectrum with position in the field of view.
+Noise: the Monte Carlo noise of S is the same in the sample and open-beam measurements and cancels in the
+transmission E/O. Otherwise counts follow a true Poisson law.
+"""
+import os
+
+import numpy as np
+
+import odin_paths  # noqa: F401  (sets sys.path)
+import odin_mcstas as tw
+
+H_OVER_M = 3956.034            # m·Å/s
+Z_DET = tw.Z_SAMPLE + tw.DET_DIST
+
+
+# --------------------------------------------------------------------------- open beam
+def pinhole_spectrum(front_mcpl, D, cache_dir):
+    """S: upstream neutrons passing the square pinhole D (at Z_PINHOLE), with t at the detector. Cached .npz."""
+    name = os.path.join(cache_dir, f"S_D{D:.3f}.npz")
+    if os.path.isfile(name):
+        z = np.load(name)
+        return {k: z[k] for k in z.files}
+    fr = tw.read_mcpl(front_mcpl, light=False)
+    dzp = tw.Z_PINHOLE - fr["z"]
+    xp = fr["x"] + fr["ux"] / fr["uz"] * dzp
+    yp = fr["y"] + fr["uy"] / fr["uz"] * dzp
+    ok = (np.abs(xp) <= D / 2) & (np.abs(yp) <= D / 2)
+    lam = fr["lam"][ok].astype(np.float64)
+    v = H_OVER_M / lam
+    t_det = fr["t"][ok] + (Z_DET - fr["z"][ok]) / (v * fr["uz"][ok])
+    S = dict(t=t_det, lam=lam.astype(np.float32), w=fr["w"][ok].astype(np.float64))
+    os.makedirs(cache_dir, exist_ok=True)
+    np.savez(name, **S)
+    return S
+
+
+def fit_acceptance(S, events_ob, field, lam_edges=np.arange(1.0, 9.0001, 0.1)):
+    """a(λ) = (McStas intensity in the field of view) / (intensity of S), smoothed: cubic spline of log a weighted by
+    the Monte Carlo noise, smoothing set for χ²/n ≈ 1 (s = number of points). Returns (spline tck, diagnostics)."""
+    from scipy.interpolate import splrep, splev
+    x0, x1, y0, y1 = field
+    num = np.zeros(len(lam_edges) - 1); var = np.zeros_like(num)
+    for e in tw.iter_mcpl(events_ob, light=True):
+        s = (e["x"] >= x0) & (e["x"] < x1) & (e["y"] >= y0) & (e["y"] < y1)
+        w = e["w"][s].astype(float)
+        a, _ = np.histogram(e["lam"][s], lam_edges, weights=w)
+        b, _ = np.histogram(e["lam"][s], lam_edges, weights=w * w)
+        num += a; var += b
+    den, _ = np.histogram(S["lam"], lam_edges, weights=S["w"])
+    ok = (num > 0) & (den > 0)
+    lc = 0.5 * (lam_edges[1:] + lam_edges[:-1])
+    r = num[ok] / den[ok]
+    sig_log = np.sqrt(var[ok]) / num[ok]                           # relative error = error on log r
+    tck = splrep(lc[ok], np.log(r), w=1 / sig_log, s=float(ok.sum()))
+    resid = (np.log(r) - splev(lc[ok], tck)) / sig_log
+    return tck, dict(lc=lc[ok], a_mc=r, sig_rel=sig_log, a_fit=np.exp(splev(lc[ok], tck)),
+                     chi2n=float(np.mean(resid ** 2)), n=int(ok.sum()), knots=len(tck[0]))
+
+
+def fit_profile(events_ob, field, n=14):
+    """f(x, y) = 1 + c·(x, y, x², y², xy), normalised, fitted on the McStas intensity (n × n grid)."""
+    x0, x1, y0, y1 = field
+    xe, ye = np.linspace(x0, x1, n + 1), np.linspace(y0, y1, n + 1)
+    h = np.zeros((n, n)); v = np.zeros((n, n))
+    for e in tw.iter_mcpl(events_ob, light=True):
+        w = e["w"].astype(float)
+        a, _, _ = np.histogram2d(e["x"], e["y"], [xe, ye], weights=w)
+        b, _, _ = np.histogram2d(e["x"], e["y"], [xe, ye], weights=w * w)
+        h += a; v += b
+    X, Y = np.meshgrid(0.5 * (xe[1:] + xe[:-1]), 0.5 * (ye[1:] + ye[:-1]), indexing="ij")
+    A = np.c_[np.ones(X.size), X.ravel(), Y.ravel(), X.ravel() ** 2, Y.ravel() ** 2, (X * Y).ravel()]
+    sw = 1 / np.sqrt(v.ravel())
+    c, *_ = np.linalg.lstsq(A * sw[:, None], h.ravel() * sw, rcond=None)
+    c = c / c[0]
+    model = A @ c
+    resid = (h.ravel() - model * h.sum() / model.sum()) * sw
+    return c, dict(chi2n=float(np.mean(resid ** 2)), variation=float(model.max() / model.min() - 1))
+
+
+def profile(c, x, y):
+    return c[0] + c[1] * x + c[2] * y + c[3] * x * x + c[4] * y * y + c[5] * x * y
+
+
+# --------------------------------------------------------------------------- sample
+def box_path_length(x, y, centre, dims, rot_deg):
+    """Path length (m) through a box (dims = width x, height y, thickness z) rotated by rot_deg about the vertical axis
+    (y) and centred at `centre`, for rays parallel to the beam axis (z) passing at (x, y). Slab method in the box
+    frame. Convention: a point (x, z) of the box frame appears at x·cos θ + z·sin θ in the lab frame."""
+    th = np.radians(rot_deg)
+    c, s = np.cos(th), np.sin(th)
+    # Ray: origin (x, y, -1), direction (0, 0, 1), expressed in the box frame (inverse rotation)
+    ox, oy, oz = x - centre[0], y - centre[1], -1.0 - centre[2]
+    ox_b, oz_b = c * ox - s * oz, s * ox + c * oz
+    dx_b, dz_b = -s, c
+    tmin = np.full(np.shape(x), -np.inf); tmax = np.full(np.shape(x), np.inf)
+    for o, d, h in ((ox_b, dx_b, dims[0] / 2), (oz_b, dz_b, dims[2] / 2)):
+        if abs(d) < 1e-15:
+            tmin = np.where(np.abs(o) <= h, tmin, np.inf)
+        else:
+            t1, t2 = (-h - o) / d, (h - o) / d
+            tmin = np.maximum(tmin, np.minimum(t1, t2)); tmax = np.minimum(tmax, np.maximum(t1, t2))
+    tmin = np.where(np.abs(oy) <= dims[1] / 2, tmin, np.inf)
+    return np.clip(tmax - tmin, 0, None)
+
+
+def sigma_tot(cfg, lam):
+    """Σ_tot(λ) in m⁻¹ (NCrystal gives cm⁻¹)."""
+    return 100.0 * tw.sigma_tot(cfg, np.asarray(lam, dtype=float))
+
+
+def volumes_transmission(volumes, stage_x, stage_rot, lam_grid=np.linspace(0.3, 20.0, 4000)):
+    """Function T(x, y, λ) for a sample made of boxes [(NCrystal cfg, centre (m), dims (m)), ...], centres given with
+    respect to the rotation-stage axis; the stage is translated by stage_x then rotated by stage_rot (degrees) about
+    the vertical axis. Σ_tot(λ) is interpolated on a grid covering all chopper modes (NCrystal called once)."""
+    th = np.radians(stage_rot)
+    c, s = np.cos(th), np.sin(th)
+    vols = []
+    for cfg, (cx, cy, cz), dims in volumes:
+        centre = (stage_x + c * cx + s * cz, cy, -s * cx + c * cz)
+        vols.append((sigma_tot(cfg, lam_grid), centre, dims))
+
+    def T(x, y, lam):
+        mu = np.zeros(len(x))
+        for sig, centre, dims in vols:
+            L = box_path_length(x, y, centre, dims, stage_rot)
+            k = L > 0
+            mu[k] += np.interp(lam[k], lam_grid, sig) * L[k]
+        return np.exp(-mu)
+    return T
+
+
+# --------------------------------------------------------------------------- drawing counts
+class HybridModel:
+    """Open beam of one configuration (upstream file, D, diffuser): S, a(λ), f(x, y). Built once, then reused."""
+
+    def __init__(self, front_mcpl, D, events_ob, field, cache_dir, lam=(1.0, 9.0)):
+        from scipy.interpolate import splev
+        self.field, self.D = field, D
+        self.S = pinhole_spectrum(front_mcpl, D, cache_dir)
+        name = os.path.join(cache_dir, f"model_D{D:.3f}_{os.path.basename(os.path.dirname(events_ob))}.npz")
+        if os.path.isfile(name):
+            z = np.load(name, allow_pickle=True)
+            self.c_a, self.c_f, self.diag = tuple(z["c_a"]), z["c_f"], z["diag"].item()
+        else:
+            self.c_a, da = fit_acceptance(self.S, events_ob, field, lam_edges=np.arange(lam[0], lam[1] + 1e-4, 0.1))
+            self.c_f, df = fit_profile(events_ob, field)
+            self.diag = dict(acceptance=da, profile=df)
+            np.savez(name, c_a=np.array(self.c_a, dtype=object), c_f=self.c_f, diag=np.array(self.diag, dtype=object))
+        lamS = self.S["lam"].astype(float)
+        lo, hi = self.diag["acceptance"]["lc"][[0, -1]]
+        self.r = self.S["w"] * np.exp(splev(np.clip(lamS, lo, hi), self.c_a))   # intensity (n/s) in the field
+
+    def rate(self, lam_abs=8.0):
+        """Expected count rate of the open beam in the field of view [counts/s] (detector efficiency included)."""
+        from odin_nexus import efficiency
+        return float((self.r * efficiency(self.S["lam"].astype(float), lam_abs)).sum())
+
+    def counts(self, t_exp, transmission=None, lam_abs=8.0, blur_m=0.1e-3, background=0.05, background_pixel=1e-3,
+               beam_factor=1.0, rng=None):
+        """Counts measured during t_exp: same output as odin_nexus.sample_counts (x, y, t, lam).
+
+        transmission(x, y, lam) -> T: attenuation by the sample at (x, y) in the sample plane (None: open beam).
+        Then the L/D geometric blur (the neutron starts from a point of the pinhole, drawn uniformly over D × D, and
+        flies DET_DIST further to the detector), then the scintillator blur.
+        """
+        from odin_nexus import efficiency, _background
+        rng = rng or np.random.default_rng()
+        lamS = self.S["lam"].astype(float)
+        m = self.r * efficiency(lamS, lam_abs) * t_exp * beam_factor
+        cum = np.cumsum(m)
+        n = rng.poisson(cum[-1])
+        idx = np.searchsorted(cum, rng.uniform(0, cum[-1], n))
+        lam, t = lamS[idx], self.S["t"][idx]
+        # Position: profile f(x, y), by rejection
+        x0, x1, y0, y1 = self.field
+        fmax = 1.05 * max(profile(self.c_f, xx, yy) for xx in (x0, x1, 0) for yy in (y0, y1, 0))
+        x = rng.uniform(x0, x1, n); y = rng.uniform(y0, y1, n)
+        rej = rng.uniform(0, fmax, n) > profile(self.c_f, x, y)
+        while rej.any():
+            k = rej.sum()
+            x[rej] = rng.uniform(x0, x1, k); y[rej] = rng.uniform(y0, y1, k)
+            rej[rej] = rng.uniform(0, fmax, k) > profile(self.c_f, x[rej], y[rej])
+        if transmission is not None:
+            keep = rng.uniform(0, 1, n) < transmission(x, y, lam)
+            x, y, t, lam = x[keep], y[keep], t[keep], lam[keep]
+        n = len(x)
+        L = tw.Z_SAMPLE - tw.Z_PINHOLE
+        xs, ys = rng.uniform(-self.D / 2, self.D / 2, n), rng.uniform(-self.D / 2, self.D / 2, n)
+        out = dict(x=(x + tw.DET_DIST * (x - xs) / L + rng.normal(0, blur_m, n)).astype(np.float32),
+                   y=(y + tw.DET_DIST * (y - ys) / L + rng.normal(0, blur_m, n)).astype(np.float32),
+                   t=t, lam=lam.astype(np.float32))
+        if background > 0:
+            out = _background(out, t_exp, self.field, background, background_pixel, rng)
+        out.update(mc_factor=1.0, n_mcstas=len(lamS))
+        return out
