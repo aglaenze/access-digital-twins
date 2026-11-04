@@ -105,7 +105,7 @@ else:
                                                       "--check"], capture_output=True).returncode:
         time.sleep(2)
     jbi_home = os.environ.get("JBI_HOME", "")
-    LIVE_PROCS.append(subprocess.Popen([sys.executable, "-m", "just_bin_it.cli", "-b", "127.0.0.1:9092", "-t",
+    LIVE_PROCS.append(subprocess.Popen([sys.executable, "-c", "from just_bin_it.cli import main; main()", "-b", "127.0.0.1:9092", "-t",
                                         "test_jbi_commands", "-hb", "test_jbi_heartbeat", "-rt", "test_jbi_responses"],
                                        cwd=jbi_home, env=dict(os.environ, PYTHONPATH=jbi_home)))
     time.sleep(10)

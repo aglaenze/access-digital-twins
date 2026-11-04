@@ -134,11 +134,12 @@ def main():
     os.makedirs(LOGS, exist_ok=True)
     print(f"Starting the {instr.upper()} digital twin with NICOS:", flush=True)
     try:
-        if o.live:                 # data streaming as at ESS: Kafka broker, then just-bin-it (histograms for NICOS)
+        if o.live:                 # data streaming as at ESS: Kafka broker, then just-bin-it (histograms for NICOS); its module
+            # just_bin_it.cli defines main() without calling it (installed as a script), hence the -c
             if not port_open(9092):
                 start("kafka", [MCSTAS_PY, os.path.join(TWIN, "kafka", "start_kafka.py")], cwd=TWIN)
                 wait_for(lambda: port_open(9092), "the Kafka broker", timeout=120)
-            start("just_bin_it", [MCSTAS_PY, "-m", "just_bin_it.cli", "-b", "127.0.0.1:9092",
+            start("just_bin_it", [MCSTAS_PY, "-c", "from just_bin_it.cli import main; main()", "-b", "127.0.0.1:9092",
                                   "-t", f"{instr}_jbi_commands", "-hb", f"{instr}_jbi_heartbeat",
                                   "-rt", f"{instr}_jbi_responses", "-l", "3"],
                   env=dict(os.environ, PYTHONPATH=JBI_HOME), cwd=JBI_HOME)
