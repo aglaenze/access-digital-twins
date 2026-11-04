@@ -139,7 +139,8 @@ histograms the stream and NICOS shows the histograms filling up during the count
 python nicos/start_nicos.py --instrument odin --live
 ```
 starts a local Kafka broker (`kafka/start_kafka.py`), just-bin-it, then the usual services, and loads the setup
-`live` (`AddSetup('live')` / `RemoveSetup('live')` by hand). With it, `count(t=10)`:
+`live` (`AddSetup('live')` / `RemoveSetup('live')` by hand). The topics are created first
+(`kafka/start_kafka.py --topics odin`: just-bin-it waits for its command topic to exist). With it, `count(t=10)`:
 1. *prepare*: the twin computes the measurement and writes the NeXus file (NICOS shows "computing the measurement");
 2. *start*: the twin streams the neutrons of the file to the topic `odin_detector` in real time, 14 pulses per
    second (ESS schema `ev44`: pulse time, arrival time, pixel), while just-bin-it (devices `jbi`, `live_image`,
@@ -147,9 +148,16 @@ starts a local Kafka broker (`kafka/start_kafka.py`), just-bin-it, then the usua
    the arrival-time spectrum (with the WFM frames) fill up during the 10 s, as on the instrument.
 
 The live stream groups the Timepix3 pixels in blocks of 32 × 32 (128 × 128 superpixels), so that the histograms stay
-small; the files keep the full pixels. Checked on 2026-11-04: a 5 s count streamed in 4.95 s, 70 pulses 71.43 ms
-apart, all its 2 702 832 neutrons in Kafka; the container test (`container/smoke_test.py`) checks that the
-histograms of just-bin-it hold all the streamed neutrons. Not reproduced: the ESS file-writer (the twin writes the
+small; the files keep the full pixels. How the count is synchronized: just-bin-it (`jbi`, listed first among the
+detectors) is configured with an explicit time window, from 0.5 s before the count to 0.5 s after its end
+(`nicos_twin.devices.TwinJustBinItDetector`; with the plain "interval" of the ESS device, just-bin-it starts the
+window when it reads the command, after the first pulses), and the twin keeps streaming empty pulses for 1.5 s after
+the measurement, as a real detector streams all the time, so that just-bin-it sees the end of its window at once.
+
+Checked on 2026-11-04 (Windows, NICOS GUI): a 10 s count of the iron plate fills the live image (plate visible) and
+the arrival-time spectrum during the 10 s; at the end the live image, the live spectrum and the file hold the same
+4 303 935 neutrons (open beam: 5 405 196, also identical). The container test (`container/smoke_test.py`) checks
+that the histograms of just-bin-it hold all the streamed neutrons. Not reproduced: the ESS file-writer (the twin writes the
 file itself, before streaming), the EPICS forwarder (device values are not streamed).
 
 Installation (route B, Windows): Java (`conda create -n kafka -c conda-forge openjdk=21`), Apache Kafka 3.9.1

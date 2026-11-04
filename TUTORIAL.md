@@ -231,6 +231,11 @@ Answer `1` (ODIN). After ~30 s the NICOS window of ESS opens. Log in with user *
 
 To stop: press Enter in the terminal where you started NICOS.
 
+**Live data, as at ESS** (ODIN): start with `python nicos\start_nicos.py --instrument odin --live` (needs Kafka and
+just-bin-it, installed as in `nicos/README.md`, "Live data"). A count then takes its real time, and during it the tab
+**Detector image** shows the image and the spectrum of the arrival times filling up (panels `live_image` and
+`live_tof`), as on the real instrument where the neutrons are streamed by Kafka and histogrammed by just-bin-it.
+
 ### With text commands (route A, in the container; no graphical interface yet)
 Terminal 1 (JupyterLab terminal):
 ```
@@ -313,7 +318,8 @@ data = read(f)               # {"front": (Q, I, dI), "middle": ..., "rear": ...}
 ```
 **Console**: as in part 3, with `python twin_server.py --instrument loki --session my_first_sans` in terminal 1;
 devices `heavy_shutter`, `shutter`, `collimation` (`3m`, `5m`, `8m`), `pulse_skipping` (`off`, `on`: choppers at
-7 Hz, wavelength band 3–21.4 Å, with `3m` only), `detector_distance` (5 or 10 m), `sample`. `status()` also shows the
+7 Hz, wavelength band 3–21.4 Å, with `3m` only), `detector_distance` (5 or 10 m; 10 m only with `8m`: with a wider wavelength band the neutrons of one pulse
+would overlap with those of the next one, "frame overlap", and the twin refuses it with the explanation), `sample`. `status()` also shows the
 chopper speeds and delays, which follow the configuration.
 
 **NICOS**: `python nicos\start_nicos.py`, answer `2` (LoKI). The window is the one of the real LoKI. In the

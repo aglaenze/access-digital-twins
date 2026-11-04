@@ -3,6 +3,7 @@ ESS: the detector of the twin publishes its neutrons on it, just-bin-it histogra
 
     python kafka/start_kafka.py                # foreground; Ctrl+C stops it
     python kafka/start_kafka.py --check        # only checks that a broker answers on localhost:9092
+    python kafka/start_kafka.py --topics odin  # creates the topics of an instrument (broker running)
 
 Needs Apache Kafka (3.9, Scala 2.13) and Java (≥ 17):
   * KAFKA_HOME: Kafka folder (default ~/McStas_runs/kafka_2.13-3.9.1), from
@@ -65,6 +66,24 @@ def cluster_id():
     return base64.urlsafe_b64encode(uuid.uuid4().bytes).decode().rstrip("=")
 
 
+def topics(instrument):
+    """Kafka topics of an instrument twin: detector stream, just-bin-it commands, heartbeat, responses, histograms."""
+    return [f"{instrument}_{t}" for t in ("detector", "jbi_commands", "jbi_heartbeat", "jbi_responses",
+                                          "visualisation")]
+
+
+def create_topics(names, brokers=f"127.0.0.1:{PORT}"):
+    """Creates the topics that do not exist yet, one partition each (just-bin-it waits for its command topic to
+    exist and needs single-partition topics). Returns the names created."""
+    from confluent_kafka.admin import AdminClient, NewTopic
+    admin = AdminClient({"bootstrap.servers": brokers})
+    existing = set(admin.list_topics(timeout=20).topics)
+    new = [NewTopic(n, num_partitions=1, replication_factor=1) for n in names if n not in existing]
+    for name, f in (admin.create_topics(new) if new else {}).items():
+        f.result(timeout=30)
+    return [t.topic for t in new]
+
+
 def java_home():
     if os.environ.get("JAVA_HOME"):
         return os.environ["JAVA_HOME"]
@@ -92,7 +111,11 @@ def java(main_class, *args, heap="-Xmx1G -Xms256M"):
 def main():
     a = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     a.add_argument("--check", action="store_true", help="only check that a broker answers")
+    a.add_argument("--topics", metavar="INSTRUMENT", help="create the topics of an instrument (broker running)")
     args = a.parse_args()
+    if args.topics:
+        print("topics created:", create_topics(topics(args.topics)) or "none (all exist)")
+        return
     if args.check or answers():
         ok = answers()
         print(f"Kafka broker on 127.0.0.1:{PORT}: {'running' if ok else 'not running'}")

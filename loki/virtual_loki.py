@@ -166,6 +166,17 @@ class VirtualLoki:
         if (new["collimation"], new["pulse_skipping"]) not in CONFIGS:
             raise ValueError(f"collimation {new['collimation']} with pulse_skipping {new['pulse_skipping']}: not "
                              f"available in the twin; available: {[f'{c} / {s}' for c, s in CONFIGS]}")
+        # Frame overlap: the neutrons of one pulse (band l_min–l_max) must all arrive at the rear detector before
+        # those of the next pulse used; otherwise some get the wrong wavelength (checked: 2 % of the rear-bank
+        # neutrons, I(Q) 4 % too low, for 3–11.5 Å at 10 m). On the instrument the band is chosen with the distance.
+        lo, hi = self.band(new)
+        period = lm.FRAME * (1 + self.pulseskip(new))
+        t_fast, t_slow = lm.arrivals(lm.L1 + float(new["detector_distance"]), lo, hi)
+        if t_slow - t_fast > period:
+            raise ValueError(f"frame overlap: with the band {lo:g}-{hi:g} A the neutrons of one pulse arrive at the "
+                             f"detector at {float(new['detector_distance']):g} m over {(t_slow - t_fast) * 1e3:.0f} ms, "
+                             f"more than the {period * 1e3:.1f} ms between two pulses used; with the detector at "
+                             f"10 m use the collimation 8m (band 3-10 A); to leave 8m, move the detector to 5 m first")
         for k, v in settings.items():
             self.devices[k].value = v
         self._log("move", settings)

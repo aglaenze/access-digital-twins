@@ -139,6 +139,8 @@ def main():
             if not port_open(9092):
                 start("kafka", [MCSTAS_PY, os.path.join(TWIN, "kafka", "start_kafka.py")], cwd=TWIN)
                 wait_for(lambda: port_open(9092), "the Kafka broker", timeout=120)
+            subprocess.run([MCSTAS_PY, os.path.join(TWIN, "kafka", "start_kafka.py"), "--topics", instr],
+                           check=True, cwd=TWIN)
             start("just_bin_it", [MCSTAS_PY, "-c", "from just_bin_it.cli import main; main()", "-b", "127.0.0.1:9092",
                                   "-t", f"{instr}_jbi_commands", "-hb", f"{instr}_jbi_heartbeat",
                                   "-rt", f"{instr}_jbi_responses", "-l", "3"],

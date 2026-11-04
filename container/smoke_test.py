@@ -104,6 +104,10 @@ else:
     while time.time() - t0 < 120 and subprocess.run([sys.executable, os.path.join(TWIN, "kafka", "start_kafka.py"),
                                                       "--check"], capture_output=True).returncode:
         time.sleep(2)
+    sys.path.insert(0, os.path.join(TWIN, "kafka"))
+    import start_kafka
+    start_kafka.create_topics(["odin_detector", "test_jbi_commands", "test_jbi_heartbeat", "test_jbi_responses",
+                               "test_visualisation"])
     jbi_home = os.environ.get("JBI_HOME", "")
     LIVE_PROCS.append(subprocess.Popen([sys.executable, "-c", "from just_bin_it.cli import main; main()", "-b", "127.0.0.1:9092", "-t",
                                         "test_jbi_commands", "-hb", "test_jbi_heartbeat", "-rt", "test_jbi_responses"],

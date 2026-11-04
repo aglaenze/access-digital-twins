@@ -59,21 +59,27 @@ Rg = 38.7 Å, I(0) = 4.373 cm⁻¹):
 | Collimation / detector | Rear bank Q range [Å⁻¹] | Rg [Å] | I(0) [cm⁻¹] | Level / exact (Guinier region) |
 |---|---|---|---|---|
 | 3 m / 5 m | 0.0115–0.258 | 39.4 ± 0.2 | 4.311 | 0.984 |
-| 3 m / 10 m | 0.0078–0.184 | 39.2 ± 0.2 | 4.178 | 0.956 |
+| 3 m / 10 m (now refused: frame overlap) | 0.0078–0.184 | 39.2 ± 0.2 | 4.178 | 0.956 |
 | 5 m / 5 m | 0.0115–0.258 | 40.1 ± 0.2 | 4.396 | 0.994 |
-| 5 m / 10 m | 0.0078–0.184 | 39.3 ± 0.2 | 4.222 | 0.965 |
+| 5 m / 10 m (now refused: frame overlap) | 0.0078–0.184 | 39.3 ± 0.2 | 4.222 | 0.965 |
 | 8 m / 10 m | 0.0082–0.184 | 39.9 ± 0.2 | 4.374 | 0.992 |
 | 8 m / 5 m | 0.0120–0.258 | 39.8 ± 0.2 | 4.380 | 0.993 |
 | 3 m, pulse skipping / 5 m | 0.0106–0.258 | 39.9 ± 0.2 | 4.357 | 0.987 |
-| 3 m, pulse skipping / 10 m | 0.0075–0.176 | 39.1 ± 0.2 | 4.285 | 0.981 |
+| 3 m, pulse skipping / 10 m (now refused: frame overlap) | 0.0075–0.176 | 39.1 ± 0.2 | 4.285 | 0.981 |
 
 All within 5 % of the exact values. Pulse skipping, checked neutron by neutron: the wavelength rebuilt from the
 arrival time (period 2/14 s) differs from the true one by +3 % (median), as without pulse skipping (+4 %: the long
 ESS pulse, the reduction assumes the mean emission time), with no frame error; the incident flux is halved
 (7.8·10⁸ → 4.0·10⁸ n/s on the sample, 3 m). The longest wavelengths are few, so the rear bank gains little at low Q
 (0.0106 instead of 0.0115 Å⁻¹ at 5 m); the gain is a wider Q range in one setting (front bank from 0.136 Å⁻¹). Rg comes out 1–4 % too large in every configuration (resolution, not corrected).
-Not understood yet: with the detector at 10 m and a short collimation (3 m, 5 m) the level is 3.5–4.5 % too low,
-while 8 m / 10 m is right; these two combinations were not used in the notebook series. Computing time: < 30 s for a
+**Frame overlap** (explained 2026-11-04): with the band 3–11.5 Å and the rear detector at 10 m, the neutrons of one
+pulse reach the detector over 82 ms (fastest 3 Å to slowest 11.5 Å, pulse length included), more than the 71.4 ms
+between two pulses: the slowest neutrons of a pulse arrive with the fastest of the next one, and get a wrong wavelength
+(checked neutron by neutron: 1.9 % of the rear-bank neutrons with an error above 30 %), hence the 4 % low level. With
+pulse skipping (3–21.4 Å, 142.9 ms between pulses used) the same happens at 10 m (166 ms; 0.3 %). This is why the 8 m
+configuration uses 3–10 Å (69 ms at 10 m). On the instrument the band is chosen with the detector distance; the twin
+now refuses a setting with frame overlap (`VirtualLoki.move`, computed from the band, the distance and the period),
+with the explanation. Allowed: 3 m / 5 m, 5 m / 5 m, 8 m / 5 m, 8 m / 10 m, 3 m pulse skipping / 5 m. Computing time: < 30 s for a
 configuration already simulated, ~1 min for a new one; peak memory 4.4–5.6 GB (8 MPI processes).
 
 ## How it works

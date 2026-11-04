@@ -14,6 +14,7 @@ NICOS devices only send orders over HTTP (standard library), exactly like the co
 import json
 import os
 import threading
+import time
 import urllib.error
 import urllib.request
 
@@ -112,10 +113,11 @@ class TwinSwitch(TwinDevice, Moveable):
 
 class TwinReadable(TwinDevice, Readable):
     """A read-only value of the twin that follows from the settings (e.g. speed and delay of a chopper, set by the
-    chopper mode), as the readback devices of the real instrument. maxage 0: always read from the twin (a value kept
-    in the NICOS cache would lag behind a change of configuration); pollinterval 2 s for the device list of the GUI."""
+    chopper mode), as the readback devices of the real instrument. read() always asks the twin (a value kept in the
+    NICOS cache would lag behind a change of configuration); the poller refreshes the cache every 2 s for the device
+    list of the GUI (maxage 5 s, set in the setups: NICOS keeps parameters in its cache between sessions)."""
     parameter_overrides = {"unit": Override(mandatory=False, default=""),
-                           "maxage": Override(default=0),
+                           "maxage": Override(default=5),
                            "pollinterval": Override(default=2)}
     valuetype = anytype
 
@@ -179,7 +181,8 @@ class TwinDetector(TwinDevice, Measurable):
 
     def _live(self):
         """Stream only when just-bin-it is one of the detectors of the count (setup live loaded)."""
-        return self.stream and any(type(d).__name__ == "JustBinItDetector" for d in session.experiment.detlist)
+        return (self.stream and _EssJustBinItDetector is not None
+                and any(isinstance(d, _EssJustBinItDetector) for d in session.experiment.detectors))
 
     def doPrepare(self):
         self._streaming = self._live()
@@ -216,6 +219,8 @@ class TwinDetector(TwinDevice, Measurable):
         return status.OK, "idle"
 
     def doIsCompleted(self):
+        if self._preparing:             # after prepare, NICOS waits for isCompleted before starting the count
+            return self._error is not None or not self._thread.is_alive() or self._ready()
         return self._thread is None or not self._thread.is_alive()
 
     def doFinish(self):
@@ -250,6 +255,28 @@ class TwinDetector(TwinDevice, Measurable):
         if not self._result or "image" not in self._result:
             return [np.zeros(tuple(self.imageshape), dtype=np.uint32)]
         return [np.asarray(self._result["image"], dtype=np.uint32)]
+
+
+try:        # live data (Kafka): needs confluent-kafka, ess-streaming-data-types, keyring (optional for the twin)
+    from nicos_ess.devices.datasources.just_bin_it import JustBinItDetector as _EssJustBinItDetector
+except Exception:
+    _EssJustBinItDetector = None
+
+if _EssJustBinItDetector is not None:
+    class TwinJustBinItDetector(_EssJustBinItDetector):
+        """The just-bin-it detector of the ESS NICOS, with an explicit time window for the histograms: from 0.5 s before
+        the count to 0.5 s after its end, instead of "interval" (just-bin-it would start it when it reads the command,
+        a little after the twin has started streaming, and lose the first pulses). The twin keeps streaming empty pulses
+        for a moment after the measurement, as a real detector streams all the time, so just-bin-it sees the end."""
+
+        def _create_config(self, interval, identifier):
+            config = super()._create_config(interval, identifier)
+            if interval:
+                now_ms = int(time.time() * 1000)
+                config.pop("interval", None)
+                config["start"] = now_ms - 500
+                config["stop"] = now_ms + int(interval * 1000) + 500
+            return config
 
 
 class TwinExperiment(EssExperiment):
