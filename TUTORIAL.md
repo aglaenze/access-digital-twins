@@ -9,7 +9,7 @@ boxes; copy them exactly.
 | Instrument | Technique | Web page | Console | NICOS | Python script |
 |---|---|:-:|:-:|:-:|:-:|
 | ODIN | neutron imaging | yes | yes | yes | yes |
-| LoKI | small-angle scattering (SANS) | — | yes | yes | yes (first version) |
+| LoKI | small-angle scattering (SANS) | yes | yes | yes | yes (first version) |
 | DREAM, BIFROST | diffraction, inelastic scattering | — | — | — | — (waiting for the official McStas models) |
 
 The installation (part 1) is common to all twins. **You choose the instrument when you start it** (console:
@@ -297,7 +297,7 @@ tomography (rotate the sample with
 
 ### LoKI (small-angle neutron scattering) — first version
 
-The LoKI twin can be used from Python, from the console and from NICOS (no web page yet), with both routes: route A
+The LoKI twin can be used from a web page, from Python, from the console and from NICOS, with both routes: route A
 (the container contains it) and route B (step 9 of the installation). It needs about 6 GB of free memory during a
 measurement (route A: memory given to Docker). Its test case measures dilute silica spheres (radius 50 Å) for 10 min
 and fits their size (route A: in a JupyterLab terminal):
@@ -316,6 +316,10 @@ loki.move(sample="silica_spheres", collimation="3m", heavy_shutter="open", shutt
 f = loki.count(600)          # 600 s; returns the file written
 data = read(f)               # {"front": (Q, I, dI), "middle": ..., "rear": ...}
 ```
+**Web page**: as in part 2, with `loki/LoKI_virtual.ipynb` (route A: open it in JupyterLab, then "Render with
+Voilà"; route B: `voila LoKI_virtual.ipynb` in the folder `loki`). It gives the settings of three measurements,
+shows the image of the rear detector after each count, and analyzes the curve (Guinier and sphere model).
+
 **Console**: as in part 3, with `python twin_server.py --instrument loki --session my_first_sans` in terminal 1;
 devices `heavy_shutter`, `shutter`, `collimation` (`3m`, `5m`, `8m`), `pulse_skipping` (`off`, `on`: choppers at
 7 Hz, wavelength band 3–21.4 Å, with `3m` only), `detector_distance` (5 or 10 m; 10 m only with `8m`: with a wider wavelength band the neutrons of one pulse

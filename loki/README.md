@@ -9,7 +9,7 @@ notebook series of this project, where every step of the simulation and of the r
 --instrument loki` + `twin_console.py`) or from NICOS (`../nicos/start_nicos.py --instrument loki`, ESS GUI and
 device names `heavy_shutter`, `fast_shutter`); data analyzed in `LoKI_analysis.ipynb`. Not yet: raw event files
 in the ESS NeXus format, reduction with the ESS software (`esssans`), the full series of measurements of a real SANS
-experiment (empty cell, solvent, dark, water calibration), web page, container.
+experiment (empty cell, solvent, dark, water calibration).
 
 ## Easy test case: dilute silica spheres
 
@@ -102,6 +102,7 @@ configuration already simulated, ~1 min for a new one; peak memory 4.4–5.6 GB 
 | `loki_samples.py` | samples (dΣ/dΩ in cm⁻¹ sr⁻¹): `silica_spheres` |
 | `virtual_loki.py` | the virtual instrument (`VirtualLoki`, `read`) |
 | `easy_case.py` | the test case above and its figure |
+| `gen_student_page.py` → `LoKI_virtual.ipynb` | student page (Voilà, `voila LoKI_virtual.ipynb`): settings table, operate (collimation, pulse skipping, detector distance, shutters; refusals explained), image of the rear panel, logbook, analysis (I(Q) of the banks, Guinier fit, sphere model), questions. Checked: R = 49.6 Å (3 m, 60 s) and 49.9 Å (8 m / 10 m, 300 s) for 50 Å |
 | `gen_analysis_notebook.py` → `LoKI_analysis.ipynb` | analysis notebook (JupyterLab): logbook, file content, I(Q) of the three banks, Guinier fit (Rg), sphere-model fit (R, background), volume fraction from I(0); on any session or proposal folder (demonstration, 10 min: Rg = 39.4 ± 0.2 Å, R = 49.6 Å, φ = 1.00 %) |
 | `components/SANS_Iq_table.comp` | McStas sample component (isotropic SANS from a table, absolute units) |
 
@@ -130,4 +131,4 @@ processes: the easy case takes 2 min (compilation + downstream part), Rg = 39.3 
    To do: understand the 4 % low level with a short collimation and the detector at 10 m; more samples.
 4. Done on 2026-11-04: twin server, console and NICOS (`../nicos/nicos_twin/loki/`, ESS GUI of LoKI), analysis
    notebook, container image, live data with Kafka and just-bin-it (rear panel, sample of the neutrons;
-   `../nicos/README.md`, "Live data"). Still to do: web page.
+   `../nicos/README.md`, "Live data"), web page `LoKI_virtual.ipynb`.

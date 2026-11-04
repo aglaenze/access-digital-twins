@@ -81,7 +81,17 @@ def create_topics(names, brokers=f"127.0.0.1:{PORT}"):
     new = [NewTopic(n, num_partitions=1, replication_factor=1) for n in names if n not in existing]
     for name, f in (admin.create_topics(new) if new else {}).items():
         f.result(timeout=30)
-    return [t.topic for t in new]
+    created = [t.topic for t in new]
+    detectors = [n for n in created if n.endswith("_detector")]
+    if detectors:
+        # A detector stream of ESS has existed for long when a histogram starts: write a first empty pulse now.
+        # (just-bin-it refuses a start time whose first message is the very first of the topic: "too old".)
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import streamer
+        if streamer.available():
+            for n in detectors:
+                streamer.Streamer(brokers, topic=n, source=n).empty_pulse()
+    return created
 
 
 def java_home():

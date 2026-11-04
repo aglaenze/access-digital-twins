@@ -12,8 +12,8 @@ measurement in each of the three ways described below).
 
 | Instrument | Folder | Technique | Status |
 |---|---|---|---|
-| ODIN | `odin/` — **read `odin/README.md`** | neutron imaging (Bragg edges, tomography, chopper modes) | working (hybrid and mcstas modes, NICOS) |
-| LoKI | `loki/` — read `loki/README.md` | small-angle neutron scattering (SANS) | first version: easy test case (silica spheres); Python, console, NICOS |
+| ODIN | `odin/` — **read `odin/README.md`** | neutron imaging (Bragg edges, tomography, chopper modes) | working (hybrid and mcstas modes, web pages, NICOS, live data with Kafka) |
+| LoKI | `loki/` — read `loki/README.md` | small-angle neutron scattering (SANS) | first version: silica spheres, 3 collimations, 2 detector distances, pulse skipping; web page, Python, console, NICOS, live data |
 | DREAM | — | powder diffraction (bispectral, time-of-flight; also single-crystal) | to do (waiting for the official McStas model) |
 | BIFROST | — | inelastic scattering: indirect-geometry time-of-flight spectrometer (cold neutrons, multiplexing analysers) | to do (waiting for the official McStas model) |
 
