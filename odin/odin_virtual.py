@@ -192,6 +192,8 @@ class VirtualOdin:
         """Sets one or several devices: odin.move(stage_x=0.5, shutter="open")."""
         for name, v in settings.items():
             if name not in self.devices:
+                if name in self.readings():
+                    raise KeyError(f"{name} is read-only: it follows from the chopper mode (devices choppers, wfm_delta)")
                 raise KeyError(f"unknown device: {name}; devices: {list(self.devices)}")
             self.devices[name].check(v)
         for name, v in settings.items():
@@ -200,6 +202,16 @@ class VirtualOdin:
 
     def status(self):
         return {n: d.value for n, d in self.devices.items()}
+
+    def readings(self):
+        """Read-only values that follow from the settings (shown by NICOS as at ESS): chopper speeds and delays."""
+        return nx.chopper_readings(self.devices["choppers"].value, self.devices["wfm_delta"].value)
+
+    @staticmethod
+    def readings_help(name):
+        """(unit, description) of a read-only value."""
+        key = name.rsplit("_", 1)[-1] if name.endswith(("_speed", "_delay")) else name
+        return nx.READINGS_HELP[key]
 
     def use_folder(self, folder):
         """Writes the next files (and the logbook) in `folder`, e.g. the proposal folder chosen in NICOS."""

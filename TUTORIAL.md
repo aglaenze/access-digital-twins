@@ -280,7 +280,9 @@ r["image"].plot()          # transmission image
 ```
 (files 1, 2, 3 = dark, open beam, sample, in the order you measured them).
 
-**Going further**: other chopper modes (`move(choppers, "natural")`, `"white"`), tomography (rotate the sample with
+**Going further**: other chopper modes (`move(choppers, "natural")`, `"white"`; in NICOS, the devices `wfm1_speed`,
+`bpc1_delay`, ... show the speed and delay of each chopper, which follow the mode: compare them in the three modes),
+tomography (rotate the sample with
 `scan(stage_rot, 0, 3, 60, t=10)`), the games of `ODIN_mission.ipynb`, the 3D view of the neutrons in the beamline
 (`python odin/show_3d.py`, route B). Everything is explained in `odin/README.md`.
 
@@ -310,7 +312,9 @@ f = loki.count(600)          # 600 s; returns the file written
 data = read(f)               # {"front": (Q, I, dI), "middle": ..., "rear": ...}
 ```
 **Console**: as in part 3, with `python twin_server.py --instrument loki --session my_first_sans` in terminal 1;
-devices `heavy_shutter`, `shutter`, `collimation`, `sample`.
+devices `heavy_shutter`, `shutter`, `collimation` (`3m`, `5m`, `8m`), `pulse_skipping` (`off`, `on`: choppers at
+7 Hz, wavelength band 3–21.4 Å, with `3m` only), `detector_distance` (5 or 10 m), `sample`. `status()` also shows the
+chopper speeds and delays, which follow the configuration.
 
 **NICOS**: `python nicos\start_nicos.py`, answer `2` (LoKI). The window is the one of the real LoKI. In the
 Experiment tab give a proposal number, then:
@@ -320,7 +324,9 @@ with nexusfile_open('silica spheres, 10 min'):
     count(t=600)
 ```
 (`heavy_shutter` and `fast_shutter` are the names used by the NICOS of the real LoKI.) The file contains I(Q) of the
-three detector banks; the Detector image tab shows the rear detector. Details: `loki/README.md`.
+three detector banks; the Detector image tab shows the rear detector. To reach lower Q, change the configuration, e.g.
+`move(collimation, '8m', detector_distance, 10)`, then count again: compare the Q range of the rear bank and the
+counting time needed for the same error bars. Details: `loki/README.md`.
 
 **Analyze** with the notebook `loki/LoKI_analysis.ipynb` (`jupyter lab` in the folder `twin`): write your folder
 (session or proposal) in its first cell, then run the cells. It plots I(Q) of the three banks, finds the radius of

@@ -49,7 +49,8 @@ class Device:
         self.name, self.unit, self.help = name, desc["unit"], desc["help"]
 
     def read(self):
-        return _request("/status")["devices"][self.name]
+        s = _request("/status")
+        return s["devices"][self.name] if self.name in s["devices"] else s.get("readings", {})[self.name]
 
     def __repr__(self):
         return f"<device {self.name} = {self.read()} {self.unit}>".replace(" >", ">")
@@ -64,12 +65,17 @@ def status():
     devs = _request("/devices")
     print(f"Virtual instrument ({s['mode']}), {'BUSY: ' + s['running'] if s['busy'] else 'ready'}; "
           f"last file no. {s['last_number']}; data: {s['folder']}")
+    width = max(len(n) for n in list(s["devices"]) + list(s.get("readings", {})))
     for n, v in s["devices"].items():
-        print(f"  {n:10s} = {v!s:>10} {devs[n]['unit']:4s}  {devs[n]['help']}")
+        print(f"  {n:{width}s} = {v!s:>14} {devs[n]['unit']:3s}  {devs[n]['help']}")
+    if s.get("readings"):
+        print("  read-only (follow from the settings):")
+        for n, v in s["readings"].items():
+            print(f"  {n:{width}s} = {v!s:>14} {devs[n]['unit']:3s}  {devs[n]['help']}")
 
 
 def read(device):
-    v = device.read() if isinstance(device, Device) else _request("/status")["devices"][device]
+    v = device.read() if isinstance(device, Device) else Device(str(device), dict(unit="", help="")).read()
     print(f"{_name(device)} = {v}")
     return v
 

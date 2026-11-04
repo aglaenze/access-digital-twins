@@ -246,6 +246,15 @@ dark runs are free), `faults` (hidden faults, `FAULTS`: `hot_pixels`, `dead_regi
 `outages_per_hour`, `mode` ("hybrid" / "mcstas").
 
 An impossible setting (value outside the choices or limits) is refused, as on the instrument.
+
+**Read-only values** (`VirtualOdin.readings()`, shown by NICOS as devices and by `status()` in the console): what the
+chopper mode implies, with the chopper names of the real ODIN file. `<chopper>_speed` [Hz] and `<chopper>_delay` [ms]
+for `wfm1`, `wfm2`, `foc1`…`foc5`, `bpc1`, `bpc2`, `t0` (values of the real ODIN file used as NeXus template, e.g.
+WFM choppers 56 Hz, band-pass choppers 7 Hz; 0 when the mode stops the chopper), `pulse_skipping` (one pulse in two
+with the band-pass choppers at 7 Hz; none in white beam) and `wfmc_separation` [m]. They cannot be moved: the twin
+has a single chopper phasing, the one of the official model (Airbus acceptance report). Other wavelength bands or
+14 Hz operation would need chopper phases from the ODIN team, not invented here.
+
 Adding a sample: one entry in `SAMPLES` (`odin_virtual.py`), a list of boxes (NCrystal file, center, dimensions); the
 same volumes are used by McStas (Union) and by the hybrid mode.
 

@@ -110,6 +110,7 @@ Devices of **ODIN** (`nicos_twin/odin/setups/odin.py`):
 | `stage_rot` | −180 to 180 deg (tomography: `scan(stage_rot, 0, 3, 60, t=10)`) |
 | `sample_holder` | `'iron_plate'` |
 | `det` | Timepix3 imaging detector, preset `t` (s); image 128 × 128 |
+| read-only (setup `choppers`) | `wfm1_speed`, `wfm1_delay` … `foc5_speed`, `foc5_delay` (Hz, ms; names of the ODIN NeXus file; 0 when the mode stops the chopper), `pulse_skipping`, `wfmc_separation` |
 
 Devices of **LoKI** (`nicos_twin/loki/setups/loki.py`), first version:
 
@@ -117,11 +118,17 @@ Devices of **LoKI** (`nicos_twin/loki/setups/loki.py`), first version:
 |---|---|
 | `heavy_shutter` | `'Open'`, `'Closed'` (ESS name; main shutter) |
 | `fast_shutter` | `'Open'`, `'Closed'` (ESS name; just before the sample) |
-| `collimation` | `'3m'` (rear detector at 5 m) |
+| `collimation` | `'3m'`, `'5m'`, `'8m'` (longer: lower Q, better resolution, less flux) |
+| `pulse_skipping` | `'off'`, `'on'` (choppers at 7 Hz, one pulse in two, band 3–21.4 Å; with `'3m'` only) |
+| `detector_distance` | 5.0, 10.0 (m; rear detector bank) |
 | `sample_holder` | `'silica_spheres'` |
 | `det` | the 9 tube panels; preset `t` (s); image: rear panel (392 × 250 pixels); file: I(Q) per bank |
+| read-only (setup `choppers`) | `ch1_speed`, `ch1a_delay`, `ch1b_delay`, `ch2_speed`, `ch2a_delay`, `ch2b_delay` (Hz, ms; bandwidth and frame-overlap chopper pairs, delays computed as in the official model), `wavelength_band` |
 
-A value outside the allowed list or limits is refused by NICOS itself ("Out of bounds").
+A value outside the allowed list or limits is refused by NICOS itself ("Out of bounds"); a combination the twin does
+not have (e.g. `pulse_skipping` on with `collimation` 8m) is refused by the twin with the list of the available ones.
+The read-only devices show what the settings imply (`read('choppers')`... or the device list of the GUI): at ESS
+the chopper speeds and phases are devices too.
 
 ## 4. Files
 

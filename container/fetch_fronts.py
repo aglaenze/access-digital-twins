@@ -43,8 +43,8 @@ def wanted(instruments=("odin", "loki")):
     if "loki" in instruments:
         import loki_mcstas as lm
         import virtual_loki as vl
-        for cfg, _, _ in vl.CONFIGS.values():
-            name = os.path.basename(lm.front_folder(**{k: v for k, v in cfg.items()}))
+        for c in vl.CONFIGS.values():
+            name = os.path.basename(lm.front_folder(**c["front"]))
             out[name] = ("loki", f"loki_front_{name.replace('+', '')}.tar")
     return out
 

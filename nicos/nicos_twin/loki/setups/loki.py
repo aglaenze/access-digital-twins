@@ -1,7 +1,7 @@
 description = 'LoKI digital twin: devices (each one relays its orders to the twin server)'
 group = 'basic'
 
-includes = ['system']
+includes = ['system', 'choppers']
 
 URL = 'http://127.0.0.1:8765'
 
@@ -18,8 +18,16 @@ devices = dict(
         mapping = {'Open': 'open', 'Closed': 'closed'},
     ),
     collimation = device('nicos_twin.devices.TwinSwitch',
-        description = 'collimation length (the rear detector distance follows: 5 m for 3 m)',
-        twinurl = URL, twindevice = 'collimation', states = ['3m'],
+        description = 'collimation length: longer = smaller divergence (lower Q, better resolution), less flux',
+        twinurl = URL, twindevice = 'collimation', states = ['3m', '5m', '8m'],
+    ),
+    pulse_skipping = device('nicos_twin.devices.TwinSwitch',
+        description = 'on: choppers at 7 Hz, one source pulse in two, wavelength band 3-21.4 A (3 m collimation only)',
+        twinurl = URL, twindevice = 'pulse_skipping', states = ['off', 'on'],
+    ),
+    detector_distance = device('nicos_twin.devices.TwinSwitch',
+        description = 'distance sample -> rear detector bank (farther = lower Q)',
+        twinurl = URL, twindevice = 'detector_distance', states = [5.0, 10.0], unit = 'm',
     ),
     sample_holder = device('nicos_twin.devices.TwinSwitch',
         description = 'sample in the beam (1 mm cell)',

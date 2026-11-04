@@ -24,12 +24,48 @@ import loki_paths as paths
 import loki_mcstas as lm
 import loki_samples as ls
 
-# Configurations: collimation length -> (upstream part, rear detector distance [m], reuses of each MCPL neutron)
+# Configurations of the beamline upstream of the sample (collimation length): upstream part of the official model
+# (source and sample apertures, wavelength band l_min–l_max that sets the chopper phases) and number of reuses of each
+# MCPL neutron in the downstream part. Same configurations as the LoKI notebook series (notebooks 01–03), where they
+# were computed and checked: the longer the collimation, the smaller the beam divergence (lower Q reached, better
+# resolution) and the lower the flux, hence more reuses. 8 m: band 3–10 Å (frame overlap at 10 m of detector).
+# Key: (collimation, pulse skipping). Pulse skipping ("on"): the choppers turn at 7 Hz and let one source pulse in two
+# through, so the time between two pulses doubles and the wavelength band can be twice as wide (3–21.4 Å, as in the
+# notebook series), at the price of half of the pulses: lower Q (long wavelengths), wider Q range in one setting.
 CONFIGS = {
-    "3m": (dict(collen=3.0, sourceapx=0.03, sampleapx=0.01, l_min=3.0, l_max=11.5, ncount=1e9), 5.0, 8),
+    ("3m", "off"): dict(front=dict(collen=3.0, sourceapx=0.03, sampleapx=0.01, l_min=3.0, l_max=11.5, ncount=1e9),
+                        repeat=8),
+    ("5m", "off"): dict(front=dict(collen=5.0, sourceapx=0.02, sampleapx=0.01, l_min=3.0, l_max=11.5, ncount=1e9),
+                        repeat=32),
+    ("8m", "off"): dict(front=dict(collen=8.0, sourceapx=0.02, sampleapx=0.01, l_min=3.0, l_max=10.0, ncount=1e9),
+                        repeat=80),
+    ("3m", "on"): dict(front=dict(collen=3.0, sourceapx=0.03, sampleapx=0.01, l_min=3.0, l_max=21.4, pulseskip=1,
+                                  ncount=1e9), repeat=8),
 }
-LAM_BAND = (3.0, 11.5)           # Å: band used in the reduction (bender transmission < 20 % below 3 Å)
+COLLIMATIONS = tuple(dict.fromkeys(c for c, _ in CONFIGS))
+DETECTOR_DISTANCES = (5.0, 10.0)  # m: rear detector bank (the middle and front banks do not move)
 Q_EDGES = np.logspace(np.log10(3e-3), np.log10(0.5), 121)
+
+# Choppers of the official model (LOKI_main.instr + includes/loki_functions.c): two pairs of discs, bandwidth chopper
+# at 6.5 m and frame-overlap chopper at 15.21 m from the source, 14 Hz (7 Hz with pulse skipping); the delays of the
+# two discs of a pair are computed from the wavelength band, with the same formulas as the model.
+CHOPPERS = {"ch1": dict(pos=6.5, slit=120.0, name="bandwidth chopper"),
+            "ch2": dict(pos=15.21, slit=190.0, name="frame-overlap chopper")}
+_DISK_OFFSET = (0.016 + 0.017) / 2          # m: from the center of a pair to the center of each disc
+_PULSE_MS = 2.86                            # ms: ESS pulse length used by the model
+
+
+def chopper_settings(l_min, l_max, pulseskip=0):
+    """{chopper: (speed [Hz], delay of disc a [ms], delay of disc b [ms])}, as computed by the official model."""
+    freq = 14.0 / (1 + pulseskip)
+    out = {}
+    for c, d in CHOPPERS.items():
+        pa, pb = d["pos"] - _DISK_OFFSET, d["pos"] + _DISK_OFFSET
+        half = d["slit"] / 2 * 1000 / (freq * 360)                   # ms to turn by half the opening
+        a = l_min * (pa - 0.08) / 3.96 + half                          # leading edge: shortest wavelength
+        b = l_max * (pb - 0.08) / 3.96 + _PULSE_MS - half              # trailing edge: longest wavelength
+        out[c] = (freq, a, b)
+    return out
 
 
 class Device:
@@ -47,7 +83,10 @@ class VirtualLoki:
         self.devices = {d.name: d for d in [
             Device("heavy_shutter", "closed", ("open", "closed"), "main shutter, upstream in the guide"),
             Device("shutter", "closed", ("open", "closed"), "fast shutter, just before the sample"),
-            Device("collimation", "3m", tuple(CONFIGS), "collimation length (sets the rear detector distance)"),
+            Device("collimation", "3m", COLLIMATIONS, "collimation length (sets the wavelength band and choppers)"),
+            Device("pulse_skipping", "off", ("off", "on"),
+                   "on: choppers at 7 Hz, one source pulse in two, wavelength band twice as wide (3 m collimation)"),
+            Device("detector_distance", 5.0, DETECTOR_DISTANCES, "distance sample -> rear detector bank", unit="m"),
             Device("sample", "silica_spheres", tuple(ls.SAMPLES), "sample in the beam"),
         ]}
         self.choices = {n: d.choices for n, d in self.devices.items()}
@@ -64,6 +103,38 @@ class VirtualLoki:
 
     def status(self):
         return self.state
+
+    @staticmethod
+    def config(state):
+        """Configuration (CONFIGS) of a device state."""
+        return CONFIGS[(state["collimation"], state["pulse_skipping"])]
+
+    def band(self, state=None):
+        """Wavelength band (l_min, l_max) [Å] of the configuration."""
+        f = self.config(state or self.state)["front"]
+        return f["l_min"], f["l_max"]
+
+    def pulseskip(self, state=None):
+        return self.config(state or self.state)["front"].get("pulseskip", 0)
+
+    def readings(self):
+        """Read-only values that follow from the settings (shown by NICOS as at ESS): chopper speeds and delays."""
+        out = {}
+        for c, (freq, a, b) in chopper_settings(*self.band(), self.pulseskip()).items():
+            out[f"{c}_speed"] = freq
+            out[f"{c}a_delay"] = round(a, 3)
+            out[f"{c}b_delay"] = round(b, 3)
+        out["wavelength_band"] = "%g-%g A" % self.band()
+        return out
+
+    @staticmethod
+    def readings_help(name):
+        """(unit, description) of a read-only value."""
+        if name.endswith("_speed"):
+            return "Hz", f"rotation speed of the {CHOPPERS[name[:3]]['name']}"
+        if name.endswith("_delay"):
+            return "ms", f"opening delay of disc {name[3]} of the {CHOPPERS[name[:3]]['name']} after the source pulse"
+        return {"wavelength_band": ("", "wavelength band let through by the choppers")}[name]
 
     def use_folder(self, folder):
         """Writes the next files (and the logbook) in `folder`, e.g. the proposal folder chosen in NICOS."""
@@ -86,9 +157,15 @@ class VirtualLoki:
     def move(self, **settings):
         for k, v in settings.items():
             if k not in self.choices:
+                if k in self.readings():
+                    raise KeyError(f"{k} is read-only: it follows from the configuration (collimation, pulse_skipping)")
                 raise KeyError(f"unknown device {k!r}; devices: {list(self.choices)}")
             if v not in self.choices[k]:
                 raise ValueError(f"{k} = {v!r} not allowed; allowed values: {self.choices[k]}")
+        new = dict(self.state, **settings)
+        if (new["collimation"], new["pulse_skipping"]) not in CONFIGS:
+            raise ValueError(f"collimation {new['collimation']} with pulse_skipping {new['pulse_skipping']}: not "
+                             f"available in the twin; available: {[f'{c} / {s}' for c, s in CONFIGS]}")
         for k, v in settings.items():
             self.devices[k].value = v
         self._log("move", settings)
@@ -104,21 +181,31 @@ class VirtualLoki:
     def simulate(self, state=None):
         """Reduced I(Q) per bank for the sample in the beam, with the McStas simulation noise only (no counting)."""
         st = state or self.state
-        cfg, reardet, repeat = CONFIGS[st["collimation"]]
+        cfg, repeat, reardet = self.config(st)["front"], self.config(st)["repeat"], float(st["detector_distance"])
+        band, skip = self.band(st), self.pulseskip(st)
         front = lm.front(mpi=self.mpi, **cfg)
         fn, kw, thick, mu_abs, mu_rem = ls.SAMPLES[st["sample"]]
         q, dsdo, _ = fn(**kw)
         # cache name: sample, configuration and a fingerprint of everything that defines the sample (a changed
         # parameter must give a new McStas simulation, never an old one read back)
         key = hashlib.md5(np.ascontiguousarray(np.r_[q, dsdo, thick, mu_abs, mu_rem]).tobytes()).hexdigest()[:8]
-        back = lm.back(front, f"{st['sample']}_col{st['collimation']}_{key}", q, dsdo, thickness=thick, mu_abs=mu_abs,
-                       mu_rem=mu_rem, repeat=repeat, mpi=self.mpi)
+        name = f"{st['sample']}_col{st['collimation']}{'_skip' if skip else ''}_{key}"
+        back = lm.back(front, name, q, dsdo, thickness=thick, mu_abs=mu_abs, mu_rem=mu_rem, repeat=repeat,
+                       mpi=self.mpi)
         if reardet not in self._det:
             self._det[reardet] = lm.Detector(reardet)
         det = self._det[reardet]
-        ev = lm.events(det.detect(lm.scattered(back)), det, *LAM_BAND)
-        lam = lm.lambda_bins(*LAM_BAND)
+        ev = lm.events(det.detect(lm.scattered(back)), det, *band, period=lm.FRAME * (1 + skip))
+        lam = lm.lambda_bins(*band)
         phi, tr = lm.spectrum(back, lam)
+        if skip:
+            # McStas simulates one source pulse, which the choppers let through, with weights in neutrons per second
+            # as if every pulse came: with pulse skipping only one pulse in (1 + skip) does. I(Q) is a ratio (same
+            # factor in the scattered neutrons and in the incident flux) but the count rates, hence the counting
+            # noise of a t-second measurement, are divided by (1 + skip).
+            for e in ev.values():
+                e["w"] = e["w"] / (1 + skip)
+            phi = phi / (1 + skip)
         return ev, det, phi, tr, lam, thick * 100
 
     def beam_on(self):
@@ -162,9 +249,10 @@ class VirtualLoki:
         if sim is None:
             return
         ev, det = sim[0], sim[1]
+        lo, hi = self.band()
         for p in det.panels:
             e = ev[p.name]
-            m = (e["lam"] >= LAM_BAND[0]) & (e["lam"] < LAM_BAND[1])
+            m = (e["lam"] >= lo) & (e["lam"] < hi)
             if p.bank == "rear":
                 expected = np.zeros(shape)
                 np.add.at(expected, (e["iy"][m], e["ix"][m]), e["w"][m] * t)

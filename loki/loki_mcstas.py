@@ -442,23 +442,25 @@ def arrivals(L, lam_min, lam_max):
     return TAU + (t_open - TAU) * L / Z_CHOP2, t_close * L / Z_CHOP2
 
 
-def frame_start(L, lam_min, lam_max):
+def frame_start(L, lam_min, lam_max, period=FRAME):
     """Start of the detector time window [s]: in the middle of the gap between the last neutron of one pulse and the
-    first of the next one."""
+    first of the next one. period: time between two pulses used (2/14 s with pulse skipping)."""
     t_fast, t_slow = arrivals(L, lam_min, lam_max)
-    return t_fast - 0.5 * np.maximum(FRAME - (t_slow - t_fast), 0.0)
+    return t_fast - 0.5 * np.maximum(period - (t_slow - t_fast), 0.0)
 
 
-def events(hits, det, lam_min, lam_max, t0=T_EMISSION):
+def events(hits, det, lam_min, lam_max, t0=T_EMISSION, period=FRAME):
     """What the detector measures, neutron by neutron, and what is deduced: pixel -> L2, 2θ; arrival time (modulo the
-    period, frames unwrapped) -> λ = h t / (m (L1 + L2)), t counted from the mean emission time; Q = 4π sin(θ)/λ."""
+    period, frames unwrapped) -> λ = h t / (m (L1 + L2)), t counted from the mean emission time; Q = 4π sin(θ)/λ.
+    period: time between two pulses used, 1/14 s, or 2/14 s with pulse skipping (the reduction knows which pulses
+    were let through by the choppers, as at ESS from the chopper settings)."""
     out = {}
     for p in det.panels:
         h, g = hits[p.name], p.geometry()
         L2 = g["L2"][h["iy"], h["ix"]]
         tth = g["tth"][h["iy"], h["ix"]]
-        t0w = frame_start(L1 + L2, lam_min, lam_max)
-        t = t0w + np.mod(np.mod(h["t"], FRAME) - t0w, FRAME)
+        t0w = frame_start(L1 + L2, lam_min, lam_max, period)
+        t = t0w + np.mod(np.mod(h["t"], period) - t0w, period)
         lam = H_OVER_M * (t - t0) / (L1 + L2)
         out[p.name] = dict(Q=4 * np.pi * np.sin(tth / 2) / lam, lam=lam, w=h["w"], lam_true=h["lam"],
                            bank=p.bank, ix=h["ix"], iy=h["iy"])

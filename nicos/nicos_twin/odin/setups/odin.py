@@ -1,7 +1,7 @@
 description = 'ODIN digital twin: devices (each one relays its orders to the twin server)'
 group = 'basic'
 
-includes = ['system']
+includes = ['system', 'choppers']
 
 URL = 'http://127.0.0.1:8765'
 

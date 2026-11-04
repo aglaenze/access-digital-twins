@@ -60,12 +60,19 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path == "/status":
-            return self._reply(200, dict(devices=INSTR.status(), busy=LOCK.locked(), running=RUNNING["action"],
-                                         last_number=INSTR.number, folder=INSTR.folder, mode=INSTR.mode))
+            readings = INSTR.readings() if hasattr(INSTR, "readings") else {}
+            return self._reply(200, dict(devices=INSTR.status(), readings=_json(readings), busy=LOCK.locked(),
+                                         running=RUNNING["action"], last_number=INSTR.number, folder=INSTR.folder,
+                                         mode=INSTR.mode))
         if self.path == "/devices":
-            return self._reply(200, {n: dict(value=d.value, unit=d.unit, limits=d.limits,
-                                             choices=_json(d.choices) if d.choices else None, help=d.help)
-                                     for n, d in INSTR.devices.items()})
+            out = {n: dict(value=d.value, unit=d.unit, limits=d.limits,
+                           choices=_json(d.choices) if d.choices else None, help=d.help)
+                   for n, d in INSTR.devices.items()}
+            if hasattr(INSTR, "readings"):                     # read-only values (chopper speeds...)
+                for n, v in INSTR.readings().items():
+                    unit, hlp = INSTR.readings_help(n)
+                    out[n] = dict(value=_json(v), unit=unit, limits=None, choices=None, help=hlp, readonly=True)
+            return self._reply(200, out)
         if self.path == "/log":
             lines = []
             if os.path.isfile(INSTR.log_file):

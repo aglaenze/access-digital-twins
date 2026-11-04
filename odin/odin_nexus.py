@@ -206,6 +206,41 @@ ACTIVE_CHOPPERS = {"wfm": NEXUS_CHOPPERS, "natural": ("bpc1", "bpc2", "t0"), "wh
 # Source pulses per frame: the band-pass choppers (7 Hz) let only one pulse in two through
 PULSES_PER_FRAME = {"wfm": 2, "natural": 2, "white": 1}
 DELTA_TEMPLATE = 0.45   # [m] WFM disc separation when the wfmc_translation stage is at 0 (template: 6.775 and 7.225 m)
+_CHOPPER_TEMPLATE = {}
+
+
+def chopper_template():
+    """{chopper: (speed setpoint [Hz], delay [ms])} read from the real ODIN file used as template for the NeXus files:
+    the values the choppers have when they turn (the same in every mode; the twin does not compute new phases)."""
+    if not _CHOPPER_TEMPLATE:
+        with h5py.File(template_file(), "r") as f:
+            for c in NEXUS_CHOPPERS:
+                g = f[f"entry/instrument/{c}"]
+                _CHOPPER_TEMPLATE[c] = (abs(float(g["rotation_speed_setpoint/value"][0])),
+                                        float(g["delay/value"][0]) * 1e-6)
+    return _CHOPPER_TEMPLATE
+
+
+def chopper_readings(mode, wfm_delta=0.30):
+    """Read-only values shown by NICOS for a chopper mode: speed [Hz] and delay [ms] of each chopper (0 when stopped),
+    pulses used and wavelength band."""
+    out = {}
+    for c, (speed, delay) in chopper_template().items():
+        on = c in ACTIVE_CHOPPERS[mode]
+        out[f"{c}_speed"] = speed if on else 0.0
+        out[f"{c}_delay"] = round(delay, 4) if on else 0.0
+    out["pulse_skipping"] = ("1 pulse in 2 (band-pass choppers at 7 Hz)" if PULSES_PER_FRAME[mode] == 2
+                             else "none: every pulse, frames overlap")
+    out["wfmc_separation"] = wfm_delta if mode == "wfm" else 0.0
+    return out
+
+
+READINGS_HELP = {
+    "speed": ("Hz", "rotation speed of the chopper (0: stopped, out of the beam)"),
+    "delay": ("ms", "opening delay of the chopper after the source pulse"),
+    "pulse_skipping": ("", "source pulses used"),
+    "wfmc_separation": ("m", "separation of the two WFM discs (0: WFM choppers stopped)"),
+}
 
 
 def chopper_settings(mode, wfm_delta=0.30):

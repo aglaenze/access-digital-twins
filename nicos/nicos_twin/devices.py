@@ -3,6 +3,7 @@
 The virtual instrument (McStas, hybrid model, NeXus writing) runs in its own process and Python environment; these
 NICOS devices only send orders over HTTP (standard library), exactly like the console twin_console.py:
   * TwinMotor / TwinSwitch: a device of the twin (stage_x, shutter, choppers...) seen as a NICOS Moveable;
+  * TwinReadable: a read-only value that follows from the settings (chopper speeds and delays...);
   * TwinDetector: a NICOS Measurable; count(t=10) asks the twin to count, then returns the number of counts and the
     file number, and sends the detector image to the live-view panel of the GUI. As at ESS (file-writer), the file
     goes to the proposal folder <dataroot>/<instrument>/<year>/<proposal>/raw, with the experiment title, and a
@@ -20,7 +21,7 @@ import numpy as np
 
 from nicos import session
 from nicos.core import ArrayDesc, CommunicationError, DeviceMixinBase, HasLimits, InvalidValueError, Measurable, Moveable, NicosError, \
-    Override, Param, Value, anytype, status
+    Override, Param, Readable, Value, anytype, status
 from nicos.devices.experiment import Experiment
 from nicos_ess.devices.experiment import EssExperiment
 
@@ -104,6 +105,19 @@ class TwinSwitch(TwinDevice, Moveable):
             if tv == v:
                 return k
         return v
+
+    def doStatus(self, maxage=0):
+        return status.OK, ""
+
+
+class TwinReadable(TwinDevice, Readable):
+    """A read-only value of the twin that follows from the settings (e.g. speed and delay of a chopper, set by the
+    chopper mode), as the readback devices of the real instrument."""
+    parameter_overrides = {"unit": Override(mandatory=False, default="")}
+    valuetype = anytype
+
+    def doRead(self, maxage=0):
+        return _request(self.twinurl, "/status", timeout=10)["readings"][self.twindevice]
 
     def doStatus(self, maxage=0):
         return status.OK, ""
