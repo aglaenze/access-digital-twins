@@ -26,7 +26,7 @@
 main_window = docked(
     tabbed(
         ('Experiment',
-         panel('nicos_ess.gui.panels.exp_panel.ExpPanel', hide_sample=True)),
+         panel('nicos_twin.gui.ExpPanel', hide_sample=True)),
         ('Instrument Setup',
          panel('nicos.clients.flowui.panels.setup_panel.SetupsPanel')),
         ('Sample Configuration',
