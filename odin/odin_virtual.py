@@ -208,6 +208,24 @@ class VirtualOdin:
         return nx.chopper_readings(self.devices["choppers"].value, self.devices["wfm_delta"].value)
 
     @staticmethod
+    def stream_pulses(nexus_file, block=32):
+        """The neutrons of a NeXus file, pulse by pulse, for the live stream (kafka/streamer.py): list of (time of the
+        pulse after the first one [ns], arrival times [ns], pixel ids). The Timepix3 pixels (4096 × 4096) are grouped
+        in blocks of block × block, numbered 1 + ix + n iy (n = 4096 / block: 128 × 128 for 32), so that the live
+        histograms stay small; the file keeps the full pixel ids."""
+        import h5py
+        with h5py.File(nexus_file, "r") as f:
+            d = f["entry/instrument/timepix3/data"]
+            tz, idx = d["event_time_zero"][()], d["event_index"][()]
+            tof, pid = d["event_time_offset"][()], d["event_id"][()]
+        n = 4096 // block
+        p = pid.astype(np.int64) - 1
+        sp = (1 + (p % 4096) // block + n * ((p // 4096) // block)).astype(np.int32)
+        bounds = list(idx) + [len(pid)]
+        return [(int(tz[k] - tz[0]), tof[bounds[k]:bounds[k + 1]].astype(np.int32), sp[bounds[k]:bounds[k + 1]])
+                for k in range(len(tz))]
+
+    @staticmethod
     def readings_help(name):
         """(unit, description) of a read-only value."""
         key = name.rsplit("_", 1)[-1] if name.endswith(("_speed", "_delay")) else name

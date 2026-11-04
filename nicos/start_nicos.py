@@ -8,11 +8,13 @@ instrument computers): choosing the instrument here is like walking into its con
     python start_nicos.py --instrument loki --no-gui        # services only (e.g. to connect another NICOS client)
     python start_nicos.py --instrument odin --mode mcstas
     python start_nicos.py --instrument odin --no-gui --background   # no console needed (stop the process to end)
+    python start_nicos.py --instrument odin --live   # live data as at ESS: Kafka broker + just-bin-it + setup "live"
 
 Two Python environments are used, on purpose: the twin (McStas, essimaging, numpy 2) in the Python running this launcher, NICOS
 (numpy < 2) in the conda env "nicos". They talk over HTTP on this computer only. Press Enter (or Ctrl+C) to stop all.
 Paths can be changed with the environment variables CONDA_ROOT, MCSTAS_PYTHON, NICOS_PYTHON, NICOS_ROOT,
-TWIN_RUN_ROOT.
+TWIN_RUN_ROOT; for --live: KAFKA_HOME, JAVA_HOME (see ../kafka/start_kafka.py) and JBI_HOME (sources of
+just-bin-it, default ~/McStas_runs/just-bin-it).
 Logs: <TWIN_RUN_ROOT>/nicos/*.log.
 """
 import argparse
@@ -44,6 +46,8 @@ LOGS = os.path.join(RUN_ROOT, "nicos")
 PROCS = []
 # instruments with a NICOS package nicos_twin/<name> (same names as in twin_server.INSTRUMENTS)
 INSTRUMENTS = {"odin": "ODIN — neutron imaging", "loki": "LoKI — small-angle neutron scattering (first version)"}
+LIVE = {"odin"}            # instruments with live data (setup nicos_twin/<instrument>/setups/live.py)
+JBI_HOME = os.environ.get("JBI_HOME", os.path.join(HOME, "McStas_runs", "just-bin-it"))
 
 
 def choose_instrument():
@@ -115,6 +119,7 @@ def main():
     a.add_argument("--port", type=int, default=8765, help="port of the twin server")
     a.add_argument("--no-gui", action="store_true")
     a.add_argument("--background", action="store_true", help="do not wait for Enter (run until stopped)")
+    a.add_argument("--live", action="store_true", help="live data: Kafka broker, just-bin-it and setup 'live'")
     o = a.parse_args()
     busy = [f"{what} (port {port})" for what, port in (("twin server", o.port), ("NICOS cache", 14869),
                                                          ("NICOS daemon", 1301)) if port_open(port)]
@@ -123,9 +128,20 @@ def main():
               "Stop it first (Enter in its launcher window, or close that launcher), then start again.")
         return 1
     instr = o.instrument or choose_instrument()
+    if o.live and instr not in LIVE:
+        print(f"Live data not available yet for {instr.upper()}: starting without it.")
+        o.live = False
     os.makedirs(LOGS, exist_ok=True)
     print(f"Starting the {instr.upper()} digital twin with NICOS:", flush=True)
     try:
+        if o.live:                 # data streaming as at ESS: Kafka broker, then just-bin-it (histograms for NICOS)
+            if not port_open(9092):
+                start("kafka", [MCSTAS_PY, os.path.join(TWIN, "kafka", "start_kafka.py")], cwd=TWIN)
+                wait_for(lambda: port_open(9092), "the Kafka broker", timeout=120)
+            start("just_bin_it", [MCSTAS_PY, "-m", "just_bin_it.cli", "-b", "127.0.0.1:9092",
+                                  "-t", f"{instr}_jbi_commands", "-hb", f"{instr}_jbi_heartbeat",
+                                  "-rt", f"{instr}_jbi_responses", "-l", "3"],
+                  env=dict(os.environ, PYTHONPATH=JBI_HOME), cwd=JBI_HOME)
         start("twin_server", [MCSTAS_PY, os.path.join(TWIN, "twin_server.py"), "--instrument", instr,
                               "--session", o.session, "--mode", o.mode, "--port", str(o.port)], cwd=TWIN)
         wait_for(lambda: http_ok(f"http://127.0.0.1:{o.port}/status"), "the twin server")
@@ -137,8 +153,13 @@ def main():
         start("nicos_poller", [NICOS_PY, os.path.join(NICOS_ROOT, "bin", "nicos-poller")], env=env, cwd=NICOS_ROOT)
         start("nicos_daemon", [NICOS_PY, os.path.join(NICOS_ROOT, "bin", "nicos-daemon")], env=env, cwd=NICOS_ROOT)
         wait_for(lambda: port_open(1301), "the NICOS daemon")
-        print(f"{instr.upper()} services ready. NICOS daemon on localhost:1301 (user student, password student).",
-              flush=True)
+        if o.live:                 # load the live-data setup in the daemon (as AddSetup('live') typed by the user)
+            r = subprocess.run([NICOS_PY, os.path.join(HERE, "run_nicos_script.py"), "-c", "AddSetup('live')"],
+                               capture_output=True, text=True, timeout=300, cwd=HERE)
+            print("  setup 'live' loaded" if r.returncode == 0 else f"  setup 'live' NOT loaded: {r.stdout[-500:]}",
+                  flush=True)
+        print(f"{instr.upper()} services ready{' (live data)' if o.live else ''}. NICOS daemon on localhost:1301 "
+              "(user student, password student).", flush=True)
         if not o.no_gui:
             start("nicos_gui", [NICOS_PY, os.path.join(NICOS_ROOT, "bin", "nicos-gui"),
                                 "-c", os.path.join(HERE, "nicos_twin", instr, "guiconfig.py"),

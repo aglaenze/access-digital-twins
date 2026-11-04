@@ -8,7 +8,7 @@ FROM mambaorg/micromamba:1.5.10
 
 USER root
 RUN apt-get update \
- && apt-get install -y --no-install-recommends git ca-certificates openssh-client \
+ && apt-get install -y --no-install-recommends git ca-certificates openssh-client curl \
  && rm -rf /var/lib/apt/lists/* \
  && mkdir -p /data && chown "$MAMBA_USER:$MAMBA_USER" /data
 USER $MAMBA_USER
@@ -47,6 +47,23 @@ RUN git init --quiet "$HOME/nicos_src" \
  && echo "$NICOS_VERSION" > nicos/RELEASE-VERSION \
  && micromamba run -n nicos pip install --no-cache-dir -r requirements.txt pyqtgraph "h5py<3.15" https://github.com/ess-dmsc/yuos_query/releases/download/v0.1.21/yuos_query-0.1.21-py3-none-any.whl
 
+# Live data, as at ESS (start_nicos.py --live): Kafka broker (Apache Kafka 3.9, KRaft mode, Java 21 in the conda
+# environment "kafka", archive checked against its SHA-512), just-bin-it (ESS histogrammer, fixed commit, run from its
+# sources) and the ESS streaming libraries in the twin and NICOS environments.
+ARG KAFKA_VERSION=3.9.1
+ARG KAFKA_SHA512=1EA204BA73411737A275429CA976D440F007FF0957B90B19BE41DC5A4BAE52617267769BE9F0B5791714D0B3C4C760605BD426FAEA39EDD90763585523FA2CFE
+ARG JBI_COMMIT=fe32c7e
+RUN micromamba create -y -n kafka -c conda-forge "openjdk=21" && micromamba clean -a -y \
+ && curl -sSL -o /tmp/kafka.tgz "https://archive.apache.org/dist/kafka/${KAFKA_VERSION}/kafka_2.13-${KAFKA_VERSION}.tgz" \
+ && echo "${KAFKA_SHA512}  /tmp/kafka.tgz" | tr 'A-F' 'a-f' | sha512sum -c - \
+ && tar xzf /tmp/kafka.tgz -C "$HOME" && rm /tmp/kafka.tgz \
+ && git clone --quiet https://github.com/ess-dmsc/just-bin-it.git "$HOME/just-bin-it" \
+ && git -C "$HOME/just-bin-it" checkout --quiet "$JBI_COMMIT" \
+ && pip install --no-cache-dir "confluent-kafka>=2.14,<3" "ess-streaming-data-types>=0.27,<0.28" "graphyte>=1.7.1,<2" \
+        "ConfigArgParse>=1.7.5,<2" \
+ && micromamba run -n nicos pip install --no-cache-dir "confluent-kafka>=2.1" "ess-streaming-data-types>=0.21" \
+        "keyring>=10.6" "keyrings.alt>=4.0" "pycryptodomex>=3.4.7"
+
 # Real ODIN file used as template for the NeXus files (downloaded by essimaging; kept in the image)
 RUN python -c "import ess.odin.data as d; print(d.iron_simulation_ob_small())"
 
@@ -56,6 +73,8 @@ WORKDIR /home/mambauser/twin
 
 ENV TWIN_RUN_ROOT=/data/twin \
     LOKI_REPO=/home/mambauser/loki_model \
+    KAFKA_HOME=/home/mambauser/kafka_2.13-3.9.1 \
+    JBI_HOME=/home/mambauser/just-bin-it \
     NICOS_ROOT=/home/mambauser/nicos_src \
     CONDA_ROOT=/opt/conda \
     OMPI_MCA_rmaps_base_oversubscribe=1 \

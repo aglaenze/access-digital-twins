@@ -130,6 +130,36 @@ not have (e.g. `pulse_skipping` on with `collimation` 8m) is refused by the twin
 The read-only devices show what the settings imply (`read('choppers')`... or the device list of the GUI): at ESS
 the chopper speeds and phases are devices too.
 
+### Live data (Kafka), as at ESS — ODIN
+
+At ESS the detector sends every neutron to **Kafka** (a data-streaming system), pulse by pulse; **just-bin-it**
+histograms the stream and NICOS shows the histograms filling up during the count. The twin does the same:
+
+```
+python nicos/start_nicos.py --instrument odin --live
+```
+starts a local Kafka broker (`kafka/start_kafka.py`), just-bin-it, then the usual services, and loads the setup
+`live` (`AddSetup('live')` / `RemoveSetup('live')` by hand). With it, `count(t=10)`:
+1. *prepare*: the twin computes the measurement and writes the NeXus file (NICOS shows "computing the measurement");
+2. *start*: the twin streams the neutrons of the file to the topic `odin_detector` in real time, 14 pulses per
+   second (ESS schema `ev44`: pulse time, arrival time, pixel), while just-bin-it (devices `jbi`, `live_image`,
+   `live_tof` of the ESS NICOS, `nicos_ess.devices.datasources.just_bin_it`) histograms them: the detector image and
+   the arrival-time spectrum (with the WFM frames) fill up during the 10 s, as on the instrument.
+
+The live stream groups the Timepix3 pixels in blocks of 32 × 32 (128 × 128 superpixels), so that the histograms stay
+small; the files keep the full pixels. Checked on 2026-11-04: a 5 s count streamed in 4.95 s, 70 pulses 71.43 ms
+apart, all its 2 702 832 neutrons in Kafka; the container test (`container/smoke_test.py`) checks that the
+histograms of just-bin-it hold all the streamed neutrons. Not reproduced: the ESS file-writer (the twin writes the
+file itself, before streaming), the EPICS forwarder (device values are not streamed).
+
+Installation (route B, Windows): Java (`conda create -n kafka -c conda-forge openjdk=21`), Apache Kafka 3.9.1
+(`kafka_2.13-3.9.1.tgz` from archive.apache.org, unpacked in `~/McStas_runs`), just-bin-it
+(`git clone https://github.com/ess-dmsc/just-bin-it.git ~/McStas_runs/just-bin-it`, run from its sources), and
+`pip install confluent-kafka ess-streaming-data-types graphyte ConfigArgParse` in the twin environment,
+`pip install confluent-kafka ess-streaming-data-types keyring keyrings.alt pycryptodomex` in the `nicos` environment
+(the Kafka devices of the ESS NICOS need the last three). In the container everything is
+installed: `docker run ... -e TWIN_LIVE=1 ... nicos`.
+
 ## 4. Files
 
 | File | Role |

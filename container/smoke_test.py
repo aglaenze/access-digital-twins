@@ -6,7 +6,9 @@
    with NCrystal (Beer–Lambert, 5 mm of α-iron) between 2.2 and 3.8 Å (below the first Bragg edge, 4.05 Å);
 3. a LoKI measurement (upstream part downloaded from the release, downstream McStas part computed): silica spheres,
    10 min; Guinier fit compared with the exact radius of gyration and I(0);
-4. NICOS services started headless with the launcher (twin server, cache, poller, daemon), then stopped.
+4. live data (if Kafka is installed: KAFKA_HOME): Kafka broker and just-bin-it started, the iron-plate
+   measurement streamed in real time (ev44), the histograms of just-bin-it must hold all its neutrons;
+5. NICOS services started headless with the launcher (twin server, cache, poller, daemon), then stopped.
 Exit code 0 if everything works.
 """
 import os
@@ -85,6 +87,71 @@ res = easy_case.main(plot=False, session="ci_loki", mpi=int(os.environ.get("TWIN
 print(f"LoKI measurement in {time.time() - t0:.0f} s (including the McStas compilation and the downstream part)")
 check(abs(res["rg"] / res["rg_true"] - 1) < 0.05, f"radius of gyration {res['rg']:.1f} Å within 5 % of {res['rg_true']:.1f} Å")
 check(abs(res["i0"] / res["i0_true"] - 1) < 0.05, f"I(0) {res['i0']:.3f} cm⁻¹ within 5 % of {res['i0_true']:.3f} cm⁻¹")
+
+step("live data: Kafka broker, just-bin-it, stream of an ODIN measurement")
+LIVE_PROCS = []
+if "--no-live" in sys.argv or not os.path.isdir(os.environ.get("KAFKA_HOME", "/nonexistent")):
+    print("skipped (--no-live or no Kafka: KAFKA_HOME)")
+else:
+    import json
+    import threading
+    from confluent_kafka import Consumer, Producer, TopicPartition
+    from streaming_data_types import deserialise_hs01
+    sys.path.insert(0, os.path.join(TWIN, "kafka"))
+    import streamer
+    LIVE_PROCS.append(subprocess.Popen([sys.executable, os.path.join(TWIN, "kafka", "start_kafka.py")]))
+    t0 = time.time()
+    while time.time() - t0 < 120 and subprocess.run([sys.executable, os.path.join(TWIN, "kafka", "start_kafka.py"),
+                                                      "--check"], capture_output=True).returncode:
+        time.sleep(2)
+    jbi_home = os.environ.get("JBI_HOME", "")
+    LIVE_PROCS.append(subprocess.Popen([sys.executable, "-m", "just_bin_it.cli", "-b", "127.0.0.1:9092", "-t",
+                                        "test_jbi_commands", "-hb", "test_jbi_heartbeat", "-rt", "test_jbi_responses"],
+                                       cwd=jbi_home, env=dict(os.environ, PYTHONPATH=jbi_home)))
+    time.sleep(10)
+    pulses = ov.VirtualOdin.stream_pulses(smp)          # the iron-plate measurement above (20 s)
+    n_events = sum(len(p[2]) for p in pulses)
+    resp = Consumer({"bootstrap.servers": "127.0.0.1:9092", "group.id": "smoke", "auto.offset.reset": "earliest"})
+    resp.subscribe(["test_jbi_responses"])
+    hists = Consumer({"bootstrap.servers": "127.0.0.1:9092", "group.id": "smoke-h", "auto.offset.reset": "earliest",
+                      "fetch.message.max.bytes": 16_000_000})
+    hists.subscribe(["test_visualisation"])
+    config = {"cmd": "config", "msg_id": "smoke-1", "input_schema": "ev44", "output_schema": "hs01", "interval": 30,
+              "histograms": [
+                  {"type": "dethist", "data_brokers": ["127.0.0.1:9092"], "data_topics": ["odin_detector"],
+                   "det_range": [1, 16385], "width": 128, "height": 128, "topic": "test_visualisation", "id": "image"},
+                  {"type": "hist1d", "data_brokers": ["127.0.0.1:9092"], "data_topics": ["odin_detector"],
+                   "tof_range": [0, 71428571], "num_bins": 300, "topic": "test_visualisation", "id": "tof"}]}
+    prod = Producer({"bootstrap.servers": "127.0.0.1:9092"})
+    acked = False
+    for attempt in range(6):                         # just-bin-it may still be starting: resend until acknowledged
+        prod.produce("test_jbi_commands", json.dumps(config).encode()); prod.flush(10)
+        t1 = time.time()
+        while time.time() - t1 < 10 and not acked:
+            m = resp.poll(1.0)
+            if m is not None and not m.error():
+                r = json.loads(m.value())
+                acked = r.get("msg_id") == "smoke-1" and r.get("response") == "ACK"
+        if acked:
+            break
+    check(acked, "just-bin-it acknowledged the histogram configuration")
+    sent = streamer.Streamer("127.0.0.1:9092", topic="odin_detector", source="odin_detector").stream(pulses)
+    print(f"streamed {sent} events in {len(pulses)} pulses")
+    last, t1 = {}, time.time()
+    while time.time() - t1 < 60:                     # latest histograms (just-bin-it publishes every 0.5 s)
+        m = hists.poll(1.0)
+        if m is None or m.error():
+            continue
+        h = deserialise_hs01(m.value())
+        hid = json.loads(h["info"]).get("id", "")
+        last[hid] = (float(np.sum(h["data"])), json.loads(h["info"]).get("state"))
+        if all(last.get(k, (0, ""))[0] >= sent for k in ("image", "tof")):
+            break
+    print("histogram totals:", last)
+    check(sent == n_events and last.get("image", (0,))[0] == sent and last.get("tof", (0,))[0] == sent,
+          f"live histograms of just-bin-it hold all the {n_events} streamed neutrons (image and arrival times)")
+    for p in reversed(LIVE_PROCS):
+        p.terminate()
 
 step("NICOS services (headless)")
 if NO_NICOS:

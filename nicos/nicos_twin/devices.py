@@ -132,11 +132,18 @@ class TwinReadable(TwinDevice, Readable):
 
 class TwinDetector(TwinDevice, Measurable):
     """The detector of the twin. Preset: t (seconds). Values: number of counts and file number. Array: the detector
-    image (sent to the live-view panel by the LiveViewSink). The file title is the experiment title (as at ESS)."""
+    image (sent to the live-view panel by the LiveViewSink). The file title is the experiment title (as at ESS).
+
+    stream = True (live data, as at ESS): in prepare, the twin computes the measurement and writes the file, then waits;
+    in start, it streams the neutrons to Kafka in real time (one message per source pulse, 14 per second), while
+    just-bin-it (detector "jbi", started by the same count) histograms them for the live display. The count lasts
+    t seconds of real time, like on the instrument."""
     parameter_overrides = {"twindevice": Override(mandatory=False, default="detector")}
     parameters = {
         "imageshape": Param("(rows, columns) of the detector image", type=tuple, default=(128, 128)),
         "lastfile": Param("last data file written by the twin", type=str, default="", settable=True, internal=True),
+        "stream": Param("stream the neutrons to Kafka during the count (live data)", type=bool, default=False,
+                        settable=True),
     }
 
     def doInit(self, mode):
@@ -144,6 +151,8 @@ class TwinDetector(TwinDevice, Measurable):
         self._thread = None
         self._result = None
         self._error = None
+        self._preparing = False
+        self._streaming = False
 
     def presetInfo(self):
         return {"t"}
@@ -152,14 +161,13 @@ class TwinDetector(TwinDevice, Measurable):
         if "t" in preset:
             self._preset["t"] = float(preset["t"])
 
-    def doStart(self):
+    def _launch(self, extra):
         self._result, self._error = None, None
         exp = session.experiment
         if not exp.propinfo.get("proposal"):          # as the ESS file-writer
             raise NicosError(self, "cannot start writing as proposal number not set: "
                                    "NewExperiment(<number>, '<title>') or the Experiment panel")
-        t = self._preset["t"]
-        args = {"t": t, "title": exp.title, "image": True, "folder": proposal_folder()}
+        args = dict({"t": self._preset["t"], "title": exp.title, "image": True, "folder": proposal_folder()}, **extra)
 
         def work():
             try:
@@ -169,11 +177,42 @@ class TwinDetector(TwinDevice, Measurable):
         self._thread = threading.Thread(target=work, daemon=True)
         self._thread.start()
 
+    def _live(self):
+        """Stream only when just-bin-it is one of the detectors of the count (setup live loaded)."""
+        return self.stream and any(type(d).__name__ == "JustBinItDetector" for d in session.experiment.detlist)
+
+    def doPrepare(self):
+        self._streaming = self._live()
+        if self._streaming:             # compute now; the stream starts with the count (doStart)
+            self._preparing = True
+            self._launch({"stream": True, "hold": True})
+
+    def doStart(self):
+        if not self._streaming:
+            self._launch({})
+            return
+        while self._preparing and self._thread.is_alive() and not self._ready():
+            session.delay(0.2)
+        self._preparing = False
+        if self._error is None and self._thread.is_alive():
+            _request(self.twinurl, "/go", {}, timeout=10)
+
+    def _ready(self):
+        try:
+            return bool(_request(self.twinurl, "/status", timeout=10).get("ready"))
+        except Exception:
+            return False
+
     def doStatus(self, maxage=0):
-        if self._thread is not None and self._thread.is_alive():
-            return status.BUSY, f"counting {self._preset['t']:g} s (simulation running)"
         if self._error is not None:
             return status.ERROR, str(self._error)
+        if self._thread is not None and self._thread.is_alive():
+            if self._preparing:
+                if self._ready():
+                    return status.OK, "measurement computed, ready to stream"
+                return status.BUSY, f"computing the measurement ({self._preset['t']:g} s)"
+            return status.BUSY, (f"counting {self._preset['t']:g} s (streaming live)" if self._streaming
+                                 else f"counting {self._preset['t']:g} s (simulation running)")
         return status.OK, "idle"
 
     def doIsCompleted(self):
@@ -189,7 +228,10 @@ class TwinDetector(TwinDevice, Measurable):
             self.log.info("file written: %s", self._result["file"])
 
     def doStop(self):
-        self.log.warning("a count of the twin cannot be interrupted; waiting for it to finish")
+        if self._streaming and self._thread is not None and self._thread.is_alive():
+            _request(self.twinurl, "/stop", {}, timeout=10)      # ends the stream (the file is already written)
+        else:
+            self.log.warning("a count of the twin cannot be interrupted; waiting for it to finish")
         self.doFinish()
 
     def valueInfo(self):

@@ -19,6 +19,11 @@ JSON over http://127.0.0.1:<port> (local connections only):
                  write=false: no file (live image only), as a count outside a file-writing job at ESS;
                  folder: where to write the files (NICOS: the proposal folder), default the session folder
     POST /scan   {"device": ..., "values": [...], "t": 10, "title": "..."}   -> {"files": [...]}
+Live data (Kafka, as at ESS; optional): /count with "stream": true replays the neutrons of the measurement to the
+Kafka topic <instrument>_detector, pulse by pulse in real time (ev44 messages, kafka/streamer.py), after the file is
+written. With "hold": true it first waits for POST /go (NICOS: computed in prepare, streamed from start, so that the
+stream and just-bin-it start together); GET /status has "ready": true while it waits. POST /stop ends a stream.
+Broker: variable TWIN_KAFKA (default 127.0.0.1:9092).
 One measurement at a time (as on the instrument): a command received during a measurement is refused (code 409,
 "instrument busy"), but /status always answers.
 """
@@ -36,8 +41,11 @@ INSTRUMENTS = {"odin": ("odin", "odin_virtual", "VirtualOdin"),
                "loki": ("loki", "virtual_loki", "VirtualLoki")}
 
 INSTR = None
+INSTR_NAME = None
 LOCK = threading.Lock()
 RUNNING = {"action": None}
+READY, GO, STOP = threading.Event(), threading.Event(), threading.Event()     # live streaming (Kafka)
+STREAMER = {}
 
 
 def _json(v):
@@ -63,7 +71,7 @@ class Handler(BaseHTTPRequestHandler):
             readings = INSTR.readings() if hasattr(INSTR, "readings") else {}
             return self._reply(200, dict(devices=INSTR.status(), readings=_json(readings), busy=LOCK.locked(),
                                          running=RUNNING["action"], last_number=INSTR.number, folder=INSTR.folder,
-                                         mode=INSTR.mode))
+                                         mode=INSTR.mode, ready=READY.is_set()))
         if self.path == "/devices":
             out = {n: dict(value=d.value, unit=d.unit, limits=d.limits,
                            choices=_json(d.choices) if d.choices else None, help=d.help)
@@ -86,6 +94,11 @@ class Handler(BaseHTTPRequestHandler):
             args = json.loads(self.rfile.read(n) or b"{}")
         except json.JSONDecodeError as e:
             return self._reply(400, dict(error=f"invalid JSON: {e}"))
+        if self.path in ("/go", "/stop"):                # live stream control: answered even during a count
+            if self.path == "/stop":
+                STOP.set()
+            GO.set()
+            return self._reply(200, dict(ok=True))
         if not LOCK.acquire(blocking=False):
             return self._reply(409, dict(error=f"instrument busy ({RUNNING['action']})"))
         try:
@@ -100,6 +113,8 @@ class Handler(BaseHTTPRequestHandler):
                     INSTR.use_folder(args["folder"])
                 f = INSTR.count(float(args["t"]), title=args.get("title", ""), write=args.get("write", True))
                 out = dict(file=f, number=INSTR.number, n_counts=getattr(INSTR, "last_n_counts", None))
+                if args.get("stream") and f:
+                    out["streamed"] = _stream(f, hold=args.get("hold", False))
                 if args.get("image"):                          # detector image for live displays (NICOS)
                     out["image"] = INSTR.last_image.tolist()
                 return self._reply(200, out)
@@ -117,8 +132,31 @@ class Handler(BaseHTTPRequestHandler):
             LOCK.release()
 
 
+def _stream(f, hold=False):
+    """Replays the neutrons of file f to Kafka in real time; returns the number of events sent (0 if not possible)."""
+    if not hasattr(INSTR, "stream_pulses"):
+        return 0
+    sys.path.insert(0, os.path.join(HERE, "kafka"))
+    import streamer
+    if not streamer.available():
+        print("[server] live stream skipped: confluent-kafka / ess-streaming-data-types not installed", flush=True)
+        return 0
+    pulses = INSTR.stream_pulses(f)
+    STOP.clear(); GO.clear()
+    if hold:                                          # computed: wait for the start of the count (POST /go)
+        READY.set()
+        GO.wait(timeout=600)
+        READY.clear()
+    if STOP.is_set():
+        return 0
+    if "s" not in STREAMER:
+        STREAMER["s"] = streamer.Streamer(os.environ.get("TWIN_KAFKA", "127.0.0.1:9092"),
+                                          topic=f"{INSTR_NAME}_detector", source=f"{INSTR_NAME}_detector")
+    return STREAMER["s"].stream(pulses, stop=STOP)
+
+
 def main():
-    global INSTR
+    global INSTR, INSTR_NAME
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("--instrument", default="odin", choices=sorted(INSTRUMENTS))
     p.add_argument("--session", default=os.environ.get("TWIN_SESSION", "console"))
@@ -129,6 +167,7 @@ def main():
     sys.path.insert(0, os.path.join(HERE, folder))
     import importlib
     INSTR = getattr(importlib.import_module(module), cls)(session=a.session, mode=a.mode)
+    INSTR_NAME = a.instrument
     srv = ThreadingHTTPServer(("127.0.0.1", a.port), Handler)
     print(f"Virtual {a.instrument.upper()} ready: http://127.0.0.1:{a.port}  (session {a.session}, files in {INSTR.folder})",
           flush=True)
