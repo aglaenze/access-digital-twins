@@ -204,6 +204,19 @@ class TwinExperiment(EssExperiment):
         return False
 
     @property
+    def scriptpath(self):
+        """Folder of the user's scripts (default folder of Open/Save in the Scripting tab):
+        <dataroot>/<instrument>/<year>/<proposal>/scripts, next to raw/. (The generic value, based on the
+        proposalpath parameter that EssExperiment does not update, is a stale relative path.)"""
+        proposal = self.propinfo.get("proposal") or self.proposal or "0"
+        folder = os.path.join(self.dataroot, os.path.dirname(self.proposalpath_of(str(proposal))), "scripts")
+        try:
+            os.makedirs(folder, exist_ok=True)
+        except OSError:
+            pass
+        return folder.replace(os.sep, "/")
+
+    @property
     def proposalsymlink(self):
         return ""
 
