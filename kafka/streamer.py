@@ -34,6 +34,17 @@ class Streamer:
                                   "queue.buffering.max.kbytes": 1_048_576, "linger.ms": 5})
         self.message_id = 0
 
+    def empty_pulse(self):
+        """One pulse without neutrons, now: the detector stream of a real instrument never stops, so a histogrammer
+        always finds data around its start time (just-bin-it fails on an empty topic)."""
+        t = time.time_ns()
+        self.message_id += 1
+        empty = np.zeros(0, dtype=np.int32)
+        self.producer.produce(self.topic, serialise_ev44(self.source, self.message_id, np.array([t], dtype=np.int64),
+                                                         np.array([0], dtype=np.int32), empty, empty),
+                              timestamp=t // 1_000_000)
+        self.producer.flush(10)
+
     def stream(self, pulses, start_ns=None, speed=1.0, stop=None, tail_s=1.5):
         """Publishes the pulses at their times: pulse k at start_ns + offset_k / speed (wall clock). Returns the number
         of events sent. stop: optional threading.Event to interrupt. tail_s: then empty pulses for this time, as a

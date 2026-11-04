@@ -463,7 +463,7 @@ def events(hits, det, lam_min, lam_max, t0=T_EMISSION, period=FRAME):
         t = t0w + np.mod(np.mod(h["t"], period) - t0w, period)
         lam = H_OVER_M * (t - t0) / (L1 + L2)
         out[p.name] = dict(Q=4 * np.pi * np.sin(tth / 2) / lam, lam=lam, w=h["w"], lam_true=h["lam"],
-                           bank=p.bank, ix=h["ix"], iy=h["iy"])
+                           bank=p.bank, ix=h["ix"], iy=h["iy"], clock=np.mod(h["t"], FRAME))
     return out
 
 

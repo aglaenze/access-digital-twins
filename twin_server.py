@@ -143,15 +143,16 @@ def _stream(f, hold=False):
         return 0
     pulses = INSTR.stream_pulses(f)
     STOP.clear(); GO.clear()
+    if "s" not in STREAMER:
+        STREAMER["s"] = streamer.Streamer(os.environ.get("TWIN_KAFKA", "127.0.0.1:9092"),
+                                          topic=f"{INSTR_NAME}_detector", source=f"{INSTR_NAME}_detector")
+    STREAMER["s"].empty_pulse()                       # the detector stream exists before the count starts
     if hold:                                          # computed: wait for the start of the count (POST /go)
         READY.set()
         GO.wait(timeout=600)
         READY.clear()
     if STOP.is_set():
         return 0
-    if "s" not in STREAMER:
-        STREAMER["s"] = streamer.Streamer(os.environ.get("TWIN_KAFKA", "127.0.0.1:9092"),
-                                          topic=f"{INSTR_NAME}_detector", source=f"{INSTR_NAME}_detector")
     return STREAMER["s"].stream(pulses, stop=STOP)
 
 

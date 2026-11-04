@@ -130,7 +130,7 @@ not have (e.g. `pulse_skipping` on with `collimation` 8m) is refused by the twin
 The read-only devices show what the settings imply (`read('choppers')`... or the device list of the GUI): at ESS
 the chopper speeds and phases are devices too.
 
-### Live data (Kafka), as at ESS — ODIN
+### Live data (Kafka), as at ESS — ODIN and LoKI
 
 At ESS the detector sends every neutron to **Kafka** (a data-streaming system), pulse by pulse; **just-bin-it**
 histograms the stream and NICOS shows the histograms filling up during the count. The twin does the same:
@@ -156,7 +156,16 @@ the measurement, as a real detector streams all the time, so that just-bin-it se
 
 Checked on 2026-11-04 (Windows, NICOS GUI): a 10 s count of the iron plate fills the live image (plate visible) and
 the arrival-time spectrum during the 10 s; at the end the live image, the live spectrum and the file hold the same
-4 303 935 neutrons (open beam: 5 405 196, also identical). The container test (`container/smoke_test.py`) checks
+4 303 935 neutrons (open beam: 5 405 196, also identical).
+
+**LoKI** (`--instrument loki --live`): the twin streams the neutrons of the rear detector panel (392 × 250 pixels),
+topic `loki_detector`; a LoKI measurement gives millions of neutrons per second, so the live stream carries a random
+sample (at most 100 000 per second and 20 million per measurement, `VirtualLoki.STREAM_MAX_RATE`): the live image and
+spectrum have the right shape, with fewer counts; the file holds the full measurement. Checked: a 10 s count of the
+silica spheres (69 million neutrons) streams 998 647 of them; the live image shows the small-angle scattering around
+the beam stop, the arrival-time spectrum the wrap-around after 71.4 ms (the slowest neutrons appear at 0–13 ms).
+Before the count the twin publishes one empty pulse, as a real detector streams all the time (just-bin-it fails on an
+empty topic). The container test (`container/smoke_test.py`) checks
 that the histograms of just-bin-it hold all the streamed neutrons. Not reproduced: the ESS file-writer (the twin writes the
 file itself, before streaming), the EPICS forwarder (device values are not streamed).
 

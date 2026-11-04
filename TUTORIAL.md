@@ -231,7 +231,7 @@ Answer `1` (ODIN). After ~30 s the NICOS window of ESS opens. Log in with user *
 
 To stop: press Enter in the terminal where you started NICOS.
 
-**Live data, as at ESS** (ODIN): start with `python nicos\start_nicos.py --instrument odin --live` (needs Kafka and
+**Live data, as at ESS** (ODIN and LoKI): start with `python nicos\start_nicos.py --instrument odin --live` (needs Kafka and
 just-bin-it, installed as in `nicos/README.md`, "Live data"). A count then takes its real time, and during it the tab
 **Detector image** shows the image and the spectrum of the arrival times filling up (panels `live_image` and
 `live_tof`), as on the real instrument where the neutrons are streamed by Kafka and histogrammed by just-bin-it.

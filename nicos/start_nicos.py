@@ -46,7 +46,7 @@ LOGS = os.path.join(RUN_ROOT, "nicos")
 PROCS = []
 # instruments with a NICOS package nicos_twin/<name> (same names as in twin_server.INSTRUMENTS)
 INSTRUMENTS = {"odin": "ODIN — neutron imaging", "loki": "LoKI — small-angle neutron scattering (first version)"}
-LIVE = {"odin"}            # instruments with live data (setup nicos_twin/<instrument>/setups/live.py)
+LIVE = {"odin", "loki"}    # instruments with live data (setup nicos_twin/<instrument>/setups/live.py)
 JBI_HOME = os.environ.get("JBI_HOME", os.path.join(HOME, "McStas_runs", "just-bin-it"))
 
 

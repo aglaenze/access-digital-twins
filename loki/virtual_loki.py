@@ -229,6 +229,7 @@ class VirtualLoki:
             raise ValueError("counting time between 0 and 24 h")
         sim = self.simulate() if self.beam_on() else None
         self._live_image(sim, t)
+        self._last_sim, self._last_t = sim, t          # for the live stream (stream_pulses)
         if not write:
             self._log("count", dict(t=t, title=title, file=None, n_counts=self.last_n_counts, state=self.state))
             return None
@@ -252,6 +253,40 @@ class VirtualLoki:
                     g["Idev"] = err[ok]; g["Idev"].attrs["units"] = "1/cm"
         self._log("count", dict(t=t, title=title, file=path, n_counts=self.last_n_counts, state=self.state))
         return path
+
+    STREAM_MAX_RATE = 1e5          # neutrons per second in the live stream (Kafka), at most
+    STREAM_MAX_EVENTS = 2e7        # and per measurement
+
+    def stream_pulses(self, path=None):
+        """Neutrons of the last measurement on the rear detector panel, pulse by pulse, for the live stream
+        (../kafka/streamer.py): list of (time of the pulse after the first one [ns], detector clock = arrival time
+        after the last source pulse [ns], pixel ids 1 + row * columns + column). A LoKI measurement gives millions
+        of neutrons per second; the live stream carries a random sample of them (at most STREAM_MAX_RATE per second
+        and STREAM_MAX_EVENTS per measurement, fraction in self.stream_fraction): the live image and spectrum have the
+        right shape, with fewer counts; the file holds the full measurement."""
+        sim, t = getattr(self, "_last_sim", None), getattr(self, "_last_t", 0.0)
+        n_pulses = max(1, int(round(t * 14)))
+        offsets = (np.arange(n_pulses) * 1e9 / 14).astype(np.int64)
+        self.stream_fraction = 0.0
+        if sim is None:
+            return [(int(o), np.zeros(0, np.int32), np.zeros(0, np.int32)) for o in offsets]
+        ev, det = sim[0], sim[1]
+        lo, hi = self.band()
+        cols = self.image_shape()[1]
+        e = next(ev[p.name] for p in det.panels if p.bank == "rear")
+        m = (e["lam"] >= lo) & (e["lam"] < hi)
+        expected = e["w"][m] * t
+        total = expected.sum()
+        k = min(1.0, self.STREAM_MAX_RATE * t / total, self.STREAM_MAX_EVENTS / total) if total > 0 else 0.0
+        self.stream_fraction = k
+        n = self.rng.poisson(expected * k)
+        pix = np.repeat((1 + e["iy"][m] * cols + e["ix"][m]).astype(np.int32), n)
+        tof = np.repeat((e["clock"][m] * 1e9).astype(np.int32), n)
+        pulse = self.rng.integers(0, n_pulses, len(pix))
+        order = np.argsort(pulse, kind="stable")
+        pix, tof, pulse = pix[order], tof[order], pulse[order]
+        bounds = np.searchsorted(pulse, np.arange(n_pulses + 1))
+        return [(int(offsets[j]), tof[bounds[j]:bounds[j + 1]], pix[bounds[j]:bounds[j + 1]]) for j in range(n_pulses)]
 
     def _live_image(self, sim, t):
         """Counts of a t-second measurement on the rear panel (Poisson), and the total on all panels."""

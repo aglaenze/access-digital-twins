@@ -129,4 +129,5 @@ processes: the easy case takes 2 min (compilation + downstream part), Rg = 39.3 
 3. Done on 2026-11-04: collimations 5 m and 8 m, rear detector at 5 or 10 m, pulse skipping (§ Configurations).
    To do: understand the 4 % low level with a short collimation and the detector at 10 m; more samples.
 4. Done on 2026-11-04: twin server, console and NICOS (`../nicos/nicos_twin/loki/`, ESS GUI of LoKI), analysis
-   notebook, container image. Still to do: web page.
+   notebook, container image, live data with Kafka and just-bin-it (rear panel, sample of the neutrons;
+   `../nicos/README.md`, "Live data"). Still to do: web page.

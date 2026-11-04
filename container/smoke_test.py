@@ -120,13 +120,17 @@ else:
     hists = Consumer({"bootstrap.servers": "127.0.0.1:9092", "group.id": "smoke-h", "auto.offset.reset": "earliest",
                       "fetch.message.max.bytes": 16_000_000})
     hists.subscribe(["test_visualisation"])
-    config = {"cmd": "config", "msg_id": "smoke-1", "input_schema": "ev44", "output_schema": "hs01", "interval": 30,
+    now_ms = int(time.time() * 1000)
+    config = {"cmd": "config", "msg_id": "smoke-1", "input_schema": "ev44", "output_schema": "hs01",
+              "start": now_ms, "stop": now_ms + 60_000,
               "histograms": [
                   {"type": "dethist", "data_brokers": ["127.0.0.1:9092"], "data_topics": ["odin_detector"],
                    "det_range": [1, 16385], "width": 128, "height": 128, "topic": "test_visualisation", "id": "image"},
                   {"type": "hist1d", "data_brokers": ["127.0.0.1:9092"], "data_topics": ["odin_detector"],
                    "tof_range": [0, 71428571], "num_bins": 300, "topic": "test_visualisation", "id": "tof"}]}
     prod = Producer({"bootstrap.servers": "127.0.0.1:9092"})
+    det_stream = streamer.Streamer("127.0.0.1:9092", topic="odin_detector", source="odin_detector")
+    det_stream.empty_pulse()                         # a detector stream exists before the histogramming starts
     acked = False
     for attempt in range(6):                         # just-bin-it may still be starting: resend until acknowledged
         prod.produce("test_jbi_commands", json.dumps(config).encode()); prod.flush(10)
@@ -139,7 +143,7 @@ else:
         if acked:
             break
     check(acked, "just-bin-it acknowledged the histogram configuration")
-    sent = streamer.Streamer("127.0.0.1:9092", topic="odin_detector", source="odin_detector").stream(pulses)
+    sent = det_stream.stream(pulses)
     print(f"streamed {sent} events in {len(pulses)} pulses")
     last, t1 = {}, time.time()
     while time.time() - t1 < 60:                     # latest histograms (just-bin-it publishes every 0.5 s)
