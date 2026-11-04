@@ -1,6 +1,9 @@
 """Generates twin/odin/ODIN_analysis.ipynb: analysis of the data of a virtual ODIN session, step by step.
 
-    python gen_analysis_notebook.py          # writes the notebook (no outputs: the student runs it)
+    python gen_analysis_notebook.py          # writes the notebook
+
+The outputs already in ODIN_analysis.ipynb are kept for every cell whose code is unchanged (a regeneration does not
+erase an analysis that was run); the cells that changed come without outputs.
 
 The notebook works on any folder of the twin: a session of the web page or of the console
 (TWIN_RUN_ROOT/odin/<session>) or a NICOS proposal (TWIN_RUN_ROOT/data/odin/<year>/<proposal>/raw). Without a folder,
@@ -41,13 +44,15 @@ Write in `FOLDER` the folder of your measurements:
   e.g. `f"{TWIN_RUN_ROOT}/data/odin/2026/1234/raw"`.
 
 `TWIN_RUN_ROOT` is the root of the results of the twin (`/data/twin` in the container,
-`C:\Users\<you>\McStas_runs\twin` on Windows). Leave `FOLDER = None` to measure a small demonstration session first
-(dark, open beam, iron plate, 10 s each; about 1 min).
+`C:\Users\<you>\McStas_runs\twin` on Windows). With `FOLDER = None` (remove the `#` in front of it and put one in
+front of the other `FOLDER` line), the notebook measures a small demonstration session first (dark, open beam, iron
+plate, 10 s each; about 1 min).
 """)
 
 code(r"""
 from odin_paths import TWIN_RUN_ROOT          # root of the results of the twins
-FOLDER = None                                  # or e.g. f"{TWIN_RUN_ROOT}/data/odin/2026/1234/raw"
+# FOLDER = None                                  # or e.g. f"{TWIN_RUN_ROOT}/data/odin/2026/1234/raw"
+FOLDER = f"{TWIN_RUN_ROOT}/data/odin/2026/1234/raw"
 """)
 
 code(r"""
@@ -390,5 +395,15 @@ nb["cells"] = cells
 nb["metadata"] = {"kernelspec": {"display_name": "Python 3", "language": "python", "name": "python3"},
                   "language_info": {"name": "python"}}
 out = os.path.join(HERE, "ODIN_analysis.ipynb")
+kept = 0
+if os.path.isfile(out):              # keep the outputs (and cell ids) of the code cells whose code is unchanged
+    old = nbf.read(out, as_version=4)
+    previous = {c.source: c for c in old.cells if c.cell_type == "code"}
+    for c in nb.cells:
+        if c.cell_type == "code" and c.source in previous:
+            p = previous[c.source]
+            c.outputs, c.execution_count, c["id"] = p.outputs, p.execution_count, p.get("id", c.get("id"))
+            kept += bool(p.outputs)
+    nb["metadata"] = old.metadata or nb["metadata"]
 nbf.write(nb, out)
-print("written", out)
+print("written", out, f"({kept} cells with their outputs kept)")
