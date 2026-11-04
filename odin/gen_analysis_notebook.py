@@ -150,6 +150,41 @@ sub-folders). The detector (`timepix3`) does not record an image: it records **e
   14 pulses per second);
 - `event_time_zero` / `event_index`: when each pulse happened and which events belong to it.
 
+The cell below prints an extract of the open-beam file: the first source pulses, then the first five neutrons, exactly
+as they are stored.
+""")
+
+code(r"""
+import datetime
+with h5py.File(path(OPEN), "r") as f:
+    det = f["entry/instrument/timepix3"]
+    t_zero = det["data/event_time_zero"][:3]       # ns since 1 January 1970 (UTC)
+    index = det["data/event_index"][:3]
+    ids = det["data/event_id"][:5]
+    toa = det["data/event_time_offset"][:5]        # ns after the start of the pulse
+    x_off, y_off = det["x_pixel_offset"][()], det["y_pixel_offset"][()]    # pixel centers [m]
+
+print("source pulses")
+print("  pulse   event_time_zero [ns]   = date and time (UTC)            event_index (first event of the pulse)")
+for k, (tz, i0) in enumerate(zip(t_zero, index)):
+    date = datetime.datetime.fromtimestamp(tz / 1e9, datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f")
+    print(f"  {k:5d}   {tz:20d}   {date}   {i0:10d}")
+print("\nfirst neutrons (all in pulse 0)")
+print("  event   event_id (pixel)   -> x, y on the detector [mm]   event_time_offset [ns]   = [ms]")
+for k, (pix, t) in enumerate(zip(ids, toa)):
+    ix, iy = (pix - 1) % len(x_off), (pix - 1) // len(x_off)      # pixel number = 1 + ix + 4096 iy
+    print(f"  {k:5d}   {pix:16d}   {x_off[ix] * 1e3:+6.2f}, {y_off[iy] * 1e3:+6.2f}"
+          f"{'':15s}{t:16.0f}   {t / 1e6:7.3f}")
+""")
+
+md(r"""
+**Reading the extract.** Each neutron is just two numbers: a pixel number and an arrival time. The first neutron
+hit pixel number `event_id` (the Timepix3 camera has 4096 × 4096 pixels, numbered row by row, which gives its position
+on the 14 mm × 14 mm detector) `event_time_offset` nanoseconds after the start of pulse 0. The pulses are 71.4 ms apart (1/14 s):
+compare the `event_time_zero` of pulses 0 and 1. `event_index` says where each pulse starts in the list of
+events: the events of pulse 0 are those numbered from `event_index[0]` to `event_index[1]` − 1, and so on. An image,
+a spectrum, a transmission: everything that follows is computed from these lists.
+
 The file also contains the state of the instrument (choppers, pinhole, shutter, sample stage...) and the **proton
 charge** of every pulse: the number of protons that hit the target, to which the number of neutrons produced is
 proportional.
