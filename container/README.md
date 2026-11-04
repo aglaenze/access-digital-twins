@@ -20,7 +20,7 @@ and runs identically on a laptop, a DTU server, UCloud or ESS's VISA.
 | `environment-nicos.yml` | environment of NICOS (Python 3.12, numpy 1.26); NICOS's `requirements.txt` is installed on top |
 | `start.sh` | entry point: `jupyter` (default), `voila`, `nicos`, `test`, or any command |
 | `fetch_fronts.py` | downloads the precomputed McStas upstream parts (release `fronts-v1`) into `$TWIN_RUN_ROOT/odin/front/` |
-| `smoke_test.py` | test run after each build: tools, a measurement with the virtual ODIN compared with NCrystal, NICOS services |
+| `smoke_test.py` | test run after each build: tools, a measurement with the virtual ODIN compared with NCrystal, NICOS services and a measurement recorded through NICOS (`nexusfile_open`, as at ESS) |
 | `../.github/workflows/container.yml` | GitHub Actions: build, test, publish to `ghcr.io/aglaenze/access-digital-twins` |
 
 ## Precomputed McStas upstream parts
@@ -37,7 +37,9 @@ no token is needed. To compute them yourself instead: `odin_mcstas.front(...)` (
 docker run --rm -p 8888:8888 -v twin-data:/data ghcr.io/aglaenze/access-digital-twins
 ```
 then open the address printed by JupyterLab. Other entry points: `... access-digital-twins voila` (student page,
-port 8866), `... nicos` (NICOS daemon, port 1301), `... test`. Results and NICOS data are in the volume (`/data/twin`).
+port 8866), `... nicos` (NICOS services of ODIN, port 1301; another instrument: `-e TWIN_INSTRUMENT=...`), `... test`.
+Results and NICOS data (`/data/twin/data/<instrument>/<year>/<proposal>/raw/`) are in the volume (`/data/twin`).
+The image contains the ODIN twin; LoKI needs its official model and upstream part, not yet in the image.
 
 The image is built by GitHub Actions on every push to `main` (about 30–60 min the first time, faster afterward
 thanks to the build cache); the run, its logs and the smoke test are in the "Actions" tab of the repository.

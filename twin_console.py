@@ -1,4 +1,4 @@
-"""Provisional console of a virtual instrument, until NICOS is available: same commands as the NICOS console.
+"""Console of a virtual instrument without NICOS: the same commands as the NICOS console (simpler set-up).
 
     python -i twin_console.py                  # interactive console
     python twin_console.py my_script.py        # runs a command script (like a NICOS script)

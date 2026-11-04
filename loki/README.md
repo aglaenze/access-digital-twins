@@ -65,4 +65,5 @@ notebook series.
 2. A real SANS session: empty beam, empty cell, solvent, sample, dark, water (absolute calibration), with
    transmissions; the samples of the notebook series (Nafion membrane, catalyst layer, porous electrode).
 3. Collimations 5 m and 8 m (rear detector at 10 m), to reach lower Q.
-4. Server (`../twin_server.py`), console, NICOS setup (`../nicos/nicos_twin/loki/`), web page, container.
+4. Done on 2026-11-04: twin server, console and NICOS (`../nicos/nicos_twin/loki/`, ESS GUI of LoKI). Still to do:
+   web page, and LoKI in the container image (official model and precomputed upstream part).

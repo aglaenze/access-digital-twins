@@ -23,13 +23,13 @@ def arrow(x1, y1, x2, y2, txt="", dx=0, dy=0.13, ha="center", style="-|>", ls="-
 
 # Top row: what the user sees
 ax.text(0.2, 8.35, "What the user sees", fontsize=11, fontweight="bold", color="0.35")
-box(0.2, 6.55, 3.6, 1.55, "Console (provisional)", "odin_console.py\nmove(stage_x, 0.5)\ncount(10) · scan(...)\n→ later: NICOS", C["ui"])
+box(0.2, 6.55, 3.6, 1.55, "NICOS or console", "NICOS (ESS GUI) · twin_console.py\nmove(stage_x, ...) · scan(...)\nnexusfile_open · count(t=10)", C["ui"])
 box(4.3, 6.55, 3.6, 1.55, "Student page (Voilà)", "ODIN_virtual.ipynb\nbuttons, logbook,\ntransmission", C["ui"])
 box(11.2, 6.55, 3.6, 1.55, "Analysis (Master)", "Jupyter notebook\nodin_reduction, odin_tomo\n(code visible)", C["ui"])
 
 # Middle row: control and files
 ax.text(0.2, 5.75, "Instrument control and data", fontsize=11, fontweight="bold", color="0.35")
-box(0.2, 3.7, 3.6, 1.8, "Server", 'odin_server.py\nHTTP + JSON, local\none measurement at a time\n("instrument busy")', C["ctl"])
+box(0.2, 3.7, 3.6, 1.8, "Server", 'twin_server.py\nHTTP + JSON, local\none measurement at a time\n("instrument busy")', C["ctl"])
 box(4.3, 3.7, 3.6, 1.8, "Virtual instrument", "odin_virtual.py\ndevices: choppers, shutter,\npinhole, diffuser, stages\ncount → counts · log.jsonl", C["ctl"])
 box(8.4, 3.7, 2.5, 1.8, "NeXus file", "odin_NNNNNN.nxs\nESS format\n(template: real\nODIN file)", C["data"])
 box(11.2, 3.7, 3.6, 1.8, "Official reduction", "essimaging\n(OdinBraggEdgeWorkflow)\ntime → λ from the choppers\nT = (E−N)/(O−N) / charge", C["red"])

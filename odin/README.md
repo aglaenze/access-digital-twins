@@ -350,10 +350,12 @@ positions (6.85/7.15 m, 6.95/7.05 m).
 log; a command sent during a measurement is refused ("instrument busy"), status remains available.
 
 ## 10. NICOS
-NICOS drives the twin since 2026-11-03, on Windows (cache, daemon, GUI): `../nicos/README.md`. NICOS requires
-numpy < 2 while the twin uses numpy 2, so NICOS runs in its own conda environment (`nicos`) and its devices send their
-orders to `../twin_server.py`, exactly like the console. The McStas device of NICOS
-(`nicos/devices/mcstas.py`, Linux only) is not used.
+NICOS drives the twin since 2026-11-03 (Windows, and Linux in the container), organized as at ESS since 2026-11-04:
+the setup package `nicos_twin.odin` is built on `nicos_ess.odin` (the NICOS of the real ODIN), with the same GUI,
+the ESS experiment (proposal number) and the ESS recording commands (`nexusfile_open`); details in
+`../nicos/README.md`. NICOS requires numpy < 2 while the twin uses numpy 2, so NICOS runs in its own conda environment
+(`nicos`) and its devices send their orders to `../twin_server.py`, exactly like the console. The McStas device of
+NICOS (`nicos/devices/mcstas.py`, Linux only) is not used.
 
 ## 11. Games and visualizations
 
