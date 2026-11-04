@@ -167,15 +167,15 @@ md(r"""
 
 For each pixel and each λ, the transmission is
 
-<p style="text-align:center; font-size:1.15em"><i>T</i> = (<i>E</i> − <i>N</i>) / (<i>O</i> − <i>N</i>)</p>
+$$T = \frac{E - N}{O - N}$$
 
-with *E*, *O* and *N* the counts of the sample, open-beam and dark runs. The dark run is first scaled to the duration
+with $E$, $O$ and $N$ the counts of the sample, open-beam and dark runs. The dark run is first scaled to the duration
 of each measurement and subtracted. Then each measurement is divided by the **proton charge** received by the target
 during the measurement (it is recorded in the file): the number of neutrons produced by the source is proportional to
 it, and the source power is never perfectly constant. The λ of each neutron is computed from its arrival time, with
 the chopper settings and distances written in the file.
 
-The spectrum *T*(λ) is computed in the central 6 mm × 6 mm square (red on the image).
+The spectrum $T(\lambda)$ is computed in the central 6 mm × 6 mm square (red on the image).
 """)
 
 code(r"""
@@ -223,9 +223,9 @@ McStas simulation).
 
 ## 4. Questions
 
-1. At which λ does the transmission jump abruptly? Using Bragg's law (λ = 2*d* sin θ, at most 2*d*),
-   which distance *d* between atomic planes do you deduce? Compare with the (110) planes of α-iron
-   (*a* = 2.867 Å, *d*₁₁₀ = *a*/√2).
+1. At which λ does the transmission jump abruptly? Using Bragg's law ($\lambda = 2d\sin\theta$, at most $2d$),
+   which distance $d$ between atomic planes do you deduce? Compare with the (110) planes of α-iron
+   ($a$ = 2.867 Å, $d_{110} = a/\sqrt2$).
 2. Repeat the sample measurement but forget to open the shutter. What do you see? How would you have noticed it
    without reducing the data?
 3. Compare a 10 s and a 90 s measurement: how do the error bars change? Why?
