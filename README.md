@@ -60,7 +60,9 @@ replay, chopper diagrams, progressive tomography, 3D neutron trajectories): `odi
 `voila odin/ODIN_mission.ipynb`, `python odin/show_3d.py`.
 
 ODIN data are NeXus files (ESS format), reduced with the official ESS code (`odin/odin_reduction.py`, built on
-`essimaging`); LoKI data are I(Q) per detector bank (first version).
+`essimaging`); LoKI data are I(Q) per detector bank (first version). Each instrument has a step-by-step analysis
+notebook for the students: `odin/ODIN_analysis.ipynb` (transmission, Bragg edges) and `loki/LoKI_analysis.ipynb`
+(Guinier and sphere-model fits).
 
 ## Python environments
 

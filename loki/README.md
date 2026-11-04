@@ -7,9 +7,9 @@ notebook series of this project, where every step of the simulation and of the r
 
 **Status: first version, one easy test case (below).** Driven from Python, from the console (`twin_server.py
 --instrument loki` + `twin_console.py`) or from NICOS (`../nicos/start_nicos.py --instrument loki`, ESS GUI and
-device names `heavy_shutter`, `fast_shutter`). Not yet: raw event files in the ESS NeXus format, reduction with the
-ESS software (`esssans`), the full series of measurements of a real SANS experiment (empty cell, solvent, dark, water
-calibration), web page, container.
+device names `heavy_shutter`, `fast_shutter`); data analyzed in `LoKI_analysis.ipynb`. Not yet: raw event files
+in the ESS NeXus format, reduction with the ESS software (`esssans`), the full series of measurements of a real SANS
+experiment (empty cell, solvent, dark, water calibration), web page, container.
 
 ## Easy test case: dilute silica spheres
 
@@ -48,6 +48,7 @@ simulation, then cached).
 | `loki_samples.py` | samples (dΣ/dΩ in cm⁻¹ sr⁻¹): `silica_spheres` |
 | `virtual_loki.py` | the virtual instrument (`VirtualLoki`, `read`) |
 | `easy_case.py` | the test case above and its figure |
+| `gen_analysis_notebook.py` → `LoKI_analysis.ipynb` | analysis notebook (JupyterLab): logbook, file content, I(Q) of the three banks, Guinier fit (Rg), sphere-model fit (R, background), volume fraction from I(0); on any session or proposal folder (demonstration, 10 min: Rg = 39.4 ± 0.2 Å, R = 49.6 Å, φ = 1.00 %) |
 | `components/SANS_Iq_table.comp` | McStas sample component (isotropic SANS from a table, absolute units) |
 
 ## Installation

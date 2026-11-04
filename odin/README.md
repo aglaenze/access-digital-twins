@@ -39,6 +39,7 @@ explained, and every approximation is stated and checked.
 | `example_session.py` | example session script for the console |
 | `gen_student_page.py` → `ODIN_virtual.ipynb` | student page (Voilà): operate, live replay, chopper diagram, logbook review, reduce, questions |
 | `gen_mission_page.py` → `ODIN_mission.ipynb` | game page (Voilà): mission "unknown metals" with beamtime budget and score, mission "something is wrong" |
+| `gen_analysis_notebook.py` → `ODIN_analysis.ipynb` | analysis notebook (JupyterLab, code visible): logbook, inside a NeXus file, raw counts, reduction, fit of the Bragg edges of iron → plane spacings; on any session or proposal folder |
 | `odin_games.py` | missions (`MetalMission`, `Troubleshooting`) and automatic logbook review (`review_log`, badges) |
 | `odin_viz.py` | live detector replay, chopper time–distance diagram, progressive tomography, players for the pages |
 | `show_3d.py` | 3D view of the neutrons flying through ODIN (McStas `mcdisplay`, WebGL, in the browser) |
@@ -365,6 +366,9 @@ browser (Voilà pages) as well as in notebooks.
 **Pages**
 - `ODIN_virtual.ipynb` (`gen_student_page.py`): guided Bragg-edge measurement (Bachelor level); after each count, a
   replay of the detector; "chopper diagram" button; "review my logbook" button.
+- `ODIN_analysis.ipynb` (`gen_analysis_notebook.py`): step-by-step analysis of a session or proposal folder, code
+  visible (JupyterLab): logbook → NeXus content → reduction → Bragg-edge fits (demonstration session, 10 s per run:
+  (110) edge at 4.059 ± 0.001 Å for 4.054 Å expected, a 0.13 % systematic offset discussed in the notebook).
 - `ODIN_mission.ipynb` (`gen_mission_page.py`): `voila ODIN_mission.ipynb` (session: variable `TWIN_SESSION`, one per
   student or group).
   - **Mission 1, "Unknown metals"**: three plates (sample_A, B, C) of metals drawn among Fe, V, Nb (bcc) and Cu, Ni,

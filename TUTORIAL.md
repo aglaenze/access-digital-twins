@@ -262,8 +262,13 @@ Each measurement is a NeXus file `odin_000001.nxs`, `odin_000002.nxs`, ... (the 
 detected neutron with its pixel and arrival time, plus the state of the instrument), and `log.jsonl` is the logbook
 of the session.
 
-**Analyze them** in a notebook (JupyterLab: *File → New → Notebook*, in the folder `odin`), with the official ESS
-reduction software:
+**Analyze them** with the notebook `odin/ODIN_analysis.ipynb` (open it in JupyterLab; route B: `jupyter lab` in the
+folder `twin`). Write your folder in its first cell and run the cells one after the other: it reads the logbook,
+finds your dark, open beam and sample, shows what is inside a NeXus file, reduces the data with the official ESS
+software (transmission spectrum and image) and fits the Bragg edges of iron to give the distance between its atomic
+planes. Leave `FOLDER = None` to try it first on a small demonstration session (about 1 min).
+
+The heart of it fits in a few lines, if you prefer your own notebook (*File → New → Notebook*, in the folder `odin`):
 ```python
 import odin_reduction as red
 folder = "/data/twin/odin/my_first_session"        # route B: r"C:\Users\<you>\McStas_runs\twin\odin\my_first_session"
@@ -313,6 +318,11 @@ with nexusfile_open('silica spheres, 10 min'):
 ```
 (`heavy_shutter` and `fast_shutter` are the names used by the NICOS of the real LoKI.) The file contains I(Q) of the
 three detector banks; the Detector image tab shows the rear detector. Details: `loki/README.md`.
+
+**Analyze** with the notebook `loki/LoKI_analysis.ipynb` (`jupyter lab` in the folder `twin`): write your folder
+(session or proposal) in its first cell, then run the cells. It plots I(Q) of the three banks, finds the radius of
+gyration with a Guinier fit, fits a sphere model to the whole curve (radius, background) and deduces the volume
+fraction of the spheres from I(0). Leave `FOLDER = None` to measure the silica spheres first.
 
 ### DREAM, BIFROST
 
