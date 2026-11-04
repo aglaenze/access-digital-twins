@@ -93,7 +93,9 @@ without a proposal number NICOS refuses to count ("cannot start writing as propo
 `nexusfile_open('title')` sets the title, which is also the experiment title shown at the top of the GUI.
 The tab **Detector image** shows the image of the last count; the files go to
 `<TWIN_RUN_ROOT>/data/<instrument>/<year>/<proposal>/raw/` (shown by `det.lastfile`). Scripts: tab **Scripting**
-(editor, Run), or `run_nicos_script.py my_script.py` from a terminal (§ 4).
+(editor: Save, Run), saved by default in the scripts folder of the proposal,
+`<TWIN_RUN_ROOT>/data/<instrument>/<year>/<proposal>/scripts/`, where `run('my_script.py')` also finds them; or
+`run_nicos_script.py my_script.py` from a terminal (§ 4).
 
 Devices of **ODIN** (`nicos_twin/odin/setups/odin.py`):
 

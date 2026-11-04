@@ -219,6 +219,9 @@ Answer `1` (ODIN). After ~30 s the NICOS window of ESS opens. Log in with user *
    with nexusfile_open('iron plate'):
        count(t=10)
    ```
+   In **Scripting**, *Save* proposes the scripts folder of your proposal
+   (`McStas_runs\twin\data\odin\<year>\<proposal>\scripts\`); a saved script can be run again later with
+   `run('my_script.py')`.
    `with nexusfile_open('title'):` is the ESS way of recording: what is measured in the indented block is written to
    a data file with this title. (In NICOS, the stage position is in **millimeters**: 500 mm = out of the beam.)
 3. The devices and their values are on the right; the image of the last count is in **Detector image**;
