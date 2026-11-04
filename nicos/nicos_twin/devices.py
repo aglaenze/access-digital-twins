@@ -112,9 +112,16 @@ class TwinSwitch(TwinDevice, Moveable):
 
 class TwinReadable(TwinDevice, Readable):
     """A read-only value of the twin that follows from the settings (e.g. speed and delay of a chopper, set by the
-    chopper mode), as the readback devices of the real instrument."""
-    parameter_overrides = {"unit": Override(mandatory=False, default="")}
+    chopper mode), as the readback devices of the real instrument. maxage 0: always read from the twin (a value kept
+    in the NICOS cache would lag behind a change of configuration); pollinterval 2 s for the device list of the GUI."""
+    parameter_overrides = {"unit": Override(mandatory=False, default=""),
+                           "maxage": Override(default=0),
+                           "pollinterval": Override(default=2)}
     valuetype = anytype
+
+    def read(self, maxage=None):
+        # NICOS keeps the parameters (maxage included) in its cache between sessions: force a fresh read here
+        return Readable.read(self, 0)
 
     def doRead(self, maxage=0):
         return _request(self.twinurl, "/status", timeout=10)["readings"][self.twindevice]
