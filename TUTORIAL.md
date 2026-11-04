@@ -1,12 +1,24 @@
 # Tutorial: your first session with a digital twin
 
-This guide takes you, step by step, from nothing to your first measurement with the virtual ODIN (neutron imaging
-at the European Spallation Source). No prior knowledge of McStas or NICOS is needed. Commands to type are in grey
+This guide takes you, step by step, from nothing to your first measurement with a digital twin of an instrument of
+the European Spallation Source (ESS). No prior knowledge of McStas or NICOS is needed. Commands to type are in grey
 boxes; copy them exactly.
 
-**What you will do**: install the twin (part 1), then measure the transmission of an iron plate in one of three ways
-(parts 2–4): in a web page, with a console, or with NICOS, the control software of the real instrument. Part 5 tells
-you where your data are and how to analyse them.
+**Which instruments?** The twins do not all offer the same things yet:
+
+| Instrument | Technique | Web page | Console | NICOS | Python script |
+|---|---|:-:|:-:|:-:|:-:|
+| ODIN | neutron imaging | yes | yes | yes | yes |
+| LoKI | small-angle scattering (SANS) | — | — | — | yes (first version) |
+| DREAM, BIFROST | diffraction, inelastic scattering | — | — | — | — (to do) |
+
+The installation (part 1) is common to all twins. The three ways to use a twin (parts 2–4) are shown with **ODIN**,
+the only twin that offers them all for now; the other twins will work the same way (same commands, with
+`--instrument loki`, ...) as they are completed. Part 6 shows how to run the LoKI twin.
+
+**What you will do**: install the twins (part 1), then measure the transmission of an iron plate with ODIN in one of
+three ways (parts 2–4): in a web page, with a console, or with NICOS, the control software of the real instruments.
+Part 5 tells you where your data are and how to analyse them; part 6 covers the other instruments.
 
 Expect: 20–60 min for the installation (mostly downloads), a few minutes per measurement session.
 
@@ -94,6 +106,10 @@ repeated). To start from scratch: `docker rm twin`, then step 4 again.
    ```
    It should end with `ALL PASSED`.
 8. *(Optional, only for part 4 with the graphical interface)* install NICOS: `nicos/README.md` § 5.
+9. *(Optional, only for the LoKI twin, part 6)* install the official McStas model of LoKI:
+   ```
+   git clone https://git.esss.dk/dmsc-instrumentmodels/LOKI.git %USERPROFILE%\McStas_runs\LOKI
+   ```
 
 Results never go into the repository folder: they go to `%USERPROFILE%\McStas_runs\twin` (McStas does not accept
 spaces in paths, so this folder must not be in OneDrive or a folder with spaces).
@@ -230,6 +246,36 @@ r["image"].plot()          # transmission image
 **Going further**: other chopper modes (`move(choppers, "natural")`, `"white"`), tomography (rotate the sample with
 `scan(stage_rot, 0, 3, 60, t=10)`), the games of `ODIN_mission.ipynb`, the 3D view of the neutrons in the beamline
 (`python odin/show_3d.py`, route B). Everything is explained in `odin/README.md`.
+
+---
+
+## Part 6 — Other instruments
+
+### LoKI (small-angle neutron scattering) — first version
+
+For now the LoKI twin is used from Python only (no web page, console or NICOS yet), and only with **route B**
+(step 9 of the installation; the container does not contain the LoKI model yet). Its test case measures dilute silica
+spheres (radius 50 Å) for 10 min and fits their size:
+```
+cd loki
+python easy_case.py
+```
+The first run takes ~15 min (McStas simulation of the beamline, then kept in `%USERPROFILE%\McStas_runs\twin\loki`),
+the next ones ~2 min. It prints the radius of gyration found (expected ≈ 39 Å) and saves the figure
+`figures/easy_case.png`: I(Q) of the three detector banks on the exact curve. To measure yourself, in Python
+(started in the folder `loki`):
+```python
+from virtual_loki import VirtualLoki, read
+loki = VirtualLoki(session="my_first_sans")
+loki.move(sample="silica_spheres", collimation="3m", shutter="open")
+f = loki.count(600)          # 600 s; returns the file written
+data = read(f)               # {"front": (Q, I, dI), "middle": ..., "rear": ...}
+```
+Details: `loki/README.md`.
+
+### DREAM, BIFROST
+
+Not started yet; they will appear here when their twin exists.
 
 ---
 
