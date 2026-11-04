@@ -23,7 +23,7 @@ main_window = docked(
                          ),
                         ('Detector Image',
                          panel(
-                             'nicos_ess.odin.gui.panels.live.MultiLiveDataPanel'
+                             'nicos_twin.gui.LiveDataPanel'
                          )),
                         ('Script Status',
                          panel(
