@@ -20,7 +20,7 @@ explained, and every approximation is stated and checked.
 8. [Troubleshooting](#8-troubleshooting)
 9. [Validation](#9-validation)
 10. [NICOS](#10-nicos)
-11. [Games and visualisations](#11-games-and-visualisations)
+11. [Games and visualizations](#11-games-and-visualizations)
 
 ## 1. What is in this folder
 
@@ -178,7 +178,7 @@ What hybrid mode neglects: neutrons **scattered** by the sample that reach the d
 "mcstas" mode (`VirtualOdin(mode="mcstas")`) simulates everything with McStas, sample included (scattering included),
 but only for short counts; it is used to validate hybrid mode. It uses a "focused" diffuser
 (`components/Graphite_Diffuser_focus.comp`): same physics as the diffuser of the official model, but neutrons are sent
-preferentially towards the field of view and their weight is corrected (mixture of the physical law and of a uniform
+preferentially toward the field of view and their weight is corrected (mixture of the physical law and of a uniform
 aiming law, weight × p/q, unbiased); ~50 times more useful events.
 
 ### 4.3 From simulated neutron to measured count (virtual detector)
@@ -210,7 +210,7 @@ the real instrument: source at −60.5 m, sample at the origin.
    realistic ESS pulse; § 7) and groups the counts by pixel. At the
    boundaries between WFM sub-frames, λ is ambiguous: the count gets NaN and is not used.
 2. Transmission: T = [(E − N·t_E/t_N)/Q_E] / [(O − N·t_O/t_N)/Q_O], with E, O, N the counts of the sample, open-beam
-   and dark runs, t the durations, Q the proton charges (normalisation by duration if the log is empty).
+   and dark runs, t the durations, Q the proton charges (normalization by duration if the log is empty).
    Uncertainties: Poisson noise of the three measurements, propagated by scipp.
 
 ### 4.7 Tomography (`odin_tomo.py`)
@@ -243,7 +243,7 @@ dark runs are free), `faults` (hidden faults, `FAULTS`: `hot_pixels`, `dead_regi
 `outages_per_hour`, `mode` ("hybrid" / "mcstas").
 
 An impossible setting (value outside the choices or limits) is refused, as on the instrument.
-Adding a sample: one entry in `SAMPLES` (`odin_virtual.py`), a list of boxes (NCrystal file, centre, dimensions); the
+Adding a sample: one entry in `SAMPLES` (`odin_virtual.py`), a list of boxes (NCrystal file, center, dimensions); the
 same volumes are used by McStas (Union) and by the hybrid mode.
 
 ## 6. Chopper modes
@@ -287,7 +287,7 @@ Validation: § 9.6.
 - **File size**: ~70 MB per 10 s of open beam; a tomography of 60 × 10 s is ~4 GB: delete the NeXus files once reduced.
 - **Memory / count limit**: at most 5·10⁷ counts per file (`MAX_COUNTS`); a count that would exceed it is refused
   with the longest allowed time (white mode: ~3 s; natural mode: ~6 s; WFM δ = 0.30: ~90 s, with D = 3 cm). A real Timepix3
-  camera would saturate at such rates; saturation is not modelled. Do not run several sessions at the same time.
+  camera would saturate at such rates; saturation is not modeled. Do not run several sessions at the same time.
 
 ## 8. Troubleshooting
 
@@ -353,7 +353,7 @@ numpy < 2 while the twin uses numpy 2, so NICOS runs in its own conda environmen
 orders to `../twin_server.py`, exactly like the provisional console. The McStas device of NICOS
 (`nicos/devices/mcstas.py`, Linux only) is not used.
 
-## 11. Games and visualisations
+## 11. Games and visualizations
 
 The twin is a teaching tool: it should make students *want* to measure. All of this is in English and works in the
 browser (Voilà pages) as well as in notebooks.
@@ -377,7 +377,7 @@ browser (Voilà pages) as well as in notebooks.
   open beam long enough; shutter state consistent with the titles; titles given. Badges: "Careful experimenter",
   "Logbook keeper", "Efficient", "Explorer".
 
-**Visualisations** (`odin_viz.py`, figures from `fig_games.py`)
+**Visualizations** (`odin_viz.py`, figures from `fig_games.py`)
 - Live detector replay (`live_frames`, `show_live`): the image and the raw arrival-time spectrum build up pulse after
   pulse, read from the NeXus file (event_time_zero, event_time_offset, pixel id), as on the live display of a real
   instrument. ![live](figures/live_replay.png)

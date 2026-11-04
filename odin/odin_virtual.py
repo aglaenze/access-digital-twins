@@ -41,7 +41,7 @@ COMPONENTS = paths.COMPONENTS
 FIELD = (-0.00705, 0.00705, -0.00705, 0.00705)  # [m] Timepix3 field of view of the template
 FOV = 0.016                      # [m] McStas detector window, slightly larger than the Timepix3 (14 mm)
 # Largest number of counts per file (memory: ~40 bytes per count while writing). The open beam gives ~1·10⁶ counts/s
-# in WFM mode but ~2·10⁷ counts/s in white mode. (A real Timepix3 camera would saturate at such rates; not modelled.)
+# in WFM mode but ~2·10⁷ counts/s in white mode. (A real Timepix3 camera would saturate at such rates; not modeled.)
 MAX_COUNTS = 5e7
 # Precomputed upstream parts (odin_mcstas.front): (mode, δ) -> (δ in the folder name, neutrons).
 # δ only matters in WFM mode (the other modes were computed with δ = 0.30, which has no effect without WFM choppers).
@@ -56,7 +56,7 @@ FOCUS = dict(focus_xw=0.020, focus_yh=0.020, focus_z=tw.Z_SAMPLE + tw.DET_DIST -
 
 # --------------------------------------------------------------------------- samples
 def _union_boxes(volumes):
-    """McStas sample (Union) made of boxes [(NCrystal cfg, centre (m), dims (m)), ...], placed relative to the stage
+    """McStas sample (Union) made of boxes [(NCrystal cfg, center (m), dims (m)), ...], placed relative to the stage
     axis. The same volumes are used by the hybrid mode (odin_hybrid.volumes_transmission)."""
     def f(instr):
         mats = {}
@@ -65,8 +65,8 @@ def _union_boxes(volumes):
                 mats[cfg] = f"mat_{len(mats)}"
                 instr.add_component(mats[cfg], "Union_NCrystal_material", AT=0, RELATIVE="origin").set_parameters(
                     cfg=f'"{cfg}"')
-        for i, (cfg, centre, dims) in enumerate(volumes):
-            instr.add_component(f"box_{i}", "Union_box", AT=list(centre), RELATIVE="sample_arm").set_parameters(
+        for i, (cfg, center, dims) in enumerate(volumes):
+            instr.add_component(f"box_{i}", "Union_box", AT=list(center), RELATIVE="sample_arm").set_parameters(
                 material_string=f'"{mats[cfg]}"', priority=10 + i, xwidth=dims[0], yheight=dims[1], zdepth=dims[2])
         instr.add_component("union_master", "Union_master", AT=0, RELATIVE="origin").set_parameters(
             enable_refraction=0, enable_reflection=0)
@@ -90,7 +90,7 @@ def _with_rotation(build_sample):
 
 
 def _focused_diffuser(instr):
-    """Graphite diffuser with importance sampling towards the field of view (same dimensions as build_back)."""
+    """Graphite diffuser with importance sampling toward the field of view (same dimensions as build_back)."""
     g = instr.add_component("graph", "Graphite_Diffuser_focus", AT=tw.Z_PINHOLE + 1e-3, RELATIVE="optical_axis")
     g.set_parameters(xwidth=0.1, ywidth=0.1, thick=0.2, **FOCUS)
     g.set_WHEN("use_diffuser == 1")
@@ -106,7 +106,7 @@ FAULTS = {
 REFERENCE_SAMPLE = "iron_plate"    # McStas instrument used for the open-beam simulations of the hybrid model
 
 SAMPLES = {
-    # α-iron (ferrite) plate, 10 mm × 10 mm, 5 mm thick, centred in the field of view (deliberately simple)
+    # α-iron (ferrite) plate, 10 mm × 10 mm, 5 mm thick, centered in the field of view (deliberately simple)
     "iron_plate": dict(volumes=[("Fe_sg229_Iron-alpha.ncmat", (0.0, 0.0, 0.0), (0.010, 0.010, 0.005))],
                        name="Fe plate 5 mm", formula="Fe"),
 }
@@ -138,7 +138,7 @@ class VirtualOdin:
     def __init__(self, session="test", mpi=4, repeat=4, focus=True, seed=None, fluctuation=0.01,
                  outages_per_hour=0.0, mode="hybrid", budget_s=None, faults=()):
         """repeat: reuses of each upstream MCPL neutron in McStas (upstream part: table FRONTS);
-        focus: focused diffuser towards the field of view (otherwise the original component, much less efficient);
+        focus: focused diffuser toward the field of view (otherwise the original component, much less efficient);
         fluctuation: relative pulse-to-pulse variation of the proton charge;
         outages_per_hour: random beam outages (5 to 60 s), as on a real source;
         mode: "hybrid" (any counting time) or "mcstas" (everything in McStas, short counts);

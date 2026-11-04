@@ -1,4 +1,4 @@
-"""Figures of the games and visualisations (README): live detector replay, chopper diagrams, mission spectra,
+"""Figures of the games and visualizations (README): live detector replay, chopper diagrams, mission spectra,
 progressive tomography. Data: sessions game_test (mission played 2026-11-03) and validation/tomo."""
 import json
 import os

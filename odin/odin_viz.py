@@ -1,4 +1,4 @@
-"""Visualisations of the ODIN digital twin (for the pages and for teaching).
+"""Visualizations of the ODIN digital twin (for the pages and for teaching).
 
 * live_frames(): "live detector" replay of a measurement, read from its NeXus file: the image builds up neutron by
   neutron and the time-of-flight histogram fills, pulse after pulse, as on the live view of a real instrument;
@@ -54,7 +54,7 @@ def live_frames(nexus_file, n_frames=24, n_pixels=128, toa_bins=150):
 
 def chopper_diagram(mode="wfm", wfm_delta=0.30, distance=60.55, neutrons=60_000, ax=None, seed=1):
     """Time–distance diagram of the chopper cascade (package `tof`): neutron paths from the ESS pulse to the detector;
-    grey: neutrons stopped by a chopper. mode: "wfm", "natural" or "white" (no chopper)."""
+    gray: neutrons stopped by a chopper. mode: "wfm", "natural" or "white" (no chopper)."""
     import matplotlib.pyplot as plt
     import odin_mcstas as tw
     choppers = tw.chopper_table(mode, wfm_delta) if mode != "white" else {}
@@ -86,7 +86,7 @@ def chopper_diagram(mode="wfm", wfm_delta=0.30, distance=60.55, neutrons=60_000,
         y_prev = y
     ax.xaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v / 1000:g}"))
     ax.set_xlabel("Time [ms]")
-    for cax in set(fig.axes) - before:                # colour bar: tof places its label over the plot -> short title
+    for cax in set(fig.axes) - before:                # color bar: tof places its label over the plot -> short title
         cax.set_ylabel("")
         cax.set_title("λ [Å]", fontsize=9)
     label = {"wfm": f"WFM, δ = {wfm_delta:.2f} m", "natural": "natural (band-pass + T0)", "white": "white beam (no chopper)"}

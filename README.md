@@ -51,7 +51,7 @@ pages); the McStas models of the instruments themselves are the official ESS one
 3. **In Python or in the student web page** (Bachelor level): `odin/odin_virtual.py` in a notebook, or
    `voila odin/ODIN_virtual.ipynb`. Details: `odin/README.md`.
 
-Games and visualisations (missions with beamtime budget and score, troubleshooting, logbook badges, live detector
+Games and visualizations (missions with beamtime budget and score, troubleshooting, logbook badges, live detector
 replay, chopper diagrams, progressive tomography, 3D neutron trajectories): `odin/README.md` § 11,
 `voila odin/ODIN_mission.ipynb`, `python odin/show_3d.py`.
 

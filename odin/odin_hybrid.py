@@ -78,7 +78,7 @@ def fit_acceptance(S, events_ob, field, lam_edges=np.arange(1.0, 9.0001, 0.1)):
 
 
 def fit_profile(events_ob, field, n=14):
-    """f(x, y) = 1 + c·(x, y, x², y², xy), normalised, fitted on the McStas intensity (n × n grid)."""
+    """f(x, y) = 1 + c·(x, y, x², y², xy), normalized, fitted on the McStas intensity (n × n grid)."""
     x0, x1, y0, y1 = field
     xe, ye = np.linspace(x0, x1, n + 1), np.linspace(y0, y1, n + 1)
     h = np.zeros((n, n)); v = np.zeros((n, n))
@@ -102,14 +102,14 @@ def profile(c, x, y):
 
 
 # --------------------------------------------------------------------------- sample
-def box_path_length(x, y, centre, dims, rot_deg):
+def box_path_length(x, y, center, dims, rot_deg):
     """Path length (m) through a box (dims = width x, height y, thickness z) rotated by rot_deg about the vertical axis
-    (y) and centred at `centre`, for rays parallel to the beam axis (z) passing at (x, y). Slab method in the box
+    (y) and centered at `center`, for rays parallel to the beam axis (z) passing at (x, y). Slab method in the box
     frame. Convention: a point (x, z) of the box frame appears at x·cos θ + z·sin θ in the lab frame."""
     th = np.radians(rot_deg)
     c, s = np.cos(th), np.sin(th)
     # Ray: origin (x, y, -1), direction (0, 0, 1), expressed in the box frame (inverse rotation)
-    ox, oy, oz = x - centre[0], y - centre[1], -1.0 - centre[2]
+    ox, oy, oz = x - center[0], y - center[1], -1.0 - center[2]
     ox_b, oz_b = c * ox - s * oz, s * ox + c * oz
     dx_b, dz_b = -s, c
     tmin = np.full(np.shape(x), -np.inf); tmax = np.full(np.shape(x), np.inf)
@@ -129,20 +129,20 @@ def sigma_tot(cfg, lam):
 
 
 def volumes_transmission(volumes, stage_x, stage_rot, lam_grid=np.linspace(0.3, 20.0, 4000)):
-    """Function T(x, y, λ) for a sample made of boxes [(NCrystal cfg, centre (m), dims (m)), ...], centres given with
+    """Function T(x, y, λ) for a sample made of boxes [(NCrystal cfg, center (m), dims (m)), ...], centers given with
     respect to the rotation-stage axis; the stage is translated by stage_x then rotated by stage_rot (degrees) about
     the vertical axis. Σ_tot(λ) is interpolated on a grid covering all chopper modes (NCrystal called once)."""
     th = np.radians(stage_rot)
     c, s = np.cos(th), np.sin(th)
     vols = []
     for cfg, (cx, cy, cz), dims in volumes:
-        centre = (stage_x + c * cx + s * cz, cy, -s * cx + c * cz)
-        vols.append((sigma_tot(cfg, lam_grid), centre, dims))
+        center = (stage_x + c * cx + s * cz, cy, -s * cx + c * cz)
+        vols.append((sigma_tot(cfg, lam_grid), center, dims))
 
     def T(x, y, lam):
         mu = np.zeros(len(x))
-        for sig, centre, dims in vols:
-            L = box_path_length(x, y, centre, dims, stage_rot)
+        for sig, center, dims in vols:
+            L = box_path_length(x, y, center, dims, stage_rot)
             k = L > 0
             mu[k] += np.interp(lam[k], lam_grid, sig) * L[k]
         return np.exp(-mu)

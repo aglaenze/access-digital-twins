@@ -39,7 +39,7 @@ docker run --rm -p 8888:8888 -v twin-data:/data ghcr.io/aglaenze/access-digital-
 then open the address printed by JupyterLab. Other entry points: `... access-digital-twins voila` (student page,
 port 8866), `... nicos` (NICOS daemon, port 1301), `... test`. Results and NICOS data are in the volume (`/data/twin`).
 
-The image is built by GitHub Actions on every push to `main` (about 30–60 min the first time, faster afterwards
+The image is built by GitHub Actions on every push to `main` (about 30–60 min the first time, faster afterward
 thanks to the build cache); the run, its logs and the smoke test are in the "Actions" tab of the repository.
 
 ## Still to do

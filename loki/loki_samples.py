@@ -16,7 +16,7 @@ def q_grid(q_min=1e-4, q_max=Q_MAX_TABLE, n=6000):
 
 
 def sphere_form_factor(q, radius):
-    """P(Q) of a homogeneous sphere, normalised to 1 at Q = 0: [3 (sin x - x cos x) / x³]², x = Q R."""
+    """P(Q) of a homogeneous sphere, normalized to 1 at Q = 0: [3 (sin x - x cos x) / x³]², x = Q R."""
     x = np.asarray(q) * radius
     with np.errstate(invalid="ignore", divide="ignore"):
         f = np.where(x > 1e-6, 3 * (np.sin(x) - x * np.cos(x)) / x ** 3, 1.0 - x ** 2 / 10)

@@ -34,8 +34,8 @@ EXE = ".exe" if os.name == "nt" else ".out"
 
 H_OVER_M = 3956.034          # h/m_n in m·Å/s: λ[Å] = 3956 / v[m/s]
 FRAME = 1 / 14               # source period [s]
-Z_SAMPLE_BACK = 0.001        # sample centre in the frame of LOKI_back (1 mm after the MCPL plane)
-L1 = 23.52                   # moderator -> sample centre along the beam [m]
+Z_SAMPLE_BACK = 0.001        # sample center in the frame of LOKI_back (1 mm after the MCPL plane)
+L1 = 23.52                   # moderator -> sample center along the beam [m]
 T_EMISSION = 1.80e-3         # mean emission time of the neutrons in the moderator [s]
 TAU = 2.86e-3                # proton pulse length [s]
 Z_CHOP2 = 15.13              # effective distance of the frame-overlap chopper pair (loki_functions.c: 15.21 - 0.08)
@@ -282,11 +282,11 @@ def read_mcpl(path):
 
 
 # MCPL_output does not move the neutron to its plane: it records the current position, in its own frame.
-Z_SCATTERED_OUT = 0.01       # position of the "scattered" MCPL_output relative to the sample centre (LOKI_back)
+Z_SCATTERED_OUT = 0.01       # position of the "scattered" MCPL_output relative to the sample center (LOKI_back)
 
 
 def scattered(back_folder):
-    """Scattered neutrons (downstream file), positions (scattering point) in the frame centred on the sample."""
+    """Scattered neutrons (downstream file), positions (scattering point) in the frame centered on the sample."""
     ev = read_mcpl(mcpl_path(back_folder, "scattered"))
     ev["z"] = ev["z"] + Z_SCATTERED_OUT
     return ev
@@ -338,7 +338,7 @@ class Panel:
         self.name, self.bank, self.w, self.h, self.tubes = name, bank, w, h, tubes
         Ra = _rot(*arm_rot)
         self.R = _rot(*rot) @ Ra                                  # global -> panel frame
-        self.center = Ra.T @ np.array([0, 0, dist])                # panel centre (sample frame)
+        self.center = Ra.T @ np.array([0, 0, dist])                # panel center (sample frame)
         self.normal = self.R[2]
         if tubes == "h":   # horizontal tubes: y = stack of tubes (straws), x = along the tube
             self.nx, self.ny = int(round(w / PIX_ALONG)), int(round(h / TUBE_PITCH)) * STRAWS
@@ -386,7 +386,7 @@ class Detector:
         self.masks()
 
     def masks(self, half_beam=0.005):
-        """A pixel is visible if the straight lines from the sample centre AND from the four corners of the beam
+        """A pixel is visible if the straight lines from the sample center AND from the four corners of the beam
         (±half_beam) to it meet neither a closer panel nor the beam stop. Hidden pixels are masked in the reduction,
         as in a real measurement (without masks, I(Q) of the rear bank is badly wrong)."""
         sources = [(0.0, 0.0)] + [(sx * half_beam, sy * half_beam) for sx in (-1, 1) for sy in (-1, 1)]
@@ -485,7 +485,7 @@ def reduce(ev, det, phi, trans, lam_edges, thickness_cm, q_edges, duration=None)
 
     (the denominator is what a sample with dΣ/dΩ = 1 cm⁻¹ would give in the same Q bin).
     duration [s]: if given, the error is that of a Poisson count of this duration plus the simulation noise.
-    Returns {bank: (Q centres, I, error, denominator)}."""
+    Returns {bank: (Q centers, I, error, denominator)}."""
     lc = 0.5 * (lam_edges[1:] + lam_edges[:-1])
     res = {}
     for bank in BANKS:

@@ -9,8 +9,8 @@ ax.set_xlim(0, 15); ax.set_ylim(0, 8.6); ax.axis("off")
 C = dict(ui="#dbe9f6", ctl="#fde2c8", phys="#d9f0d3", data="#f2f2f2", red="#e8dcf2")
 
 
-def box(x, y, w, h, title, text, colour, fs=8.6):
-    ax.add_patch(FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0.04,rounding_size=0.12", fc=colour, ec="0.3", lw=1))
+def box(x, y, w, h, title, text, color, fs=8.6):
+    ax.add_patch(FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0.04,rounding_size=0.12", fc=color, ec="0.3", lw=1))
     ax.text(x + w / 2, y + h - 0.2, title, ha="center", va="top", fontsize=10, fontweight="bold")
     ax.text(x + w / 2, y + h - 0.58, text, ha="center", va="top", fontsize=fs, linespacing=1.35)
 

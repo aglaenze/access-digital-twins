@@ -1,7 +1,7 @@
 """Games of the ODIN digital twin: missions with a beamtime budget, troubleshooting, logbook review.
 
 * Mission "unknown metals": three plates of unknown metals (codes sample_A, sample_B, sample_C), drawn among
-  Fe, V, Nb (body-centred cubic) and Cu, Ni, Al (face-centred cubic). The student measures their Bragg-edge spectra
+  Fe, V, Nb (body-centered cubic) and Cu, Ni, Al (face-centered cubic). The student measures their Bragg-edge spectra
   within a beamtime budget and submits, for each sample, the metal and its lattice parameter a. Score: 100 points per
   correct metal, +50 if a is within 0.5 %, + 1 point per 5 s of beamtime left (only with at least one correct metal).
   Why it works (edges 2d computed with NCrystal): the first edges of Fe (4.055 Å) and Ni (4.069 Å), or of Nb
@@ -38,7 +38,7 @@ def _decode(txt):
 
 
 def register_samples(secret):
-    """Adds the mystery plates (10 × 10 × 5 mm, centred) to the samples of the virtual ODIN."""
+    """Adds the mystery plates (10 × 10 × 5 mm, centered) to the samples of the virtual ODIN."""
     for code, metal in secret.items():
         ov.SAMPLES[code] = dict(volumes=[(METALS[metal][0], (0.0, 0.0, 0.0), (0.010, 0.010, 0.005))],
                                 name=code.replace("_", " "), formula="?")

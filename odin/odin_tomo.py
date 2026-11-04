@@ -2,7 +2,7 @@
 back-projection (FBP).
 
 Chain: one NeXus file per angle (VirtualOdin.scan("stage_rot", angles, t)) -> essimaging (λ of each count)
--> for each angle: counts per (λ band, column x) in a horizontal slice y -> transmission T = (E - N)/(O - N) normalised
+-> for each angle: counts per (λ band, column x) in a horizontal slice y -> transmission T = (E - N)/(O - N) normalized
 by the proton charge -> projection p = -ln T -> sinogram -> FBP -> μ(x, z).
 Units: p is dimensionless, the reconstructed slice μ is in cm⁻¹ (= Σ_tot of the material, comparable to NCrystal).
 """

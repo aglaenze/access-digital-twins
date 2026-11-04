@@ -9,7 +9,7 @@
 * the outgoing direction is drawn from a MIXTURE of
 *   - the physical distribution of the original component (probability f_phys), and
 *   - a uniform distribution of aiming points on a rectangle (focus_xw x focus_yh)
-*     centred on the beam axis at a distance focus_z downstream (probability 1 - f_phys).
+*     centered on the beam axis at a distance focus_z downstream (probability 1 - f_phys).
 * The neutron weight is multiplied by p_phys / q_mix, so all tallies stay unbiased
 * (q_mix > 0 wherever p_phys > 0, and the weight factor is bounded by 1/f_phys).
 *

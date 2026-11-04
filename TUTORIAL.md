@@ -1,7 +1,7 @@
 # Tutorial: your first session with a digital twin
 
 This guide takes you, step by step, from nothing to your first measurement with a digital twin of an instrument of
-the European Spallation Source (ESS). No prior knowledge of McStas or NICOS is needed. Commands to type are in grey
+the European Spallation Source (ESS). No prior knowledge of McStas or NICOS is needed. Commands to type are in gray
 boxes; copy them exactly.
 
 **Which instruments?** The twins do not all offer the same things yet:
@@ -18,7 +18,7 @@ the only twin that offers them all for now; the other twins will work the same w
 
 **What you will do**: install the twins (part 1), then measure the transmission of an iron plate with ODIN in one of
 three ways (parts 2–4): in a web page, with a console, or with NICOS, the control software of the real instruments.
-Part 5 tells you where your data are and how to analyse them; part 6 covers the other instruments.
+Part 5 tells you where your data are and how to analyze them; part 6 covers the other instruments.
 
 Expect: 20–60 min for the installation (mostly downloads), a few minutes per measurement session.
 
@@ -177,12 +177,12 @@ count(10, title="iron plate")
 log()
 ```
 - `status()` shows the devices (choppers, shutter, pinhole, diffuser, sample stage);
-- `move(device, value, ...)` changes them: `stage_x` is the sample position in metres (0.5 m = out of the beam);
+- `move(device, value, ...)` changes them: `stage_x` is the sample position in meters (0.5 m = out of the beam);
 - `count(t)` measures for `t` seconds and writes a NeXus file (the ESS data format);
 - try a forbidden value, e.g. `move(pinhole, 0.025)`: the instrument refuses, as a real one would;
 - `help_twin()` lists all commands. Quit with `exit()`.
 
-Then analyse the three files: part 5.
+Then analyze the three files: part 5.
 
 ---
 
@@ -204,7 +204,7 @@ det.title = 'open beam'; count(t=10)
 move(stage_x, 0)
 det.title = 'iron plate'; count(t=10)
 ```
-(In NICOS, the stage position is in **millimetres**: 500 mm = out of the beam.) The devices and their values are
+(In NICOS, the stage position is in **millimeters**: 500 mm = out of the beam.) The devices and their values are
 shown on the right. To stop: press Enter in the terminal where you started NICOS.
 
 ### With text commands (route A, in the container; no graphical interface yet)
@@ -232,7 +232,7 @@ Each measurement is a NeXus file `odin_000001.nxs`, `odin_000002.nxs`, ... (the 
 detected neutron with its pixel and arrival time, plus the state of the instrument), and `log.jsonl` is the logbook
 of the session.
 
-**Analyse them** in a notebook (JupyterLab: *File → New → Notebook*, in the folder `odin`), with the official ESS
+**Analyze them** in a notebook (JupyterLab: *File → New → Notebook*, in the folder `odin`), with the official ESS
 reduction software:
 ```python
 import odin_reduction as red

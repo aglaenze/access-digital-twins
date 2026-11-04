@@ -4,7 +4,7 @@ The twin's NeXus files (odin_nexus.py) and those of the real ODIN go through the
 `ess.odin.OdinBraggEdgeWorkflow`: arrival time -> λ from the choppers and distances read in the file, then masks.
 We only add what the workflow does not (yet) do for time-of-flight imaging:
   * subtraction of the dark run (detector background, shutter closed), scaled to the duration of each measurement;
-  * normalisation by the **proton charge** received by the target during the measurement
+  * normalization by the **proton charge** received by the target during the measurement
     (`entry/instrument/source/pulse_charge`), as at ESS: the number of neutrons produced is proportional to it, while
     the source power varies (fluctuations, outages). Falls back to the duration if the log is empty;
   * division by the open beam -> transmission T(λ) and transmission image.
@@ -21,7 +21,7 @@ import scipp as sc
 warnings.filterwarnings("ignore", category=FutureWarning, module="ess")   # numba -> scipy backend warning
 
 
-# Time -> λ lookup table of essreduce. "simulation": the ESS source pulse is modelled realistically (package `tof`);
+# Time -> λ lookup table of essreduce. "simulation": the ESS source pulse is modeled realistically (package `tof`);
 # "analytical" (essimaging default): uniform emission between 0 and 5 ms. Without choppers cutting the pulse (natural
 # and white modes), "analytical" assumes a mean emission time ~0.8 ms too late and gives λ 0.05 Å too small; in WFM
 # mode both agree (the choppers define the time). Checked event by event, 2026-11-03 (README § 9.6).
@@ -128,9 +128,9 @@ def histograms(file, lam, roi, n_pixels=64, wavelength_from=None):
     return dict(image=image, spectrum=spectrum, duration=duration(file), charge=proton_charge(file))
 
 
-def reduce(sample, open_beam, dark=None, lam=None, roi=(-3, 3, -3, 3), n_pixels=64, normalisation="charge",
+def reduce(sample, open_beam, dark=None, lam=None, roi=(-3, 3, -3, 3), n_pixels=64, normalization="charge",
            wavelength_from=None):
-    """Transmission: image (all λ) and spectrum T(λ) in roi. normalisation: "charge" or "duration";
+    """Transmission: image (all λ) and spectrum T(λ) in roi. normalization: "charge" or "duration";
     wavelength_from: "simulation" (default, WAVELENGTH_FROM) or "analytical" (essimaging default)."""
     if lam is None:
         lam = sc.linspace("wavelength", 1.0, 9.0, 201, unit="angstrom")
@@ -143,8 +143,8 @@ def reduce(sample, open_beam, dark=None, lam=None, roi=(-3, 3, -3, 3), n_pixels=
             h = H[k][what]
             if "N" in H:
                 h = h - H["N"][what] * (H[k]["duration"] / H["N"]["duration"])
-            norm = H[k]["charge"] if normalisation == "charge" and H[k]["charge"] > 0 else H[k]["duration"]
+            norm = H[k]["charge"] if normalization == "charge" and H[k]["charge"] > 0 else H[k]["duration"]
             res[k] = h / norm
         out[what] = res["E"] / res["O"]
-    out["normalisation"] = {k: dict(duration=v["duration"], charge_uC=v["charge"]) for k, v in H.items()}
+    out["normalization"] = {k: dict(duration=v["duration"], charge_uC=v["charge"]) for k, v in H.items()}
     return out

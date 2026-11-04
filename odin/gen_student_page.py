@@ -49,7 +49,7 @@ md(r"""
 
 After each count, a replay shows the detector filling up neutron by neutron, as on a live display; the
 "chopper diagram" button shows the flight of the neutrons through the choppers for the selected mode.
-The detector field of view is 14 mm × 14 mm. The iron plate (10 mm × 10 mm, 5 mm thick) is centred when the stage
+The detector field of view is 14 mm × 14 mm. The iron plate (10 mm × 10 mm, 5 mm thick) is centered when the stage
 is at 0. The first count with a new configuration (chopper mode, pinhole, diffuser) starts a McStas simulation and
 can take a few minutes. The following ones are fast.
 
@@ -202,7 +202,7 @@ def reduce_runs(_):
         fig.colorbar(im, ax=ax[0], label="T")
         lc = sc.midpoints(spec.coords["wavelength"]).values
         ax[1].errorbar(lc, spec.values, yerr=np.sqrt(spec.variances), fmt=".", ms=3, lw=0.6)
-        ax[1].set(xlabel="λ (Å)", ylabel="T", title="Transmission at the centre of the sample", ylim=(0, 1.1))
+        ax[1].set(xlabel="λ (Å)", ylabel="T", title="Transmission at the center of the sample", ylim=(0, 1.1))
         ax[1].grid(alpha=0.3)
         plt.tight_layout(); plt.show()
         if N is None:

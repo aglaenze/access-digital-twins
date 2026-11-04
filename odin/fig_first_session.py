@@ -26,7 +26,7 @@ for row, (folder, label, chi2) in enumerate(cases):
     for x in (3, 5, 7):
         a.axvline(x, color="tab:red", lw=0.4, ls=":")
     a.text(8.95, 0.94, "χ²/n per 2 Å band (≈ 1: correct error bars)", ha="right", fontsize=8, color="tab:red")
-    a.set(xlabel="λ (Å)", ylabel="T", ylim=(0, 1.1), xlim=(1, 9), title="Transmission at the centre (red 6 × 6 mm square)")
+    a.set(xlabel="λ (Å)", ylabel="T", ylim=(0, 1.1), xlim=(1, 9), title="Transmission at the center (red 6 × 6 mm square)")
     a.legend(loc="lower right", fontsize=9)
     a.grid(alpha=0.3)
 plt.tight_layout()

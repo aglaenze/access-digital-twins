@@ -53,7 +53,7 @@ MODES = {
 # Wavelength range drawn at the source for each mode [Å]. White beam: wide; with choppers only 1–9 Å can pass.
 FRONT_LAM = {"white": (0.5, 15.0), "natural": (1.0, 9.0), "wfm": (1.0, 9.0)}
 # Number of simulated pulses. The band-pass choppers turn at 7 Hz (half of 14 Hz): they let through ONE pulse out of
-# TWO (pulse skipping). The source weights are normalised for a train of identical pulses; simulating 2 pulses, of
+# TWO (pulse skipping). The source weights are normalized for a train of identical pulses; simulating 2 pulses, of
 # which one passes, directly gives the time-averaged flux (with 1 pulse it would be overestimated by a factor 2).
 FRONT_PULSES = {"white": 1, "natural": 2, "wfm": 2}
 EXE = ".exe" if os.name == "nt" else ".out"        # extension of the executables written by mcrun
@@ -122,7 +122,7 @@ def build_back(name, build_dir, sample=None, det_size=0.08, det_dist=DET_DIST,
     instr.add_parameter("int", "preload", value=0, comment="1: load the (filtered) MCPL file in memory once per process")
     instr.add_parameter("double", "D", value=D_default, comment="[m] side of the square pinhole")
     # Open beam: the sample is translated out of the beam (sample_x = 0.5 m), as on the real instrument.
-    # (A WHEN condition cannot be used: Union geometries are set up once, at initialisation.)
+    # (A WHEN condition cannot be used: Union geometries are set up once, at initialization.)
     instr.add_parameter("double", "sample_x", value=0.0, comment="[m] horizontal sample translation (0.5 = out of beam)")
     instr.add_parameter("int", "use_diffuser", value=1, comment="1: graphite diffuser in the beam, 0: removed")
     instr.add_component("origin", "Progress_bar")

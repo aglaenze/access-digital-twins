@@ -1,7 +1,7 @@
 # Example session script for the virtual ODIN console (NICOS command syntax).
 #   python twin_server.py --instrument odin --session example     (first terminal, in twin/)
 #   python twin_console.py odin/example_session.py                 (second terminal, in twin/)
-# The NeXus files are written to McStas_runs/twin/odin/example/; reduce them afterwards in the browser
+# The NeXus files are written to McStas_runs/twin/odin/example/; reduce them afterward in the browser
 # (page ODIN_virtual.ipynb) or in a notebook (odin_reduction.reduce).
 
 status()
