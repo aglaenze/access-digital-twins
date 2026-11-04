@@ -8,44 +8,34 @@
    screens); on a laptop the bottom of the window (Apply button of the Experiment tab, device list) was out of the
    screen. The content is put in a scroll area and the window is kept within the screen.
 3. Experiment panel: the Apply button right under the form (ExpPanel below), not at the bottom of the window.
-4. Detector image (ODIN): color levels recomputed while they are flat (LiveDataPanel below); device list given a
-   third of the height of the Instrument interaction tab.
+4. Detector image (ODIN): color levels recomputed for every new image (LiveDataPanel below).
+5. Instrument interaction tab: the device list can be enlarged. The tab is a splitter (command line and output /
+   detector image above, devices below); the detector-image panel needs ~810 pixels, so on a laptop the splitter had
+   no room left and its handle did not move. The upper part is put in a scroll area (its minimum height no longer
+   blocks the handle) and the device list gets a third of the height at start.
 """
 from nicos.clients.flowui.mainwindow import MainWindow as FlowuiMainWindow
-from nicos.guisupport.qt import QAction, QApplication, QFrame, QScrollArea, QSplitter, Qt, QWidget
+from nicos.guisupport.qt import QAction, QApplication, QFrame, QScrollArea, QSplitter, QTimer
 from nicos_ess.gui.panels.exp_panel import ExpPanel as EssExpPanel
 from nicos_ess.odin.gui.panels.live import MultiLiveDataPanel as OdinMultiLiveDataPanel
 
 
-def _fix_flat_levels(widgets):
-    """The ESS image widget sets its color levels once, from the first image it receives (5 %–95 % of the pixel
-    values), and keeps them. If that image is flat (e.g. a dark run first: almost no counts), the levels are 0–0 and
-    every later image is all yellow. Here the automatic levels are recomputed as long as they are flat; levels set
-    by the user (low < high) are kept."""
-    for w in widgets:
-        item = getattr(w, "image_item", None)
-        if item is None or not hasattr(w, "autolevel_complete"):
-            continue
-        levels = item.getLevels()
-        if levels is None:
-            continue
-        try:
-            flat = float(levels[1]) <= float(levels[0])
-        except (TypeError, ValueError, IndexError):
-            continue
-        if flat and getattr(w, "raw_image", None) is not None:
-            w.autolevel_complete = False
-            w.update_image()
-
-
 class LiveDataPanel(OdinMultiLiveDataPanel):
-    """The ODIN detector-image panel of ESS, with automatic color levels again when they are flat."""
+    """The ODIN detector-image panel of ESS, with automatic color levels for every new image.
+
+    The ESS image widget sets its color levels once, from the first image it receives (5 %-95 % of the pixel values),
+    then keeps them: at ESS the image is refreshed continuously during a count. The twin sends one image per count,
+    and successive counts differ a lot (dark: almost nothing; open beam: ~330 counts per pixel; sample: ~200), so
+    fixed levels gave an all-yellow or all-dark image. Here the levels are recomputed for each new image (the
+    Autoscale button and the level fields still work in between)."""
 
     def on_client_livedata(self, params, blobs):
-        OdinMultiLiveDataPanel.on_client_livedata(self, params, blobs)
-        widgets = [getattr(getattr(self, "plotwidget", None), "plotwidget", None), getattr(self, "plotwidget", None)]
+        widgets = [getattr(self, "plotwidget", None)]
         widgets += [getattr(p, "widget", None) for p in getattr(self, "_previews", {}).values()]
-        _fix_flat_levels([w for w in widgets if w is not None])
+        for w in widgets:
+            if w is not None and hasattr(w, "autolevel_complete"):
+                w.autolevel_complete = False
+        OdinMultiLiveDataPanel.on_client_livedata(self, params, blobs)
 
 
 class ExpPanel(EssExpPanel):
@@ -75,6 +65,24 @@ class MainWindow(FlowuiMainWindow):
         scroll.setWidget(content)
         self.setCentralWidget(scroll)
         self._fitted = False
+        self._device_splitters = []
+        for sp in self.findChildren(QSplitter):
+            kinds = [type(sp.widget(i)).__name__ for i in range(sp.count())]
+            if sp.count() < 2 or not any("DevicesPanel" in k for k in kinds):
+                continue
+            for i, k in enumerate(kinds):
+                if "DevicesPanel" not in k:            # the other part scrolls instead of blocking the handle
+                    part = sp.widget(i)
+                    area = QScrollArea()
+                    area.setWidgetResizable(True)
+                    area.setFrameShape(QFrame.NoFrame)
+                    hidden = part.isHidden()
+                    sp.replaceWidget(i, area)
+                    area.setWidget(part)
+                    part.setHidden(hidden)
+                    area.setHidden(hidden)          # replaceWidget leaves the new widget hidden
+            sp.setChildrenCollapsible(False)
+            self._device_splitters.append(sp)
 
     def showEvent(self, event):
         FlowuiMainWindow.showEvent(self, event)
@@ -87,20 +95,21 @@ class MainWindow(FlowuiMainWindow):
             if (w, h) != (self.width(), self.height()):
                 self.resize(w, h)
                 self.move(avail.x() + (avail.width() - w) // 2, avail.y())
-            self._give_room_to_devices()
+            QTimer.singleShot(500, self._give_room_to_devices)     # after NICOS has restored its saved layout
 
     def _give_room_to_devices(self):
-        """The device list (bottom part of a splitter) gets a third of the height instead of a few lines."""
-        for sp in self.findChildren(QSplitter):
-            if sp.orientation() != Qt.Orientation.Vertical or sp.count() < 2:
+        """The device list gets a third of the height of its splitter at start (then the handle moves freely)."""
+        for sp in self._device_splitters:
+            total = sum(sp.sizes())
+            if total <= 0:
                 continue
-            last = sp.widget(sp.count() - 1)
-            names = {type(w).__name__ for w in [last] + last.findChildren(QWidget)}
-            if "DevicesPanel" in names:
-                total = sum(sp.sizes()) or sp.height()
-                if total > 0:
-                    top = int(total * 0.67)
-                    sp.setSizes([top] + [0] * (sp.count() - 2) + [total - top])
+            dev = [i for i in range(sp.count()) if "DevicesPanel" in type(sp.widget(i)).__name__][0]
+            sizes = [0] * sp.count()
+            sizes[dev] = total // 3
+            others = [i for i in range(sp.count()) if i != dev]
+            for i in others:
+                sizes[i] = (total - sizes[dev]) // len(others)
+            sp.setSizes(sizes)
 
     def _ensure_website_action(self):
         if not hasattr(self, "actionInstrumentWebsite"):

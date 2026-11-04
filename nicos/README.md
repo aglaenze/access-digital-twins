@@ -23,7 +23,7 @@ built on its `nicos_ess` counterpart:
 
 | | ESS (`nicos_ess/<instrument>/`) | Twin (`nicos_twin/<instrument>/`) |
 |---|---|---|
-| GUI | `guiconfig.py`: tabs Experiment, Setup, Instrument interaction (command line, output, scan plot, detector image, script status, devices), Scripting, History, Logs | **the same file** (copied), with small changes in `nicos_twin/gui.py`: workaround for a NICOS bug, scrolling on small screens, Apply button of the Experiment tab under the form, detector-image levels recomputed while flat (ODIN), more room for the device list |
+| GUI | `guiconfig.py`: tabs Experiment, Setup, Instrument interaction (command line, output, scan plot, detector image, script status, devices), Scripting, History, Logs | **the same file** (copied), with small changes in `nicos_twin/gui.py`: workaround for a NICOS bug, scrolling on small screens, Apply button of the Experiment tab under the form, detector-image color levels recomputed for each new image (ODIN), device list that can be enlarged (the detector-image panel no longer blocks the splitter handle) |
 | Experiment | `EssExperiment`: proposal number, title, users, samples; look-up in the ESS user office | `TwinExperiment` = `EssExperiment` without the user-office look-up (type any proposal number) |
 | Data files | written by the ESS file-writer (Kafka), started by NICOS; `<instrument>/<year>/<proposal>/raw/` | written by the twin, one per count, in `<TWIN_RUN_ROOT>/data/<instrument>/<year>/<proposal>/raw/` |
 | Recording commands | `nexusfile_open`, `start_filewriting`, `stop_filewriting`, `list_filewriting_jobs` (`nicos_ess.commands`) | the same commands (`nicos_twin.commands`) |
