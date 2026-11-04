@@ -25,11 +25,14 @@ and runs identically on a laptop, a DTU server, UCloud or ESS's VISA.
 
 ## Precomputed McStas upstream parts
 
-The upstream part of each chopper mode (ESS source → guides → choppers → guide exit, MCPL file) takes minutes to an
-hour to compute and weighs up to 0.7 GB: too big for git, too slow to compute at each start. They are attached to the
-GitHub release `fronts-v1` (one `.tar` per mode, ~1.5 GB in total, with SHA-256 checksums) and downloaded on the first
-start of a container into `/data/twin/odin/front/` (a volume: kept between containers). The repository is public:
-no token is needed. To compute them yourself instead: `odin_mcstas.front(...)` (see `../odin/README.md` § 2).
+The upstream part of each chopper mode of ODIN (ESS source → guides → choppers → guide exit, MCPL file) takes minutes
+to an hour to compute and weighs up to 0.7 GB: too big for git, too slow to compute at each start; the same holds for
+the upstream part of LoKI (source → benders → choppers → collimation → sample aperture, 3 m collimation: 56 MB, ~15 min
+on 8 cores). They are attached to the GitHub release `fronts-v1` (one `.tar` per upstream part: `front_<mode>.tar` for
+ODIN, `loki_front_<configuration>.tar` for LoKI, ~1.6 GB in total, with SHA-256 checksums) and downloaded by
+`fetch_fronts.py` on the first start of a container into `/data/twin/odin/front/` and `/data/twin/loki/front/` (a
+volume: kept between containers). The repository is public: no token is needed. To compute them yourself instead:
+`odin_mcstas.front(...)` (see `../odin/README.md` § 2), `loki_mcstas.front(...)`.
 
 ## Use
 
@@ -39,7 +42,9 @@ docker run --rm -p 8888:8888 -v twin-data:/data ghcr.io/aglaenze/access-digital-
 then open the address printed by JupyterLab. Other entry points: `... access-digital-twins voila` (student page,
 port 8866), `... nicos` (NICOS services of ODIN, port 1301; another instrument: `-e TWIN_INSTRUMENT=...`), `... test`.
 Results and NICOS data (`/data/twin/data/<instrument>/<year>/<proposal>/raw/`) are in the volume (`/data/twin`).
-The image contains the ODIN twin; LoKI needs its official model and upstream part, not yet in the image.
+The image contains the ODIN and LoKI twins (official models at fixed commits, `~/odin_model` and `~/loki_model`). A
+LoKI measurement needs about 6 GB of memory (downstream McStas part and its 440 MB of scattered neutrons, computed on
+the first measurement of each sample, ~2 min): give Docker enough memory.
 
 The image is built by GitHub Actions on every push to `main` (about 30–60 min the first time, faster afterward
 thanks to the build cache); the run, its logs and the smoke test are in the "Actions" tab of the repository.

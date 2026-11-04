@@ -26,8 +26,8 @@ from virtual_loki import VirtualLoki, read   # noqa: E402
 T = 600.0
 
 
-def main(plot=True):
-    loki = VirtualLoki(session="easy_case", seed=1)
+def main(plot=True, session="easy_case", mpi=None):
+    loki = VirtualLoki(session=session, seed=1, mpi=mpi)
     loki.move(sample="silica_spheres", collimation="3m", heavy_shutter="open", shutter="open")
     f = loki.count(T, title="silica spheres R = 50 A, 1 % in D2O")
     data = read(f)

@@ -40,7 +40,9 @@ class Device:
 
 
 class VirtualLoki:
-    def __init__(self, session="test", mpi=8, seed=None, mode="mcstas"):
+    def __init__(self, session="test", mpi=None, seed=None, mode="mcstas"):
+        """mpi: number of McStas processes (default: variable TWIN_MPI, else 8)."""
+        mpi = int(os.environ.get("TWIN_MPI", "8")) if mpi is None else mpi
         self.session, self.mpi, self.mode = session, mpi, "mcstas"   # always McStas (no hybrid model yet)
         self.devices = {d.name: d for d in [
             Device("heavy_shutter", "closed", ("open", "closed"), "main shutter, upstream in the guide"),

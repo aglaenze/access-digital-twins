@@ -56,6 +56,25 @@ can take a few minutes. The following ones are fast.
 **Chopper modes**: *WFM* (wavelength frame multiplication) cuts the long ESS pulse into short sub-pulses: good
 wavelength resolution; the separation δ of the two WFM discs sets the resolution. *Natural*: only the band-pass
 choppers turn: the resolution is set by the long ESS pulse (2.86 ms). *White*: no chopper at all.
+
+**Your three measurements, setting by setting** (set the controls below, then click *Count*; one count per row):
+
+| Measurement | Choppers | Shutter | Pinhole D | Diffuser | Stage x (mm) | Time (s) | Title |
+|---|---|---|---|---|---|---|---|
+| 1. dark | WFM, δ = 0.30 m | **closed** | 3 cm | in | 0 | 30 | dark |
+| 2. open beam | WFM, δ = 0.30 m | **open** | 3 cm | in | **500** | 60 | open beam |
+| 3. sample | WFM, δ = 0.30 m | **open** | 3 cm | in | **0** | 60 | iron plate |
+
+Only the shutter and the stage change from one row to the next (in bold). Why:
+- **choppers, pinhole and diffuser stay the same** for the three measurements: they set the beam (its wavelengths,
+  its size, its homogeneity), and the open beam is used to divide the sample measurement: both must see *the same*
+  beam, otherwise the ratio means nothing;
+- **stage x = 500 mm** for the open beam: the plate is moved 50 cm aside, far out of the 14 mm field of view (any
+  value beyond 20 mm works); **0 mm** puts it back in the middle of the beam;
+- **times**: the dark run contains very few counts, 30 s are enough (it is scaled to the duration of the other
+  measurements). For the open beam and the sample, 60 s give error bars of about 1 % on the transmission; longer
+  counts give smaller error bars (÷2 for 4 times longer);
+- the **title** is free, but a clear title helps you find your files later.
 """)
 
 code(r"""

@@ -1,12 +1,13 @@
-"""Downloads the precomputed McStas upstream parts of ODIN (GitHub release of this repository) into
-<TWIN_RUN_ROOT>/odin/front/.
+"""Downloads the precomputed McStas upstream parts of the twins (GitHub release of this repository) into
+<TWIN_RUN_ROOT>/odin/front/ and <TWIN_RUN_ROOT>/loki/front/.
 
-    python container/fetch_fronts.py                 # all the upstream parts used by the twin (~1.5 GB)
+    python container/fetch_fronts.py                 # all the upstream parts used by the twins (~1.6 GB)
     python container/fetch_fronts.py wfm_delta0.10_N2e+08 natural_delta0.30_N2e+08
+    python container/fetch_fronts.py --instrument loki      # only those of one instrument (odin, loki)
     python container/fetch_fronts.py --list
 
-The upstream parts (source -> guides -> choppers -> guide exit) take from minutes to an hour to compute
-(odin_mcstas.front), so they are computed once and published as release assets (tag RELEASE). An upstream part that
+The upstream parts (source -> guides -> choppers -> guide exit, or sample aperture for LoKI) take from minutes to an
+hour to compute (odin_mcstas.front, loki_mcstas.front), so they are computed once and published as release assets (tag RELEASE). An upstream part that
 is already complete on disk is not downloaded again. The repository is public: no token is needed (a GitHub token
 in GITHUB_TOKEN or GH_TOKEN is used if present: higher API rate limit, or a private fork).
 Variables: TWIN_ASSETS_REPO (default aglaenze/access-digital-twins), TWIN_FRONTS_RELEASE (default fronts-v1).
@@ -19,19 +20,33 @@ import tarfile
 import urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(HERE, "..", "odin"))
+for _instr in ("odin", "loki"):
+    sys.path.insert(0, os.path.join(HERE, "..", _instr))
 import odin_paths  # noqa: E402
+import loki_paths  # noqa: E402
 
 REPO = os.environ.get("TWIN_ASSETS_REPO", "aglaenze/access-digital-twins")
 RELEASE = os.environ.get("TWIN_FRONTS_RELEASE", "fronts-v1")
-FRONT_DIR = f"{odin_paths.RUN_ROOT}/front"
+FRONT_DIRS = {"odin": f"{odin_paths.RUN_ROOT}/front", "loki": f"{loki_paths.RUN_ROOT}/front"}
 
 
-def wanted():
-    """Folder names of the upstream parts used by the twin (odin_virtual.FRONTS)."""
-    import odin_mcstas as tw
-    import odin_virtual as ov
-    return [os.path.basename(tw.front_folder(mode, n, delta)) for (mode, _), (delta, n) in ov.FRONTS.items()]
+def wanted(instruments=("odin", "loki")):
+    """{folder name: (instrument, release asset)} of the upstream parts used by the twins (odin_virtual.FRONTS,
+    virtual_loki.CONFIGS). ODIN assets are front_<name>.tar, LoKI assets loki_front_<name>.tar ('+' removed)."""
+    out = {}
+    if "odin" in instruments:
+        import odin_mcstas as tw
+        import odin_virtual as ov
+        for (mode, _), (delta, n) in ov.FRONTS.items():
+            name = os.path.basename(tw.front_folder(mode, n, delta))
+            out[name] = ("odin", f"front_{name.replace('+', '')}.tar")
+    if "loki" in instruments:
+        import loki_mcstas as lm
+        import virtual_loki as vl
+        for cfg, _, _ in vl.CONFIGS.values():
+            name = os.path.basename(lm.front_folder(**{k: v for k, v in cfg.items()}))
+            out[name] = ("loki", f"loki_front_{name.replace('+', '')}.tar")
+    return out
 
 
 def complete(folder):
@@ -69,24 +84,34 @@ def download(url, dest):
 
 def main():
     args = sys.argv[1:]
-    names = wanted()
+    instruments = ("odin", "loki")
+    if "--instrument" in args:
+        i = args.index("--instrument")
+        instruments = (args[i + 1],)
+        del args[i:i + 2]
+    known = wanted(instruments)
     if args[:1] == ["--list"]:
-        print("\n".join(names))
+        print("\n".join(f"{v[0]}: {n}" for n, v in known.items()))
         return
-    names = args or names
-    todo = [n for n in names if not complete(os.path.join(FRONT_DIR, n))]
+    for n in args:
+        if n not in known:
+            raise SystemExit(f"unknown upstream part {n}; known: {list(known)}")
+    names = args or list(known)
+    todo = [n for n in names if not complete(os.path.join(FRONT_DIRS[known[n][0]], n))]
     if not todo:
-        print(f"upstream parts already present in {FRONT_DIR}")
+        print("upstream parts already present in " + ", ".join(FRONT_DIRS[i] for i in instruments))
         return
     available = assets()
     sums = {}
     if "SHA256SUMS" in available:
-        tmp = os.path.join(FRONT_DIR, "SHA256SUMS")
-        os.makedirs(FRONT_DIR, exist_ok=True)
+        tmp = os.path.join(FRONT_DIRS[known[todo[0]][0]], "SHA256SUMS")
+        os.makedirs(os.path.dirname(tmp), exist_ok=True)
         download(available["SHA256SUMS"], tmp)
         sums = {l.split()[1]: l.split()[0] for l in open(tmp) if l.strip()}
     for n in todo:
-        asset = f"front_{n.replace('+', '')}.tar"
+        instr, asset = known[n]
+        FRONT_DIR = FRONT_DIRS[instr]
+        os.makedirs(FRONT_DIR, exist_ok=True)
         if asset not in available:
             raise SystemExit(f"{asset} is not in release {RELEASE} of {REPO}")
         print(f"downloading {asset} ...")

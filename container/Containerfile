@@ -1,4 +1,5 @@
-# Container image of the ACCESS digital twins: McStas + official ESS instrument models + twins + NICOS + JupyterLab.
+# Container image of the ACCESS digital twins: McStas + official ESS instrument models (ODIN, LoKI) + twins + NICOS
+# + JupyterLab.
 # Built and tested by GitHub Actions (.github/workflows/container.yml); also builds with Docker or Podman:
 #   docker build -f container/Containerfile -t access-twins .
 #   docker run --rm -p 8888:8888 -v twin-data:/data access-twins
@@ -29,6 +30,13 @@ RUN git clone --quiet "$ODIN_REPO" "$HOME/odin_model" \
  && git -C "$HOME/odin_model" checkout --quiet "$ODIN_COMMIT" \
  && pip install --no-deps -e "$HOME/odin_model/instrpy" -e "$HOME/odin_model/extra"
 
+# Official McStas model of LoKI (ESS/DMSC), fixed commit. Its upstream part is precomputed (release asset, see
+# fetch_fronts.py): the model is only needed to recompute it or to read the instrument description.
+ARG LOKI_REPO_URL=https://git.esss.dk/dmsc-instrumentmodels/LOKI.git
+ARG LOKI_COMMIT=00fc29c76df3087648b1f133c549e981ef3084c3
+RUN git clone --quiet "$LOKI_REPO_URL" "$HOME/loki_model" \
+ && git -C "$HOME/loki_model" checkout --quiet "$LOKI_COMMIT"
+
 # NICOS sources, fixed commit; a shallow checkout has no version tag, so the version is written by hand
 ARG NICOS_COMMIT=44bec9c74fea00406a936ae327b2fd71253e3138
 ARG NICOS_VERSION=3.13.2.dev0+g44bec9c
@@ -47,6 +55,7 @@ COPY --chown=$MAMBA_USER:$MAMBA_USER . /home/mambauser/twin
 WORKDIR /home/mambauser/twin
 
 ENV TWIN_RUN_ROOT=/data/twin \
+    LOKI_REPO=/home/mambauser/loki_model \
     NICOS_ROOT=/home/mambauser/nicos_src \
     CONDA_ROOT=/opt/conda \
     OMPI_MCA_rmaps_base_oversubscribe=1 \

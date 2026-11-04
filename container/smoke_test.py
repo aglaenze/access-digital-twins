@@ -4,7 +4,9 @@
 2. a short measurement with the virtual ODIN (WFM δ = 0.10 m, the smallest upstream part, downloaded from the
    release; hybrid mode): dark, open beam, iron plate; reduction with essimaging; transmission of the plate compared
    with NCrystal (Beer–Lambert, 5 mm of α-iron) between 2.2 and 3.8 Å (below the first Bragg edge, 4.05 Å);
-3. NICOS services started headless with the launcher (twin server, cache, poller, daemon), then stopped.
+3. a LoKI measurement (upstream part downloaded from the release, downstream McStas part computed): silica spheres,
+   10 min; Guinier fit compared with the exact radius of gyration and I(0);
+4. NICOS services started headless with the launcher (twin server, cache, poller, daemon), then stopped.
 Exit code 0 if everything works.
 """
 import os
@@ -72,6 +74,17 @@ T_nc = np.exp(-sigma * 0.5)
 dev = np.mean(T) - np.mean(T_nc)
 print(f"transmission 2.2–3.8 Å: measured {np.mean(T):.3f}, NCrystal {np.mean(T_nc):.3f}")
 check(abs(dev) < 0.03, f"iron plate transmission agrees with NCrystal (difference {dev:+.3f})")
+
+step("measurement with the virtual LoKI")
+r = subprocess.run([sys.executable, os.path.join(HERE, "fetch_fronts.py"), "--instrument", "loki"])
+check(r.returncode == 0, "LoKI upstream part downloaded")
+t0 = time.time()
+sys.path.insert(0, os.path.join(TWIN, "loki"))
+import easy_case                                      # noqa: E402
+res = easy_case.main(plot=False, session="ci_loki", mpi=int(os.environ.get("TWIN_MPI", "4")))
+print(f"LoKI measurement in {time.time() - t0:.0f} s (including the McStas compilation and the downstream part)")
+check(abs(res["rg"] / res["rg_true"] - 1) < 0.05, f"radius of gyration {res['rg']:.1f} Å within 5 % of {res['rg_true']:.1f} Å")
+check(abs(res["i0"] / res["i0_true"] - 1) < 0.05, f"I(0) {res['i0']:.3f} cm⁻¹ within 5 % of {res['i0_true']:.3f} cm⁻¹")
 
 step("NICOS services (headless)")
 if NO_NICOS:

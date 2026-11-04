@@ -40,13 +40,15 @@ Write in `FOLDER` the folder of your measurements:
 - NICOS: the folder of your proposal, `f"{TWIN_RUN_ROOT}/data/loki/<year>/<proposal>/raw"`,
   e.g. `f"{TWIN_RUN_ROOT}/data/loki/2026/3001/raw"`.
 
-`TWIN_RUN_ROOT` is the root of the results of the twin (`C:\Users\<you>\McStas_runs\twin` on Windows). Leave
+`TWIN_RUN_ROOT` is the root of the results of the twin (`/data/twin` in the container,
+`C:\Users\<you>\McStas_runs\twin` on Windows). Leave
 `FOLDER = None` to measure the silica spheres for 10 min first: about 2 min of computing, ~15 min the very first time
 (McStas simulation of the beamline, then kept).
 """)
 
 code(r"""
-FOLDER = None
+from loki_paths import TWIN_RUN_ROOT          # root of the results of the twins
+FOLDER = None                                  # or e.g. f"{TWIN_RUN_ROOT}/data/loki/2026/3001/raw"
 """)
 
 code(r"""

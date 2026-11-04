@@ -57,14 +57,21 @@ Same environment as the ODIN twin, plus the official LoKI model:
 ```
 git clone https://git.esss.dk/dmsc-instrumentmodels/LOKI.git ~/McStas_runs/LOKI
 ```
-The upstream part of the 3 m configuration (`front/col3m_src30mm_sam10mm_lam3-11.5_skip0_N1e+09/`, 54 MB) is computed
-by `loki_mcstas.front()` on first use (~15 min) — on the development computer it was taken (hard link) from the LoKI
-notebook series.
+The upstream part of the 3 m configuration (`front/col3m_src30mm_sam10mm_lam3-11.5_skip0_N1e+09/`, 54 MB) is
+downloaded from the release of this repository (`python ../container/fetch_fronts.py --instrument loki`, asset
+`loki_front_...tar`); otherwise it is computed by `loki_mcstas.front()` on first use (~15 min on 8 cores). With the
+upstream part present, the official model is not needed to measure.
+
+**Container**: the image contains the official model (fixed commit, `LOKI_REPO=~/loki_model`) and downloads the
+upstream part at start. Checked on 2026-11-04 from an empty results folder, without the official model, 4 MPI
+processes: the easy case takes 2 min (compilation + downstream part), Rg = 39.3 ± 0.2 Å, I(0) = 4.33 cm⁻¹, peak memory
+5.6 GB. The smoke test of the container runs it at every push. Number of McStas processes: variable `TWIN_MPI`
+(default 8).
 
 ## Next steps
 1. Raw data: event files in the ESS NeXus format of LoKI, reduced with `esssans` (as ODIN with `essimaging`).
 2. A real SANS session: empty beam, empty cell, solvent, sample, dark, water (absolute calibration), with
    transmissions; the samples of the notebook series (Nafion membrane, catalyst layer, porous electrode).
 3. Collimations 5 m and 8 m (rear detector at 10 m), to reach lower Q.
-4. Done on 2026-11-04: twin server, console and NICOS (`../nicos/nicos_twin/loki/`, ESS GUI of LoKI). Still to do:
-   web page, and LoKI in the container image (official model and precomputed upstream part).
+4. Done on 2026-11-04: twin server, console and NICOS (`../nicos/nicos_twin/loki/`, ESS GUI of LoKI), analysis
+   notebook, container image. Still to do: web page.

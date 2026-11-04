@@ -9,7 +9,7 @@ boxes; copy them exactly.
 | Instrument | Technique | Web page | Console | NICOS | Python script |
 |---|---|:-:|:-:|:-:|:-:|
 | ODIN | neutron imaging | yes | yes | yes | yes |
-| LoKI | small-angle scattering (SANS) | — | yes | yes | yes (first version, route B only) |
+| LoKI | small-angle scattering (SANS) | — | yes | yes | yes (first version) |
 | DREAM, BIFROST | diffraction, inelastic scattering | — | — | — | — (waiting for the official McStas models) |
 
 The installation (part 1) is common to all twins. **You choose the instrument when you start it** (console:
@@ -106,9 +106,11 @@ repeated). To start from scratch: `docker rm twin`, then step 4 again.
    ```
    It should end with `ALL PASSED`.
 8. *(Optional, only for part 4 with the graphical interface)* install NICOS: `nicos/README.md` § 5.
-9. *(Optional, only for the LoKI twin, part 6)* install the official McStas model of LoKI:
+9. *(Optional, only for the LoKI twin, part 6)* install the official McStas model of LoKI and download its
+   precomputed upstream part (56 MB; computing it yourself takes ~15 min on 8 cores):
    ```
    git clone https://git.esss.dk/dmsc-instrumentmodels/LOKI.git %USERPROFILE%\McStas_runs\LOKI
+   python container\fetch_fronts.py --instrument loki
    ```
 
 Results never go into the repository folder: they go to `%USERPROFILE%\McStas_runs\twin` (McStas does not accept
@@ -288,15 +290,16 @@ r["image"].plot()          # transmission image
 
 ### LoKI (small-angle neutron scattering) — first version
 
-The LoKI twin can be used from Python, from the console and from NICOS (no web page yet), and only with **route B**
-(step 9 of the installation; the container does not contain the LoKI model yet). Its test case measures dilute silica
-spheres (radius 50 Å) for 10 min and fits their size:
+The LoKI twin can be used from Python, from the console and from NICOS (no web page yet), with both routes: route A
+(the container contains it) and route B (step 9 of the installation). It needs about 6 GB of free memory during a
+measurement (route A: memory given to Docker). Its test case measures dilute silica spheres (radius 50 Å) for 10 min
+and fits their size (route A: in a JupyterLab terminal):
 ```
 cd loki
 python easy_case.py
 ```
-The first run takes ~15 min (McStas simulation of the beamline, then kept in `%USERPROFILE%\McStas_runs\twin\loki`),
-the next ones ~2 min. It prints the radius of gyration found (expected ≈ 39 Å) and saves the figure
+The first run takes ~2 min (McStas simulation of the sample, then kept in the results folder `twin/loki`), the next
+ones less than a minute. It prints the radius of gyration found (expected ≈ 39 Å) and saves the figure
 `figures/easy_case.png`: I(Q) of the three detector banks on the exact curve. To measure yourself, in Python
 (started in the folder `loki`):
 ```python

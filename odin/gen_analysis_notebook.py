@@ -46,7 +46,8 @@ Write in `FOLDER` the folder of your measurements:
 """)
 
 code(r"""
-FOLDER = None
+from odin_paths import TWIN_RUN_ROOT          # root of the results of the twins
+FOLDER = None                                  # or e.g. f"{TWIN_RUN_ROOT}/data/odin/2026/1234/raw"
 """)
 
 code(r"""
