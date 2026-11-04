@@ -9,16 +9,16 @@ boxes; copy them exactly.
 | Instrument | Technique | Web page | Console | NICOS | Python script |
 |---|---|:-:|:-:|:-:|:-:|
 | ODIN | neutron imaging | yes | yes | yes | yes |
-| LoKI | small-angle scattering (SANS) | — | — | — | yes (first version) |
-| DREAM, BIFROST | diffraction, inelastic scattering | — | — | — | — (to do) |
+| LoKI | small-angle scattering (SANS) | — | yes | yes | yes (first version, route B only) |
+| DREAM, BIFROST | diffraction, inelastic scattering | — | — | — | — (waiting for the official McStas models) |
 
-The installation (part 1) is common to all twins. The three ways to use a twin (parts 2–4) are shown with **ODIN**,
-the only twin that offers them all for now; the other twins will work the same way (same commands, with
-`--instrument loki`, ...) as they are completed. Part 6 shows how to run the LoKI twin.
+The installation (part 1) is common to all twins. **You choose the instrument when you start it** (console:
+`--instrument odin` or `loki`; NICOS: the launcher asks), as you would walk into the control room of that instrument
+at ESS. The examples of parts 2–4 use **ODIN** (iron plate); part 6 gives the same steps for LoKI.
 
-**What you will do**: install the twins (part 1), then measure the transmission of an iron plate with ODIN in one of
-three ways (parts 2–4): in a web page, with a console, or with NICOS, the control software of the real instruments.
-Part 5 tells you where your data are and how to analyze them; part 6 covers the other instruments.
+**What you will do**: install the twins (part 1), then measure with one of the three ways to use a twin (parts 2–4):
+a web page, a console, or NICOS, the control software of the real ESS instruments. Part 5 tells you where your data are
+and how to analyze them; part 6 covers the other instruments.
 
 Expect: 20–60 min for the installation (mostly downloads), a few minutes per measurement session.
 
@@ -190,43 +190,70 @@ Then analyze the three files: part 5.
 
 NICOS is the software that controls the real instruments. Here it controls the twin.
 
+At ESS every instrument has its own NICOS (same program, its own devices and window), running on the computers of
+that instrument. Here the launcher asks which instrument you want: that is your "control room". As on the real
+instruments, you take data by **typing commands** (or running scripts of commands); the buttons of the window only
+write these commands for you.
+
 ### With the graphical interface (route B, after installing NICOS)
 ```
-python nicos\start_odin_nicos.py
+python nicos\start_nicos.py
 ```
-After ~30 s the NICOS window opens. Log in with user **student**, password **student** (server `localhost:1301`).
-In the tab *Command line*, type:
-```
-read()
-move(shutter, 'closed'); count(t=10)
-move(shutter, 'open', stage_x, 500)
-det.title = 'open beam'; count(t=10)
-move(stage_x, 0)
-det.title = 'iron plate'; count(t=10)
-```
-(In NICOS, the stage position is in **millimeters**: 500 mm = out of the beam.) The devices and their values are
-shown on the right. To stop: press Enter in the terminal where you started NICOS.
+Answer `1` (ODIN). After ~30 s the NICOS window of ESS opens. Log in with user **student**, password **student**
+(server `localhost:1301`).
+
+1. Tab **Experiment**: type a *Proposal ID* (any number, e.g. `1234`: at ESS it is the number of your accepted
+   proposal), a title, your name in *Users*, then **Apply**. Without a proposal NICOS refuses to record data, as at
+   ESS.
+2. Tab **Instrument interaction**: type in the command line (one line, then Enter; or several lines in the tab
+   **Scripting**, then Run):
+   ```
+   read()
+   move(shutter, 'closed')
+   with nexusfile_open('dark'):
+       count(t=10)
+   move(shutter, 'open', stage_x, 500)
+   with nexusfile_open('open beam'):
+       count(t=10)
+   move(stage_x, 0)
+   with nexusfile_open('iron plate'):
+       count(t=10)
+   ```
+   `with nexusfile_open('title'):` is the ESS way of recording: what is measured in the indented block is written to
+   a data file with this title. (In NICOS, the stage position is in **millimeters**: 500 mm = out of the beam.)
+3. The devices and their values are on the right; the image of the last count is in **Detector image**;
+   `list_filewriting_jobs()` lists the files written.
+
+To stop: press Enter in the terminal where you started NICOS.
 
 ### With text commands (route A, in the container; no graphical interface yet)
 Terminal 1 (JupyterLab terminal):
 ```
-python nicos/start_odin_nicos.py --no-gui --background --session my_nicos_session
+python nicos/start_nicos.py --instrument odin --no-gui --background
 ```
-Wait for `Services ready`. Terminal 2:
+Wait for `ODIN services ready`. Terminal 2: write your commands in a file, e.g. `my_session.py`
+(JupyterLab: *File → New → Text File*):
 ```
-$CONDA_ROOT/envs/nicos/bin/python nicos/run_nicos_script.py -c "read(); move(shutter, 'open', stage_x, 500); det.title = 'open beam'; count(t=10)"
+NewExperiment(1234, 'Bragg edges of iron')
+move(shutter, 'open', stage_x, 500)
+with nexusfile_open('open beam'):
+    count(t=10)
 ```
-You see what NICOS answers (devices moving, file written). A longer session can be written in a file (one NICOS
-command per line) and run with `.../python nicos/run_nicos_script.py my_session.py`. To stop the services:
-`Ctrl+C` in terminal 1.
+and run it:
+```
+$CONDA_ROOT/envs/nicos/bin/python nicos/run_nicos_script.py my_session.py
+```
+You see what NICOS answers (devices moving, file written). To stop the services: `Ctrl+C` in terminal 1.
 
 ---
 
 ## Part 5 — Your data and their analysis
 
-**Where are the files?** One folder per session:
-- route A: `/data/twin/odin/<session>/` in the container (visible in JupyterLab's terminal: `ls /data/twin/odin`);
-- route B: `%USERPROFILE%\McStas_runs\twin\odin\<session>\`.
+**Where are the files?** Web page and console: one folder per session; NICOS: one folder per proposal, as at ESS:
+- route A: `/data/twin/odin/<session>/` and `/data/twin/data/odin/<year>/<proposal>/raw/` in the container (visible in
+  JupyterLab's terminal: `ls /data/twin/odin`);
+- route B: `%USERPROFILE%\McStas_runs\twin\odin\<session>\` and
+  `%USERPROFILE%\McStas_runs\twin\data\odin\<year>\<proposal>\raw\`.
 
 Each measurement is a NeXus file `odin_000001.nxs`, `odin_000002.nxs`, ... (the same format as at ESS: every
 detected neutron with its pixel and arrival time, plus the state of the instrument), and `log.jsonl` is the logbook
@@ -253,7 +280,7 @@ r["image"].plot()          # transmission image
 
 ### LoKI (small-angle neutron scattering) — first version
 
-For now the LoKI twin is used from Python only (no web page, console or NICOS yet), and only with **route B**
+The LoKI twin can be used from Python, from the console and from NICOS (no web page yet), and only with **route B**
 (step 9 of the installation; the container does not contain the LoKI model yet). Its test case measures dilute silica
 spheres (radius 50 Å) for 10 min and fits their size:
 ```
@@ -267,15 +294,27 @@ the next ones ~2 min. It prints the radius of gyration found (expected ≈ 39 Å
 ```python
 from virtual_loki import VirtualLoki, read
 loki = VirtualLoki(session="my_first_sans")
-loki.move(sample="silica_spheres", collimation="3m", shutter="open")
+loki.move(sample="silica_spheres", collimation="3m", heavy_shutter="open", shutter="open")
 f = loki.count(600)          # 600 s; returns the file written
 data = read(f)               # {"front": (Q, I, dI), "middle": ..., "rear": ...}
 ```
-Details: `loki/README.md`.
+**Console**: as in part 3, with `python twin_server.py --instrument loki --session my_first_sans` in terminal 1;
+devices `heavy_shutter`, `shutter`, `collimation`, `sample`.
+
+**NICOS**: `python nicos\start_nicos.py`, answer `2` (LoKI). The window is the one of the real LoKI. In the
+Experiment tab give a proposal number, then:
+```
+move(heavy_shutter, 'Open', fast_shutter, 'Open')
+with nexusfile_open('silica spheres, 10 min'):
+    count(t=600)
+```
+(`heavy_shutter` and `fast_shutter` are the names used by the NICOS of the real LoKI.) The file contains I(Q) of the
+three detector banks; the Detector image tab shows the rear detector. Details: `loki/README.md`.
 
 ### DREAM, BIFROST
 
-Not started yet; they will appear here when their twin exists.
+Not started yet: their official McStas models are not yet available to the project (ESS repositories
+`dmsc-instrumentmodels/dream`, `dmsc-instrumentmodels/bifrost`). They will appear here when their twin exists.
 
 ---
 

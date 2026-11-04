@@ -1,8 +1,8 @@
 """Digital-twin server: a virtual instrument (e.g. VirtualOdin) in its own process, driven over the network.
 
 Why: on a real instrument, the control station (NICOS) and what it drives are separate processes. Here too: NICOS
-cannot live in the McStas environment (it requires numpy < 2; essimaging and scipp use numpy 2). The future NICOS
-device will simply send its orders to this server, as the provisional console `twin_console.py` already does.
+cannot live in the McStas environment (it requires numpy < 2; essimaging and scipp use numpy 2). The NICOS devices
+(nicos/nicos_twin) send their orders to this server, as the console `twin_console.py` does.
 
     python twin_server.py --instrument odin [--session NAME] [--port 8765] [--mode hybrid|mcstas]
 
@@ -14,7 +14,10 @@ JSON over http://127.0.0.1:<port> (local connections only):
     GET  /devices                        -> description of the devices (unit, limits, choices, help)
     GET  /log                            -> actions of the session
     POST /move   {"device": value, ...}
-    POST /count  {"t": 10, "title": "...", "image": false}  -> {"file", "number", "n_counts", ["image" 128×128]}
+    POST /count  {"t": 10, "title": "...", "image": false, "write": true, "folder": null}
+                 -> {"file", "number", "n_counts", ["image": detector image for live displays]}
+                 write=false: no file (live image only), as a count outside a file-writing job at ESS;
+                 folder: where to write the files (NICOS: the proposal folder), default the session folder
     POST /scan   {"device": ..., "values": [...], "t": 10, "title": "..."}   -> {"files": [...]}
 One measurement at a time (as on the instrument): a command received during a measurement is refused (code 409,
 "instrument busy"), but /status always answers.
@@ -29,7 +32,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 # instrument name -> (sub-folder of twin/, module, class)
-INSTRUMENTS = {"odin": ("odin", "odin_virtual", "VirtualOdin")}
+INSTRUMENTS = {"odin": ("odin", "odin_virtual", "VirtualOdin"),
+               "loki": ("loki", "virtual_loki", "VirtualLoki")}
 
 INSTR = None
 LOCK = threading.Lock()
@@ -83,7 +87,11 @@ class Handler(BaseHTTPRequestHandler):
                 INSTR.move(**args)
                 return self._reply(200, dict(devices=INSTR.status()))
             if self.path == "/count":
-                f = INSTR.count(float(args["t"]), title=args.get("title", ""))
+                if args.get("folder"):
+                    if not os.path.isabs(args["folder"]):
+                        raise ValueError(f"folder must be an absolute path: {args['folder']}")
+                    INSTR.use_folder(args["folder"])
+                f = INSTR.count(float(args["t"]), title=args.get("title", ""), write=args.get("write", True))
                 out = dict(file=f, number=INSTR.number, n_counts=getattr(INSTR, "last_n_counts", None))
                 if args.get("image"):                          # detector image for live displays (NICOS)
                     out["image"] = INSTR.last_image.tolist()

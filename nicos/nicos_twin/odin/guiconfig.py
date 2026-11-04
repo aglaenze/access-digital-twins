@@ -1,45 +1,76 @@
-"""NICOS GUI configuration of the ODIN digital twin (standard NICOS panels only)."""
+"""NICOS GUI of the ODIN digital twin: copy of nicos_ess/odin/guiconfig.py (the GUI of the real ODIN)."""
 
 main_window = docked(
     tabbed(
-        ('Command line',
-         vsplit(
-             panel('nicos.clients.gui.panels.cmdbuilder.CommandPanel'),
-             panel('nicos.clients.gui.panels.status.ScriptStatusPanel', eta=True),
-             panel('nicos.clients.gui.panels.console.ConsolePanel', hasinput=False),
-         ),
+        ('Experiment', panel('nicos_ess.gui.panels.exp_panel.ExpPanel')),
+        ('Setup',
+         panel('nicos.clients.flowui.panels.setup_panel.SetupsPanel')),
+        ('  ', panel('nicos.clients.flowui.panels.empty.EmptyPanel')),
+        (
+            'Instrument interaction',
+            hsplit(
+                vbox(
+                    panel(
+                        'nicos.clients.flowui.panels.cmdbuilder.CommandPanel',
+                    ),
+                    tabbed(
+                        ('Output',
+                         panel(
+                             'nicos.clients.flowui.panels.console.ConsolePanel',
+                             hasinput=False)),
+                        ('Scan Plot',
+                         panel('nicos.clients.flowui.panels.scans.ScansPanel')
+                         ),
+                        ('Detector Image',
+                         panel(
+                             'nicos_ess.odin.gui.panels.live.MultiLiveDataPanel'
+                         )),
+                        ('Script Status',
+                         panel(
+                             'nicos.clients.flowui.panels.status.ScriptStatusPanel',
+                             eta=True)),
+                    ),
+                ),  # vsplit
+                panel(
+                    'nicos.clients.flowui.panels.devices.DevicesPanel',
+                    dockpos='right',
+                    param_display={'Exp': ['lastpoint', 'lastscan']},
+                    filters=[],
+                ),
+            ),  # hsplit
         ),
-        ('Detector image',
-         panel('nicos.clients.gui.panels.live.LiveDataPanel'),
+        (
+            'Scripting',
+            panel('nicos.clients.flowui.panels.editor.EditorPanel',
+                  tools=None),
         ),
-    ),
-    ('ODIN devices',
-     panel('nicos.clients.gui.panels.devices.DevicesPanel',
-           dockpos='right',
-           param_display={'Exp': ['lastpoint', 'lastscan'], 'det': ['lastfile']},
-           filters=[('Detector', 'det'), ('Sample stage', '^stage'), ('Beam', 'chopper|pinhole|diffuser|shutter|wfm')],
-     ),
-    ),
-    ('Experiment',
-     panel('nicos.clients.gui.panels.expinfo.ExpInfoPanel', dockpos='right'),
-    ),
-)
+        (
+            'History',
+            panel('nicos.clients.flowui.panels.history.HistoryPanel'),
+        ),
+        (
+            'Logs',
+            tabbed(
+                ('Errors',
+                 panel('nicos.clients.gui.panels.errors.ErrorPanel')),
+                ('Log files',
+                 panel('nicos.clients.gui.panels.logviewer.LogViewerPanel')),
+            ),
+        ),
+        position='left',
+        margins=(0, 0, 0, 0),
+        textpadding=(30, 20),
+    ),  # tabbed
+)  # docked
 
-windows = [
-    window('Editor', 'editor',
-           vsplit(
-               panel('nicos.clients.gui.panels.scriptbuilder.CommandsPanel'),
-               panel('nicos.clients.gui.panels.editor.EditorPanel'),
-           )),
-    window('Scans', 'plotter', panel('nicos.clients.gui.panels.scans.ScansPanel')),
-    window('History', 'find', panel('nicos.clients.gui.panels.history.HistoryPanel')),
-    window('Live data', 'live', panel('nicos.clients.gui.panels.live.LiveDataPanel')),
-    window('Log files', 'table', panel('nicos.clients.gui.panels.logviewer.LogViewerPanel')),
-    window('Errors', 'errors', panel('nicos.clients.gui.panels.errors.ErrorPanel')),
-]
+windows = []
 
 tools = [
-    tool('Calculator', 'nicos.clients.gui.tools.calculator.CalculatorTool'),
+    tool('Report NICOS bug or request enhancement',
+         'nicos.clients.gui.tools.bugreport.BugreportTool'),
 ]
 
-options = {}
+options = {
+    # ESS flowui window, with a workaround for a NICOS bug (see nicos_twin/gui.py)
+    'mainwindow_class': 'nicos_twin.gui.MainWindow',
+}

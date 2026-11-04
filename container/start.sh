@@ -12,7 +12,7 @@ fetch() { python container/fetch_fronts.py || echo "WARNING: upstream parts not 
 case "${1:-jupyter}" in
   jupyter) fetch; exec jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --ServerApp.root_dir="$HOME/twin" ;;
   voila)   fetch; exec voila odin/ODIN_virtual.ipynb --Voila.ip=0.0.0.0 --port=8866 --no-browser ;;
-  nicos)   fetch; exec python nicos/start_odin_nicos.py --no-gui --background --session "${TWIN_SESSION:-nicos}" ;;
+  nicos)   fetch; exec python nicos/start_nicos.py --instrument "${TWIN_INSTRUMENT:-odin}" --no-gui --background --session "${TWIN_SESSION:-nicos}" ;;
   test)    exec python container/smoke_test.py ;;
   *)       exec "$@" ;;
 esac

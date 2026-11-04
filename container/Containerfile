@@ -37,7 +37,7 @@ RUN git init --quiet "$HOME/nicos_src" \
  && git fetch --quiet --depth 1 https://github.com/mlz-ictrl/nicos "$NICOS_COMMIT" \
  && git checkout --quiet FETCH_HEAD \
  && echo "$NICOS_VERSION" > nicos/RELEASE-VERSION \
- && micromamba run -n nicos pip install --no-cache-dir -r requirements.txt
+ && micromamba run -n nicos pip install --no-cache-dir -r requirements.txt pyqtgraph "h5py<3.15" https://github.com/ess-dmsc/yuos_query/releases/download/v0.1.21/yuos_query-0.1.21-py3-none-any.whl
 
 # Real ODIN file used as template for the NeXus files (downloaded by essimaging; kept in the image)
 RUN python -c "import ess.odin.data as d; print(d.iron_simulation_ob_small())"

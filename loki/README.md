@@ -5,9 +5,11 @@ arrangement of objects from ~1 to ~100 nm (particles, pores, polymers, membranes
 digital twin, built like the ODIN twin (`../odin/`), from the official McStas model of LoKI and from the French LoKI
 notebook series of this project, where every step of the simulation and of the reduction is explained and validated.
 
-**Status: first version, Python only, one easy test case (below).** Not yet: raw event files in the ESS NeXus format,
-reduction with the ESS software (`esssans`), the full series of measurements of a real SANS experiment (empty cell,
-solvent, dark, water calibration), NICOS, web page, container.
+**Status: first version, one easy test case (below).** Driven from Python, from the console (`twin_server.py
+--instrument loki` + `twin_console.py`) or from NICOS (`../nicos/start_nicos.py --instrument loki`, ESS GUI and
+device names `heavy_shutter`, `fast_shutter`). Not yet: raw event files in the ESS NeXus format, reduction with the
+ESS software (`esssans`), the full series of measurements of a real SANS experiment (empty cell, solvent, dark, water
+calibration), web page, container.
 
 ## Easy test case: dilute silica spheres
 
@@ -20,9 +22,9 @@ dΣ/dΩ = φ V Δρ² P(Q) + background, I(0) = 4.37 cm⁻¹, minima of P(Q) at 
 
 ![Easy case](figures/easy_case.png)
 
-Result (2026-11-03): the three detector banks join up and follow the exact curve; Guinier fit (Q Rg < 1.3, 26 points):
-**Rg = 39.7 ± 0.2 Å (exact 38.7 Å), I(0) = 4.33 ± 0.01 cm⁻¹ (exact 4.37)**; mean level in the Guinier region 0.984
-of the exact one. The apparent Rg is 2.6 % too large because the instrument resolution smears the curve (it also
+Result (2026-11-04): the three detector banks join up and follow the exact curve; Guinier fit (Q Rg < 1.3, 26 points):
+**Rg = 39.4 ± 0.2 Å (exact 38.7 Å), I(0) = 4.31 ± 0.01 cm⁻¹ (exact 4.37)**; mean level in the Guinier region 0.984
+of the exact one. The apparent Rg is 1.8 % too large because the instrument resolution smears the curve (it also
 fills in the minima); it is not corrected here. The first run takes ~2 min (McStas compilation and downstream
 simulation, then cached).
 
@@ -35,7 +37,7 @@ simulation, then cached).
 | Detector | `loki_mcstas.Detector` | the 9 tube panels of the official model (front, middle, rear banks), straight lines from the sample to the first panel met, beam stop, masks of hidden pixels |
 | Time of flight | `loki_mcstas.events` | arrival time modulo the source period, frames unwrapped, λ = h t / (m L), Q = 4π sin θ / λ |
 | Reduction | `loki_mcstas.reduce` | I(Q) in absolute units per bank: counts / (flux × transmission × thickness × solid angle) |
-| Instrument | `virtual_loki.VirtualLoki` | devices (`collimation`, `sample`, `shutter`), `move`, `count(t)` → HDF5 file with I(Q) and errors per bank (counting noise of a `t`-second measurement + simulation noise), logbook `log.jsonl` |
+| Instrument | `virtual_loki.VirtualLoki` | devices (`heavy_shutter`, `shutter`, `collimation`, `sample`), `move`, `count(t)` → HDF5 file with I(Q) and errors per bank (counting noise of a `t`-second measurement + simulation noise), live image of the rear panel, logbook `log.jsonl`; same interface as `VirtualOdin`, so the twin server and NICOS drive it |
 
 ## Files
 

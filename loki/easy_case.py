@@ -15,6 +15,9 @@ import sys
 
 import numpy as np
 
+if hasattr(sys.stdout, "reconfigure"):      # Å, ⁻¹ also when the output is redirected (Windows)
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import loki_samples as ls          # noqa: E402
@@ -25,7 +28,7 @@ T = 600.0
 
 def main(plot=True):
     loki = VirtualLoki(session="easy_case", seed=1)
-    loki.move(sample="silica_spheres", collimation="3m", shutter="open")
+    loki.move(sample="silica_spheres", collimation="3m", heavy_shutter="open", shutter="open")
     f = loki.count(T, title="silica spheres R = 50 A, 1 % in D2O")
     data = read(f)
     _, _, P = ls.silica_spheres()

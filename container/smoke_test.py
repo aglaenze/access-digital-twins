@@ -77,7 +77,7 @@ step("NICOS services (headless)")
 if NO_NICOS:
     print("skipped (--no-nicos)")
     sys.exit(0 if ok else 1)
-p = subprocess.Popen([sys.executable, os.path.join(TWIN, "nicos", "start_odin_nicos.py"), "--no-gui", "--background",
+p = subprocess.Popen([sys.executable, os.path.join(TWIN, "nicos", "start_nicos.py"), "--instrument", "odin", "--no-gui", "--background",
                       "--session", "ci_nicos"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
 ready, lines, t0 = False, [], time.time()
 while time.time() - t0 < 300:
@@ -86,14 +86,16 @@ while time.time() - t0 < 300:
         break
     lines.append(line.rstrip())
     print("  " + line.rstrip(), flush=True)
-    if "Services ready" in line:
+    if "services ready" in line:
         ready = True
         break
 check(ready, "NICOS cache, poller and daemon started with the twin server")
 if ready:   # a measurement driven through NICOS, as a student would do (login student / student)
     r = subprocess.run([nicos_py, os.path.join(TWIN, "nicos", "run_nicos_script.py"), "-c",
-                        "move(choppers, 'wfm', wfm_delta, 0.1); move(shutter, 'open', stage_x, 500); "
-                        "det.title = 'open beam via NICOS'; count(t=5)"],
+                        "NewExperiment(1234, 'smoke test')\n"
+                        "move(choppers, 'wfm', wfm_delta, 0.1); move(shutter, 'open', stage_x, 500)\n"
+                        "with nexusfile_open('open beam via NICOS'):\n"
+                        "    count(t=5)\n"],
                        capture_output=True, text=True, timeout=900)
     print("  " + r.stdout.replace("\n", "\n  ") + r.stderr[-2000:], flush=True)
     check(r.returncode == 0 and "file written" in r.stdout, "measurement driven through NICOS (file written)")

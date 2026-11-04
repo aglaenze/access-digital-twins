@@ -201,8 +201,19 @@ class VirtualOdin:
     def status(self):
         return {n: d.value for n, d in self.devices.items()}
 
-    def count(self, t, title=""):
-        """Measures for t seconds; returns the path of the NeXus file written."""
+    def use_folder(self, folder):
+        """Writes the next files (and the logbook) in `folder`, e.g. the proposal folder chosen in NICOS."""
+        folder = folder.replace(os.sep, "/")
+        if folder != self.folder:
+            os.makedirs(folder, exist_ok=True)
+            self.folder = folder
+            self.log_file = os.path.join(folder, "log.jsonl")
+            self.number = self._last_number()
+
+    def count(self, t, title="", write=True):
+        """Measures for t seconds; returns the path of the NeXus file written.
+        write=False: the detector image only (live display), no file, as a count outside a file-writing job at ESS;
+        returns None."""
         if not 0 < t <= 3600:
             raise ValueError("counting time between 0 and 3600 s")
         t0 = time.time()
@@ -239,6 +250,12 @@ class VirtualOdin:
         # Detector image of this measurement (128 × 128 pixels of 110 µm), for live displays (NICOS, page)
         self.last_image = np.histogram2d(counts["y"], counts["x"], bins=128,
                                          range=[FIELD[2:], FIELD[:2]])[0].astype(np.uint32)
+        if not write:
+            self.last_n_counts = int(self.last_image.sum())
+            self._log("count", dict(t=t, title=title, file=None, n_counts=self.last_n_counts, mode=self.mode,
+                                    charge_uC=round(float(charge.sum()), 1), state=self.status(),
+                                    compute_time=round(time.time() - t0, 1)))
+            return None
         self.number += 1
         out_file = f"{self.folder}/odin_{self.number:06d}.nxs"
         r = nx.write_nexus(counts, out_file, t, title=title or f"run {self.number}",

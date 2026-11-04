@@ -67,9 +67,21 @@ def main():
         return 1
     time.sleep(1)
     c.run(code)
-    if not c.done.wait(o.timeout):
-        print("timeout")
-        c.failed = True
+    t_end = time.time() + o.timeout
+    while True:
+        if not c.done.wait(max(t_end - time.time(), 0)):
+            print("timeout")
+            c.failed = True
+            break
+        # the daemon may report "idle" for a moment between the blocks of a script (e.g. inside a with block):
+        # finished only if it is still idle with nothing queued a moment later
+        time.sleep(1.5)
+        st = c.ask("getstatus", quiet=True) or {}
+        status = st.get("status", (-1,))[0]
+        if status < 0 and not st.get("requests"):
+            break
+        c.done.clear()
+        c.started = True
     time.sleep(1)
     c.disconnect()
     return 1 if c.failed else 0

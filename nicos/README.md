@@ -1,90 +1,123 @@
 # NICOS for the digital twins
 
-*Created 2026-11-03.* NICOS (Networked Instrument Control System, MLZ / ESS) drives the virtual instruments exactly as
-it drives the real ones: devices are moved with `move`, measurements are made with `count` and `scan`, the GUI shows
-the devices, the console and the detector image. The twin (McStas, hybrid model, NeXus files) runs in the background;
+*Created 2026-11-03, organized as at ESS on 2026-11-04.* NICOS (Networked Instrument Control System, MLZ / ESS) drives
+the virtual instruments as it drives the real ones: the same program, the same GUI as at ESS, the same commands
+(`move`, `count`, `scan`, `nexusfile_open`...). The twin (McStas, hybrid model, data files) runs in the background;
 the user never sees McStas.
 
-Status (2026-11-03): **working on Windows** for ODIN (cache, poller, daemon, GUI client: login and device values
-checked by a user); **on Linux in the container image** (`../container/`): cache, poller and daemon, started by the
-smoke test of every build (no GUI in the container yet). Student step-by-step guide: `../TUTORIAL.md`.
+Status (2026-11-04): **ODIN and LoKI** on Windows (services, ESS GUI, measurements written to the proposal folder);
+ODIN on Linux in the container image (`../container/`), checked by the smoke test of every build (no GUI in the
+container yet). Student step-by-step guide: `../TUTORIAL.md`.
 
-## 1. How it fits together
+## 1. How NICOS is organized at ESS, and in the twins
+
+At ESS there is **one NICOS program** (the `nicos` repository) and **one NICOS installation per instrument**. The
+package `nicos_ess` has one folder per instrument (`odin/`, `loki/`, `dream/`, `bifrost/`...), each with its
+`nicos.conf`, its *setups* (the devices of the instrument) and its `guiconfig.py` (the layout of its GUI). The NICOS
+services (cache, poller, daemon) of an instrument run on the computers of that instrument, which know which instrument
+they are (`INSTRUMENT=nicos_ess.odin`). A user does not choose the instrument in NICOS: they sit in the control room
+of their instrument, open its NICOS GUI, log in and work in their experiment (proposal number).
+
+The twins do the same with the package **`nicos_twin`** (this folder): `nicos_twin/odin/`, `nicos_twin/loki/`, each
+built on its `nicos_ess` counterpart:
+
+| | ESS (`nicos_ess/<instrument>/`) | Twin (`nicos_twin/<instrument>/`) |
+|---|---|---|
+| GUI | `guiconfig.py`: tabs Experiment, Setup, Instrument interaction (command line, output, scan plot, detector image, script status, devices), Scripting, History, Logs | **the same file** (copied), main window with a workaround for a NICOS bug (`nicos_twin/gui.py`) |
+| Experiment | `EssExperiment`: proposal number, title, users, samples; look-up in the ESS user office | `TwinExperiment` = `EssExperiment` without the user-office look-up (type any proposal number) |
+| Data files | written by the ESS file-writer (Kafka), started by NICOS; `<instrument>/<year>/<proposal>/raw/` | written by the twin, one per count, in `<TWIN_RUN_ROOT>/data/<instrument>/<year>/<proposal>/raw/` |
+| Recording commands | `nexusfile_open`, `start_filewriting`, `stop_filewriting`, `list_filewriting_jobs` (`nicos_ess.commands`) | the same commands (`nicos_twin.commands`) |
+| Devices | EPICS (motors, choppers...), detector data through Kafka | HTTP orders to the twin server; names of `nicos_ess` where they exist (LoKI: `heavy_shutter`, `fast_shutter`) |
+| Which instrument | the computer you sit at | `start_nicos.py` asks (or `--instrument`): like walking into a control room |
+
+What is not reproduced: EPICS, Kafka and the file-writer themselves (§ 9), and ESS accounts (local accounts, § 2).
+At ESS, everything recorded inside one `nexusfile_open` block goes into **one** file; the twin writes one file per
+count. The device setups of the real instruments are still thin (ODIN and LoKI are in commissioning): most twin devices
+have no ESS name yet, and keep the twin names.
 
 ```
-NICOS GUI (or any NICOS client)          conda env "nicos" (numpy < 2)
+NICOS GUI (ESS layout)                  conda env "nicos" (numpy < 2)
    │  login, commands
-NICOS daemon + cache                      conda env "nicos"; setup package nicos_twin (this folder)
+NICOS daemon + cache + poller            conda env "nicos"; INSTRUMENT=nicos_twin.<instrument>
    │  nicos_twin devices: HTTP orders (move, count, status)
-twin_server.py --instrument odin          conda env "mcstas" (numpy 2, McStas, essimaging)
+twin_server.py --instrument <name>       conda env of the twins (numpy 2, McStas, essimaging)
    │
-virtual ODIN (twin/odin/) → NeXus files in <TWIN_RUN_ROOT>/odin/<session>/
+virtual instrument (twin/odin/, twin/loki/) → data files in the proposal folder
 ```
-
-Why two environments: NICOS requires **numpy < 2** (`requirements.txt` of NICOS), while the twin (essimaging, scipp)
-uses numpy 2. NICOS therefore does not import the twin: its devices send their orders to the twin server over HTTP
-(local only), like the provisional console `../twin_console.py`. The McStas device of NICOS
-(`nicos/devices/mcstas.py`, which needs Linux signals) is not used.
+Why two environments: NICOS requires numpy < 2, the twins numpy 2; so NICOS does not import the twin, its devices
+send their orders to the twin server over HTTP (this computer only).
 
 ## 2. Quick start
 
 ```
-python start_odin_nicos.py
+python start_nicos.py
 ```
-(run it from this folder, with any Python, e.g. the `mcstas` env; in the container: `start.sh nicos`). It starts, in this order: the twin server (env
-`mcstas`), the NICOS cache, poller (reads the devices every few seconds, so that the GUI shows their values) and
-daemon (env `nicos`), then the NICOS GUI. Press Enter in that terminal to stop
-everything. First count with a new configuration: 1–2 min (McStas simulation, then cached); then a few seconds.
+(from this folder, in the twin environment; in the container: `start.sh nicos`). It asks which instrument, then
+starts the twin server, the NICOS cache, poller and daemon, and the NICOS GUI. First count with a new configuration:
+1–2 min (McStas simulation, then cached); then a few seconds. To stop: Enter in that terminal. Only one instrument at a
+time on a computer (as one NICOS per instrument computer): the launcher refuses to start if another one is running.
 
-**Login in the GUI** (accounts of `nicos_twin/odin/setups/special/daemon.py`; the daemon only accepts connections from
-this computer):
-
-| User name | Password | Rights |
-|---|---|---|
-| `student` | `student` | user: can run measurements (recommended) |
-| `guest` | *(empty)* | guest |
-| `admin` | `admin` | administrator |
-
-Server: `localhost:1301` (filled in automatically).
-
-Options:
 ```
-python start_odin_nicos.py --session group_A           # data folder <TWIN_RUN_ROOT>/odin/group_A/
-python start_odin_nicos.py --mode mcstas                # full McStas instead of the hybrid model (short counts)
-python start_odin_nicos.py --no-gui                     # services only (connect another NICOS client)
-python start_odin_nicos.py --no-gui --background        # services only, no console needed (stop the process to end)
+python start_nicos.py --instrument odin                  # no question
+python start_nicos.py --instrument loki --no-gui         # services only (connect another NICOS client)
+python start_nicos.py --instrument odin --mode mcstas    # ODIN: full McStas instead of the hybrid model
+python start_nicos.py --instrument odin --no-gui --background   # no console needed (stop the process to end)
 ```
 
-## 3. Using it
+**Login** (accounts of `nicos_twin/<instrument>/setups/special/daemon.py`; the daemon only accepts connections from this
+computer): `student` / `student` (user: can measure), `guest` / *(empty)*, `admin` / `admin`.
 
-In the GUI, tab **Command line** (or in any NICOS client):
+## 3. Taking data: commands, as on the real instruments
+
+Yes, at ESS data are taken by typing commands (or running scripts of commands): NICOS is a Python command line. The
+GUI buttons (command builder, script builder) only write these commands for you. In the GUI, tab **Instrument
+interaction**, or in any NICOS client:
+
 ```python
-read()                                     # state of all devices
-move(choppers, 'wfm', wfm_delta, 0.3)      # chopper mode
-move(shutter, 'closed'); count(t=10)       # dark run
-move(shutter, 'open', stage_x, 500)        # open beam: sample out of the beam (mm)
-det.title = 'open beam'                    # title written in the next NeXus files
-count(t=10)
-move(stage_x, 0); det.title = 'iron plate'
-count(t=10)
-scan(stage_rot, 0, 3, 60, t=10)            # tomography: 60 projections of 10 s
-det.lastfile                               # last NeXus file written
+NewExperiment(1234, 'Bragg edges of iron')     # 1. your experiment: proposal number and title
+                                               #    (or the Experiment tab: Proposal ID, title, users, Apply)
+read()                                         # state of all devices
+move(shutter, 'closed')
+with nexusfile_open('dark'):                   # 2. record: everything in the block is written to file
+    count(t=10)
+move(shutter, 'open', stage_x, 500)            # sample out of the beam (mm)
+with nexusfile_open('open beam'):
+    count(t=10)
+move(stage_x, 0)
+with nexusfile_open('iron plate'):
+    count(t=10)
+list_filewriting_jobs()                        # what was written
 ```
-After each count, the tab **Detector image** shows the 128 × 128 detector image (live-view sink); the devices are
-listed on the right. The NeXus files (ESS format) are written by the twin to `<TWIN_RUN_ROOT>/odin/<session>/`; reduce
-them in a notebook (`twin/odin/odin_reduction.py`) or in the student page (`twin/odin/ODIN_virtual.ipynb`).
+`count()` alone also writes a file (as at ESS with the file-writer data sink), with the current experiment title;
+without a proposal number NICOS refuses to count ("cannot start writing as proposal number not set"), as at ESS.
+`nexusfile_open('title')` sets the title, which is also the experiment title shown at the top of the GUI.
+The tab **Detector image** shows the image of the last count; the files go to
+`<TWIN_RUN_ROOT>/data/<instrument>/<year>/<proposal>/raw/` (shown by `det.lastfile`). Scripts: tab **Scripting**
+(editor, Run), or `run_nicos_script.py my_script.py` from a terminal (§ 4).
 
-| NICOS device | Twin device | Values |
-|---|---|---|
-| `choppers` | `choppers` | `'wfm'`, `'natural'`, `'white'` |
-| `wfm_delta` | `wfm_delta` | 0.1, 0.3, 0.45 (m) |
-| `shutter` | `shutter` | `'open'`, `'closed'` |
-| `pinhole` | `pinhole` | 0.01, 0.02, 0.03, 0.04 (m) |
-| `diffuser` | `diffuser` | `'in'`, `'out'` |
-| `stage_x` | `stage_x` | −500 to 500 **mm** (the twin uses m: factor `scale = 1e-3`) |
-| `stage_rot` | `stage_rot` | −180 to 180 deg |
-| `sample_holder` | `sample` | `'iron_plate'` (NICOS reserves the name `Sample`) |
-| `det` | detector | preset `t` (s); values: counts, file number; array: image |
+Devices of **ODIN** (`nicos_twin/odin/setups/odin.py`):
+
+| NICOS device | Values |
+|---|---|
+| `choppers` | `'wfm'`, `'natural'`, `'white'` |
+| `wfm_delta` | 0.1, 0.3, 0.45 (m) |
+| `shutter` | `'open'`, `'closed'` |
+| `pinhole` | 0.01, 0.02, 0.03, 0.04 (m) |
+| `diffuser` | `'in'`, `'out'` |
+| `stage_x` | −500 to 500 mm (out of the beam: 500) |
+| `stage_rot` | −180 to 180 deg (tomography: `scan(stage_rot, 0, 3, 60, t=10)`) |
+| `sample_holder` | `'iron_plate'` |
+| `det` | Timepix3 imaging detector, preset `t` (s); image 128 × 128 |
+
+Devices of **LoKI** (`nicos_twin/loki/setups/loki.py`), first version:
+
+| NICOS device | Values |
+|---|---|
+| `heavy_shutter` | `'Open'`, `'Closed'` (ESS name; main shutter) |
+| `fast_shutter` | `'Open'`, `'Closed'` (ESS name; just before the sample) |
+| `collimation` | `'3m'` (rear detector at 5 m) |
+| `sample_holder` | `'silica_spheres'` |
+| `det` | the 9 tube panels; preset `t` (s); image: rear panel (392 × 250 pixels); file: I(Q) per bank |
 
 A value outside the allowed list or limits is refused by NICOS itself ("Out of bounds").
 
@@ -92,25 +125,28 @@ A value outside the allowed list or limits is refused by NICOS itself ("Out of b
 
 | File | Role |
 |---|---|
-| `start_odin_nicos.py` | launcher (twin server + NICOS cache + daemon + GUI) |
-| `nicos_twin/devices.py` | NICOS devices: `TwinSwitch`, `TwinMotor` (Moveables), `TwinDetector` (Measurable with image), `TwinExperiment` |
-| `nicos_twin/odin/nicos.conf` | setup folders of the instrument |
-| `nicos_twin/odin/setups/` | `startup.py` (loaded by the daemon), `odin.py` (devices), `system.py` (instrument, experiment, data sinks), `special/cache.py`, `special/poller.py`, `special/daemon.py` |
-| `nicos_twin/odin/guiconfig.py` | GUI layout (standard NICOS panels) |
+| `start_nicos.py` | launcher: instrument choice, twin server + NICOS cache, poller, daemon + GUI |
+| `run_nicos_script.py` | runs NICOS commands from a terminal (`-c "..."` or a script file); used in the container and in tests |
+| `nicos_twin/devices.py` | `TwinSwitch`, `TwinMotor` (Moveables), `TwinDetector` (Measurable with image), `TwinExperiment` |
+| `nicos_twin/commands.py` | ESS recording commands: `nexusfile_open`, `start_filewriting`, `stop_filewriting`, `list_filewriting_jobs` |
+| `nicos_twin/gui.py` | ESS GUI main window with a workaround for a NICOS bug (missing action at the tested commit) |
+| `nicos_twin/<instrument>/nicos.conf` | setup folders of the instrument |
+| `nicos_twin/<instrument>/setups/` | `startup.py`, `<instrument>.py` (devices), `system.py` (instrument, experiment, data sinks, as in `nicos_ess`), `special/` (cache, poller, daemon) |
+| `nicos_twin/<instrument>/guiconfig.py` | copy of `nicos_ess/<instrument>/guiconfig.py` |
 
-Outputs, in `<TWIN_RUN_ROOT>/nicos/` (default `~/McStas_runs/twin/nicos/`; the launcher passes `TWIN_RUN_ROOT` to
-the setups): `*.log` (one per service, written by the launcher), `cache/` (NICOS cache database), `data/` (NICOS
-experiment folders: scripts, scan files). NICOS's own logs and pid files: `log/` and `pid/` in the NICOS root.
+Outputs in `<TWIN_RUN_ROOT>/` (default `~/McStas_runs/twin/`): `data/<instrument>/<year>/<proposal>/raw/` (data files
+and the logbook `log.jsonl` of the twin), `nicos/*.log` (one log per service), `nicos/<instrument>/cache/` (NICOS
+cache). NICOS's own logs and pid files: `log/` and `pid/` in the NICOS root.
 
-Adding an instrument (e.g. LoKI): a sub-package `nicos_twin/loki/` with the same setups, and the instrument in
-`INSTRUMENTS` of `../twin_server.py`.
+Adding an instrument: the twin in `twin/<instrument>/` with the class interface of `VirtualOdin` (devices, move,
+count, scan, status, use_folder), its entry in `INSTRUMENTS` of `../twin_server.py` and of `start_nicos.py`, and a
+sub-package `nicos_twin/<instrument>/` built from `nicos_ess/<instrument>/`.
 
 ## 5. Installation
 
-**Easiest: the container image** (`../container/`, Linux): NICOS is already installed (sources at a fixed commit,
-environment `nicos`, `requirements.txt`). Nothing to do.
+**Easiest: the container image** (`../container/`, Linux): NICOS is already installed. Nothing to do.
 
-**On Windows** (as on the development computer, 2026-11-03; `%USERPROFILE%` is your home folder, e.g. `C:\Users\you`):
+**On Windows** (`%USERPROFILE%` is your home folder, e.g. `C:\Users\you`):
 1. NICOS sources in `%USERPROFILE%\McStas_runs\nicos_src` (other place: variable `NICOS_ROOT`):
    ```
    git clone --depth 1 https://github.com/mlz-ictrl/nicos %USERPROFILE%\McStas_runs\nicos_src
@@ -128,10 +164,11 @@ environment `nicos`, `requirements.txt`). Nothing to do.
    ```
    conda run -n mcstas %USERPROFILE%\AppData\Local\miniforge3\envs\nicos\python.exe -m pip install --extra-index-url https://forge.frm2.tum.de/simple nicos-pyctl
    ```
-4. Remaining requirements and GUI:
+4. Remaining requirements, GUI, and what the ESS setups need (`yuos_query`: ESS experiment; `h5py`, `pyqtgraph`: ESS
+   GUI panels):
    ```
    cd %USERPROFILE%\McStas_runs\nicos_src
-   %USERPROFILE%\AppData\Local\miniforge3\envs\nicos\python.exe -m pip install -r requirements.txt PyQt5 PyQtWebEngine QScintilla gr
+   %USERPROFILE%\AppData\Local\miniforge3\envs\nicos\python.exe -m pip install -r requirements.txt PyQt5 PyQtWebEngine QScintilla gr pyqtgraph "h5py<3.15" https://github.com/ess-dmsc/yuos_query/releases/download/v0.1.21/yuos_query-0.1.21-py3-none-any.whl
    ```
 The launcher runs the twin server with its own Python (start it from the activated twin environment) and finds the
 `nicos` environment in the same conda installation; otherwise: variables `MCSTAS_PYTHON`, `NICOS_PYTHON`,
@@ -145,32 +182,42 @@ The commands are those of `../container/Containerfile`.
   with administrator rights or developer mode. `TwinExperiment` disables the experiment links; the cache prints a
   harmless warning ("error setting lastday symlink").
 - **Dry run** (simulation of a script before running it, in the GUI) uses `fork` and is not available on Windows.
-- Stopping: the launcher kills the whole process tree of each service (`taskkill /T`).
-- On Linux the same package works unchanged (no symbolic-link warning, dry run available); all paths have Linux
-  defaults (§ 5).
+- Stopping: the launcher kills the whole process tree of each service (`taskkill /T`). Closing the GUI of a launcher
+  started with `--background` stops everything.
 
 ## 7. Troubleshooting
 
 | Symptom | Cause | Fix |
 |---|---|---|
+| `Another twin with NICOS is already running` | services of a previous session | Enter in its launcher window (or close it), then start again |
+| `cannot start writing as proposal number not set` | no experiment yet | `NewExperiment(1234, 'title')` or the Experiment tab |
 | `Cannot find a version number` | shallow NICOS clone | create `nicos/RELEASE-VERSION` (§ 5.1) |
+| `No module named 'yuos_query'` / `'pyqtgraph'` | ESS requirements missing | § 5.4 |
 | `no answer from the twin server` (NICOS error) | twin server not running | start via the launcher; check `<TWIN_RUN_ROOT>/nicos/twin_server.log` |
-| `counting without detector` | `SetDetectors(det)` not run | run `SetDetectors(det)`; normally done by `startup.py` |
-| `setting parameter ... not possible in slave mode` | daemon not in master mode | `SetMode('master')` (done by `startup.py`) |
-| GUI login refused | wrong account | § 2 (e.g. `student` / `student`) |
+| GUI login refused | wrong account | § 2 (`student` / `student`) |
 | device values shown as "-" in the GUI | poller not running | use the launcher (it starts `nicos-poller`) |
-| a service stops at once | port already used (old services still running) | stop them (Task Manager: python.exe), restart |
 
-## 8. Validation (2026-11-03)
-Scripted session through the daemon (NICOS client API): `read()` shows the twin state; `move(shutter, 'open',
-stage_x, 500)`; `count(t=5)` → `odin_000001.nxs`, 2 707 868 counts (open beam); sample in the beam: 2 145 255 counts;
-`move(pinhole, 0.025)` refused by NICOS ("Out of bounds … allowed values"); `scan(stage_rot, 0, 30, 3, t=2)` → standard
-NICOS scan table with counts and file number per angle (files 3–5). GUI on Windows: login and device panel with
-the values of the twin checked by a user; **still to check**: the detector image in the live-view tab after a count.
-Linux (container, every build): cache, poller and daemon start with the twin server (`../container/smoke_test.py`).
+## 8. Validation (2026-11-04, Windows)
+- ODIN, scripted session through the daemon: `count(t=2)` without proposal refused with the ESS message;
+  `NewExperiment(1234, ...)`, then `with nexusfile_open('open beam'): count(t=5)` → `data/odin/2026/1234/raw/odin_000001.nxs`
+  (2.7 million counts), job listed by `list_filewriting_jobs()`; sample in the beam: 2.1 million counts; shutter
+  closed: 16 counts (background).
+- ESS GUI (`nicos_ess/odin/guiconfig.py`): starts and connects, header "Instrument: ODIN, Experiment: <title>",
+  Experiment tab with the proposal number and title editable. **Still to check by a user**: the detector image
+  (tab Instrument interaction → Detector image) after a count.
+- LoKI: `move(heavy_shutter, 'Open', fast_shutter, 'Open')`, `with nexusfile_open('silica spheres, 10 min'):
+  count(t=600)` → `data/loki/2026/3001/raw/loki_000001.h5` (I(Q) of the 3 banks), in 25 s once the simulations are
+  cached.
+- Linux (container, every build): ODIN services and a measurement through NICOS with `nexusfile_open`
+  (`../container/smoke_test.py`).
 
 ## 9. Still to do
 - NICOS GUI for students when the twin runs in the container or on a server: the daemon accepts connections from
   its own computer only (`daemon.py`: `server = 'localhost'`). Options: a NICOS GUI in the browser (noVNC), or the
   daemon opened to the network with real passwords (the demo accounts above must then be changed).
-- A NICOS setup for each new instrument (LoKI: `nicos_twin/loki/`).
+- Closer to ESS: the twin publishing its events to Kafka and the real ESS file-writer writing the NeXus files (one
+  file per `nexusfile_open` block), and devices as simulated EPICS process variables, so that the unmodified
+  `nicos_ess` setups can be used. To discuss with ESS (ECDC), who built such test set-ups (simulated AMOR, NeXus
+  streamer).
+- LoKI in the container image (official model and its precomputed upstream part).
+- DREAM and BIFROST: `nicos_twin/dream/`, `nicos_twin/bifrost/` once their twins have devices.

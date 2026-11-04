@@ -60,8 +60,8 @@ ttime = w.Dropdown(options=[5, 10, 20, 30, 60, 90], value=30, description="Time 
 title = w.Text(placeholder="e.g. open beam", description="Title")
 budget = w.FloatProgress(min=0, max=mission.data["budget_s"], description="Beamtime", bar_style="success")
 budget_txt = w.Label()
-button = w.Button(description="Count", button_style="primary", icon="play")
-diag_button = w.Button(description="Show chopper diagram", icon="clock")
+button = w.Button(description="Count", button_style="primary", icon="play", layout=w.Layout(width="auto"))
+diag_button = w.Button(description="Show chopper diagram", icon="clock", layout=w.Layout(width="auto"))
 out, diag_out = w.Output(), w.Output()
 
 def refresh_budget():
@@ -124,7 +124,7 @@ cursor = w.FloatSlider(min=2.0, max=5.5, step=0.005, value=4.0, description="λ 
                        layout=w.Layout(width="520px"))
 structure = w.ToggleButtons(options=["bcc", "fcc"], description="Structure")
 a_txt = w.HTML()
-red_button = w.Button(description="Compute transmission", button_style="success", icon="calculator")
+red_button = w.Button(description="Compute transmission", button_style="success", icon="calculator", layout=w.Layout(width="auto"))
 red_out = w.Output()
 SPEC = {}
 
@@ -168,7 +168,7 @@ is right).
 code(r"""
 METAL_OPTS = ["?"] + list(games.METALS)
 ans = {c: (w.Dropdown(options=METAL_OPTS, description=c), w.FloatText(value=0.0, description="a (Å)")) for c in games.CODES}
-sub_button = w.Button(description="Submit", button_style="warning", icon="check")
+sub_button = w.Button(description="Submit", button_style="warning", icon="check", layout=w.Layout(width="auto"))
 sub_out = w.Output()
 
 def do_submit(_):
@@ -202,7 +202,7 @@ trouble = games.Troubleshooting(SESSION + "_fault")
 odin2 = trouble.instrument()
 shut2 = w.ToggleButtons(options=["closed", "open"], value="open", description="Shutter")
 stage2 = w.Dropdown(options=[("in the beam (0 mm)", 0.0), ("out of the beam (500 mm)", 0.5)], value=0.5, description="Stage")
-b2 = w.Button(description="Count 10 s", button_style="primary", icon="play")
+b2 = w.Button(description="Count 10 s", button_style="primary", icon="play", layout=w.Layout(width="auto"))
 out2 = w.Output()
 
 def count2(_):
@@ -214,7 +214,7 @@ def count2(_):
 
 b2.on_click(count2)
 guess = w.Dropdown(options=[(f"{k}: {v}", k) for k, v in FAULTS.items()], description="Fault", layout=w.Layout(width="720px"))
-gb = w.Button(description="This is the fault!", button_style="warning")
+gb = w.Button(description="This is the fault!", button_style="warning", layout=w.Layout(width="auto"))
 gout = w.Output()
 
 def do_guess(_):

@@ -34,8 +34,8 @@ explained, and every approximation is stated and checked.
 | `odin_tomo.py` | tomography: sinogram from a rotation scan, filtered back-projection |
 | `odin_paths.py` | paths (ODIN notebook series, results, build folder); imported first by every module |
 | `../twin_server.py` | the instrument in its own process, driven over the (local) network (`--instrument odin`) |
-| `../twin_console.py` | provisional control station with NICOS commands |
-| `../nicos/` | NICOS setup package and launcher (`start_odin_nicos.py`) |
+| `../twin_console.py` | control station with NICOS commands |
+| `../nicos/` | NICOS setup package (`nicos_twin.odin`, built on `nicos_ess.odin`) and launcher (`start_nicos.py`) |
 | `example_session.py` | example session script for the console |
 | `gen_student_page.py` → `ODIN_virtual.ipynb` | student page (Voilà): operate, live replay, chopper diagram, logbook review, reduce, questions |
 | `gen_mission_page.py` → `ODIN_mission.ipynb` | game page (Voilà): mission "unknown metals" with beamtime budget and score, mission "something is wrong" |
@@ -124,12 +124,14 @@ slice_mu = to.fbp(sino[0], angles, xs)                                    # μ(x
 
 ### b) With NICOS (as at ESS)
 ```
-python ../nicos/start_odin_nicos.py               # twin server + NICOS + GUI; login student / student
+python ../nicos/start_nicos.py --instrument odin  # twin server + NICOS + the ESS GUI of ODIN; login student / student
 ```
-Then in the NICOS GUI: `move(shutter, 'open', stage_x, 500)` (stage in mm in NICOS), `count(t=10)`,
-`scan(stage_rot, 0, 3, 60, t=10)`. Details, accounts, devices: `../nicos/README.md`.
+Then in the NICOS GUI: a proposal number (Experiment tab, or `NewExperiment(1234, 'title')`),
+`move(shutter, 'open', stage_x, 500)` (stage in mm in NICOS), `with nexusfile_open('open beam'): count(t=10)`,
+`scan(stage_rot, 0, 3, 60, t=10)`. Files: `<TWIN_RUN_ROOT>/data/odin/<year>/<proposal>/raw/`. Details, accounts,
+devices: `../nicos/README.md`.
 
-### c) With the provisional console (no NICOS needed)
+### c) With the console (no NICOS needed)
 ```
 python ../twin_server.py --instrument odin --session test   # terminal 1: the instrument
 python -i ../twin_console.py                                # terminal 2: the control station
@@ -350,7 +352,7 @@ log; a command sent during a measurement is refused ("instrument busy"), status 
 ## 10. NICOS
 NICOS drives the twin since 2026-11-03, on Windows (cache, daemon, GUI): `../nicos/README.md`. NICOS requires
 numpy < 2 while the twin uses numpy 2, so NICOS runs in its own conda environment (`nicos`) and its devices send their
-orders to `../twin_server.py`, exactly like the provisional console. The McStas device of NICOS
+orders to `../twin_server.py`, exactly like the console. The McStas device of NICOS
 (`nicos/devices/mcstas.py`, Linux only) is not used.
 
 ## 11. Games and visualizations

@@ -70,7 +70,7 @@ diff = w.ToggleButtons(options=[("in", "in"), ("out", "out")], value=st["diffuse
 stage = w.BoundedFloatText(value=st["stage_x"] * 1000, min=-500, max=500, step=1, description="Stage x (mm)")
 ttime = w.Dropdown(options=[2, 5, 10, 30, 60, 90], value=30, description="Time (s)")
 title = w.Text(value="", placeholder="e.g. open beam", description="Title")
-button = w.Button(description="Count", button_style="primary", icon="play")
+button = w.Button(description="Count", button_style="primary", icon="play", layout=w.Layout(width="auto"))
 out = w.Output()
 
 def do_count(_):
@@ -91,7 +91,7 @@ def do_count(_):
     button.disabled = False
     refresh_list()
 
-diag_button = w.Button(description="Show chopper diagram", icon="clock")
+diag_button = w.Button(description="Show chopper diagram", icon="clock", layout=w.Layout(width="auto"))
 diag_out = w.Output()
 
 def show_diagram(_):
@@ -141,7 +141,7 @@ def refresh_list():
                   f"-> {d['n_counts']:,} counts"
                   + (f"  (simulation quality: error bars ×{d['mc_factor']:.1f} too small)" if d.get('mc_factor', 1) > 1.2 else ""))
 
-review_button = w.Button(description="Review my logbook", icon="list")
+review_button = w.Button(description="Review my logbook", icon="list", layout=w.Layout(width="auto"))
 review_out = w.Output()
 
 def do_review(_):
@@ -179,7 +179,7 @@ The spectrum $T(\lambda)$ is computed in the central 6 mm × 6 mm square (red on
 """)
 
 code(r"""
-button_red = w.Button(description="Compute transmission", button_style="success", icon="calculator")
+button_red = w.Button(description="Compute transmission", button_style="success", icon="calculator", layout=w.Layout(width="auto"))
 out_red = w.Output()
 ROI = (-3, 3, -3, 3)                                     # mm
 
