@@ -21,4 +21,4 @@ Start-Job -ScriptBlock {
 } -ArgumentList $Port, $Token, $Url | Out-Null
 Write-Host "The catalogue opens in your browser when the twin is ready: $Url"
 & $Engine run --rm -it -p "${Port}:8888" -v twin-data:/data $Image bash -c `
-  "python container/fetch_fronts.py || true; exec jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --ServerApp.token=$Token --ServerApp.root_dir=/home/mambauser/twin"
+  "python container/fetch_fronts.py || true; exec jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --IdentityProvider.token=$Token --ServerApp.root_dir=/home/mambauser/twin"

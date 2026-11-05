@@ -24,4 +24,4 @@ URL="http://localhost:${PORT}/voila/render/Catalogue.ipynb?token=${TOKEN}"
   done ) &
 exec "$ENGINE" run --rm -it -p "${PORT}:8888" -v twin-data:/data "$IMAGE" \
   bash -c "python container/fetch_fronts.py || true; exec jupyter lab --ip=0.0.0.0 --port=8888 --no-browser \
-           --ServerApp.token=${TOKEN} --ServerApp.root_dir=/home/mambauser/twin"
+           --IdentityProvider.token=${TOKEN} --ServerApp.root_dir=/home/mambauser/twin"
