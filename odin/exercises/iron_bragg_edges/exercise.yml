@@ -1,0 +1,36 @@
+# One exercise of the catalogue (python gen_catalogue.py, at the root of the repository).
+# Paths are relative to the root of the repository.
+title: How far apart are the atoms in iron?
+instrument: odin
+technique: Wavelength-resolved imaging (Bragg edges)
+sample: Iron plate, 5 mm (alpha-iron, body-centered cubic)
+question: >-
+  Measure the transmission of an iron plate as a function of the neutron wavelength, find its Bragg edges and deduce
+  the spacing of the atomic planes.
+learn: Time of flight, transmission (dark, open beam, sample), Bragg's law, counting statistics, fitting.
+status: ready
+modes:
+  bsc:
+    label: Guided web page
+    what: Settings given and explained, a Measure button, plots and questions. No code.
+    duration: 2 hours
+    open: voila
+    file: odin/ODIN_virtual.ipynb
+  msc:
+    label: Notebook with tasks
+    what: >-
+      The same measurement, then the analysis in code: the reduction with the ESS software is given, you write the
+      Bragg-edge model and the fit, an automatic check tells you if your result is right.
+    duration: half a day
+    open: lab
+    file: odin/exercises/iron_bragg_edges/ODIN_iron_msc.ipynb
+  beamtime:
+    label: Beamtime with NICOS
+    what: >-
+      A proposal and a beamtime budget. You drive ODIN in NICOS, choose the measurements yourself, then analyze your
+      files with a starter notebook. No settings are given.
+    duration: 1 day
+    open: lab
+    file: odin/exercises/iron_bragg_edges/beamtime.md
+    nicos: odin
+    analysis: odin/exercises/iron_bragg_edges/ODIN_iron_beamtime.ipynb

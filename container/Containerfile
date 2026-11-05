@@ -7,8 +7,15 @@
 FROM mambaorg/micromamba:1.5.10
 
 USER root
+# A Linux desktop in the web browser, for the NICOS window (JupyterLab launcher "Desktop", jupyter-remote-desktop-proxy:
+# TigerVNC + noVNC, through the port of JupyterLab): Xfce, and the libraries of Qt 5 (NICOS GUI, PyQt5 wheels).
 RUN apt-get update \
  && apt-get install -y --no-install-recommends git ca-certificates openssh-client curl \
+        xfce4 xfce4-terminal dbus-x11 tigervnc-standalone-server tigervnc-tools scrot fonts-dejavu x11-utils \
+        libgl1 libegl1 libxkbcommon-x11-0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 \
+        libxcb-render-util0 libxcb-xinerama0 libxcb-xfixes0 libxcb-shape0 libxcb-cursor0 libdbus-1-3 libfontconfig1 \
+        libnss3 libxcomposite1 libxdamage1 libxrandr2 libxtst6 libxi6 libasound2 \
+ && (apt-get remove -y xfce4-screensaver light-locker || true) \
  && rm -rf /var/lib/apt/lists/* \
  && mkdir -p /data && chown "$MAMBA_USER:$MAMBA_USER" /data
 USER $MAMBA_USER
@@ -64,12 +71,22 @@ RUN micromamba create -y -n kafka -c conda-forge "openjdk=21" && micromamba clea
  && micromamba run -n nicos pip install --no-cache-dir "confluent-kafka>=2.1" "ess-streaming-data-types>=0.21" \
         "keyring>=10.6" "keyrings.alt>=4.0" "pycryptodomex>=3.4.7"
 
-# Real ODIN file used as template for the NeXus files (downloaded by essimaging; kept in the image)
-RUN python -c "import ess.odin.data as d; print(d.iron_simulation_ob_small())"
+# NICOS window (GUI client, Qt 5) in the nicos environment, and the desktop in JupyterLab
+RUN micromamba run -n nicos pip install --no-cache-dir -r "$HOME/nicos_src/requirements-gui.txt" lttb \
+ && pip install --no-cache-dir "jupyter-remote-desktop-proxy>=3,<4"
+
+# Real ODIN and LoKI files used as templates for the NeXus files (downloaded by essimaging / esssans; kept in the image)
+RUN python -c "import ess.odin.data as d; print(d.iron_simulation_ob_small())" \
+ && python -c "import ess.loki.data as d; print(d.loki_coda_file())"
 
 # The twins (this repository)
 COPY --chown=$MAMBA_USER:$MAMBA_USER . /home/mambauser/twin
 WORKDIR /home/mambauser/twin
+
+# Menu entries and desktop icons "NICOS - ODIN" and "NICOS - LoKI" (container/desktop/)
+RUN mkdir -p "$HOME/.local/share/applications" "$HOME/Desktop" \
+ && cp container/desktop/*.desktop "$HOME/.local/share/applications/" \
+ && cp container/desktop/*.desktop "$HOME/Desktop/" && chmod +x "$HOME/Desktop/"*.desktop
 
 ENV TWIN_RUN_ROOT=/data/twin \
     LOKI_REPO=/home/mambauser/loki_model \

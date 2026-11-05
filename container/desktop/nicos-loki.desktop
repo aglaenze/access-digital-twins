@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=NICOS - LoKI
+Comment=The LoKI digital twin driven by NICOS, as in the ESS control room (login: student / student)
+Exec=xfce4-terminal --title "NICOS LoKI services (close to stop)" --command "/opt/conda/envs/mcstas/bin/python /home/mambauser/twin/nicos/start_nicos.py --instrument loki"
+Icon=applications-science
+Terminal=false
+Categories=Science;Education;

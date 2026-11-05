@@ -23,6 +23,7 @@ import numpy as np
 import loki_paths as paths
 import loki_mcstas as lm
 import loki_samples as ls
+import loki_nexus as lnx
 
 # Configurations of the beamline upstream of the sample (collimation length): upstream part of the official model
 # (source and sample apertures, wavelength band l_min–l_max that sets the chopper phases) and number of reuses of each
@@ -94,6 +95,7 @@ class VirtualLoki:
         self.use_folder(f"{paths.RUN_ROOT}/{session}")
         self.rng = np.random.default_rng(seed)
         self._det = {}
+        self._real_det = {}                 # real LoKI pixels (NeXus files), per detector distance
         self.last_image = np.zeros(self.image_shape(), dtype=np.uint32)
         self.last_n_counts = 0
 
@@ -143,7 +145,7 @@ class VirtualLoki:
             os.makedirs(folder, exist_ok=True)
             self.folder = folder
             self.log_file = os.path.join(folder, "log.jsonl")
-            nums = [int(f[5:11]) for f in os.listdir(folder) if f.startswith("loki_") and f.endswith(".h5")]
+            nums = [int(f[5:11]) for f in os.listdir(folder) if f.startswith("loki_") and f.endswith((".nxs", ".h5"))]
             self.number = max(nums, default=0)
 
     @staticmethod
@@ -196,19 +198,26 @@ class VirtualLoki:
         band, skip = self.band(st), self.pulseskip(st)
         front = lm.front(mpi=self.mpi, **cfg)
         fn, kw, thick, mu_abs, mu_rem = ls.SAMPLES[st["sample"]]
-        q, dsdo, _ = fn(**kw)
-        # cache name: sample, configuration and a fingerprint of everything that defines the sample (a changed
-        # parameter must give a new McStas simulation, never an old one read back)
-        key = hashlib.md5(np.ascontiguousarray(np.r_[q, dsdo, thick, mu_abs, mu_rem]).tobytes()).hexdigest()[:8]
-        name = f"{st['sample']}_col{st['collimation']}{'_skip' if skip else ''}_{key}"
-        back = lm.back(front, name, q, dsdo, thickness=thick, mu_abs=mu_abs, mu_rem=mu_rem, repeat=repeat,
-                       mpi=self.mpi)
         if reardet not in self._det:
             self._det[reardet] = lm.Detector(reardet)
         det = self._det[reardet]
-        ev = lm.events(det.detect(lm.scattered(back)), det, *band, period=lm.FRAME * (1 + skip))
         lam = lm.lambda_bins(*band)
-        phi, tr = lm.spectrum(back, lam)
+        self._front = front
+        if fn is None:                                   # empty beam: nothing scattered, everything transmitted
+            self._back, self._scattered = None, {k: np.zeros(0) for k in ("x", "y", "z", "ux", "uy", "uz", "t",
+                                                                          "lam", "w")}
+            phi, tr = np.zeros(len(lam) - 1), np.ones(len(lam) - 1)
+        else:
+            q, dsdo, _ = fn(**kw)
+            # cache name: sample, configuration and a fingerprint of everything that defines the sample (a changed
+            # parameter must give a new McStas simulation, never an old one read back)
+            key = hashlib.md5(np.ascontiguousarray(np.r_[q, dsdo, thick, mu_abs, mu_rem]).tobytes()).hexdigest()[:8]
+            name = f"{st['sample']}_col{st['collimation']}{'_skip' if skip else ''}_{key}"
+            self._back = lm.back(front, name, q, dsdo, thickness=thick, mu_abs=mu_abs, mu_rem=mu_rem, repeat=repeat,
+                                 mpi=self.mpi)
+            self._scattered = lm.scattered(self._back)
+            phi, tr = lm.spectrum(self._back, lam)
+        ev = lm.events(det.detect(self._scattered), det, *band, period=lm.FRAME * (1 + skip))
         if skip:
             # McStas simulates one source pulse, which the choppers let through, with weights in neutrons per second
             # as if every pulse came: with pulse skipping only one pulse in (1 + skip) does. I(Q) is a ratio (same
@@ -223,10 +232,12 @@ class VirtualLoki:
         return self.state["heavy_shutter"] == "open" and self.state["shutter"] == "open"
 
     def count(self, t, title="", write=True):
-        """Measures for t seconds; returns the path of the HDF5 file written (I(Q) per bank, absolute units).
+        """Measures for t seconds; returns the path of the NeXus event file written (format of the real LoKI,
+        loki_nexus.py; reduced with the ESS software, loki_reduction.py).
         write=False: the live detector image only, no file (a count outside a file-writing job at ESS); returns None."""
         if not 0 < t <= 24 * 3600:
             raise ValueError("counting time between 0 and 24 h")
+        start = datetime.datetime.now(datetime.timezone.utc)
         sim = self.simulate() if self.beam_on() else None
         self._live_image(sim, t)
         self._last_sim, self._last_t = sim, t          # for the live stream (stream_pulses)
@@ -234,25 +245,51 @@ class VirtualLoki:
             self._log("count", dict(t=t, title=title, file=None, n_counts=self.last_n_counts, state=self.state))
             return None
         self.number += 1
-        path = f"{self.folder}/loki_{self.number:06d}.h5"
-        with h5py.File(path, "w") as f:
-            e = f.create_group("entry"); e.attrs["NX_class"] = "NXentry"
-            e["title"] = title; e["start_time"] = datetime.datetime.now().isoformat(timespec="seconds")
-            e["duration"] = float(t); e["duration"].attrs["units"] = "s"
-            for k, v in self.state.items():
-                e[f"instrument_state/{k}"] = v
-            if sim is not None:
-                ev, det, phi, tr, lam, thick_cm = sim
-                red = lm.reduce(ev, det, phi, tr, lam, thick_cm, Q_EDGES, duration=t)
-                for bank, (qc, I, err, den) in red.items():
-                    ok = np.isfinite(I) & (den > 0.02 * np.nanmax(den))       # bins well covered by this bank
-                    noisy = I[ok] + self.rng.normal(0, 1, ok.sum()) * err[ok]   # one realisation of the noise
-                    g = e.create_group(f"data_{bank}"); g.attrs["NX_class"] = "NXdata"
-                    g["Q"] = qc[ok]; g["Q"].attrs["units"] = "1/angstrom"
-                    g["I"] = noisy; g["I"].attrs["units"] = "1/cm"
-                    g["Idev"] = err[ok]; g["Idev"].attrs["units"] = "1/cm"
-        self._log("count", dict(t=t, title=title, file=path, n_counts=self.last_n_counts, state=self.state))
+        path = f"{self.folder}/loki_{self.number:06d}.nxs"
+        r = self._write_nexus(path, sim, t, start, title)
+        self._log("count", dict(t=t, title=title, file=os.path.basename(path), n_counts=self.last_n_counts,
+                                n_events=r["n_events"], event_sampling=r["sampling"], state=self.state))
         return path
+
+    def _write_nexus(self, path, sim, t, start, title):
+        """Events of the measurement (all banks, monitors m1 and m3) in a NeXus file of the real LoKI's format."""
+        st = self.state
+        cfg = self.config(st)["front"]
+        skip = self.pulseskip(st)
+        reardet = float(st["detector_distance"])
+        if reardet not in self._real_det:
+            self._real_det[reardet] = lnx.RealDetector(reardet)
+        empty = {b: (np.zeros(0, int), np.zeros(0, np.uint32), np.zeros(0, np.uint32)) for b in lnx.BANKS}
+        n_pulses = max(1, int(round(t / lnx.PERIOD)))
+        sampling, det_ev, mon_ev = 1.0, empty, {}
+        if sim is not None:
+            sc_ = self._scattered
+            beam = lm.read_mcpl(lm.mcpl_path(self._front, "beam_at_sample"))
+            rate = 1.0 / (1 + skip)                    # McStas weights: every pulse; pulse skipping uses one in two
+            sampling = lnx.sampling_fraction(sc_, beam, t, rate)
+            if self._back is not None:
+                lam_m, i_inc, _, _ = lm.monitor(self._back, "incident_lambda")
+                _, i_tr, _, _ = lm.monitor(self._back, "transmitted_lambda")
+                tr = np.where(i_inc > 0, i_tr / np.where(i_inc > 0, i_inc, 1), 1.0)
+                transmission = lambda lam: np.interp(lam, lam_m, tr)
+            else:
+                transmission = lambda lam: np.ones_like(lam)
+            det_ev, n_pulses = lnx.detector_events(self.rng, sc_, self._real_det[reardet], t, sampling * rate,
+                                                   1 + skip)
+            mon_ev = lnx.monitor_events(self.rng, beam, transmission, t, sampling * rate, 1 + skip)
+        choppers = {}
+        for c, (freq, a, b) in chopper_settings(*self.band(st), skip).items():
+            n1, n2 = ("bw_chopper1", "bw_chopper2") if c == "ch1" else ("fo_chopper1", "fo_chopper2")
+            choppers[n1], choppers[n2] = (freq, a), (freq, b)
+        fn, kw, thick, _, _ = ls.SAMPLES[st["sample"]]
+        truth = {} if fn is None else {k: v for k, v in fn(**kw)[2].items() if np.isscalar(v)}
+        info = {k: float(v) for k, v in cfg.items()}                  # configuration (finds the wavelength table)
+        info.update(pulseskip=int(skip), event_sampling=sampling, sample_thickness_m=float(thick),
+                    sample_model=st["sample"], proposal=os.path.basename(os.path.dirname(self.folder)),
+                    **{f"true_{k}": float(v) for k, v in truth.items()})
+        lnx.write(path, det_ev, mon_ev, n_pulses, start, t, title or f"run {self.number}", st["sample"],
+                  {k: str(v) for k, v in st.items()}, choppers, reardet - lnx.REAR_Z0, info, lm.L1)
+        return dict(n_events=int(sum(len(v[0]) for v in det_ev.values())), sampling=sampling)
 
     STREAM_MAX_RATE = 1e5          # neutrons per second in the live stream (Kafka), at most
     STREAM_MAX_EVENTS = 2e7        # and per measurement

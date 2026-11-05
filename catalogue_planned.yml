@@ -1,0 +1,14 @@
+# Exercises planned but not built yet: shown greyed in the catalogue (Catalogue.ipynb).
+# An exercise that is built has its own folder <instrument>/exercises/<name>/ with an exercise.yml.
+- title: Inside an object without opening it
+  instrument: odin
+  technique: Wavelength-resolved tomography
+  question: Reconstruct a 3D object from radiographs taken at many angles; find the hidden part.
+- title: Magnetic fields made visible
+  instrument: odin
+  technique: Polarized neutron imaging
+  question: Map the magnetic field of a coil with polarized neutrons.
+- title: Small structures in a membrane
+  instrument: loki
+  technique: SANS, contrast variation
+  question: Change the H2O/D2O ratio of the solvent to make parts of a sample invisible.

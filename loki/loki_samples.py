@@ -40,7 +40,18 @@ def silica_spheres(radius=50.0, phi=0.01, background=0.05, q=None):
                                                                      i0=i0, drho=drho)
 
 
+def d2o(background=0.05, q=None):
+    """The solvent alone, D₂O in the same cell (the "background" measurement of a SANS experiment): its flat incoherent
+    scattering, the same as in silica_spheres. Subtracting it leaves the scattering of the spheres alone (the 1 % of
+    volume they take from the solvent is neglected)."""
+    q = q_grid() if q is None else np.asarray(q)
+    return q, np.full_like(q, background), dict(background=background)
+
+
 SAMPLES = {
     # name: (function, keyword arguments, thickness [m], mu_abs [1/m at 1.798 Å], mu_rem [1/m])
     "silica_spheres": (silica_spheres, {}, 1e-3, 0.0, 0.0),
+    "d2o": (d2o, {}, 1e-3, 0.0, 0.0),
+    # nothing in the beam: the "empty beam" measurement (transmission reference of the reduction)
+    "empty_beam": (None, {}, 0.0, 0.0, 0.0),
 }

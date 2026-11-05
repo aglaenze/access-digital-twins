@@ -77,7 +77,7 @@ dev = np.mean(T) - np.mean(T_nc)
 print(f"transmission 2.2–3.8 Å: measured {np.mean(T):.3f}, NCrystal {np.mean(T_nc):.3f}")
 check(abs(dev) < 0.03, f"iron plate transmission agrees with NCrystal (difference {dev:+.3f})")
 
-step("measurement with the virtual LoKI")
+step("LoKI: empty beam, solvent and sample, NeXus event files reduced with esssans, sasmodels fit")
 r = subprocess.run([sys.executable, os.path.join(HERE, "fetch_fronts.py"), "--instrument", "loki"])
 check(r.returncode == 0, "LoKI upstream part downloaded")
 t0 = time.time()
@@ -86,7 +86,8 @@ import easy_case                                      # noqa: E402
 res = easy_case.main(plot=False, session="ci_loki", mpi=int(os.environ.get("TWIN_MPI", "4")))
 print(f"LoKI measurement in {time.time() - t0:.0f} s (including the McStas compilation and the downstream part)")
 check(abs(res["rg"] / res["rg_true"] - 1) < 0.05, f"radius of gyration {res['rg']:.1f} Å within 5 % of {res['rg_true']:.1f} Å")
-check(abs(res["i0"] / res["i0_true"] - 1) < 0.05, f"I(0) {res['i0']:.3f} cm⁻¹ within 5 % of {res['i0_true']:.3f} cm⁻¹")
+check(abs(res["radius"] / 50.0 - 1) < 0.03, f"sphere radius (sasmodels) {res['radius']:.1f} Å within 3 % of 50 Å")
+check(abs(res["phi"] / 0.01 - 1) < 0.08, f"volume fraction (absolute units) {100 * res['phi']:.2f} % within 8 % of 1 %")
 
 step("live data: Kafka broker, just-bin-it, stream of an ODIN measurement")
 LIVE_PROCS = []

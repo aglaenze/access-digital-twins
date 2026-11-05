@@ -25,7 +25,7 @@ a few degrees at most by objects of 1 to 100 nm dispersed in the sample. The way
 angle tells their **size and shape**.
 
 **Goal**: measure the size of silica nanoparticles dispersed in heavy water, then choose the instrument configuration
-that measures it best.
+that measures it best. Your files have the format of the real LoKI and are reduced with the official ESS software.
 
 **The instrument, from the source to the detector**: the **choppers** select a band of wavelengths; the
 **collimation** (3, 5 or 8 m long) makes the beam parallel; the **sample** scatters a small fraction of the neutrons;
@@ -40,10 +40,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import ipywidgets as w
 from IPython.display import display, clear_output
-from scipy.optimize import curve_fit
 sys.path.insert(0, os.path.abspath("."))
-from virtual_loki import VirtualLoki, read
-import loki_samples as ls
+from virtual_loki import VirtualLoki
+import loki_reduction as red
+import loki_analysis as la
 
 loki = VirtualLoki(session=os.environ.get("LOKI_SESSION", "student"))
 """)
@@ -53,13 +53,19 @@ md(r"""
 
 **Your measurements, setting by setting** (set the controls below, then click *Count*):
 
-| Measurement | Main shutter | Fast shutter | Collimation | Pulse skipping | Detector distance | Time (s) |
-|---|---|---|---|---|---|---|
-| 1. first look | open | open | 3m | off | 5 m | 60 |
-| 2. lower Q | open | open | **8m** | off | **10 m** | 300 |
-| 3. wider band | open | open | 3m | **on** | 5 m | 120 |
+| Measurement | Sample | Main shutter | Fast shutter | Collimation | Pulse skipping | Detector distance | Time (s) |
+|---|---|---|---|---|---|---|---|
+| 1. empty beam | empty beam | open | open | 3m | off | 5 m | 60 |
+| 2. solvent | D2O | open | open | 3m | off | 5 m | 300 |
+| 3. sample | silica spheres | open | open | 3m | off | 5 m | 300 |
+| 4.-6. lower Q | the same three | open | open | **8m** | off | **10 m** | 60, 600, 600 |
 
 Why:
+- **three measurements per configuration**, as in every SANS experiment: the **sample** (particles in D₂O, in a
+  cell), the **solvent** alone in the same cell (its scattering is subtracted from the sample's, leaving the
+  particles), and the **empty beam** (nothing in the beam: the reference for the transmission of the two others).
+  All three must be measured with the same collimation, pulse skipping and detector distance; the empty beam needs
+  only the monitors, so it can be short;
 - **both shutters open**: the main shutter (far upstream) and the fast shutter (just before the sample) must both be
   open for neutrons to reach the sample;
 - **collimation**: a longer collimation makes the beam more parallel. Small angles can then be measured closer to the
@@ -71,8 +77,9 @@ Why:
   between two pulses doubles, so the wavelength band can be twice as wide (3–21.4 Å): a wider $Q$ range in one
   measurement, with half of the pulses.
 
-The first count with a new configuration starts a McStas simulation of the sample (about 1 minute); the following ones
-are fast. After each count, the image of the rear detector panel is shown.
+The first count with a new sample or configuration starts a McStas simulation (about 1 minute; up to 15 minutes for a
+configuration never used on this computer); the following ones take about a minute (writing the events). After each
+count, the image of the rear detector panel is shown.
 """)
 
 code(r"""
@@ -82,6 +89,8 @@ fast = w.ToggleButtons(options=["closed", "open"], value=st["shutter"], descript
 coll = w.ToggleButtons(options=["3m", "5m", "8m"], value=st["collimation"], description="Collimation")
 skip = w.ToggleButtons(options=["off", "on"], value=st["pulse_skipping"], description="Pulse skipping")
 dist = w.ToggleButtons(options=[("5 m", 5.0), ("10 m", 10.0)], value=st["detector_distance"], description="Detector")
+smp = w.ToggleButtons(options=[("silica spheres", "silica_spheres"), ("D2O", "d2o"), ("empty beam", "empty_beam")],
+                      value=st["sample"], description="Sample")
 ttime = w.Dropdown(options=[10, 30, 60, 120, 300, 600, 1800], value=60, description="Time (s)")
 title = w.Text(value="", placeholder="e.g. silica 3m", description="Title")
 button = w.Button(description="Count", button_style="primary", icon="play", layout=w.Layout(width="auto"))
@@ -102,7 +111,7 @@ def do_count(_):
         clear_output()
         try:
             loki.move(heavy_shutter=heavy.value, shutter=fast.value, collimation=coll.value,
-                      pulse_skipping=skip.value, detector_distance=dist.value)
+                      pulse_skipping=skip.value, detector_distance=dist.value, sample=smp.value)
             show_readings()
             print("Measuring (the first count of a configuration takes about 1 minute)...")
             f = loki.count(ttime.value, title=title.value)
@@ -121,7 +130,7 @@ def do_count(_):
 
 button.on_click(do_count)
 show_readings()
-display(w.VBox([heavy, fast, coll, skip, dist, ttime, title, button, info, out]))
+display(w.VBox([smp, heavy, fast, coll, skip, dist, ttime, title, button, info, out]))
 """)
 
 md(r"""
@@ -150,19 +159,18 @@ def measurements():
 def refresh_list():
     ms = measurements()
     pick.options = [(f"{os.path.basename(m['details']['file'])}: {m['details']['title'] or '(no title)'}",
-                     m["details"]["file"]) for m in ms]
+                     m["details"]["file"]) for m in ms if red.kind(m["details"]["state"]) == "sample"]
     with listing:
         clear_output()
         if not ms:
             print("No measurement yet.")
         for m in ms:
             d = m["details"]; s = d["state"]
-            beam = "beam" if s["heavy_shutter"] == "open" and s["shutter"] == "open" else "NO BEAM (shutter closed)"
-            print(f"{os.path.basename(d['file'])}  {d['title'] or '(no title)':20s} t = {d['t']:5g} s  "
-                  f"{s['collimation']:3s} skip {s.get('pulse_skipping', 'off'):3s} detector {s['detector_distance']:g} m  "
-                  f"{beam}  -> {d.get('n_counts', 0):,} neutrons")
+            print(f"{os.path.basename(d['file'])}  {red.kind(s):14s} {d['title'] or '(no title)':22s} "
+                  f"t = {d['t']:5g} s  {s['collimation']:3s} skip {s.get('pulse_skipping', 'off'):3s} "
+                  f"detector {s['detector_distance']:g} m  -> {d.get('n_counts', 0):,} neutrons")
 
-pick = w.Dropdown(description="File", layout=w.Layout(width="480px"))
+pick = w.Dropdown(description="Sample file", layout=w.Layout(width="480px"))
 refresh_list()
 display(listing)
 """)
@@ -170,80 +178,92 @@ display(listing)
 md(r"""
 ## 3. Analyze: the size of the particles
 
-The file contains the **scattering curve** $I(Q)$ of each detector bank, in absolute units (cm⁻¹ sr⁻¹).
+Choose a sample file: the page finds the last solvent and empty beam measured in the same configuration, reduces the
+three files with the ESS software (`esssans`: wavelength from the arrival time, $Q$ from the pixel, normalization by
+the monitors, transmission, solid angle, subtraction of the solvent) and gives the **scattering curve** $I(Q)$ of the
+particles in absolute units (cm⁻¹ sr⁻¹). About 1 minute (a few minutes the first time for a configuration).
 $Q = 4\pi\sin\theta/\lambda$ combines the scattering angle $2\theta$ and the wavelength $\lambda$: a structure of size
 $D$ scatters mostly around $Q \approx 2\pi/D$.
 
-The button below does two analyses:
+Then two analyses:
 - **Guinier**: at small $Q$, $\ln I = \ln I(0) - (R_g^2/3)\,Q^2$ for any particle shape. The slope of $\ln I$ against
   $Q^2$ gives the **radius of gyration** $R_g$; for a sphere, $R = \sqrt{5/3}\,R_g$;
-- **sphere model**: the whole curve fitted with the scattering of spheres of radius $R$ (its minima are at
-  $Q = 4.49/R$, $7.73/R$...).
+- **sphere model** of SasView (`sasmodels`): the whole curve fitted with the scattering of spheres of radius $R$
+  (minima at $Q = 4.49/R$, $7.73/R$...), which also gives their volume fraction $\phi$.
 """)
 
 code(r"""
 button_an = w.Button(description="Analyze", button_style="success", icon="calculator", layout=w.Layout(width="auto"))
 out_an = w.Output()
+COLORS = {"rear": "tab:blue", "middle": "tab:green", "front": "tab:red"}
+
+def partners(sample_file):
+    # last solvent and empty beam measured in the configuration of the sample file
+    ms = measurements()
+    me = next(m for m in ms if m["details"]["file"] == sample_file)
+    cfg = lambda m: tuple(m["details"]["state"][k] for k in ("collimation", "pulse_skipping", "detector_distance"))
+    found = {}
+    for m in ms:
+        if cfg(m) == cfg(me):
+            found[red.kind(m["details"]["state"])] = m["details"]["file"]
+    return found.get("solvent"), found.get("empty beam")
 
 def analyze(_):
+    button_an.disabled = True
     with out_an:
         clear_output()
-        if not pick.value:
-            print("Choose a file."); return
-        d = read(pick.value)
-        if not d:
-            print("This file has no scattering curve: were both shutters open?"); return
-        q = np.concatenate([v[0] for v in d.values()]); I = np.concatenate([v[1] for v in d.values()])
-        dI = np.concatenate([v[2] for v in d.values()])
-        o = np.argsort(q); q, I, dI = q[o], I[o], dI[o]
-        hi = q > 0.3
-        bg = np.average(I[hi], weights=1 / dI[hi] ** 2) if hi.sum() > 3 else 0.0
-        qmax, rg = 0.02, None
-        for _ in range(10):                                  # Guinier range Q Rg < 1.3, found iteratively
-            m = (q < qmax) & (I - bg > 0)
-            if m.sum() < 4:
-                break
-            y, wt = np.log(I[m] - bg), ((I[m] - bg) / dI[m]) ** 2
-            A = np.column_stack([np.ones(m.sum()), q[m] ** 2])
-            cov = np.linalg.inv(A.T @ (A * wt[:, None])); a, b = cov @ (A.T @ (wt * y))
-            if b >= 0:
-                break
-            rg = np.sqrt(-3 * b)
-            if abs(1.3 / rg - qmax) < 1e-4:
-                break
-            qmax = 1.3 / rg
-        sph = lambda qq, i0, R, c: i0 * ls.sphere_form_factor(qq, R) + c
-        p0 = [np.exp(a) if rg else I.max(), rg / np.sqrt(0.6) if rg else 50.0, bg]
         try:
-            p, cov = curve_fit(sph, q, I, p0=p0, sigma=dI, absolute_sigma=True)
-        except Exception:
-            p = None
-        fig, ax = plt.subplots(1, 2, figsize=(13, 4.8))
-        for (bank, (qb, Ib, dIb)), c in zip(d.items(), ("tab:red", "tab:green", "tab:blue")):
-            ax[0].errorbar(qb, Ib, dIb, fmt="o", ms=3, lw=0.8, color=c, label=f"{bank} bank")
-        if p is not None:
+            if not pick.value:
+                print("Measure a sample first (with both shutters open)."); return
+            sample = pick.value if os.path.isabs(pick.value) else os.path.join(loki.folder, pick.value)
+            solvent, empty = partners(pick.value)
+            if solvent is None or empty is None:
+                print("Missing in this configuration:", ", ".join(n for n, f in (("the solvent (D2O)", solvent),
+                      ("the empty beam", empty)) if f is None) + ". Measure it, then click Analyze again."); return
+            full = lambda f: f if os.path.isabs(f) else os.path.join(loki.folder, f)
+            print(f"Reducing {os.path.basename(sample)} - {os.path.basename(solvent)} "
+                  f"(empty beam {os.path.basename(empty)}) with esssans...")
+            iq = red.reduce(full(sample), background=full(solvent), empty_beam=full(empty),
+                            banks=[f"loki_detector_{i}" for i in range(9)])
+            thickness_cm = float(red.lnx.read_twin(full(sample))["sample_thickness_m"]) * 100
+            groups = red.combine(iq, thickness_cm)
+            q = np.concatenate([v[0] for v in groups.values()]); I = np.concatenate([v[1] for v in groups.values()])
+            dI = np.concatenate([v[2] for v in groups.values()])
+            o = np.argsort(q); q, I, dI = q[o], I[o], dI[o]
+            g = la.guinier(q, I, dI)
+            fit = la.sphere_fit(q, I, dI, radius0=g["rg"] / np.sqrt(0.6) if g else 50.0)
+            clear_output()
+            fig, ax = plt.subplots(1, 2, figsize=(13, 4.8))
+            for gname, (qb, Ib, dIb) in groups.items():
+                ax[0].errorbar(qb, Ib, dIb, fmt="o", ms=3, lw=0.8, color=COLORS[gname], label=f"{gname} bank(s)")
             qq = np.logspace(np.log10(q.min()), np.log10(q.max()), 500)
-            ax[0].plot(qq, sph(qq, *p), "k-", lw=1.2, label=f"spheres, R = {p[1]:.1f} Å")
-        ax[0].set(xscale="log", yscale="log", xlabel="Q (Å⁻¹)", ylabel="I (cm⁻¹ sr⁻¹)", title="Scattering curve")
-        ax[0].legend(); ax[0].grid(alpha=0.3, which="both")
-        if rg:
-            show = q < 2.5 * qmax
-            ax[1].errorbar(q[show] ** 2, np.log(np.clip(I[show] - bg, 1e-6, None)), dI[show] / (I[show] - bg),
-                           fmt="o", ms=3, color="0.6", lw=0.8, label="measured")
-            ax[1].errorbar(q[m] ** 2, np.log(I[m] - bg), dI[m] / (I[m] - bg), fmt="o", ms=3, color="tab:blue",
-                           lw=0.8, label="used: Q Rg < 1.3")
-            x2 = np.linspace(0, (q[show] ** 2).max(), 50)
-            ax[1].plot(x2, a + b * x2, "r-", label=f"Rg = {rg:.1f} Å")
-            ax[1].set(xlabel="Q² (Å⁻²)", ylabel="ln(I − background)", title="Guinier plot"); ax[1].legend()
-            ax[1].grid(alpha=0.3)
-        plt.tight_layout(); plt.show()
-        if rg:
-            print(f"Guinier: Rg = {rg:.1f} Å ({m.sum()} points, Q < {qmax:.4f} Å⁻¹) -> sphere radius "
-                  f"R = {rg / np.sqrt(0.6):.1f} Å")
-        else:
-            print("Guinier: not enough points at small Q (choose a configuration that reaches lower Q).")
-        if p is not None:
-            print(f"Sphere model: R = {p[1]:.1f} Å, I(0) = {p[0]:.2f} cm⁻¹, background = {p[2]:.3f} cm⁻¹")
+            ax[0].plot(qq, la.sphere_intensity(fit["model"], qq, *fit["p"]), "k-", lw=1.2,
+                       label=f"spheres, R = {fit['radius']:.1f} Å")
+            ax[0].set(xscale="log", yscale="log", xlabel="Q (Å⁻¹)", ylabel="I (cm⁻¹ sr⁻¹)",
+                      ylim=(max(I[I > 0].min() / 3, 1e-4), I.max() * 3), title="Scattering curve of the particles")
+            ax[0].legend(); ax[0].grid(alpha=0.3, which="both")
+            if g:
+                m = g["mask"]; show = (q < 2.5 * g["q_max"]) & (I > 0)
+                ax[1].errorbar(q[show] ** 2, np.log(I[show]), dI[show] / I[show], fmt="o", ms=3, color="0.6", lw=0.8,
+                               label="measured")
+                ax[1].errorbar(q[m] ** 2, np.log(I[m]), dI[m] / I[m], fmt="o", ms=3, color="tab:blue", lw=0.8,
+                               label="used: Q Rg < 1.3")
+                x2 = np.linspace(0, (q[show] ** 2).max(), 50)
+                ax[1].plot(x2, g["a"] + g["b"] * x2, "r-", label=f"Rg = {g['rg']:.1f} Å")
+                ax[1].set(xlabel="Q² (Å⁻²)", ylabel="ln I", title="Guinier plot"); ax[1].legend()
+                ax[1].grid(alpha=0.3)
+            plt.tight_layout(); plt.show()
+            if g:
+                print(f"Guinier: Rg = {g['rg']:.1f} ± {g['drg']:.1f} Å ({g['mask'].sum()} points, Q < {g['q_max']:.4f} Å⁻¹)"
+                      f" -> sphere radius R = {g['rg'] / np.sqrt(0.6):.1f} Å")
+            else:
+                print("Guinier: not enough points at small Q (choose a configuration that reaches lower Q).")
+            print(f"Sphere model (sasmodels): R = {fit['radius']:.1f} ± {fit['dradius']:.1f} Å, "
+                  f"volume fraction φ = {100 * fit['phi']:.2f} %, reduced χ² = {fit['chi2']:.1f}")
+        except Exception as e:
+            print("Analysis failed:", e)
+        finally:
+            button_an.disabled = False
 
 button_an.on_click(analyze)
 display(w.VBox([pick, button_an, out_an]))
@@ -252,15 +272,17 @@ display(w.VBox([pick, button_an, out_an]))
 md(r"""
 **How the twin produces your measurements (and its limits).** The beamline up to the sample is the official McStas
 model of LoKI, simulated once per configuration. The sample scatters with the exact cross-section of identical silica
-spheres; the detection, the time of flight and the reduction to $I(Q)$ follow the real instrument. Not yet in the twin:
-the empty-cell, solvent and transmission measurements of a real SANS experiment, and the raw event files (the file
-already contains $I(Q)$).
+spheres. Each detected neutron is written, with its pixel of the real LoKI and its arrival time, in a NeXus file of
+the real instrument's format, then reduced by the ESS software. Simplifications: the files hold a random sample of
+the neutrons (LoKI counts millions per second), the empty cell is not measured separately (the solvent run includes
+the cell), and the transmission monitor always sees the beam.
 
 ## 4. Questions
 
-1. From your first measurement, what is the radius of the particles? Do the Guinier analysis and the sphere model
+1. From your first measurements, what is the radius of the particles? Do the Guinier analysis and the sphere model
    agree? Which one needs an assumption on the shape?
-2. Count 10 s and 300 s in the same configuration: how do the error bars change? Is the radius more precise?
+2. Measure the sample for 30 s and for 300 s in the same configuration: how do the error bars change? Is the radius
+   more precise?
 3. Compare the lowest $Q$ of the rear bank with the 3 m collimation (detector at 5 m) and with the 8 m collimation
    (detector at 10 m). Why does it matter for larger particles? What do you pay for it?
 4. Try the 3 m collimation with the detector at 10 m. The twin refuses: explain with numbers. A 11.5 Å neutron flies

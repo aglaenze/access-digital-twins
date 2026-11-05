@@ -50,6 +50,23 @@ jobs:
           df -h /
           docker run --rm -e GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }} -e TWIN_MPI=4 twin:test test
 
+      - name: NICOS window on the desktop of the container (screenshot)
+        run: |
+          mkdir -p shots && chmod 777 shots
+          docker run --rm -v "$PWD/shots:/data/shots" -e TWIN_MPI=4 twin:test bash container/desktop_test.sh /data/shots
+
+      - name: Desktop and catalogue in the web browser (screenshots)
+        continue-on-error: true
+        run: bash container/browser_desktop_test.sh twin:test
+
+      - name: Keep the screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: shots
+          if-no-files-found: ignore
+
       - name: Log in to ghcr.io
         if: github.event_name != 'pull_request'
         uses: docker/login-action@v3

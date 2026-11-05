@@ -20,6 +20,10 @@ at ESS. The examples of parts 2–4 use **ODIN** (iron plate); part 6 gives the 
 a web page, a console, or NICOS, the control software of the real ESS instruments. Part 5 tells you where your data are
 and how to analyze them; part 6 covers the other instruments.
 
+**In a course** you will rather start from the **catalogue of exercises** (`Catalogue.ipynb`, the start page of the
+container): choose the instrument, then an exercise, then the way in: a guided web page (BSc), a notebook with tasks
+and automatic checks (MSc), or a beamtime with NICOS (a proposal, a budget, your own decisions).
+
 Expect: 20–60 min for the installation (mostly downloads), a few minutes per measurement session.
 
 ---
@@ -29,14 +33,20 @@ Expect: 20–60 min for the installation (mostly downloads), a few minutes per m
 | | Route A: container (recommended) | Route B: local installation |
 |---|---|---|
 | For | everyone (Windows, macOS, Linux) | Windows users who want to change the code |
-| You install | Docker Desktop | Miniforge, Git, Visual Studio Build Tools, NICOS (optional) |
-| Disk space | ~8 GB | ~10 GB |
-| Ways to use the twin | web page, console, NICOS (text commands) | web page, console, NICOS (with its graphical interface) |
+| You install | Podman Desktop (free) or Docker Desktop | Miniforge, Git, Visual Studio Build Tools, NICOS (optional) |
+| Disk space | ~10 GB | ~10 GB |
+| Ways to use the twin | catalogue, web pages, console, NICOS with its window (in the browser) | web pages, console, NICOS (with its window) |
 
 ### Route A — the container
 
-A container is a ready-made Linux system with everything already installed (McStas, the official ODIN model, the
-twin, the ESS analysis software, JupyterLab, NICOS). You download it once and run it on your computer.
+A container is a ready-made Linux system with everything already installed (McStas, the official ODIN and LoKI
+models, the twins, the ESS analysis software, JupyterLab, NICOS and its window). You download it once and run it on
+your computer.
+
+**The shortest way**: install Podman Desktop (https://podman-desktop.io, free) or Docker Desktop, then run the
+launcher of the repository, `container/run_twin.ps1` (Windows: right-click > *Run with PowerShell*) or
+`bash container/run_twin.sh` (macOS, Linux). It downloads the image the first time, starts it and opens the
+catalogue in your browser. The steps below do the same by hand.
 
 1. **Install Docker Desktop**: https://www.docker.com/products/docker-desktop/ — install, restart if asked, then
    start Docker Desktop and wait until it says "Engine running". (On Windows it may ask to enable WSL 2: accept.)
@@ -59,7 +69,7 @@ twin, the ESS analysis software, JupyterLab, NICOS). You download it once and ru
    http://127.0.0.1:8888/lab?token=3f2a...
    ```
 5. **Open that address** (the one with `127.0.0.1` and the token) in your browser: you see JupyterLab, with the files
-   of the twin on the left.
+   of the twin on the left. The start page of the exercises is `Catalogue.ipynb`: right-click > *Open With > Voilà*.
 6. **Check that everything works** (optional, 2 min): in JupyterLab, *File → New → Terminal*, then
    ```
    python container/smoke_test.py
@@ -236,7 +246,13 @@ just-bin-it, installed as in `nicos/README.md`, "Live data"). A count then takes
 **Detector image** shows the image and the spectrum of the arrival times filling up (panels `live_image` and
 `live_tof`), as on the real instrument where the neutrons are streamed by Kafka and histogrammed by just-bin-it.
 
-### With text commands (route A, in the container; no graphical interface yet)
+### With the graphical interface (route A, in the container: in your browser)
+In JupyterLab: *File → New Launcher*, then **Desktop**. A Linux desktop opens in a new browser tab. Double-click the
+icon **NICOS - ODIN** (or use the menu *Applications → NICOS - ODIN*): a terminal shows the services starting, then the
+NICOS window opens on the desktop. Log in with **student** / **student**, and continue as in steps 1–3 above. To stop:
+close the terminal "NICOS ODIN services".
+
+### With text commands (route A, without the desktop)
 Terminal 1 (JupyterLab terminal):
 ```
 python nicos/start_nicos.py --instrument odin --no-gui --background
@@ -299,26 +315,36 @@ tomography (rotate the sample with
 
 The LoKI twin can be used from a web page, from Python, from the console and from NICOS, with both routes: route A
 (the container contains it) and route B (step 9 of the installation). It needs about 6 GB of free memory during a
-measurement (route A: memory given to Docker). Its test case measures dilute silica spheres (radius 50 Å) for 10 min
-and fits their size (route A: in a JupyterLab terminal):
+measurement (route A: memory given to Docker). As on the real LoKI, each measurement is a **NeXus event file** (every
+detected neutron with its pixel of the real detector and its arrival time) and the reduction to I(Q) is done by the
+official ESS software (`esssans`). A SANS experiment needs **three measurements** in the same configuration: the
+sample (`silica_spheres`), the solvent alone (`d2o`, subtracted) and the empty beam (`empty_beam`, reference of the
+transmission). Its test case measures the three for dilute silica spheres (radius 50 Å) and fits their size (route
+A: in a JupyterLab terminal):
 ```
 cd loki
 python easy_case.py
 ```
-The first run takes ~2 min (McStas simulation of the sample, then kept in the results folder `twin/loki`), the next
-ones less than a minute. It prints the radius of gyration found (expected ≈ 39 Å) and saves the figure
-`figures/easy_case.png`: I(Q) of the three detector banks on the exact curve. To measure yourself, in Python
-(started in the folder `loki`):
+The first run takes ~10 min (McStas simulations of the samples and the calibration of the configuration, then kept
+in the results folder `twin/loki`), the next ones a few minutes. It prints the radius of gyration (expected ≈ 39 Å),
+the radius and the volume fraction from the sphere model of sasmodels, and saves the figure `figures/easy_case.png`.
+To measure yourself, in Python (started in the folder `loki`):
 ```python
-from virtual_loki import VirtualLoki, read
+from virtual_loki import VirtualLoki
+import loki_reduction as red
 loki = VirtualLoki(session="my_first_sans")
-loki.move(sample="silica_spheres", collimation="3m", heavy_shutter="open", shutter="open")
-f = loki.count(600)          # 600 s; returns the file written
-data = read(f)               # {"front": (Q, I, dI), "middle": ..., "rear": ...}
+loki.move(collimation="3m", heavy_shutter="open", shutter="open")
+files = {}
+for s in ("empty_beam", "d2o", "silica_spheres"):
+    loki.move(sample=s)
+    files[s] = loki.count(600)          # 600 s; returns the NeXus file written
+iq = red.reduce(files["silica_spheres"], background=files["d2o"], empty_beam=files["empty_beam"])
+iq["loki_detector_0"].plot()            # I(Q) of the rear bank (esssans), divide by the thickness (0.1 cm) for cm⁻¹
 ```
 **Web page**: as in part 2, with `loki/LoKI_virtual.ipynb` (route A: open it in JupyterLab, then "Render with
-Voilà"; route B: `voila LoKI_virtual.ipynb` in the folder `loki`). It gives the settings of three measurements,
-shows the image of the rear detector after each count, and analyzes the curve (Guinier and sphere model).
+Voilà"; route B: `voila LoKI_virtual.ipynb` in the folder `loki`). It gives the settings of the measurements (empty
+beam, solvent, sample, in two configurations), shows the image of the rear detector after each count, and analyzes
+the curve (esssans, Guinier and the sphere model of sasmodels).
 
 **Console**: as in part 3, with `python twin_server.py --instrument loki --session my_first_sans` in terminal 1;
 devices `heavy_shutter`, `shutter`, `collimation` (`3m`, `5m`, `8m`), `pulse_skipping` (`off`, `on`: choppers at
@@ -330,18 +356,26 @@ chopper speeds and delays, which follow the configuration.
 Experiment tab give a proposal number, then:
 ```
 move(heavy_shutter, 'Open', fast_shutter, 'Open')
+move(sample_holder, 'empty_beam')
+with nexusfile_open('empty beam'):
+    count(t=60)
+move(sample_holder, 'd2o')
+with nexusfile_open('D2O'):
+    count(t=600)
+move(sample_holder, 'silica_spheres')
 with nexusfile_open('silica spheres, 10 min'):
     count(t=600)
 ```
-(`heavy_shutter` and `fast_shutter` are the names used by the NICOS of the real LoKI.) The file contains I(Q) of the
-three detector banks; the Detector image tab shows the rear detector. To reach lower Q, change the configuration, e.g.
+(`heavy_shutter` and `fast_shutter` are the names used by the NICOS of the real LoKI.) Each file holds the events of
+the 9 detector banks and of the monitors; the Detector image tab shows the rear detector. To reach lower Q, change the configuration, e.g.
 `move(collimation, '8m', detector_distance, 10)`, then count again: compare the Q range of the rear bank and the
 counting time needed for the same error bars. Details: `loki/README.md`.
 
 **Analyze** with the notebook `loki/LoKI_analysis.ipynb` (`jupyter lab` in the folder `twin`): write your folder
-(session or proposal) in its first cell, then run the cells. It plots I(Q) of the three banks, finds the radius of
-gyration with a Guinier fit, fits a sphere model to the whole curve (radius, background) and deduces the volume
-fraction of the spheres from I(0). Leave `FOLDER = None` to measure the silica spheres first.
+(session or proposal) in its first cell, then run the cells. It finds your sample, solvent and empty beam in the
+logbook, shows what is inside a NeXus file, reduces them with esssans (9 banks, solvent subtracted, absolute units),
+finds the radius of gyration with a Guinier fit, and fits the sphere model of sasmodels (the engine of SasView) to
+the whole curve: radius and volume fraction. Leave `FOLDER = None` to measure first.
 
 ### DREAM, BIFROST
 

@@ -1,7 +1,8 @@
 # Conda environment of NICOS (cache, poller, daemon): NICOS needs numpy < 2, the twins numpy 2, hence two
 # environments that talk over HTTP (twin_server.py). The NICOS Python requirements (requirements.txt of the NICOS
 # sources, including nicos-pyctl from the FRM II package index) are installed by the Containerfile.
-# No GUI in the container (no PyQt): students connect with a NICOS client, or use the web pages.
+# The NICOS window (PyQt5, requirements-gui.txt of the NICOS sources) is installed by the Containerfile too; it runs
+# on the desktop of JupyterLab (launcher "Desktop").
 name: nicos
 channels:
   - conda-forge

@@ -33,6 +33,8 @@ dependencies:
   - pip:
       - matplotlib==3.11.1
       - essimaging==26.10.1
+      - esssans==26.10.0
+      - sasmodels==1.1.0
       - essreduce==26.10.1
       - sciline==26.9.0
       - voila==0.5.13

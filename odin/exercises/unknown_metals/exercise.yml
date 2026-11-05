@@ -1,0 +1,17 @@
+# One exercise of the catalogue (python gen_catalogue.py, at the root of the repository).
+title: Unknown metals (game)
+instrument: odin
+technique: Wavelength-resolved imaging (Bragg edges)
+sample: Three metal plates labeled A, B, C
+question: >-
+  Identify three unknown metal plates and measure their lattice parameter, within a limited beamtime budget (score).
+  Mission 2: the instrument has a hidden fault; find it from the data.
+learn: Planning a measurement under a budget, identifying a crystal structure from its Bragg edges, troubleshooting.
+status: ready
+modes:
+  bsc:
+    label: Game page
+    what: A web page with a budget, a score and two missions. No code.
+    duration: 2 hours
+    open: voila
+    file: odin/ODIN_mission.ipynb

@@ -5,11 +5,53 @@ arrangement of objects from ~1 to ~100 nm (particles, pores, polymers, membranes
 digital twin, built like the ODIN twin (`../odin/`), from the official McStas model of LoKI and from the French LoKI
 notebook series of this project, where every step of the simulation and of the reduction is explained and validated.
 
-**Status: first version, one easy test case, three collimations, two detector distances, pulse skipping (below).** Driven from Python, from the console (`twin_server.py
---instrument loki` + `twin_console.py`) or from NICOS (`../nicos/start_nicos.py --instrument loki`, ESS GUI and
-device names `heavy_shutter`, `fast_shutter`); data analyzed in `LoKI_analysis.ipynb`. Not yet: raw event files
-in the ESS NeXus format, reduction with the ESS software (`esssans`), the full series of measurements of a real SANS
-experiment (empty cell, solvent, dark, water calibration).
+**Status (2026-11-05): NeXus event files in the format of the real LoKI, reduced with the ESS software (`esssans`),
+analyzed with `sasmodels` (the engine of SasView).** Three collimations, two detector distances, pulse skipping
+(below); three samples: `silica_spheres` (in D₂O), `d2o` (the solvent, background) and `empty_beam` (transmission
+reference). Driven from Python, from the console (`twin_server.py --instrument loki` + `twin_console.py`) or from
+NICOS (`../nicos/start_nicos.py --instrument loki`, ESS GUI and device names `heavy_shutter`, `fast_shutter`,
+`sample_holder`); data analyzed in `LoKI_analysis.ipynb`; exercise of the catalogue in `exercises/silica_spheres/`.
+Not yet: empty cell measured separately, dark, a movable transmission monitor, the resolution function for the fits.
+
+## NeXus files and the ESS reduction (2026-11-05)
+
+**The file** (`loki_nexus.py`): the template is a real file written by the ESS file writer at LoKI (April 2026, five
+pulses), distributed by ESS with esssans (`ess.loki.data.loki_coda_file()`, downloaded once). Its whole structure is
+kept (9 detector banks with their real geometry, 2.8 million pixels in 4 layers of tubes of 7 straws, 5 monitors,
+choppers, motors, logs); the twin replaces the events and the settings, removes the users of the template, and adds
+`entry/twin` (the true sample, the fraction of neutrons written). Each neutron scattered by the sample (McStas) flies
+in a straight line to the first bank it meets (beam stop: absorbed); in that bank it is detected in one of the
+overlapping sub-detectors (a layer and a straw position, drawn at random), in the pixel closest to its point of
+impact, so that each pixel receives neutrons in proportion to its solid angle, as the ESS reduction assumes.
+`event_time_offset` = arrival time after its pulse, `event_time_zero` = pulse times (14 Hz). Monitors: m1 (incident,
+8.4 m before the sample) and m3 (transmission, 0.2 m after it), efficiency 10⁻³, from the McStas beam at the sample.
+**Volume**: LoKI counts millions of neutrons per second (4·10⁹ in 10 min for the silica spheres): a file holds at most
+10⁷ detector events and 2·10⁶ per monitor, a random sample at the same rate for detectors and monitors
+(`entry/twin/event_sampling`, 0.1 % for the easy case), so that absolute intensities and transmissions are unchanged.
+About 140 MB and 1 min per measurement.
+
+**The reduction** (`loki_reduction.py`): `ess.loki.LokiWorkflow`, unmodified, with the parameters of the ESS notebook
+"loki-reduction-ess", on each bank. What the twin provides, as the instrument team does at ESS:
+- the time → λ **lookup table** of each configuration, built by essreduce (`make_wavelength_lut_from_simulation`)
+  from the McStas beam at the sample (`<run root>/loki/lookup_tables/`);
+- the **masks** (pixel ids): pixels behind the beam stop or a closer bank, seen from the center and the corners of
+  the beam, plus a margin of 0.6 tube pitch around them and along the bank edges (a pixel collects a band one tube
+  pitch wide);
+- the **direct-beam function** D(λ) of each bank: the calibration that makes I(Q) absolute, measured as at ESS with a
+  standard of known cross-section: the twin measures its D₂O (flat, 0.05 cm⁻¹ sr⁻¹) and an empty beam for one hour
+  in the configuration, once (`<run root>/loki/calibration/`). It corrects what the geometry alone does not know: the
+  layers and straws overlap as seen from the sample, so the solid angle summed over the pixels is about ten times the
+  true one (D ≈ 0.08–0.1 times the plain monitor ratio).
+Then `red.reduce(sample, background=solvent, empty_beam=empty)` gives I(Q) per bank, background subtracted;
+`red.combine` merges the banks into rear / middle / front and divides by the thickness (cm⁻¹ sr⁻¹).
+
+**Validation** (3 m / 5 m, 10 min each, 2026-11-05): D₂O reduced alone: flat within ±3 % on the rear bank for
+Q = 0.013–0.26 Å⁻¹ and on the middle bank 1; up to +20 % / −12 % at the inner and outer edges of the middle and front
+banks (the calibration is one factor per bank; a pixel-by-pixel flat field would remove it), and −20 to −35 % at the
+lowest Q of the rear bank (< 0.011 Å⁻¹, next to the beam-stop mask). Silica spheres minus D₂O, all banks:
+**Rg = 39.2 ± 1.2 Å (exact 38.7), I(0) = 4.20 ± 0.08 cm⁻¹ (exact 4.37), sasmodels sphere: R = 49.1 ± 0.1 Å (50),
+φ = 1.00 % (1 %), χ²/n = 0.5.** Two pitfalls met on the way (2026-11-05): a too small coverage tolerance let neutrons through the middle
+banks (+25 % at the edges of the rear bank), and looking the pixels up along the direction from the sample center smeared the counts by the beam size next to the beam stop.
 
 ## Easy test case: dilute silica spheres
 
@@ -22,11 +64,10 @@ dΣ/dΩ = φ V Δρ² P(Q) + background, I(0) = 4.37 cm⁻¹, minima of P(Q) at 
 
 ![Easy case](figures/easy_case.png)
 
-Result (2026-11-04): the three detector banks join up and follow the exact curve; Guinier fit (Q Rg < 1.3, 26 points):
-**Rg = 39.4 ± 0.2 Å (exact 38.7 Å), I(0) = 4.31 ± 0.01 cm⁻¹ (exact 4.37)**; mean level in the Guinier region 0.984
-of the exact one. The apparent Rg is 1.8 % too large because the instrument resolution smears the curve (it also
-fills in the minima); it is not corrected here. The first run takes ~2 min (McStas compilation and downstream
-simulation, then cached).
+Since 2026-11-05 the easy case measures, as a real SANS experiment, an empty beam (60 s), the solvent and the sample
+(10 min each), writes NeXus event files and reduces them with esssans (§ NeXus files); results above. The first run
+takes ~10 min (McStas simulations of the two samples, calibration of the configuration, then cached), the next ones
+~4 min. Before (2026-11-04, the twin's own reduction to I(Q)): Rg = 39.4 ± 0.2 Å, I(0) = 4.31 cm⁻¹.
 
 ## Configurations
 
@@ -53,8 +94,8 @@ formulas of the model (`includes/loki_functions.c`; checked against the values p
 halved (McStas simulates one pulse, which the choppers let through, with weights in neutrons per second as if every
 pulse came; I(Q) is a ratio and does not change, but the counting noise of a t-second measurement does).
 
-**Validation** (2026-11-04, silica spheres of the easy case, 10 min, Guinier fit Q Rg < 1.3 on all banks; exact
-Rg = 38.7 Å, I(0) = 4.373 cm⁻¹):
+**Validation of the configurations** (2026-11-04, with the twin's own reduction, before the NeXus files; silica
+spheres of the easy case, 10 min, Guinier fit Q Rg < 1.3 on all banks; exact Rg = 38.7 Å, I(0) = 4.373 cm⁻¹):
 
 | Collimation / detector | Rear bank Q range [Å⁻¹] | Rg [Å] | I(0) [cm⁻¹] | Level / exact (Guinier region) |
 |---|---|---|---|---|
@@ -88,10 +129,12 @@ configuration already simulated, ~1 min for a new one; peak memory 4.4–5.6 GB 
 |---|---|---|
 | Upstream part | `loki_mcstas.front` | official `LOKI_main.instr` cut just before the sample, MCPL file of the neutrons at the sample (computed once per configuration: ~15 min for 10⁹ neutrons on 8 cores, ~1.4 GB RAM per process) |
 | Sample | `loki_mcstas.back`, `components/SANS_Iq_table.comp` | McStas downstream part: the sample scatters with a tabulated dΣ/dΩ(Q) in absolute units; scattered neutrons to an MCPL file, transmitted beam to wavelength monitors |
-| Detector | `loki_mcstas.Detector` | the 9 tube panels of the official model (front, middle, rear banks), straight lines from the sample to the first panel met, beam stop, masks of hidden pixels |
+| Detector | `loki_mcstas.Detector` (live image), `loki_nexus.RealDetector` (files) | the 9 banks: panels of the official model for the live image; real pixels of LoKI for the NeXus files; straight lines from the sample, beam stop |
 | Time of flight | `loki_mcstas.events` | arrival time modulo the source period (2/14 s with pulse skipping), frames unwrapped, λ = h t / (m L), Q = 4π sin θ / λ |
-| Reduction | `loki_mcstas.reduce` | I(Q) in absolute units per bank: counts / (flux × transmission × thickness × solid angle) |
-| Instrument | `virtual_loki.VirtualLoki` | devices (`heavy_shutter`, `shutter`, `collimation`, `pulse_skipping`, `detector_distance`, `sample`), `move`, `count(t)` → HDF5 file with I(Q) and errors per bank (counting noise of a `t`-second measurement + simulation noise), live image of the rear panel, logbook `log.jsonl`; same interface as `VirtualOdin`, so the twin server and NICOS drive it |
+| File | `loki_nexus` | NeXus event file of the real LoKI's format (events of the 9 banks and of the monitors m1, m3, settings) |
+| Reduction | `loki_reduction` (esssans) | I(Q) in absolute units per bank, solvent subtracted; lookup table, masks, direct-beam calibration provided by the twin |
+| Analysis | `loki_analysis` | Guinier fit, sphere model of sasmodels (scale = volume fraction) |
+| Instrument | `virtual_loki.VirtualLoki` | devices (`heavy_shutter`, `shutter`, `collimation`, `pulse_skipping`, `detector_distance`, `sample`), `move`, `count(t)` → NeXus file, live image of the rear panel, logbook `log.jsonl`; same interface as `VirtualOdin`, so the twin server and NICOS drive it |
 
 ## Files
 
@@ -99,11 +142,16 @@ configuration already simulated, ~1 min for a new one; peak memory 4.4–5.6 GB 
 |---|---|
 | `loki_paths.py` | paths: official model `LOKI_REPO` (default `~/McStas_runs/LOKI`), results `<TWIN_RUN_ROOT>/loki/` |
 | `loki_mcstas.py` | McStas engine (English copy of the engine of the LoKI notebook series, same physics) |
-| `loki_samples.py` | samples (dΣ/dΩ in cm⁻¹ sr⁻¹): `silica_spheres` |
-| `virtual_loki.py` | the virtual instrument (`VirtualLoki`, `read`) |
+| `loki_samples.py` | samples (dΣ/dΩ in cm⁻¹ sr⁻¹): `silica_spheres`, `d2o`, `empty_beam` |
+| `virtual_loki.py` | the virtual instrument (`VirtualLoki`) |
+| `loki_nexus.py` | NeXus event files from the real LoKI template; real pixel geometry, masks |
+| `loki_reduction.py` | reduction with esssans: lookup tables, masks, direct-beam calibration, `reduce`, `combine` |
+| `loki_analysis.py` | Guinier, sasmodels sphere fit (used by the web page) |
+| `loki_exercises.py` | automatic checks of the MSc notebook |
+| `exercises/silica_spheres/` | exercise of the catalogue: `exercise.yml`, MSc notebook, beamtime sheet and starter notebook (`gen_notebooks.py`) |
 | `easy_case.py` | the test case above and its figure |
-| `gen_student_page.py` → `LoKI_virtual.ipynb` | student page (Voilà, `voila LoKI_virtual.ipynb`): settings table, operate (collimation, pulse skipping, detector distance, shutters; refusals explained), image of the rear panel, logbook, analysis (I(Q) of the banks, Guinier fit, sphere model), questions. Checked: R = 49.6 Å (3 m, 60 s) and 49.9 Å (8 m / 10 m, 300 s) for 50 Å |
-| `gen_analysis_notebook.py` → `LoKI_analysis.ipynb` | analysis notebook (JupyterLab): logbook, file content, I(Q) of the three banks, Guinier fit (Rg), sphere-model fit (R, background), volume fraction from I(0); on any session or proposal folder (demonstration, 10 min: Rg = 39.4 ± 0.2 Å, R = 49.6 Å, φ = 1.00 %) |
+| `gen_student_page.py` → `LoKI_virtual.ipynb` | BSc page (Voilà): settings table (empty beam, solvent, sample, two configurations), operate (sample, collimation, pulse skipping, detector distance, shutters; refusals explained), image of the rear panel, logbook, analysis (esssans, Guinier, sasmodels), questions |
+| `gen_analysis_notebook.py` → `LoKI_analysis.ipynb` | analysis notebook (JupyterLab): logbook (kind of each file), inside a NeXus file, reduction with esssans (9 banks, solvent subtracted, transmission), Guinier fit, sasmodels sphere fit (R, φ); on any session or proposal folder |
 | `components/SANS_Iq_table.comp` | McStas sample component (isotropic SANS from a table, absolute units) |
 
 ## Installation
@@ -124,9 +172,10 @@ processes: the easy case takes 2 min (compilation + downstream part), Rg = 39.3 
 (default 8).
 
 ## Next steps
-1. Raw data: event files in the ESS NeXus format of LoKI, reduced with `esssans` (as ODIN with `essimaging`).
-2. A real SANS session: empty beam, empty cell, solvent, sample, dark, water (absolute calibration), with
-   transmissions; the samples of the notebook series (Nafion membrane, catalyst layer, porous electrode).
+1. Done on 2026-11-05: event files in the ESS NeXus format of LoKI, reduced with `esssans`; solvent and empty beam.
+2. A complete SANS session: empty cell measured separately, dark, a movable transmission monitor, flat field per
+   pixel (removes the bank-edge deviations), the resolution for the fits (sasmodels `dq`); the samples of the
+   notebook series (Nafion membrane, catalyst layer, porous electrode).
 3. Done on 2026-11-04: collimations 5 m and 8 m, rear detector at 5 or 10 m, pulse skipping (§ Configurations).
    To do: understand the 4 % low level with a short collimation and the detector at 10 m; more samples.
 4. Done on 2026-11-04: twin server, console and NICOS (`../nicos/nicos_twin/loki/`, ESS GUI of LoKI), analysis
