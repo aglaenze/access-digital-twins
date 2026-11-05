@@ -22,7 +22,18 @@ USER $MAMBA_USER
 
 # Conda environments (pinned versions): "mcstas" for the twins, "nicos" for NICOS (numpy < 2)
 COPY --chown=$MAMBA_USER:$MAMBA_USER container/environment-mcstas.yml container/environment-nicos.yml /tmp/
-RUN micromamba create -y -f /tmp/environment-mcstas.yml \
+# On ARM (arm64) conda-forge has no scipp for Linux: scipp and the packages that require it come from PyPI (wheels for
+# aarch64), at the same versions as in environment-mcstas.yml.
+ARG TARGETARCH
+RUN SCIPP_PKGS="scipp|scippneutron|scippnexus|tof|plopp|mcstastox"; \
+    if [ "$TARGETARCH" = "arm64" ]; then \
+      grep -vE "^ +- ($SCIPP_PKGS)=" /tmp/environment-mcstas.yml > /tmp/environment-mcstas-arm64.yml \
+      && micromamba create -y -f /tmp/environment-mcstas-arm64.yml \
+      && micromamba run -n mcstas pip install --no-cache-dir \
+           $(grep -oE "^ +- ($SCIPP_PKGS)=[^ ]+" /tmp/environment-mcstas.yml | sed -E 's/^ +- //; s/=/==/'); \
+    else \
+      micromamba create -y -f /tmp/environment-mcstas.yml; \
+    fi \
  && micromamba create -y -f /tmp/environment-nicos.yml \
  && micromamba clean -a -y
 
