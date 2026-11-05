@@ -316,7 +316,7 @@ q.number("For a full sphere $R_g = \\sqrt{3/5}\\,R$. Which radius $R$ (in Å) do
          value=50.5, tol=0.05, rel=True, unit="Å",
          mistakes=[(30.6, "you multiplied by √(3/5); R = √(5/3)·Rg"), (5.05, "in nm; the answer is asked in Å"),
                    (39.5, "this is Rg; R is larger: R = √(5/3)·Rg = 1.29·Rg")],
-         hints=["R = Rg / √(3/5) = 1.29 Rg."],
+         hints=['Solve Rg = √(3/5)·R for R.', 'R = Rg / √(3/5) = 1.29 × Rg.'],
          explanation="R = √(5/3)·Rg ≈ 1.29 × 39.4 ≈ 51 Å, close to what the sphere model gives (50 Å).",
          title="Q2. From Rg to the radius")
 q.choice("The Guinier analysis and the sphere model agree. Which one needs an assumption on the **shape** of the "
@@ -327,7 +327,8 @@ q.choice("The Guinier analysis and the sphere model agree. Which one needs an as
                         3: "The sphere model assumes spheres: its whole curve (with its minima) is that of a sphere."},
          explanation="Guinier gives Rg for any shape; turning Rg into a radius, or fitting the whole curve, needs a "
                      "model of the shape (here a sphere). If the particles were rods, the sphere model would fit "
-                     "badly.", title="Q3. Which one assumes a shape?")
+                     "badly.", hints=['Which formula would change if the particles were rods instead of spheres?', 'The Guinier law holds at small Q for any particle; the sphere model is the curve of a sphere.'],
+         title="Q3. Which one assumes a shape?")
 q.choice("**Your verdict.** The batch must have a radius between 4.5 and 5.5 nm. What do you write?",
          ["Released: radius 5.0 nm, within the specification.",
           "Rejected: the radius is 3.9 nm, too small.",
@@ -337,7 +338,8 @@ q.choice("**Your verdict.** The batch must have a radius between 4.5 and 5.5 nm.
                         2: "50 Å, not 50 nm: 1 nm = 10 Å, so 50 Å = 5.0 nm.",
                         3: "SANS gives the average size over the whole batch, in the liquid: exactly what the "
                            "specification is about."},
-         explanation="R ≈ 50 Å = 5.0 nm, in the 4.5-5.5 nm window: the batch can be released.", title="Q4. The verdict")
+         explanation="R ≈ 50 Å = 5.0 nm, in the 4.5-5.5 nm window: the batch can be released.", hints=['Convert your radius to nm (1 nm = 10 Å) and compare with 4.5-5.5 nm.', 'Use the radius R of the sphere (about 50 Å), not Rg.'],
+         title="Q4. The verdict")
 q.choice("You measure the sample for 30 s, then for 300 s, in the same configuration. What happens?",
          ["The error bars are about 3 times smaller, and the radius more precise.",
           "The error bars are 10 times smaller.",
@@ -347,7 +349,8 @@ q.choice("You measure the sample for 30 s, then for 300 s, in the same configura
                         2: "A smoother curve is precisely smaller error bars.",
                         3: "The particles are the same; only the precision of the measured radius improves."},
          explanation="Counting statistics: relative errors go as 1/√N, so 10 times longer gives errors √10 ≈ 3.2 times "
-                     "smaller, and a more precise radius.", title="Q5. Counting time")
+                     "smaller, and a more precise radius.", hints=['N counts have an uncertainty √N: what happens to √N/N when N is 10 times larger?', '√10 ≈ 3.2.'],
+         title="Q5. Counting time")
 q.choice("With the 3 m collimation (detector at 5 m) the rear bank reaches Q = 0.0115 Å⁻¹; with the 8 m collimation "
          "(detector at 10 m), 0.0082 Å⁻¹. Which is true?",
          ["The lower Q reaches larger particles (the Guinier range Q·Rg < 1.3 allows Rg up to about 160 Å instead of "
@@ -362,13 +365,14 @@ q.choice("With the 3 m collimation (detector at 5 m) the rear bank reaches Q = 0
                            "separated from the direct beam), not the wavelengths."},
          explanation="Small Q = large objects: 1.3/0.0082 ≈ 160 Å against 1.3/0.0115 ≈ 113 Å for the largest Rg in the "
                      "Guinier range. The price is the flux: a more parallel beam has fewer neutrons.",
+         hints=['Q ≈ 4π θ/λ: large objects scatter at small angles. And what does a longer collimation cut away from the beam?', 'A longer collimation keeps only the most parallel neutrons.'],
          title="Q6. Collimation")
 q.number("The twin refuses the 3 m collimation (band 3-11.5 Å) with the detector at 10 m. The far detector is 33.5 m "
          "from the source. How much later than a 3 Å neutron does an 11.5 Å neutron arrive? (time t = L·λ/3956 s, "
          "L in m, λ in Å)", value=72.0, tol=1.5, unit="ms",
          mistakes=[(97.4, "the flight time of the 11.5 Å neutron alone; subtract that of the 3 Å neutron"),
                    (0.072, "in seconds; the answer is asked in ms")],
-         hints=["t(11.5 Å) − t(3 Å) = L·(11.5 − 3)/3956 s.", "33.5 × 8.5 / 3956 s."],
+         hints=['Compute the flight time of each neutron: t = L·λ/3956 s, with L = 33.5 m.', 't(11.5 Å) − t(3 Å) = 33.5 × (11.5 − 3) / 3956 s; then × 1000 for ms.'],
          explanation="33.5 × 8.5 / 3956 = 72.0 ms, more than the 71.4 ms between two ESS pulses (and the pulse itself "
                      "lasts 2.86 ms): the slowest neutrons of one pulse arrive with the fastest of the next one, and "
                      "would get a wrong wavelength. At 5 m (28.5 m) the spread is 61 ms: no overlap.",
@@ -385,6 +389,7 @@ q.choice("With pulse skipping the choppers let one ESS pulse in two through. Why
                         3: "The sample does not change; only the range of Q measured at once changes."},
          explanation="A wider band of wavelengths at a fixed angle means a wider range of Q in one setting. The price: "
                      "half of the source pulses, and the longest wavelengths are few, so the gain at low Q is small.",
+         hints=['With one pulse in two, how much time is there between two pulses used?', 'More time between pulses allows slower neutrons, so a wider band of λ; at a fixed angle, Q = 4π sin θ/λ.'],
          title="Q8. Pulse skipping")
 q.report()
 """)

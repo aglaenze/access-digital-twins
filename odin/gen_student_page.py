@@ -301,6 +301,7 @@ q.number("In a cubic lattice the (110) planes are $d_{110} = a/\\sqrt{2}$ apart.
          mistakes=[(2.027, "d itself; multiply by √2"), (1.433, "you divided by √2; d_110 = a/√2, so a = d_110·√2"),
                    (4.054, "λ_edge; a = (λ_edge/2)·√2")],
          explanation="$a = d_{110}\\sqrt{2}$ = 2.867 Å: the lattice parameter of α-iron (2.8665 Å).",
+         hints=['Start from d_110 = a/√2 and solve for a.', 'a = d_110 × √2, with the d of question 2 (about 2.03 Å).'],
          title="Q3. The lattice parameter")
 q.choice("**Your verdict for the supplier.** α-iron (body-centered cubic, a = 2.87 Å) has its edges at 4.05, 2.87 and "
          "2.34 Å; γ-iron (face-centered cubic, a = 3.59 Å) would have its last edges at 4.15 and 3.59 Å. What do you "
@@ -314,6 +315,7 @@ q.choice("**Your verdict for the supplier.** α-iron (body-centered cubic, a = 2
                         3: "No need: the neutrons went through 5 mm of steel, the measurement is non-destructive."},
          explanation="The edges of your plate are those of a body-centered cubic lattice with a = 2.87 Å: the supplier "
                      "delivered ferritic steel, as ordered. Neutrons saw it without cutting the plate.",
+         hints=['Compare the edges you measured with the two lists given in the question.', 'Your last edge is at 4.05 Å, not 4.15 Å; do you see an edge at 3.59 Å?'],
          title="Q4. The verdict")
 q.choice("You measure the sample again but forget to open the shutter. How can you notice it **without** reducing the "
          "data?", ["The logbook (part 2) shows only a few hundred counts, like the dark run, instead of tens of millions.",
@@ -325,7 +327,8 @@ q.choice("You measure the sample again but forget to open the shutter. How can y
                            "10⁵.",
                         3: "The edges are set by the iron, not by the shutter; here there is simply no beam."},
          explanation="With the shutter closed the detector only sees the background, like the dark run. Always look at "
-                     "the number of counts of a file before analyzing it.", title="Q5. A forgotten shutter")
+                     "the number of counts of a file before analyzing it.", hints=['What does the detector receive when no neutron beam comes in? Which of your runs looks like that?', 'Look at the column of counts of the logbook (part 2): the dark run has a few hundred, the others millions.'],
+         title="Q5. A forgotten shutter")
 q.choice("You measure the plate for 10 s, then for 90 s. How do the error bars of the transmission change?",
          ["About 3 times smaller", "About 9 times smaller", "The same", "About 3 times larger"],
          answer=0, why={1: "The number of counts N is 9 times larger, but the error on N is √N: relative error ∝ 1/√N, "
@@ -333,7 +336,8 @@ q.choice("You measure the plate for 10 s, then for 90 s. How do the error bars o
                         2: "More neutrons, so a better relative precision: the error bars shrink.",
                         3: "Counting longer collects more neutrons and always improves the precision."},
          explanation="Counting statistics: N counts have an uncertainty √N, so the relative error goes as 1/√N. Nine "
-                     "times longer gives errors 3 times smaller.", title="Q6. Counting time")
+                     "times longer gives errors 3 times smaller.", hints=['N counts have an uncertainty √N: what happens to √N/N when N is 9 times larger?', '√9 = 3.'],
+         title="Q6. Counting time")
 q.choice("Measure the edge with WFM δ = 0.10 m, δ = 0.45 m and in natural mode (same pinhole, same time). Which is "
          "true?", ["δ = 0.10 m gives the sharpest edge; natural mode gives the most counts.",
                    "Natural mode gives the sharpest edge and the most counts.",
@@ -346,11 +350,12 @@ q.choice("Measure the edge with WFM δ = 0.10 m, δ = 0.45 m and in natural mode
                         3: "The chopper setting changes the wavelength resolution, so the width of the edge."},
          explanation="Resolution and flux are a trade-off: δ = 0.10 m cuts the shortest sub-pulses (sharpest edge, "
                      "about 3 times fewer neutrons than δ = 0.30 m), natural mode lets the whole pulse through (about "
-                     "15 times more neutrons than δ = 0.30 m, broad edge).", title="Q7. Resolution or flux?")
+                     "15 times more neutrons than δ = 0.30 m, broad edge).", hints=['A sharper edge needs a better wavelength resolution, i.e. shorter neutron pulses. Shorter pulses: more or fewer neutrons?', 'In WFM mode the closer the two discs (small δ), the shorter the sub-pulses; natural mode keeps the whole 2.86 ms pulse.'],
+         title="Q7. Resolution or flux?")
 q.number("White mode (no chopper): how long does a 5 Å neutron take to fly the 60.5 m from the source to the "
          "detector? (speed $v$ = 3956/λ m/s, λ in Å)", value=76.5, tol=1.5, unit="ms",
          mistakes=[(0.0765, "in seconds; the answer is asked in ms"), (13.1, "the inverse; t = L / v")],
-         hints=["v = 3956 / 5 = 791 m/s.", "t = 60.5 / 791 s."],
+         hints=['First the speed: v = 3956/λ with λ = 5 Å.', 't = L / v = 60.5 m / 791 m/s, then convert seconds into milliseconds (× 1000).'],
          explanation="v = 791 m/s, t = 60.5/791 = 76.5 ms. Two ESS pulses are 1/14 s = 71.4 ms apart: this neutron "
                      "arrives after the next pulse has started, mixed with fast neutrons of that pulse.",
          title="Q8. Time of flight")
@@ -365,7 +370,8 @@ q.choice("So why does the wavelength spectrum make no sense in white mode?",
                         3: "The edges are still there; the problem is the conversion from time to λ."},
          explanation="Frame overlap: λ is computed from the arrival time, which only works if the neutrons of "
                      "successive pulses do not overlap. Beyond 4.7 Å (60.5 m in 71.4 ms) they do; the band-pass "
-                     "choppers cut the band so that they never meet.", title="Q9. Frame overlap")
+                     "choppers cut the band so that they never meet.", hints=['Compare your answer to Q8 (76.5 ms) with the time between two ESS pulses (1/14 s).', 'λ is computed from the arrival time, counted from the last pulse. What if the neutron arrives after the next pulse?'],
+         title="Q9. Frame overlap")
 q.report()
 """)
 

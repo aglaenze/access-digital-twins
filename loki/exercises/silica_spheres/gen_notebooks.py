@@ -161,7 +161,8 @@ q_.choice("The batch must have a radius between 4.5 and 5.5 nm. With your result
                          2: "50 Å = 5.0 nm (1 nm = 10 Å).",
                          3: "Your uncertainty on R is a fraction of an Å, the margin is ±5 Å."},
           explanation="R ≈ 50 Å = 5.0 nm, in the 4.5-5.5 nm window, with an uncertainty much smaller than the margin.",
-          title="Verdict")
+          hints=['Convert your radius R to nm (1 nm = 10 Å) and compare with 4.5-5.5 nm.', 'Compare your uncertainty on R with the margin of the specification (±0.5 nm = ±5 Å).'],
+         title="Verdict")
 """), md(r"""
 ## 7. Developing the method
 
@@ -187,7 +188,8 @@ q_.choice("A new batch has particles 4 times larger (R = 200 Å, Rg = 155 Å). T
                          3: "Pulse skipping at 5 m starts at 0.0106 Å⁻¹: better, but still above 0.0084 Å⁻¹."},
           explanation="1.3/155 Å = 0.0084 Å⁻¹: only the 8 m collimation with the detector at 10 m reaches it (0.0082 "
                       "Å⁻¹), at the edge. Its beam is more parallel, with fewer neutrons: count longer.",
-          title="Larger particles")
+          hints=['Compute the largest Q of the Guinier range: 1.3/Rg with Rg = 155 Å.', '1.3/155 = 0.0084 Å⁻¹: which configuration starts below it?'],
+         title="Larger particles")
 q_.report()
 """)]
 write(msc, "LoKI_silica_msc.ipynb")

@@ -156,7 +156,8 @@ q.choice("γ-iron (face-centered cubic, a = 3.59 Å) would have its (111) edge a
                         3: "A mixture would show the edges of both lattices (4.15 and 3.59 Å as well): your spectrum "
                            "has only those of a body-centered cubic lattice."},
          explanation="The edges are those of a body-centered cubic lattice with a = 2.87 Å: ferritic steel. The "
-                     "difference to γ-iron is far larger than your uncertainty.", title="Verdict")
+                     "difference to γ-iron is far larger than your uncertainty.", hints=['Compare your last edge (about 4.06 Å) with that of γ-iron (4.15 Å): how many uncertainties apart?', 'Your lattice parameter is about 2.87 Å; γ-iron has 3.59 Å.'],
+         title="Verdict")
 """), md(r"""
 ## 7. Developing the method: a systematic error
 
@@ -182,6 +183,7 @@ q.choice("You count 4 times longer. What happens to the uncertainty `dlam_edge` 
                         3: "The uncertainty goes as 1/√N: √4 = 2, not 4."},
          explanation="Statistical errors shrink as 1/√N (halved for 4 times more counts); a systematic error does "
                      "not. When the distance to the truth is several times the uncertainty, the error is systematic.",
+         hints=['Which of the two depends on the number of neutrons counted?', 'A statistical uncertainty goes as 1/√N; an offset of the wavelength scale does not depend on N.'],
          title="Statistical or systematic?")
 q.choice("How is such a systematic error corrected at a real instrument?",
          ["By measuring a reference sample whose plane spacings are known, and correcting the wavelength scale.",
@@ -191,7 +193,8 @@ q.choice("How is such a systematic error corrected at a real instrument?",
                         3: "It can: the wavelength scale is calibrated."},
          explanation="The error comes from the conversion of the arrival time into a wavelength (flight distances, "
                      "chopper timings, shape of the ESS pulse). Instruments calibrate it with a reference powder of "
-                     "known lattice parameter.", title="Calibration")
+                     "known lattice parameter.", hints=['The offset comes from the wavelength scale. How would you check a scale?', 'Measure something whose answer you know already.'],
+         title="Calibration")
 q.report()
 """)]
 write(msc, "ODIN_iron_msc.ipynb")

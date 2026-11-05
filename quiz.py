@@ -57,6 +57,14 @@ def _box(kind, text):
     return f'<div class="twq-fb twq-{kind}">{_md(text)}</div>'
 
 
+def _hint(item, hints):
+    """The hint for the current wrong try: the first one, then more and more precise ones (the last one repeats)."""
+    if not hints:
+        return ""
+    n = sum(1 for a in item["answers"]) - (1 if item["state"] == "right" else 0)
+    return " **Hint:** " + hints[min(max(n, 1), len(hints)) - 1]
+
+
 def _run_root():
     return os.environ.get("TWIN_RUN_ROOT", os.path.join(os.path.expanduser("~"), "McStas_runs", "twin"))
 
@@ -89,9 +97,10 @@ class Quiz:
         return item
 
     # ------------------------------------------------------------------ question types
-    def choice(self, text, options, answer, why=None, explanation="", title=None):
+    def choice(self, text, options, answer, why=None, hints=(), explanation="", title=None):
         """Multiple choice. answer: index of the right option (or a set of indices: several right options, ticked
-        with checkboxes). why: {index of a wrong option: why it is wrong}. explanation: shown when right or revealed."""
+        with checkboxes). why: {index of a wrong option: why it is wrong}. hints: clues toward the right answer, one
+        more precise at each wrong try. explanation: shown when right or revealed."""
         _css()
         item = self._new("choice", text)
         multi = not isinstance(answer, int)
@@ -125,7 +134,8 @@ class Quiz:
                 parts.append("Some right answers are missing.")
             elif multi and not parts:
                 parts.append("At least one of the ticked answers is wrong.")
-            fb.value = _box("no", "**Not quite.** " + " ".join(parts or ["Think again, and try another answer."]))
+            fb.value = _box("no", "**Not quite.** " + " ".join(parts or ["Think again, and try another answer."])
+                            + _hint(item, hints))
             reveal.layout.display = ""
 
         def on_reveal(_):
@@ -163,13 +173,8 @@ class Quiz:
                 reveal.layout.display = "none"
                 return
             known = next((txt for v, txt in mistakes if close(x, v)), None)
-            if known:
-                msg = known
-            else:
-                n = sum(1 for a in item["answers"] if not close(a, value))
-                msg = (hints[min(n, len(hints)) - 1] if hints else "Check your calculation and your units.")
-                msg = ("too large. " if x > value else "too small. ") + msg
-            fb.value = _box("no", f"**Not quite**: {x:g} {unit} is {msg}")
+            msg = known or ("too large." if x > value else "too small.")
+            fb.value = _box("no", f"**Not quite**: {x:g} {unit} is {msg}" + _hint(item, hints))
             reveal.layout.display = ""
 
         def on_reveal(_):
