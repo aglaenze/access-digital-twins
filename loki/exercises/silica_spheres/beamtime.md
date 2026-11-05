@@ -9,7 +9,7 @@ small-angle neutron scattering (SANS). The particles are dispersed in heavy wate
 committee asks for:
 
 1. the reduced curve I(Q) in absolute units (cm⁻¹), with the solvent subtracted;
-2. the radius of gyration $R_g$ (Guinier analysis) and the radius of the spheres (sphere model), with uncertainties;
+2. the radius of gyration Rg (Guinier analysis) and the radius of the spheres (sphere model), with uncertainties;
 3. a short logbook: which measurements you made, why, and with which settings.
 
 ## Your beamtime
@@ -22,14 +22,13 @@ committee asks for:
 - Mistakes are allowed, as at a real instrument. Some combinations are refused by the instrument: find out why.
 
 **Samples**: `sample_info()` describes the sample mounted. To go further (another particle size, a contrast with
-H₂O/D₂O), design your own sample with the **sample builder** (`Sample_builder.ipynb`, catalogue): it is saved with
+H₂O/D₂O), design your own sample with the **sample builder** (button *Sample builder*, above): it is saved with
 your proposal and appears on the sample changer.
 
 ## How to
 
-1. Open **NICOS LoKI**: in JupyterLab, *File > New Launcher > Desktop*, then the menu *Applications > NICOS - LoKI*
-   (log in as `student` / `student`).
+1. Click **Open NICOS** (above) and choose LoKI: the NICOS window of the instrument opens, ready.
 2. Enter the proposal number **3001** in the *Experiment* panel.
 3. Record data with `nexusfile_open`, e.g. `with nexusfile_open('silica 3m'): count(t=600)`.
    Your files go to `data/loki/2026/3001/raw`.
-4. Analyze them with the starter notebook `LoKI_silica_beamtime.ipynb` (next to this file).
+4. Analyze them with the **starter notebook** (above).

@@ -38,3 +38,4 @@ dependencies:
       - essreduce==26.10.1
       - sciline==26.9.0
       - voila==0.5.13
+      - notebook==7.6.4    # the single-notebook view of the app (MSc notebooks, without the file browser)

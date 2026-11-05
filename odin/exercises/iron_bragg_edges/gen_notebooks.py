@@ -65,8 +65,8 @@ Measure first in NICOS (a dark, an open beam and the iron plate; your files are 
 `f"{TWIN_RUN_ROOT}/data/odin/<year>/<proposal>/raw"`), or leave `FOLDER = None` below to start with a short
 demonstration session.
 
-**The measurements in NICOS** (open NICOS - ODIN on the Desktop of JupyterLab, log in as `student` / `student`, give
-a proposal number in the *Experiment* panel, then type in the command line or the *Scripting* tab):
+**The measurements in NICOS** (click *Open NICOS* in the app and choose ODIN: NICOS opens, ready; give a proposal
+number in the *Experiment* panel, then type in the command line or the *Scripting* tab):
 ```
 move(shutter, 'closed')
 with nexusfile_open('dark'):

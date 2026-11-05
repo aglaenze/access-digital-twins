@@ -11,3 +11,4 @@ loki/build/
 *.nxs
 *.mcpl
 *.mcpl.gz
+work/

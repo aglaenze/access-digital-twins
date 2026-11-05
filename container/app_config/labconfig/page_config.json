@@ -1,0 +1,7 @@
+{
+  "disabledExtensions": {
+    "@jupyter-notebook/lab-extension:interface-switcher": true,
+    "@jupyter-notebook/lab-extension:launch-tree": true,
+    "@jupyter-notebook/application-extension:logo": true
+  }
+}

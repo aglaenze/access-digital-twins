@@ -60,8 +60,8 @@ Measure first in NICOS (empty beam, D₂O, silica spheres, same configuration; y
 proposal, `f"{TWIN_RUN_ROOT}/data/loki/<year>/<proposal>/raw"`), or leave `FOLDER = None` below to start with a
 demonstration session.
 
-**The measurements in NICOS** (open NICOS - LoKI on the Desktop of JupyterLab, log in as `student` / `student`, give
-a proposal number in the *Experiment* panel, then type in the command line or the *Scripting* tab):
+**The measurements in NICOS** (click *Open NICOS* in the app and choose LoKI: NICOS opens, ready; give a proposal
+number in the *Experiment* panel, then type in the command line or the *Scripting* tab):
 ```
 move(heavy_shutter, 'Open', fast_shutter, 'Open')
 move(collimation, '3m', detector_distance, 5)

@@ -28,6 +28,25 @@ Expect: 20–60 min for the installation (mostly downloads), a few minutes per m
 
 ---
 
+## Students: the app (nothing else to read)
+
+1. Install **Podman Desktop** (https://podman-desktop.io, free) and start it once (it sets itself up).
+2. Download the launcher: [run_twin.ps1](container/run_twin.ps1) (Windows) or [run_twin.sh](container/run_twin.sh)
+   (macOS, Linux). **Windows**: right-click it > *Run with PowerShell*. **macOS, Linux**: in a terminal,
+   `bash run_twin.sh`. This is done **once**: it puts the icon **ESS digital twins** on your desktop, downloads the
+   twins (several GB, 10–30 min) and opens the app.
+3. From then on: **double-click ESS digital twins**. A window opens on the catalogue of exercises: choose the
+   instrument, the exercise and your level. To stop, close the window (macOS: *Quit*, ⌘Q).
+
+What you see depends on your level. **BSc**: only this window (a guided page; no code, no NICOS). **MSc and free
+beamtime**: the notebook of your exercise (your own copy, kept between sessions) and the button **Open NICOS**: the
+control room of the instrument opens, you choose ODIN or LoKI, and the NICOS window is there, logged in. There are no
+files to look for and no other program to learn.
+
+The rest of this guide is for teachers and for students who want to go further (console, scripts, local installation).
+
+---
+
 ## Part 1 — Installation: choose route A or route B
 
 | | Route A: container (recommended) | Route B: local installation |
@@ -43,10 +62,8 @@ A container is a ready-made Linux system with everything already installed (McSt
 models, the twins, the ESS analysis software, JupyterLab, NICOS and its window). You download it once and run it on
 your computer.
 
-**The shortest way**: install Podman Desktop (https://podman-desktop.io, free) or Docker Desktop, then run the
-launcher of the repository, `container/run_twin.ps1` (Windows: right-click > *Run with PowerShell*) or
-`bash container/run_twin.sh` (macOS, Linux). It downloads the image the first time, starts it and opens the
-catalogue in your browser. The steps below do the same by hand.
+**The shortest way** is the app (section "Students: the app" above). The steps below start the container by hand,
+with JupyterLab and all the files (for teachers, and for the console and script ways of parts 3–4).
 
 1. **Install Podman Desktop** (https://podman-desktop.io, free) or **Docker Desktop**
    (https://www.docker.com/products/docker-desktop/; paid for large organizations) — install, restart if asked, then
@@ -249,10 +266,10 @@ just-bin-it, installed as in `nicos/README.md`, "Live data"). A count then takes
 `live_tof`), as on the real instrument where the neutrons are streamed by Kafka and histogrammed by just-bin-it.
 
 ### With the graphical interface (route A, in the container: in your browser)
-In JupyterLab: *File → New Launcher*, then **Desktop**. A Linux desktop opens in a new browser tab. Double-click the
-icon **NICOS - ODIN** (or use the menu *Applications → NICOS - ODIN*): a terminal shows the services starting, then the
-NICOS window opens on the desktop. Log in with **student** / **student**, and continue as in steps 1–3 above. To stop:
-close the terminal "NICOS ODIN services".
+In the app: button **Open NICOS** of an MSc or beamtime exercise (by hand: the address `/desktop/` of the server).
+The control room opens in a new window: click **ODIN** (or LoKI); after about a minute the NICOS window is there,
+full screen and logged in. Continue as in steps 1–3 above. Close the NICOS window to stop NICOS and come back to the
+choice of the instrument.
 
 ### With text commands (route A, without the desktop)
 Terminal 1 (JupyterLab terminal):

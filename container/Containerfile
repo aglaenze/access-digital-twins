@@ -12,6 +12,7 @@ USER root
 RUN apt-get update \
  && apt-get install -y --no-install-recommends git ca-certificates openssh-client curl \
         xfce4 xfce4-terminal dbus-x11 tigervnc-standalone-server tigervnc-tools scrot fonts-dejavu x11-utils \
+        xdotool x11-xserver-utils \
         libgl1 libegl1 libxkbcommon-x11-0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 \
         libxcb-render-util0 libxcb-xinerama0 libxcb-xfixes0 libxcb-shape0 libxcb-cursor0 libdbus-1-3 libfontconfig1 \
         libnss3 libxcomposite1 libxdamage1 libxrandr2 libxtst6 libxi6 libasound2 \
@@ -32,7 +33,10 @@ RUN SCIPP_PKGS="scipp|scippneutron|scippnexus|tof|plopp|mcstastox"; \
       && sed -i "s/^dependencies:$/dependencies:\n  - kiwisolver\n  - contourpy\n  - pillow\n  - fonttools/" /tmp/environment-mcstas-arm64.yml \
       && micromamba create -y -f /tmp/environment-mcstas-arm64.yml \
       && micromamba run -n mcstas pip install --no-cache-dir \
-           $(grep -oE "^ +- ($SCIPP_PKGS)=[^ ]+" /tmp/environment-mcstas.yml | sed -E 's/^ +- //; s/=/==/'); \
+           $(grep -oE "^ +- ($SCIPP_PKGS)=[^ ]+" /tmp/environment-mcstas.yml | sed -E 's/^ +- //; s/=/==/') \
+      && printf '%s\n' "import ctypes, sys  # arm64: the libstdc++ of conda first (the scipp wheel would load the older system one)" \
+           "ctypes.CDLL(sys.prefix + '/lib/libstdc++.so.6', mode=ctypes.RTLD_GLOBAL)" \
+           > "$(micromamba run -n mcstas python -c 'import site; print(site.getsitepackages()[0])')/sitecustomize.py"; \
     else \
       micromamba create -y -f /tmp/environment-mcstas.yml; \
     fi \
@@ -107,12 +111,13 @@ RUN python -c "import ess.odin.data as d; print(d.iron_simulation_ob_small())" \
 COPY --chown=$MAMBA_USER:$MAMBA_USER . /home/mambauser/twin
 WORKDIR /home/mambauser/twin
 
-# Menu entries and desktop icons "NICOS - ODIN" and "NICOS - LoKI" (container/desktop/)
-RUN mkdir -p "$HOME/.local/share/applications" "$HOME/Desktop" \
- && cp container/desktop/*.desktop "$HOME/.local/share/applications/" \
- && cp container/desktop/*.desktop "$HOME/Desktop/" && chmod +x "$HOME/Desktop/"*.desktop
+# The control room (button "Open NICOS" of the app): instead of a Linux desktop, the choice of the instrument and the
+# NICOS window alone (container/control_room.sh, started by jupyter-remote-desktop-proxy)
+RUN chmod +x container/control_room.sh container/start.sh
 
 ENV TWIN_RUN_ROOT=/data/twin \
+    TWIN_HOME=/home/mambauser/twin \
+    JUPYTER_REMOTE_DESKTOP_PROXY_XSTARTUP=/home/mambauser/twin/container/control_room.sh \
     LOKI_REPO=/home/mambauser/loki_model \
     KAFKA_HOME=/home/mambauser/kafka_2.13-3.9.1 \
     JBI_HOME=/home/mambauser/just-bin-it \

@@ -6,7 +6,7 @@
 First the ESS instrument, then the exercises on it. Each exercise has up to three ways in:
   * BSc, guided web page (Voilà, no code);
   * MSc, notebook with tasks (JupyterLab, code open, automatic checks);
-  * beamtime, as at ESS: a proposal sheet, NICOS (in the Desktop of JupyterLab), a starter notebook.
+  * beamtime, as at ESS: a proposal sheet, NICOS (the control room, opened by a button), a starter notebook.
 
 The page reads the exercises when it is shown: one folder <instrument>/exercises/<name>/ with an exercise.yml per
 exercise (see odin/exercises/iron_bragg_edges/exercise.yml), and catalogue_planned.yml for those not built yet.
@@ -46,17 +46,48 @@ def load():
     ex = []
     for f in sorted(glob.glob(os.path.join(ROOT, "*", "exercises", "*", "exercise.yml"))):
         with open(f, encoding="utf-8") as fh:
-            ex.append(yaml.safe_load(fh))
+            e = yaml.safe_load(fh)
+        e["_dir"] = os.path.relpath(os.path.dirname(f), ROOT).replace(os.sep, "/")
+        ex.append(e)
     planned = os.path.join(ROOT, "catalogue_planned.yml")
     if os.path.isfile(planned):
         with open(planned, encoding="utf-8") as fh:
             ex += [dict(e, status="planned") for e in yaml.safe_load(fh) or []]
     return ex
 
-def link(m):
-    # links from the root of the Jupyter server: work in Voilà and in JupyterLab
-    route = "voila/render" if m.get("open") == "voila" else "lab/tree"
-    return f"../../{route}/{m['file']}"
+def personal_copy(rel):
+    # a notebook of an exercise copied once into work/ (the student's own, kept between sessions: work/ is in the
+    # data volume of the container); its relative paths are made absolute. Returns the path of the copy.
+    import nbformat
+    src = os.path.join(ROOT, rel)
+    ex_dir = os.path.dirname(src)
+    instr_dir = os.path.dirname(os.path.dirname(ex_dir))
+    dst_rel = f"work/{os.path.basename(instr_dir)}_{os.path.basename(ex_dir)}/{os.path.basename(rel)}"
+    dst = os.path.join(ROOT, dst_rel)
+    if not os.path.isfile(dst):
+        nb = nbformat.read(src, as_version=4)
+        for c in nb.cells:
+            c.source = (c.source.replace('os.path.abspath("../../..")', repr(ROOT))
+                        .replace('os.path.abspath("../..")', repr(instr_dir))
+                        .replace('"exercise.yml"', repr(os.path.join(ex_dir, "exercise.yml"))))
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        nbformat.write(nb, dst)
+    return dst_rel
+
+
+def link(m, file=None):
+    # from the root of the server: pages in Voilà; notebooks alone (Jupyter Notebook view, no file browser), on the
+    # student's own copy
+    file = file or m["file"]
+    if file.endswith(".ipynb") and m.get("open") != "voila":
+        return f"../../notebooks/{personal_copy(file)}"
+    return f"../../voila/render/{file}"
+
+
+def sheet(rel):
+    import mistune
+    with open(os.path.join(ROOT, rel), encoding="utf-8") as fh:
+        return mistune.html(fh.read())
 """)
 
 code(r"""
@@ -74,7 +105,13 @@ CSS = '''<style>
 .mode b {font-size: 14px} .mode span {display: block; font-size: 12.5px; opacity: .92; margin-top: 3px}
 .mode:hover {filter: brightness(1.08)}
 .mode .badge {float: right; font-size: 11.5px; background: rgba(255,255,255,.22); border-radius: 10px; padding: 1px 8px}
-.extra {font-size: 12.5px; margin-top: 6px} .extra a {margin-right: 14px}
+.btns {margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap}
+.btn {display: inline-block; padding: 7px 12px; border-radius: 7px; font-size: 13px; font-weight: 600;
+  text-decoration: none !important; border: 1px solid #c9cfda; color: #1d2433 !important; background: #fff}
+.btn.nicos {background: #1d2433; color: #fff !important; border-color: #1d2433}
+.btn:hover {filter: brightness(0.96)}
+details.sheet {margin-top: 8px; font-size: 13px; background: #fff; border: 1px solid #d9dde5; border-radius: 8px;
+  padding: 6px 12px} details.sheet summary {cursor: pointer; font-weight: 600}
 </style>'''
 
 def card(e):
@@ -87,15 +124,22 @@ def card(e):
         m = e.get("modes", {}).get(key)
         if not m:
             continue
-        extra = ""
-        if key == "beamtime":
-            extra = (f'<div class="extra"><a href="../../desktop/" target="_blank">Desktop (NICOS)</a>'
-                     f'<a href="{link(dict(open="lab", file=m["analysis"]))}" target="_blank">starter notebook</a>'
-                     f'<a href="{link(dict(open="voila", file="Sample_builder.ipynb"))}" target="_blank">sample builder</a>'
-                     '</div>' if m.get("analysis") else "")
-        modes.append(f'<div style="flex:1 1 280px"><a class="mode" style="background:{color};display:block" '
-                     f'href="{link(m)}" target="_blank"><span class="badge">{label} · {esc(m.get("duration", ""))}</span>'
-                     f'<b>{esc(m["label"])}</b><span>{esc(m.get("what", ""))}</span></a>{extra}</div>')
+        head = (f'<span class="badge">{label} · {esc(m.get("duration", ""))}</span><b>{esc(m["label"])}</b>'
+                f'<span>{esc(m.get("what", ""))}</span>')
+        if key == "bsc":                      # BSc: the guided page only (no NICOS at this level)
+            modes.append(f'<div style="flex:1 1 280px"><a class="mode" style="background:{color};display:block" '
+                         f'href="{link(m)}" target="_blank">{head}</a></div>')
+            continue
+        nicos = '<a class="btn nicos" href="../../desktop/" target="_blank">Open NICOS</a>' if m.get("nicos") or key == "msc" else ""
+        if key == "msc":
+            btns = f'<a class="btn" href="{link(m)}" target="_blank">Open the notebook</a>{nicos}'
+            extra = ""
+        else:                                 # beamtime: the proposal sheet here, NICOS, the starter notebook
+            btns = (nicos + f'<a class="btn" href="{link(m, m["analysis"])}" target="_blank">Starter notebook</a>'
+                    f'<a class="btn" href="../../voila/render/Sample_builder.ipynb" target="_blank">Sample builder</a>')
+            extra = f'<details class="sheet"><summary>Your proposal</summary>{sheet(m["file"])}</details>'
+        modes.append(f'<div style="flex:1 1 280px"><div class="mode" style="background:{color}">{head}</div>'
+                     f'<div class="btns">{btns}</div>{extra}</div>')
     return (f'<div class="card"><div class="t">{esc(e["title"])}</div>'
             f'<div class="meta">{esc(e["technique"])} · sample: {esc(e.get("sample", ""))}</div>'
             f'<div class="q">{esc(e["question"])}</div><div class="modes">{"".join(modes)}</div>'
@@ -126,15 +170,17 @@ for key in keys:
     ex = [e for e in exercises if e["instrument"] == key]
     body = "".join(card(e) for e in [e for e in ex if e.get("status") != "planned"] + [e for e in ex if e.get("status") == "planned"])
     panels.append(f'<div class="panel" id="p_{key}"><h3>2. Choose an exercise on {i["name"]} ({i["kind"].lower()})</h3>{body}</div>')
-display(HTML(CSS + TABS + " ".join(css) + "</style>" + '<div class="cat tabs"><h3>1. Choose an instrument</h3>'
+display(HTML("<script>document.title = \"ESS digital twins\"</script>" + CSS + TABS + " ".join(css) + "</style>" + '<div class="cat tabs"><h3>1. Choose an instrument</h3>'
              + "".join(parts) + "".join(panels) + "</div>"))
 """)
 
 md(r"""
-**How the three ways in differ.** The **BSc** page gives the settings and explains them; you measure with a button
-and answer questions (no NICOS at this level). The **MSc** level measures in NICOS (the commands are given), then the notebook shows the code: the reduction with the ESS software is given, and you write
-the analysis yourself, with automatic checks. The **beamtime** is the real thing: a proposal, a budget, the NICOS
-control program of the instrument (open it from the *Desktop* of JupyterLab), and your own decisions.
+**How the three ways in differ.** **BSc**: a guided page; the settings are given and explained, you measure with a
+button and answer questions. **MSc**: you measure in NICOS (*Open NICOS*; the commands are given in the notebook),
+then you analyze in your notebook (*Open the notebook*): the reduction with the ESS software is given, you write the
+analysis, automatic checks tell you if you are right. **Beamtime**: the real thing: a proposal, a budget, NICOS, a
+starter notebook, and your own decisions; you can also design your own sample (*Sample builder*). Your notebooks are
+yours: they are kept between sessions.
 """)
 
 nb = nbf.v4.new_notebook()

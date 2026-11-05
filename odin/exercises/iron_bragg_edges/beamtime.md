@@ -6,10 +6,10 @@
 
 Steel parts are made of iron crystals. The distance between their atomic planes changes slightly when the part is
 strained, or when the steel changes phase. Before measuring real components, your group must show that it can measure
-the plane spacing $d$ of a reference: a **5 mm iron plate**. The beamtime committee asks for:
+the plane spacing *d* of a reference: a **5 mm iron plate**. The beamtime committee asks for:
 
-1. the wavelength of the (110) Bragg edge, and $d_{110}$, with their uncertainties;
-2. the lattice parameter $a$ of iron, compared with the reference value 2.8665 Å;
+1. the wavelength of the (110) Bragg edge, and *d*₁₁₀, with their uncertainties;
+2. the lattice parameter *a* of iron, compared with the reference value 2.8665 Å;
 3. a short logbook: which measurements you made, why, and with which settings.
 
 ## Your beamtime
@@ -22,17 +22,16 @@ the plane spacing $d$ of a reference: a **5 mm iron plate**. The beamtime commit
 
 ## How to
 
-1. Open **NICOS ODIN**: in JupyterLab, *File > New Launcher > Desktop*, then the menu *Applications > NICOS - ODIN*
-   (log in as `student` / `student`).
+1. Click **Open NICOS** (above) and choose ODIN: the NICOS window of the instrument opens, ready.
 2. Enter the proposal number **1234** in the *Experiment* panel. Without it NICOS does not record data, as at ESS.
 3. Record data with `nexusfile_open`, e.g. `with nexusfile_open('my title'): count(t=60)`.
    Your files go to `data/odin/2026/1234/raw`.
-4. Analyze them with the starter notebook `ODIN_iron_beamtime.ipynb` (next to this file). The tools are there; the
+4. Analyze them with the **starter notebook** (above). The tools are there; the
    decisions are yours.
 
 **Samples**: the sample changer (`sample_holder`) holds the iron plate and other samples of the library (`sample_info()`
 describes the one mounted). For your own questions you can also design a sample with the **sample builder**
-(`Sample_builder.ipynb`, catalogue): it is saved with your proposal and appears on the sample changer.
+(button *Sample builder*, above): it is saved with your proposal and appears on the sample changer.
 
 The NICOS commands of the twin are listed in `nicos/README.md`; the physics of Bragg edges is explained in the guided
 notebook `odin/ODIN_analysis.ipynb`, if you need it.

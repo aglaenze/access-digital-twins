@@ -7,8 +7,8 @@ the user never sees McStas.
 
 Status (2026-11-05): **ODIN and LoKI** on Windows and on Linux in the container image (`../container/`): services,
 ESS GUI, measurements written to the proposal folder, live data (Kafka, just-bin-it), sample changer with the
-students' own samples. In the container the NICOS window opens on the Linux desktop shown in the browser (JupyterLab
-launcher "Desktop"), checked with a screenshot at every build. NICOS is used at the MSc level and in the free
+students' own samples. In the container the NICOS window opens in the "control room" shown in the browser (button
+*Open NICOS* of the app, `../container/control_room.sh`), checked with a screenshot at every build. NICOS is used at the MSc level and in the free
 beamtime; BSc students use the web pages. Student step-by-step guide: `../TUTORIAL.md`.
 
 ## 1. How NICOS is organized at ESS, and in the twins

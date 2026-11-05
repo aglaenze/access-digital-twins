@@ -120,6 +120,8 @@ def main():
     a.add_argument("--no-gui", action="store_true")
     a.add_argument("--background", action="store_true", help="do not wait for Enter (run until stopped)")
     a.add_argument("--live", action="store_true", help="live data: Kafka broker, just-bin-it and setup 'live'")
+    a.add_argument("--until-gui-closes", action="store_true",
+                   help="stop everything when the NICOS window is closed (the control room of the app)")
     o = a.parse_args()
     busy = [f"{what} (port {port})" for what, port in (("twin server", o.port), ("NICOS cache", 14869),
                                                          ("NICOS daemon", 1301)) if port_open(port)]
@@ -166,7 +168,13 @@ def main():
         if not o.no_gui:
             start("nicos_gui", [NICOS_PY, os.path.join(NICOS_ROOT, "bin", "nicos-gui"),
                                 "-c", os.path.join(HERE, "nicos_twin", instr, "guiconfig.py"),
-                                "student@localhost:1301"], env=env, cwd=NICOS_ROOT)
+                                "student:student@localhost:1301"], env=env, cwd=NICOS_ROOT)   # logged in at once
+        if o.until_gui_closes and not o.no_gui:
+            gui = dict(PROCS)["nicos_gui"]
+            print("Close the NICOS window to stop everything.", flush=True)
+            while gui.poll() is None and all(p.poll() is None for _, p in PROCS if p is not gui):
+                time.sleep(1)
+            return 0
         background = o.background
         if not background:
             print("Press Enter to stop everything.", flush=True)

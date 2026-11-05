@@ -1,8 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=NICOS - ODIN
-Comment=The ODIN digital twin driven by NICOS, as in the ESS control room (login: student / student)
-Exec=xfce4-terminal --title "NICOS ODIN services (close to stop)" --command "/opt/conda/envs/mcstas/bin/python /home/mambauser/twin/nicos/start_nicos.py --instrument odin"
-Icon=applications-science
-Terminal=false
-Categories=Science;Education;
