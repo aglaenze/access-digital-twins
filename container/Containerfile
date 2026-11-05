@@ -23,11 +23,13 @@ USER $MAMBA_USER
 # Conda environments (pinned versions): "mcstas" for the twins, "nicos" for NICOS (numpy < 2)
 COPY --chown=$MAMBA_USER:$MAMBA_USER container/environment-mcstas.yml container/environment-nicos.yml /tmp/
 # On ARM (arm64) conda-forge has no scipp for Linux: scipp and the packages that require it come from PyPI (wheels for
-# aarch64), at the same versions as in environment-mcstas.yml.
+# aarch64), at the same versions as in environment-mcstas.yml; the compiled dependencies of matplotlib from conda-forge
+# (PyPI wheels would need a newer libstdc++ than the system one).
 ARG TARGETARCH
 RUN SCIPP_PKGS="scipp|scippneutron|scippnexus|tof|plopp|mcstastox"; \
     if [ "$TARGETARCH" = "arm64" ]; then \
       grep -vE "^ +- ($SCIPP_PKGS)=" /tmp/environment-mcstas.yml > /tmp/environment-mcstas-arm64.yml \
+      && sed -i "s/^dependencies:$/dependencies:\n  - kiwisolver\n  - contourpy\n  - pillow\n  - fonttools/" /tmp/environment-mcstas-arm64.yml \
       && micromamba create -y -f /tmp/environment-mcstas-arm64.yml \
       && micromamba run -n mcstas pip install --no-cache-dir \
            $(grep -oE "^ +- ($SCIPP_PKGS)=[^ ]+" /tmp/environment-mcstas.yml | sed -E 's/^ +- //; s/=/==/'); \
