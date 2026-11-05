@@ -1,5 +1,8 @@
 # Beamtime on ODIN: the atomic spacing of iron
 
+**Your role**: the materials engineer of your company. Your steel supplier delivers plates sold as ferritic steel;
+before your group checks real components, you must show that ODIN measures the plane spacing of steel reliably.
+
 ## Your proposal (accepted)
 
 **Proposal 1234**: *"Lattice spacing of a ferritic steel component by Bragg-edge imaging"*

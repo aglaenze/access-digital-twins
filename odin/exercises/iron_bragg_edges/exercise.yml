@@ -8,6 +8,8 @@ question: >-
   Measure the transmission of an iron plate as a function of the neutron wavelength, find its Bragg edges and deduce
   the spacing of the atomic planes.
 learn: Time of flight, transmission (dark, open beam, sample), Bragg's law, counting statistics, fitting.
+mission: >-
+  You are a materials engineer. A supplier has delivered plates sold as ferritic steel (alpha-iron); a mix-up with austenitic steel would matter for your parts, and you may not cut them. Neutrons see the crystal structure through the steel: give your verdict.
 status: ready
 # samples of the library used by the exercise (odin/samples/*.yml); hidden: properties not shown to the students
 samples:

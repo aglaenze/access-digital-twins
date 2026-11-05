@@ -1,14 +1,26 @@
-{#- The pages of the app: the "lab" template of Voila, plus MathJax for the formulas of the markdown cells (the lab
-    template of Voila 0.5 removes it, so $...$ stayed as raw text). Selected by app_config/voila.json. -#}
+{#- The pages of the app: the "lab" template of Voila, plus MathJax for the formulas (the lab template of Voila 0.5
+    removes it, so $...$ stayed as raw text). Selected by app_config/voila.json. MathJax (SVG output: one file, no fonts to fetch) is served by the app itself
+    (static/, works without network), the CDN is the fallback. -#}
 {%- extends 'lab/index.html.j2' -%}
 {%- block html_head_js_mathjax -%}
 <script>
 window.MathJax = {
-  tex: {inlineMath: [['$', '$'], ['\(', '\)']], displayMath: [['$$', '$$'], ['\[', '\]']], processEscapes: true},
-  options: {skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']}
+  tex: {inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], processEscapes: true},
+  options: {skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']},
+  startup: {
+    ready: () => {
+      MathJax.startup.defaultReady();
+      // cells and widgets (questions, feedback) arrive after the page: typeset each new piece of the page
+      let pending = null;
+      new MutationObserver((records) => {
+        if (records.every(r => r.target.closest && r.target.closest('mjx-container'))) return;
+        clearTimeout(pending);
+        pending = setTimeout(() => MathJax.typesetPromise().catch(() => {}), 300);
+      }).observe(document.body, {childList: true, subtree: true, characterData: true});
+    }
+  }
 };
-// cells arrive one by one (progressive rendering): typeset again when the page is complete, and after the widgets
-window.addEventListener('load', () => setTimeout(() => window.MathJax.typesetPromise && window.MathJax.typesetPromise(), 1500));
 </script>
-<script async src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-chtml.js"></script>
+<script async src="{{ resources.base_url }}voila/templates/twin/static/tex-svg-full.js"
+        onerror="var s = document.createElement('script'); s.async = true; s.src = 'https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg-full.js'; document.head.appendChild(s);"></script>
 {%- endblock html_head_js_mathjax -%}

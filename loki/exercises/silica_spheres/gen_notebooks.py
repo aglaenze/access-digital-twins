@@ -51,6 +51,12 @@ i1, i5 = section(src, "## 1."), section(src, "## 5.")
 msc = [md(r"""
 # How big are these nanoparticles? (MSc)
 
+**Your mission.** You work in a laboratory that makes silica nanoparticles for medical imaging. A new batch must
+have a radius between 4.5 and 5.5 nm: the size decides how long the particles stay in the blood and where they end
+up. An electron microscope shows a few hundred dried particles; small-angle neutron scattering gives the average over
+the billions of particles of the batch, in the liquid. You measure the batch on LoKI, develop the analysis, and
+decide whether the batch can be released (end of part 6).
+
 Silica nanoparticles dispersed in heavy water, measured on the virtual LoKI. Parts 1 to 4 are guided: they take your
 files (sample, solvent, empty beam) to the scattering curve $I(Q)$ in absolute units, with the official ESS reduction
 (`esssans`). Parts 5 and 6 are yours: **you write the Guinier analysis and the model fit**, and check cells tell you
@@ -92,9 +98,21 @@ At small $Q$ the scattering of any particle follows $I(Q) \simeq I(0)\exp(-Q^2R_
 depends on $R_g$, which you do not know yet: how do you proceed? Store $R_g$, its uncertainty and $I(0)$ (cm⁻¹).
 """), code(r"""
 rg, drg, i0 = None, None, None     # your results [Å, Å, cm⁻¹]
-"""), md("**Check.**"), code(r"""
-import loki_exercises as ex
+"""), md("**Check.** If it is wrong, read the explanation and try again; the solution is behind the button "
+         "(opening it is noted in your results)."), code(r"""
+import loki_exercises as ex, quiz
+q_ = quiz.Quiz("loki_silica_msc")
 ex.check_guinier(rg, drg, i0)
+q_.solution("tasks 5.1 and 5.2", explanation="$\\ln I = \\ln I(0) - (R_g^2/3)\\,Q^2$: a straight line in $Q^2$ "
+            "with slope $-R_g^2/3$. The valid range depends on $R_g$: start from a guess, fit, recompute the range "
+            "$Q R_g < 1.3$, and repeat until $R_g$ no longer changes.", code=chr(10).join([
+    'rg = 40.0                                                # a first guess [Å], improved below',
+    'for _ in range(6):',
+    '    m = (q * rg < 1.3) & (I > 0) & np.isfinite(dI) & (dI > 0)',
+    '    p, cov = np.polyfit(q[m] ** 2, np.log(I[m]), 1, w=I[m] / dI[m], cov="unscaled")   # w = 1 / sigma(ln I)',
+    '    rg = np.sqrt(-3 * p[0])',
+    'drg = 1.5 * np.sqrt(cov[0, 0]) / rg                      # rg = sqrt(-3 s): d rg = 1.5 ds / rg',
+    'i0 = np.exp(p[1])']))
 """), md(r"""
 ## 6. Your turn: a model fit with sasmodels (SasView)
 
@@ -117,6 +135,33 @@ uncertainties (from the Jacobian: $\text{cov} = (J^TJ)^{-1}$).
 radius, dradius, phi, dphi = None, None, None, None     # your results [Å, Å, -, -]
 """), md("**Check.**"), code(r"""
 ex.check_sphere(radius, dradius, phi, dphi)
+q_.solution("task 6.1", explanation="Residuals weighted by the error bars; the covariance of the parameters is "
+            "$(J^TJ)^{-1}$ with the Jacobian of these residuals. `x_scale` tells the fit the size of each parameter.",
+            code=chr(10).join([
+    'from scipy.optimize import least_squares',
+    'from sasmodels.core import load_model',
+    'from sasmodels.direct_model import call_kernel',
+    'm = np.isfinite(I) & np.isfinite(dI) & (dI > 0)',
+    'kernel = load_model("sphere").make_kernel([q[m]])',
+    '',
+    'def residuals(x):',
+    '    phi_, r_, bg_ = x',
+    '    model = call_kernel(kernel, dict(scale=phi_, radius=r_, sld=3.47, sld_solvent=6.36, background=bg_))',
+    '    return (model - I[m]) / dI[m]',
+    '',
+    'fit = least_squares(residuals, [0.01, rg * np.sqrt(5 / 3), 0.0], x_scale=[0.01, 10.0, 0.01])',
+    'cov = np.linalg.inv(fit.jac.T @ fit.jac)',
+    'phi, radius = fit.x[0], fit.x[1]',
+    'dphi, dradius = np.sqrt(cov[0, 0]), np.sqrt(cov[1, 1])']))
+"""), md("**Your verdict.**"), code(r"""
+q_.choice("The batch must have a radius between 4.5 and 5.5 nm. With your results, what do you write?",
+          ["Released: R = 5.0 nm, within the specification (its uncertainty is far smaller than the margin).",
+           "Rejected: R = 3.9 nm.", "Rejected: R = 50 nm.", "Cannot be decided: the uncertainty is too large."],
+          answer=0, why={1: "3.9 nm is Rg; for a sphere R = √(5/3)·Rg ≈ 5.0 nm.",
+                         2: "50 Å = 5.0 nm (1 nm = 10 Å).",
+                         3: "Your uncertainty on R is a fraction of an Å, the margin is ±5 Å."},
+          explanation="R ≈ 50 Å = 5.0 nm, in the 4.5-5.5 nm window, with an uncertainty much smaller than the margin.",
+          title="Verdict")
 """), md(r"""
 ## 7. Developing the method
 
@@ -128,7 +173,23 @@ ex.check_sphere(radius, dradius, phi, dphi)
 3. **Configuration.** Particles 4 times larger: which configuration of LoKI (collimation, detector distance) would you
    choose, and what would it cost in counting time? Check with the twin.
 4. **Statistics.** Which banks dominate the uncertainty on $R$? On $\phi$? Fit with the rear bank only to see it.
-"""), code("")]
+
+Then check your understanding:
+"""), code(r"""
+q_.choice("A new batch has particles 4 times larger (R = 200 Å, Rg = 155 Å). The Guinier range needs Q < 1.3/Rg. "
+          "Which configuration of LoKI do you choose?",
+          ["8 m collimation, detector at 10 m (rear bank from 0.0082 Å⁻¹), and count longer: fewer neutrons.",
+           "3 m collimation, detector at 5 m: the most neutrons.",
+           "The same as for the 5 nm particles.",
+           "Pulse skipping with the detector at 5 m: it reaches the lowest Q."],
+          answer=0, why={1: "It starts at 0.0115 Å⁻¹, above 1.3/155 = 0.0084 Å⁻¹: no Guinier range left.",
+                         2: "The same configuration starts at 0.0115 Å⁻¹, above the 0.0084 Å⁻¹ needed.",
+                         3: "Pulse skipping at 5 m starts at 0.0106 Å⁻¹: better, but still above 0.0084 Å⁻¹."},
+          explanation="1.3/155 Å = 0.0084 Å⁻¹: only the 8 m collimation with the detector at 10 m reaches it (0.0082 "
+                      "Å⁻¹), at the edge. Its beam is more parallel, with fewer neutrons: count longer.",
+          title="Larger particles")
+q_.report()
+""")]
 write(msc, "LoKI_silica_msc.ipynb")
 
 # --------------------------------------------------------------------------- beamtime starter
@@ -153,5 +214,11 @@ up to you. Keep notes of your choices: they are part of your report.
     'from loki_paths import TWIN_RUN_ROOT\n'
     'FOLDER = f"{TWIN_RUN_ROOT}/data/loki/2026/3001/raw"     # the folder of your proposal (NICOS)'),
       imports, clean(logbook), md("## Your analysis"), code(""), code(""), code(""),
-      md("## Results for the committee\n\n($I(Q)$, $R_g$, $R$, $\\phi$, with uncertainties; logbook of your choices)")]
+      md("## Results for the committee\n\n($I(Q)$, $R_g$, $R$, $\\phi$, with uncertainties; logbook of your choices)"),
+      md("## Check your results (after writing them)\n\nThe twin knows the true sample: put your final numbers below "
+         "and run the cell. A wrong result is explained."),
+      code("import loki_exercises as ex\n"
+           "rg, drg, i0 = None, None, None                     # Guinier [Å, Å, cm⁻¹]\n"
+           "radius, dradius, phi, dphi = None, None, None, None  # sphere model [Å, Å, -, -]\n"
+           "ex.check_guinier(rg, drg, i0)\nex.check_sphere(radius, dradius, phi, dphi)")]
 write(bt, "LoKI_silica_beamtime.ipynb")

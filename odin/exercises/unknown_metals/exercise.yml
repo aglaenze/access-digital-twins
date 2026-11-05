@@ -7,6 +7,8 @@ question: >-
   Identify three unknown metal plates and measure their lattice parameter, within a limited beamtime budget (score).
   Mission 2: the instrument has a hidden fault; find it from the data.
 learn: Planning a measurement under a budget, identifying a crystal structure from its Bragg edges, troubleshooting.
+mission: >-
+  You are the neutron expert of a metal-recycling company: three plates have lost their labels, and a plate in the wrong furnace ruins a batch of alloy. Identify them without damaging them. Then, as instrument scientist on duty, find the hidden fault of the instrument.
 status: ready
 modes:
   bsc:

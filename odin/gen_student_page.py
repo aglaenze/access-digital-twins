@@ -20,8 +20,13 @@ You are operating the ODIN imaging instrument at ESS. Behind this page, a McStas
 your measurements. The files are in the ESS NeXus format, and the reduction uses the official `essimaging` code, the
 same one that will be used for real ODIN data.
 
-**Goal**: measure the transmission of an iron plate as a function of the neutron wavelength λ, and find a
-**Bragg edge** in it.
+**Your mission.** You are a materials engineer at a company that builds parts for research facilities. A supplier
+has delivered steel plates sold as *ferritic* steel: α-iron, whose atoms sit on a body-centered cubic lattice. A mix-up
+with *austenitic* steel (γ-iron, face-centered cubic) would matter: austenitic steel is not magnetic and expands more
+when heated. You may not cut the plates. Neutrons go through centimeters of steel, and the wavelengths at which the
+transmission jumps, the **Bragg edges**, are set by the distances between the planes of atoms: they reveal the
+crystal structure. Your job: measure the transmission of a plate as a function of the neutron wavelength λ, find its
+Bragg edges, and give your verdict to the supplier (part 4): α-iron or not, and with which lattice parameter?
 
 **You need three measurements**:
 1. the **dark** run: shutter closed. The detector still records a few counts (gamma rays, fast neutrons): the background;
@@ -267,18 +272,101 @@ the attenuation by the sample with the Beer-Lambert law and the NCrystal cross-s
 **scattered** by the sample that still reach the detector (here less than 0.3 % of the signal, checked with a full
 McStas simulation).
 
-## 4. Questions
+## 4. Questions: your verdict, and the instrument
 
-1. At which λ does the transmission jump abruptly? Using Bragg's law ($\lambda = 2d\sin\theta$, at most $2d$),
-   which distance $d$ between atomic planes do you deduce? Compare with the (110) planes of α-iron
-   ($a$ = 2.867 Å, $d_{110} = a/\sqrt2$).
-2. Repeat the sample measurement but forget to open the shutter. What do you see? How would you have noticed it
-   without reducing the data?
-3. Compare a 10 s and a 90 s measurement: how do the error bars change? Why?
-4. Measure the Bragg edge with WFM δ = 0.10 m, δ = 0.45 m and in natural mode (same pinhole, same time). Which edge is
-   the sharpest? Which measurement has the most counts? Explain the trade-off.
-5. In white mode, the image is fine but the wavelength spectrum makes no sense. Hint: how long does a 5 Å neutron
-   take to fly 60.5 m, and how far apart are two ESS pulses? What do the choppers do about it?
+Answer in the boxes, then click *Check*. A wrong answer is explained; after a try you can also show the answer.
+Your answers are kept, and *My results* (at the end) gives your score and a report to download.
+""")
+
+code(r"""
+import quiz
+q = quiz.Quiz("odin_iron_bsc")
+q.number("On your transmission $T(\\lambda)$ of the iron plate, at which wavelength is the **last** Bragg edge (the "
+         "jump at the largest λ)?", value=4.054, tol=0.05, unit="Å",
+         mistakes=[(2.867, "an edge too, the (200) one; look for the last jump, at the largest λ"),
+                   (2.340, "an edge too, the (211) one; look for the last jump, at the largest λ")],
+         hints=["Look at the reduced spectrum of part 3: beyond the last edge the transmission is high and smooth.",
+                "The last edge of iron is between 3.5 and 4.5 Å."],
+         explanation="Beyond 4.05 Å no family of planes can diffract any more, so the neutrons go straight through: "
+                     "the transmission jumps up.", title="Q1. The last edge")
+q.number("Bragg's law: $\\lambda = 2d\\sin\\theta$. Which distance $d$ between the planes of atoms gives this last "
+         "edge?", value=2.027, tol=0.03, unit="Å",
+         mistakes=[(4.054, "λ itself. At the edge the neutrons are scattered straight back, sin θ = 1, so λ = 2d"),
+                   (2.867, "the lattice parameter a, not the distance d of the planes (next question)")],
+         hints=["The largest λ that can still be diffracted is reached for θ = 90°.", "d = λ_edge / 2."],
+         explanation="At the edge sin θ = 1, so $d = \\lambda_\\mathrm{edge}/2$ = 2.027 Å: the (110) planes, the most widely "
+                     "spaced planes of a body-centered cubic lattice.", title="Q2. The distance between the planes")
+q.number("In a cubic lattice the (110) planes are $d_{110} = a/\\sqrt{2}$ apart. Which lattice parameter $a$ "
+         "do you deduce?", value=2.867, tol=0.04, unit="Å",
+         mistakes=[(2.027, "d itself; multiply by √2"), (1.433, "you divided by √2; d_110 = a/√2, so a = d_110·√2"),
+                   (4.054, "λ_edge; a = (λ_edge/2)·√2")],
+         explanation="$a = d_{110}\\sqrt{2}$ = 2.867 Å: the lattice parameter of α-iron (2.8665 Å).",
+         title="Q3. The lattice parameter")
+q.choice("**Your verdict for the supplier.** α-iron (body-centered cubic, a = 2.87 Å) has its edges at 4.05, 2.87 and "
+         "2.34 Å; γ-iron (face-centered cubic, a = 3.59 Å) would have its last edges at 4.15 and 3.59 Å. What do you "
+         "write?", ["The plates are α-iron (ferritic): edges at 4.05, 2.87 and 2.34 Å, a = 2.87 Å.",
+                    "The plates are γ-iron (austenitic).",
+                    "Neutrons cannot tell: both are iron.",
+                    "We would have to cut a plate to know."],
+         answer=0, why={1: "γ-iron would show an edge at 3.59 Å and its last edge at 4.15 Å, not at 4.05 Å.",
+                        2: "The atoms are the same, but not their arrangement: the edges come from the distances "
+                           "between the planes, which differ between the two structures.",
+                        3: "No need: the neutrons went through 5 mm of steel, the measurement is non-destructive."},
+         explanation="The edges of your plate are those of a body-centered cubic lattice with a = 2.87 Å: the supplier "
+                     "delivered ferritic steel, as ordered. Neutrons saw it without cutting the plate.",
+         title="Q4. The verdict")
+q.choice("You measure the sample again but forget to open the shutter. How can you notice it **without** reducing the "
+         "data?", ["The logbook (part 2) shows only a few hundred counts, like the dark run, instead of tens of millions.",
+                   "The transmission is larger than 1.",
+                   "Nothing shows it before the reduction.",
+                   "The Bragg edges move to shorter wavelengths."],
+         answer=0, why={1: "The transmission would rather be close to 0: almost no neutrons reach the detector.",
+                        2: "The number of counts of each file is in the logbook: a closed shutter divides it by about "
+                           "10⁵.",
+                        3: "The edges are set by the iron, not by the shutter; here there is simply no beam."},
+         explanation="With the shutter closed the detector only sees the background, like the dark run. Always look at "
+                     "the number of counts of a file before analyzing it.", title="Q5. A forgotten shutter")
+q.choice("You measure the plate for 10 s, then for 90 s. How do the error bars of the transmission change?",
+         ["About 3 times smaller", "About 9 times smaller", "The same", "About 3 times larger"],
+         answer=0, why={1: "The number of counts N is 9 times larger, but the error on N is √N: relative error ∝ 1/√N, "
+                           "so 1/√9 = 1/3.",
+                        2: "More neutrons, so a better relative precision: the error bars shrink.",
+                        3: "Counting longer collects more neutrons and always improves the precision."},
+         explanation="Counting statistics: N counts have an uncertainty √N, so the relative error goes as 1/√N. Nine "
+                     "times longer gives errors 3 times smaller.", title="Q6. Counting time")
+q.choice("Measure the edge with WFM δ = 0.10 m, δ = 0.45 m and in natural mode (same pinhole, same time). Which is "
+         "true?", ["δ = 0.10 m gives the sharpest edge; natural mode gives the most counts.",
+                   "Natural mode gives the sharpest edge and the most counts.",
+                   "δ = 0.45 m gives the sharpest edge; δ = 0.10 m the most counts.",
+                   "All three give the same edge: only the counting time matters."],
+         answer=0, why={1: "In natural mode the wavelength resolution is set by the long ESS pulse (2.86 ms): many "
+                           "neutrons, but a broad edge.",
+                        2: "The other way round: the closer the two WFM discs (small δ), the shorter the sub-pulses, "
+                           "the sharper the edge, and the fewer the neutrons.",
+                        3: "The chopper setting changes the wavelength resolution, so the width of the edge."},
+         explanation="Resolution and flux are a trade-off: δ = 0.10 m cuts the shortest sub-pulses (sharpest edge, "
+                     "about 3 times fewer neutrons than δ = 0.30 m), natural mode lets the whole pulse through (about "
+                     "15 times more neutrons than δ = 0.30 m, broad edge).", title="Q7. Resolution or flux?")
+q.number("White mode (no chopper): how long does a 5 Å neutron take to fly the 60.5 m from the source to the "
+         "detector? (speed $v$ = 3956/λ m/s, λ in Å)", value=76.5, tol=1.5, unit="ms",
+         mistakes=[(0.0765, "in seconds; the answer is asked in ms"), (13.1, "the inverse; t = L / v")],
+         hints=["v = 3956 / 5 = 791 m/s.", "t = 60.5 / 791 s."],
+         explanation="v = 791 m/s, t = 60.5/791 = 76.5 ms. Two ESS pulses are 1/14 s = 71.4 ms apart: this neutron "
+                     "arrives after the next pulse has started, mixed with fast neutrons of that pulse.",
+         title="Q8. Time of flight")
+q.choice("So why does the wavelength spectrum make no sense in white mode?",
+         ["Slow neutrons of one pulse arrive together with fast neutrons of the next one: the arrival time no longer "
+          "gives a single λ. The choppers select a band of wavelengths to prevent it.",
+          "Without choppers there are no neutrons.",
+          "The detector cannot count that fast.",
+          "The iron plate blocks the slow neutrons."],
+         answer=0, why={1: "There are even more neutrons without choppers: the image is fine.",
+                        2: "The image is fine, so the counting works; the problem is the wavelength.",
+                        3: "The edges are still there; the problem is the conversion from time to λ."},
+         explanation="Frame overlap: λ is computed from the arrival time, which only works if the neutrons of "
+                     "successive pulses do not overlap. Beyond 4.7 Å (60.5 m in 71.4 ms) they do; the band-pass "
+                     "choppers cut the band so that they never meet.", title="Q9. Frame overlap")
+q.report()
 """)
 
 nb = nbf.v4.new_notebook()

@@ -56,6 +56,12 @@ i1, i6 = section(src, "## 1."), section(src, "## 6.")
 msc = [md(r"""
 # How far apart are the atoms in iron? (MSc)
 
+**Your mission.** You are a materials engineer. A supplier has delivered steel plates sold as *ferritic* steel
+(α-iron, body-centered cubic); a mix-up with *austenitic* steel (γ-iron, face-centered cubic: not magnetic, expands
+more when heated) would matter for the parts you build, and you may not cut the plates. The Bragg edges of the
+neutron transmission reveal the crystal structure through centimeters of steel. You measure a plate with ODIN,
+develop the analysis, and give your verdict with its uncertainty (end of part 6).
+
 You will measure the **Bragg edges** of an iron plate with the virtual ODIN and deduce the spacing of its atomic planes.
 Parts 1 to 5 are guided: they take your files from the raw neutrons to the transmission $T(\lambda)$, with the
 official ESS reduction. Part 6 is yours: **you write the model and the fit**, and a check cell tells you whether your
@@ -109,15 +115,48 @@ something. Store the result in `lam_edge` and its uncertainty in `dlam_edge` (Å
 from scipy.optimize import curve_fit
 
 lam_edge, dlam_edge = None, None     # your result [Å]
-"""), md("**Check.** Run the cell below."), code(r"""
-import odin_exercises as ex
+"""), md("**Check.** Run the cell below. If it is wrong, read the explanation, try again; the solution is behind the "
+         "button (opening it is noted in your results)."), code(r"""
+import odin_exercises as ex, quiz
+q = quiz.Quiz("odin_iron_msc")
 ex.check_edge(lam_edge, dlam_edge)
+q.solution("tasks 6.1 and 6.2", explanation="A step smoothed by a Gaussian resolution of width $w$ is an error "
+           "function: $T = A + C(\\lambda-\\lambda_e) + \\frac{B}{2}\\,\\mathrm{erfc}(-(\\lambda-\\lambda_e)/(\\sqrt2\\,w))$, "
+           "on a sloped baseline. The fit window is ±0.35 Å around the expected edge, with bounds that keep the fit "
+           "on the edge.", code=chr(10).join([
+    'def edge(lam, lam_edge, width, base, slope, jump):',
+    '    return base + slope * (lam - lam_edge) + 0.5 * jump * erfc(-(lam - lam_edge) / (np.sqrt(2) * width))',
+    '',
+    'expected = 2 * 2.8665 / np.sqrt(2)                      # (110) edge: 2 d_110 = a √2',
+    'm = (lam > expected - 0.35) & (lam < expected + 0.35) & np.isfinite(T) & (dT > 0)',
+    'p, cov = curve_fit(edge, lam[m], T[m], sigma=dT[m], absolute_sigma=True,',
+    '                   p0=[expected, 0.03, T[m].min(), 0.0, 0.1],',
+    '                   bounds=([expected - 0.3, 0.005, 0, -2, 0], [expected + 0.3, 0.3, 2, 2, 1]))',
+    'lam_edge, dlam_edge = p[0], np.sqrt(cov[0, 0])']))
 """), md(r"""
 **Task 6.3.** Deduce $d_{110}$ and the lattice parameter $a$, with their uncertainties, and compare with 2.8665 Å.
 Store $a$ and its uncertainty in `a_fe`, `da_fe`.
 """), code(r"""
 a_fe, da_fe = None, None     # your result [Å]
 ex.check_lattice(a_fe, da_fe)
+q.solution("task 6.3", explanation="At the edge $\\lambda = 2d_{110}$ and $d_{110} = a/\\sqrt2$, so "
+           "$a = \\lambda_\\mathrm{edge}/\\sqrt2$; the uncertainty is divided by the same factor.", code=chr(10).join([
+    'd110, dd110 = lam_edge / 2, dlam_edge / 2',
+    'a_fe, da_fe = d110 * np.sqrt(2), dd110 * np.sqrt(2)']))
+"""), md(r"""
+**Your verdict for the supplier.**
+"""), code(r"""
+q.choice("γ-iron (face-centered cubic, a = 3.59 Å) would have its (111) edge at 4.15 Å and a (200) edge at 3.59 Å. "
+         "Your plate has its last edge at about 4.06 Å and a lattice parameter of about 2.87 Å. What do you write?",
+         ["Ferritic steel (α-iron), a = 2.87 Å: as ordered.", "Austenitic steel (γ-iron): send it back.",
+          "Cannot be decided from the transmission.", "A mixture of both, half and half."],
+         answer=0, why={1: "γ-iron would put its last edge at 4.15 Å, 0.09 Å away from yours: about a hundred times "
+                           "your uncertainty.",
+                        2: "The positions of the edges are set by the crystal lattice: they decide.",
+                        3: "A mixture would show the edges of both lattices (4.15 and 3.59 Å as well): your spectrum "
+                           "has only those of a body-centered cubic lattice."},
+         explanation="The edges are those of a body-centered cubic lattice with a = 2.87 Å: ferritic steel. The "
+                     "difference to γ-iron is far larger than your uncertainty.", title="Verdict")
 """), md(r"""
 ## 7. Developing the method: a systematic error
 
@@ -132,8 +171,29 @@ fluctuation would shrink if you counted longer; this does not. Find where it com
 3. **Counting statistics.** Count 4 times longer: by how much do `dlam_edge` and the distance to the truth change?
 
 Write your conclusion: what limits the accuracy of a Bragg-edge measurement, and how would you calibrate it at a real
-instrument?
-"""), code("")]
+instrument? Then check your understanding:
+"""), code(r"""
+q.choice("You count 4 times longer. What happens to the uncertainty `dlam_edge` and to the distance between your edge "
+         "and the truth?", ["dlam_edge is halved; the distance to the truth stays about the same.",
+                            "Both are halved.", "Both stay the same.", "dlam_edge is divided by 4."],
+         answer=0, why={1: "The distance to the truth is a systematic error: it does not depend on the number of "
+                           "neutrons.",
+                        2: "More neutrons always shrink the statistical uncertainty: as 1/√N.",
+                        3: "The uncertainty goes as 1/√N: √4 = 2, not 4."},
+         explanation="Statistical errors shrink as 1/√N (halved for 4 times more counts); a systematic error does "
+                     "not. When the distance to the truth is several times the uncertainty, the error is systematic.",
+         title="Statistical or systematic?")
+q.choice("How is such a systematic error corrected at a real instrument?",
+         ["By measuring a reference sample whose plane spacings are known, and correcting the wavelength scale.",
+          "By counting longer.", "By using a wider fit window.", "It cannot be corrected."],
+         answer=0, why={1: "Counting longer only shrinks the statistical error.",
+                        2: "The window changes the fit a little but does not remove an error of the wavelength scale.",
+                        3: "It can: the wavelength scale is calibrated."},
+         explanation="The error comes from the conversion of the arrival time into a wavelength (flight distances, "
+                     "chopper timings, shape of the ESS pulse). Instruments calibrate it with a reference powder of "
+                     "known lattice parameter.", title="Calibration")
+q.report()
+""")]
 write(msc, "ODIN_iron_msc.ipynb")
 
 # --------------------------------------------------------------------------- beamtime starter
@@ -157,5 +217,11 @@ up to you. Keep notes of your choices: they are part of your report.
     'from odin_paths import TWIN_RUN_ROOT\n'
     'FOLDER = f"{TWIN_RUN_ROOT}/data/odin/2026/1234/raw"     # the folder of your proposal (NICOS)'),
       starter_imports, clean(logbook), md("## Your analysis"), code(""), code(""), code(""),
-      md("## Results for the committee\n\n(edge position, $d_{110}$, $a$, with uncertainties; logbook of your choices)")]
+      md("## Results for the committee\n\n(edge position, $d_{110}$, $a$, with uncertainties; logbook of your choices)"),
+      md("## Check your results (after writing them)\n\nThe twin knows the true sample: put your final numbers below "
+         "and run the cell. A wrong result is explained."),
+      code("import odin_exercises as ex\n"
+           "lam_edge, dlam_edge = None, None     # your (110) edge and its uncertainty [Å]\n"
+           "a_fe, da_fe = None, None             # your lattice parameter and its uncertainty [Å]\n"
+           "ex.check_edge(lam_edge, dlam_edge)\nex.check_lattice(a_fe, da_fe)")]
 write(bt, "ODIN_iron_beamtime.ipynb")

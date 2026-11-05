@@ -27,6 +27,35 @@ METALS = {   # name: (NCrystal file, structure, lattice parameter a [Å] from th
     "Ni": ("Ni_sg225.ncmat", "fcc", 3.5239), "Al": ("Al_sg225.ncmat", "fcc", 4.0496),
 }
 CODES = ("sample_A", "sample_B", "sample_C")
+# How each fault shows in the data (for the explanations of the game page)
+FAULT_SIGNS = {
+    "hot_pixels": "a few isolated bright pixels, there even in the dark run (shutter closed), with a flat time spectrum",
+    "dead_region": "a corner of the image with zero counts, also in the open beam without sample",
+    "stage_offset": "the plate not centered in the image when the stage reads 0 mm (shifted by a few mm)",
+    "beam_outages": "runs with the same settings and time but quite different numbers of counts, and a proton charge "
+                    "in the files lower than expected for the counting time",
+}
+
+
+def edges(metal, n=3):
+    """Wavelengths [Å] of the first n Bragg edges (λ = 2 d_hkl) of a candidate metal: bcc (110), (200), (211);
+    fcc (111), (200), (220)."""
+    _, structure, a = METALS[metal]
+    hkl2 = (2, 4, 6) if structure == "bcc" else (3, 4, 8)
+    return [2 * a / np.sqrt(h) for h in hkl2[:n]]
+
+
+def explain_metal(metal):
+    """What the spectrum of a plate of this metal looks like (an answer can be checked against the data)."""
+    _, structure, a = METALS[metal]
+    txt = (f"{metal} ({structure}, a = {a:.3f} Å) has its last edges at "
+           + ", ".join(f"{e:.2f}" for e in edges(metal)) + " Å")
+    if metal == "V":
+        txt += ", but almost invisible: vanadium scatters incoherently (no Bragg edges), its transmission just falls " \
+               "slowly with λ"
+    if metal == "Al":
+        txt += "; aluminium is very transparent (T ≈ 0.94 for 5 mm): its edges are only a few % high"
+    return txt + "."
 
 
 def _encode(obj):
@@ -91,13 +120,21 @@ class MetalMission:
         # Beamtime bonus only with at least one correct metal (no points for answering at random without measuring)
         bonus = int(left // 5) if any(r["correct"] for r in rows) else 0
         score += bonus
+        if self.data.get("revealed"):          # answers shown: not scored any more
+            return score, rows, bonus
         self.data["submissions"].append(dict(rows=rows, beamtime_bonus=bonus, score=score))
         json.dump(self.data, open(self.file, "w", encoding="utf-8"), indent=1)
         return score, rows, bonus
 
     def reveal(self):
-        """For the teacher: the true metals."""
+        """The true metals (teacher; or the student, after a submission: the score is then frozen)."""
         return _decode(self.data["secret"])
+
+    def give_up(self):
+        """The student shows the answers: recorded, no more scored submissions."""
+        self.data["revealed"] = True
+        json.dump(self.data, open(self.file, "w", encoding="utf-8"), indent=1)
+        return self.reveal()
 
 
 class Troubleshooting:

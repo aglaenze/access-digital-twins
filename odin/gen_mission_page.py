@@ -20,11 +20,14 @@ md(r"""
 You have been awarded beamtime on **ODIN**, the imaging instrument of the European Spallation Source (here its
 digital twin: a McStas simulation of the instrument, files in the ESS NeXus format, official ESS reduction).
 
-**Mission 1, "Unknown metals"**: three metal plates have arrived with labels A, B, C only. Identify each metal and
-measure its lattice parameter, using the Bragg edges in the transmission spectrum. Beamtime is precious: you have a
+**Mission 1, "Unknown metals"**: you are the neutron expert of a metal-recycling company. Three plates have arrived
+with their labels lost (only A, B, C are left); sent to the wrong furnace, a plate ruins a whole batch of alloy.
+Chemical tests would damage them: identify each metal and measure its lattice parameter with the Bragg edges of
+its transmission spectrum, which neutrons see through the whole plate. Beamtime is precious: you have a
 **limited budget**, and unused beamtime gives bonus points.
 
-**Mission 2, "Something is wrong"**: the instrument has a hidden fault. Find it from your data.
+**Mission 2, "Something is wrong"**: you are the instrument scientist on duty. A user complains that their data
+look strange: the instrument has a hidden fault. Find it from your data before the next user arrives.
 """)
 
 code(r"""
@@ -176,6 +179,8 @@ def do_submit(_):
     score, rows, bonus = mission.submit(answers, odin.beam_used())
     with sub_out:
         clear_output()
+        if mission.data.get("revealed"):
+            print("You have shown the answers: this submission is not scored (your earlier score stays).")
         for r in rows:
             print(f"{r['sample']}: {r['answer'] or '?':3s} {'correct' if r['correct'] else 'wrong'}"
                   f"{' + lattice parameter within 0.5 %' if r['a_within_0_5_percent'] else ''}  -> {r['points']} points")
@@ -185,9 +190,27 @@ def do_submit(_):
         for ok, msg in checks:
             print(("  OK   " if ok else "  !!   ") + msg)
         print("Badges:", ", ".join(badges) if badges else "none yet")
+        wrong = [r for r in rows if not r["correct"]]
+        if wrong:
+            print("\nTo check your wrong answers against your data:")
+            for r in wrong:
+                print(f"  {r['sample']}: " + (games.explain_metal(r["answer"]) if r["answer"] else "no answer yet.")
+                      + " Do your measured edges match?")
+            show_button.layout.display = ""
 
+def do_show(_):
+    secret = mission.give_up()
+    with sub_out:
+        print("\nThe answers:")
+        for c in games.CODES:
+            print(f"  {c}: {games.explain_metal(secret[c])}")
+        print("Two metals with almost the same first edge (Fe and Ni, Nb and Al) are told apart by their second edge.")
+    show_button.layout.display = "none"
+
+show_button = w.Button(description="Show the answers (ends the scoring)", icon="eye", layout=w.Layout(width="auto", display="none"))
 sub_button.on_click(do_submit)
-display(w.VBox([w.HBox([m, a]) for m, a in ans.values()] + [sub_button, sub_out]))
+show_button.on_click(do_show)
+display(w.VBox([w.HBox([m, a]) for m, a in ans.values()] + [w.HBox([sub_button, show_button]), sub_out]))
 """)
 
 md(r"""
@@ -220,10 +243,24 @@ gout = w.Output()
 def do_guess(_):
     with gout:
         clear_output()
-        print("Well diagnosed!" if trouble.guess(guess.value) else "No, look again at your data.")
+        if trouble.guess(guess.value):
+            print("Well diagnosed! It shows as " + games.FAULT_SIGNS[guess.value] + ".")
+            reveal2.layout.display = "none"
+        else:
+            print("No. If it were this fault you would see " + games.FAULT_SIGNS[guess.value] + ". Do you? Compare a "
+                  "dark run, an open beam and the sample, and look at the images and at the numbers of counts.")
+            reveal2.layout.display = ""
 
+def do_reveal2(_):
+    with gout:
+        f = trouble.reveal()
+        print(f"\nThe fault was: {FAULTS[f]}. It shows as {games.FAULT_SIGNS[f]}.")
+    reveal2.layout.display = "none"
+
+reveal2 = w.Button(description="Show the answer", icon="eye", layout=w.Layout(width="auto", display="none"))
 gb.on_click(do_guess)
-display(w.VBox([shut2, stage2, b2, out2, guess, gb, gout]))
+reveal2.on_click(do_reveal2)
+display(w.VBox([shut2, stage2, b2, out2, guess, w.HBox([gb, reveal2]), gout]))
 """)
 
 nb = nbf.v4.new_notebook()

@@ -8,6 +8,8 @@ question: >-
   Measure the small-angle scattering of silica nanoparticles in D2O, subtract the solvent, and find the size of the
   particles (Guinier analysis, then a sphere model).
 learn: SANS measurement (sample, solvent, empty beam), reduction to I(Q) in absolute units, Guinier law, form factors.
+mission: >-
+  You make silica nanoparticles for medical imaging. A new batch must have a radius between 4.5 and 5.5 nm. Measure the average size of the billions of particles of the batch, in the liquid, and decide whether it can be released.
 status: ready
 # samples of the library used by the exercise (loki/samples/*.yml); hidden: properties not shown to the students
 # (what they have to measure)

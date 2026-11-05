@@ -24,8 +24,13 @@ ESS model) produces your measurements. LoKI measures **small-angle neutron scatt
 a few degrees at most by objects of 1 to 100 nm dispersed in the sample. The way the scattered intensity falls with the
 angle tells their **size and shape**.
 
-**Goal**: measure the size of silica nanoparticles dispersed in heavy water, then choose the instrument configuration
-that measures it best. Your files have the format of the real LoKI and are reduced with the official ESS software.
+**Your mission.** You work in a laboratory that makes silica nanoparticles for medical imaging. The particles of a
+new batch must have a radius between 4.5 and 5.5 nm: the size decides how long the particles stay in the blood and
+where they end up in the body. An electron microscope would show a few hundred particles, dried on a grid; you need the
+average over the billions of particles of the batch, as they are in the liquid. That is what small-angle neutron
+scattering gives. Your job: measure the batch (particles in heavy water), find the size of the particles, and decide
+(part 4) whether the batch can be released. Then find the instrument configuration that measures it best. Your files
+have the format of the real LoKI and are reduced with the official ESS software.
 
 **The instrument, from the source to the detector**: the **choppers** select a band of wavelengths; the
 **collimation** (3, 5 or 8 m long) makes the beam parallel; the **sample** scatters a small fraction of the neutrons;
@@ -290,18 +295,98 @@ the real instrument's format, then reduced by the ESS software. Simplifications:
 the neutrons (LoKI counts millions per second), the empty cell is not measured separately (the solvent run includes
 the cell), and the transmission monitor always sees the beam.
 
-## 4. Questions
+## 4. Questions: your verdict, and the instrument
 
-1. From your first measurements, what is the radius of the particles? Do the Guinier analysis and the sphere model
-   agree? Which one needs an assumption on the shape?
-2. Measure the sample for 30 s and for 300 s in the same configuration: how do the error bars change? Is the radius
-   more precise?
-3. Compare the lowest $Q$ of the rear bank with the 3 m collimation (detector at 5 m) and with the 8 m collimation
-   (detector at 10 m). Why does it matter for larger particles? What do you pay for it?
-4. Try the 3 m collimation with the detector at 10 m. The twin refuses: explain with numbers. A 11.5 Å neutron flies
-   $v = 3956/11.5$ m/s; how long does it take to travel 33.5 m from the source to the far detector, and how far apart
-   are two ESS pulses?
-5. With pulse skipping, which banks see a wider $Q$ range, and why?
+Answer in the boxes, then click *Check*. A wrong answer is explained; after a try you can also show the answer.
+Your answers are kept, and *My results* (at the end) gives your score and a report to download.
+""")
+
+code(r"""
+import quiz
+q = quiz.Quiz("loki_silica_bsc")
+q.number("Your Guinier analysis gives the **radius of gyration** $R_g$ of the particles. Which value do you find?",
+         value=39.5, tol=1.6, unit="Å",
+         mistakes=[(50.0, "the radius R of the sphere (from the sphere model), not its radius of gyration"),
+                   (3.95, "in nm; the answer is asked in Å (1 nm = 10 Å)")],
+         hints=["Read the result of the Guinier fit in part 3 (the straight line of ln I against Q²).",
+                "It is a few tens of Å."],
+         explanation="About 39-40 Å. The exact value for these particles is 38.7 Å: the resolution of the instrument "
+                     "(spread of wavelengths, size of the beam) makes it look 1-2 % larger.", title="Q1. Guinier")
+q.number("For a full sphere $R_g = \\sqrt{3/5}\\,R$. Which radius $R$ (in Å) do you deduce from your $R_g$?",
+         value=50.5, tol=0.05, rel=True, unit="Å",
+         mistakes=[(30.6, "you multiplied by √(3/5); R = √(5/3)·Rg"), (5.05, "in nm; the answer is asked in Å"),
+                   (39.5, "this is Rg; R is larger: R = √(5/3)·Rg = 1.29·Rg")],
+         hints=["R = Rg / √(3/5) = 1.29 Rg."],
+         explanation="R = √(5/3)·Rg ≈ 1.29 × 39.4 ≈ 51 Å, close to what the sphere model gives (50 Å).",
+         title="Q2. From Rg to the radius")
+q.choice("The Guinier analysis and the sphere model agree. Which one needs an assumption on the **shape** of the "
+         "particles?", ["The sphere model", "The Guinier analysis", "Both", "Neither"],
+         answer=0, why={1: "The Guinier law I(Q) ≈ I(0) exp(−Q²Rg²/3) holds at small Q for particles of any shape: it "
+                           "gives Rg whatever the shape.",
+                        2: "Guinier does not: it holds for any shape at small Q.",
+                        3: "The sphere model assumes spheres: its whole curve (with its minima) is that of a sphere."},
+         explanation="Guinier gives Rg for any shape; turning Rg into a radius, or fitting the whole curve, needs a "
+                     "model of the shape (here a sphere). If the particles were rods, the sphere model would fit "
+                     "badly.", title="Q3. Which one assumes a shape?")
+q.choice("**Your verdict.** The batch must have a radius between 4.5 and 5.5 nm. What do you write?",
+         ["Released: radius 5.0 nm, within the specification.",
+          "Rejected: the radius is 3.9 nm, too small.",
+          "Rejected: the radius is 50 nm, far too large.",
+          "We cannot say without an electron microscope."],
+         answer=0, why={1: "3.9 nm is Rg, not the radius of the sphere: R = √(5/3)·Rg ≈ 5.0 nm.",
+                        2: "50 Å, not 50 nm: 1 nm = 10 Å, so 50 Å = 5.0 nm.",
+                        3: "SANS gives the average size over the whole batch, in the liquid: exactly what the "
+                           "specification is about."},
+         explanation="R ≈ 50 Å = 5.0 nm, in the 4.5-5.5 nm window: the batch can be released.", title="Q4. The verdict")
+q.choice("You measure the sample for 30 s, then for 300 s, in the same configuration. What happens?",
+         ["The error bars are about 3 times smaller, and the radius more precise.",
+          "The error bars are 10 times smaller.",
+          "The error bars do not change, only the curve gets smoother.",
+          "The radius changes: longer counts give larger particles."],
+         answer=0, why={1: "10 times more neutrons, but the error on N counts is √N: errors 1/√10 ≈ 1/3.2 as large.",
+                        2: "A smoother curve is precisely smaller error bars.",
+                        3: "The particles are the same; only the precision of the measured radius improves."},
+         explanation="Counting statistics: relative errors go as 1/√N, so 10 times longer gives errors √10 ≈ 3.2 times "
+                     "smaller, and a more precise radius.", title="Q5. Counting time")
+q.choice("With the 3 m collimation (detector at 5 m) the rear bank reaches Q = 0.0115 Å⁻¹; with the 8 m collimation "
+         "(detector at 10 m), 0.0082 Å⁻¹. Which is true?",
+         ["The lower Q reaches larger particles (the Guinier range Q·Rg < 1.3 allows Rg up to about 160 Å instead of "
+          "113 Å), but the longer collimation lets fewer neutrons through.",
+          "The lower Q gives smaller particles.",
+          "The lower Q is free: same number of neutrons.",
+          "The collimation only changes the wavelengths."],
+         answer=0, why={1: "Q and size go the other way: large objects scatter at small angles, so small Q.",
+                        2: "A longer collimation makes the beam more parallel by cutting the divergent neutrons: "
+                           "fewer neutrons per second.",
+                        3: "The collimation sets the divergence of the beam (and so the smallest angle that can be "
+                           "separated from the direct beam), not the wavelengths."},
+         explanation="Small Q = large objects: 1.3/0.0082 ≈ 160 Å against 1.3/0.0115 ≈ 113 Å for the largest Rg in the "
+                     "Guinier range. The price is the flux: a more parallel beam has fewer neutrons.",
+         title="Q6. Collimation")
+q.number("The twin refuses the 3 m collimation (band 3-11.5 Å) with the detector at 10 m. The far detector is 33.5 m "
+         "from the source. How much later than a 3 Å neutron does an 11.5 Å neutron arrive? (time t = L·λ/3956 s, "
+         "L in m, λ in Å)", value=72.0, tol=1.5, unit="ms",
+         mistakes=[(97.4, "the flight time of the 11.5 Å neutron alone; subtract that of the 3 Å neutron"),
+                   (0.072, "in seconds; the answer is asked in ms")],
+         hints=["t(11.5 Å) − t(3 Å) = L·(11.5 − 3)/3956 s.", "33.5 × 8.5 / 3956 s."],
+         explanation="33.5 × 8.5 / 3956 = 72.0 ms, more than the 71.4 ms between two ESS pulses (and the pulse itself "
+                     "lasts 2.86 ms): the slowest neutrons of one pulse arrive with the fastest of the next one, and "
+                     "would get a wrong wavelength. At 5 m (28.5 m) the spread is 61 ms: no overlap.",
+         title="Q7. Frame overlap")
+q.choice("With pulse skipping the choppers let one ESS pulse in two through. Why does each bank then see a wider Q "
+         "range in one measurement?",
+         ["The pulses are 143 ms apart instead of 71 ms, so the wavelength band can be twice as wide (3-21.4 Å), and "
+          "each pixel sees Q = 4π sin θ / λ over more wavelengths.",
+          "The detector moves closer.",
+          "There are twice as many neutrons.",
+          "The particles look larger."],
+         answer=0, why={1: "Nothing moves: the gain comes from the wavelengths.",
+                        2: "The other way round: half of the pulses are lost, the flux is halved.",
+                        3: "The sample does not change; only the range of Q measured at once changes."},
+         explanation="A wider band of wavelengths at a fixed angle means a wider range of Q in one setting. The price: "
+                     "half of the source pulses, and the longest wavelengths are few, so the gain at low Q is small.",
+         title="Q8. Pulse skipping")
+q.report()
 """)
 
 nb = nbf.v4.new_notebook()

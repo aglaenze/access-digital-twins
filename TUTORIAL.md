@@ -38,6 +38,10 @@ Expect: 20–60 min for the installation (mostly downloads), a few minutes per m
 3. From then on: **double-click ESS digital twins**. A window opens on the catalogue of exercises: choose the
    instrument, the exercise and your level. To stop, close the window (macOS: *Quit*, ⌘Q).
 
+Each exercise gives you a **role and a mission** (why the measurement matters), and its questions are interactive:
+click *Check*; a wrong answer is explained, and you can show the answer; *My results* gives your score and a report to
+download. Besides the exercises, each instrument offers a **free beamtime**: your own question, your own samples.
+
 What you see depends on your level. **BSc**: only this window (a guided page; no code, no NICOS). **MSc and free
 beamtime**: the notebook of your exercise (your own copy, kept between sessions) and the button **Open NICOS**: the
 control room of the instrument opens, you choose ODIN or LoKI, and the NICOS window is there, logged in. There are no

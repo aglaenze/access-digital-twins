@@ -16,6 +16,13 @@ beamtime with NICOS (button *Open NICOS*: the control room, in the browser). NIC
 and the free beamtime only: BSc students use the web pages and never see NICOS. Each exercise is one folder
 `<instrument>/exercises/<name>/` with an `exercise.yml`; its MSc and beamtime notebooks are generated from the guided
 analysis notebook of the instrument (`gen_notebooks.py`). Exercises planned: `catalogue_planned.yml`.
+Rules for every exercise: the student has a **role and a mission** that say why the measurement matters (field
+`mission` of `exercise.yml`, shown on the card, in the page and in the notebooks, with a final verdict); every
+question is **interactive** (`quiz.py`: multiple choice or a value checked with a tolerance, a wrong answer is
+explained, the answer can be shown, MSc tasks have their solution behind a button), so that the exercises work
+without a teacher. Each instrument also has a **free beamtime** (no exercise: NICOS, sample builder, a starter
+notebook asking for the question and the plan first; `gen_free_beamtime.py`). The answers are kept in
+`TWIN_RUN_ROOT/progress/`; `progress_summary.py` gives the teacher a table for a class.
 
 ## Instruments
 
@@ -42,6 +49,9 @@ twin/
 ├── loki/                everything specific to LoKI — read loki/README.md
 ├── sample_library.py    the samples (one YAML file each: odin/samples, loki/samples, <proposal>/samples)
 ├── Catalogue.ipynb      start page: the catalogue of exercises (gen_catalogue.py)
+├── quiz.py              interactive questions (explanations, answers on request, report, progress files)
+├── gen_free_beamtime.py starter notebooks of the free beamtime (<instrument>/exercises/free_beamtime/)
+├── progress_summary.py  teachers: the answers of a class, from the students' progress files
 └── Sample_builder.ipynb the sample builder of the free beamtime (gen_sample_builder.py)
 ```
 Results (outside the repository and OneDrive, no spaces in the path: McStas needs it): `<TWIN_RUN_ROOT>/<instrument>/`,

@@ -103,6 +103,8 @@ CSS = '''<style>
 .card .t {font-size: 16px; font-weight: 650}
 .card .meta {font-size: 12.5px; color: #5a6475; margin: 2px 0 8px}
 .card .q {font-size: 14px; margin-bottom: 10px}
+.card .mission {font-size: 14px; margin: 4px 0 10px; padding: 8px 12px; border-left: 4px solid #e8a33d;
+  background: #fdf6ea; border-radius: 6px}
 .modes {display: flex; gap: 10px; flex-wrap: wrap}
 .mode {flex: 1 1 280px; border-radius: 8px; padding: 10px 12px; color: white; text-decoration: none !important}
 .mode, .mode * {color: #fff !important}
@@ -148,9 +150,25 @@ def card(e):
                      f'<div class="btns">{btns}</div>{extra}</div>')
     return (f'<div class="card"><div class="t">{esc(e["title"])}</div>'
             f'<div class="meta">{esc(e["technique"])} · sample: {esc(e.get("sample", ""))}</div>'
-            f'<div class="q">{esc(e["question"])}</div><div class="modes">{"".join(modes)}</div>'
+            + (f'<div class="mission"><b>Your mission.</b> {esc(e["mission"])}</div>' if e.get("mission") else "")
+            + f'<div class="q">{esc(e["question"])}</div><div class="modes">{"".join(modes)}</div>'
             + (f'<div class="meta" style="margin-top:8px">You learn: {esc(e["learn"])}</div>' if e.get("learn") else "")
             + '</div>')
+
+def free_card(key, name):
+    # the free beamtime of an instrument (no exercise): NICOS, the sample builder, a starter notebook
+    nb = f"{key}/exercises/free_beamtime/{name}_free_beamtime.ipynb"
+    if not os.path.isfile(os.path.join(ROOT, nb)):
+        return ""
+    btns = (f'<a class="btn nicos" href="{NICOS_URL}{key}" target="_blank">Open NICOS</a>'
+            f'<a class="btn" href="{link(dict(open="lab"), nb)}" target="_blank">Starter notebook</a>'
+            f'<a class="btn" href="../../voila/render/Sample_builder.ipynb" target="_blank">Sample builder</a>')
+    return (f'<div class="card"><div class="t">Free beamtime on {name}</div>'
+            f'<div class="meta">No exercise · MSc and beyond · your own question</div>'
+            f'<div class="q">Your own question, your own samples (sample builder), your own measurements and analysis, '
+            f'as in a real beamtime at ESS. The starter notebook asks you to write your question and your plan '
+            f'first.</div><div class="btns">{btns}</div></div>')
+
 
 exercises = load()
 TABS = '''<style>
@@ -175,7 +193,8 @@ for key in keys:
     i = INSTRUMENTS[key]
     ex = [e for e in exercises if e["instrument"] == key]
     body = "".join(card(e) for e in [e for e in ex if e.get("status") != "planned"] + [e for e in ex if e.get("status") == "planned"])
-    panels.append(f'<div class="panel" id="p_{key}"><h3>2. Choose an exercise on {i["name"]} ({i["kind"].lower()})</h3>{body}</div>')
+    panels.append(f'<div class="panel" id="p_{key}"><h3>2. Choose an exercise on {i["name"]} ({i["kind"].lower()})</h3>{body}'
+                  + (f'<h3>Or: a free beamtime</h3>{free_card(key, i["name"])}' if any(e.get("status") != "planned" for e in ex) else "") + '</div>')
 display(HTML("<script>document.title = \"ESS digital twins\"</script>" + CSS + TABS + " ".join(css) + "</style>" + '<div class="cat tabs"><h3>1. Choose an instrument</h3>'
              + "".join(parts) + "".join(panels) + "</div>"))
 """)
@@ -185,7 +204,9 @@ md(r"""
 button and answer questions. **MSc**: you measure in NICOS (*Open NICOS*; the commands are given in the notebook),
 then you analyze in your notebook (*Open the notebook*): the reduction with the ESS software is given, you write the
 analysis, automatic checks tell you if you are right. **Beamtime**: the real thing: a proposal, a budget, NICOS, a
-starter notebook, and your own decisions; you can also design your own sample (*Sample builder*). Your notebooks are
+starter notebook, and your own decisions; you can also design your own sample (*Sample builder*). **Free beamtime**:
+no exercise at all, your own question and samples. Every question is interactive: a wrong answer is explained, and
+you can show the answer. Your notebooks are
 yours: they are kept between sessions.
 """)
 
