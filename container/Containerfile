@@ -90,14 +90,15 @@ RUN micromamba create -y -n kafka -c conda-forge "openjdk=21" && micromamba clea
 
 # NICOS window (GUI client, Qt 5) in the nicos environment, and the desktop in JupyterLab. On ARM (Apple Silicon,
 # arm64) PyPI has no PyQt5 wheels: Qt 5, QtWebEngine and QScintilla come from conda-forge, the rest from
-# requirements-gui.txt; gr (plots of some panels) is installed if a wheel exists.
+# requirements-gui.txt; gr (plots of some panels) is installed if a wheel exists; PyQt5.QtDesigner (missing) is a stub.
 ARG TARGETARCH
 RUN if [ "$TARGETARCH" = "arm64" ]; then \
       micromamba install -y -n nicos -c conda-forge "pyqt=5.15" pyqtwebengine qscintilla2 && micromamba clean -a -y \
       && grep -viE "^(pyqt|qscintilla|gr[=<>;]|gr$)" "$HOME/nicos_src/requirements-gui.txt" > /tmp/req-gui.txt \
       && micromamba run -n nicos pip install --no-cache-dir -r /tmp/req-gui.txt lttb \
       && (micromamba run -n nicos pip install --no-cache-dir --extra-index-url https://forge.frm2.tum.de/simple \
-            "gr>=1.23.2" || echo "gr not available on arm64"); \
+            "gr>=1.23.2" || echo "gr not available on arm64")       && (micromamba run -n nicos python -c "import PyQt5.QtDesigner" 2>/dev/null           || printf '%s
+' "# arm64: conda-forge PyQt5 has no QtDesigner; NICOS imports it only for its Qt Designer plugins"                "class QPyDesignerCustomWidgetPlugin:" "    def __init__(self, *args): pass"                > "$(micromamba run -n nicos python -c 'import PyQt5, os; print(os.path.dirname(PyQt5.__file__))')/QtDesigner.py"); \
     else \
       micromamba run -n nicos pip install --no-cache-dir -r "$HOME/nicos_src/requirements-gui.txt" lttb; \
     fi \
