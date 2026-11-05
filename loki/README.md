@@ -1,4 +1,4 @@
-# Digital twin of LoKI (small-angle neutron scattering, ESS) — first version
+# Digital twin of LoKI (small-angle neutron scattering, ESS)
 
 *Started 2026-11-03.* LoKI measures small-angle neutron scattering (SANS) by time of flight: the size, shape and
 arrangement of objects from ~1 to ~100 nm (particles, pores, polymers, membranes). This folder is the start of its
@@ -42,15 +42,21 @@ About 140 MB and 1 min per measurement.
   in the configuration, once (`<run root>/loki/calibration/`). It corrects what the geometry alone does not know: the
   layers and straws overlap as seen from the sample, so the solid angle summed over the pixels is about ten times the
   true one (D ≈ 0.08–0.1 times the plain monitor ratio).
+- the **flat field** of the pixels (`flat_field`, 2026-11-05): their efficiency relative to their bank, from the same
+  D₂O calibration run (a flat scatterer, as at a real SANS instrument: counts / solid angle), in cells of one tube ×
+  32 pixels along it (layers and straws together, a few thousand counts each), normalized to the median cell. It
+  enters esssans by replacing its solid-angle provider (`SolidAngle` × efficiency; the ESS code is unchanged). It
+  removes the deviations at the edges of the middle and front banks (pixels that receive more or fewer neutrons than
+  their solid angle says, overlapping layers and straws). D(λ) is calibrated after it.
 Then `red.reduce(sample, background=solvent, empty_beam=empty)` gives I(Q) per bank, background subtracted;
 `red.combine` merges the banks into rear / middle / front and divides by the thickness (cm⁻¹ sr⁻¹).
 
-**Validation** (3 m / 5 m, 10 min each, 2026-11-05): D₂O reduced alone: flat within ±3 % on the rear bank for
-Q = 0.013–0.26 Å⁻¹ and on the middle bank 1; up to +20 % / −12 % at the inner and outer edges of the middle and front
-banks (the calibration is one factor per bank; a pixel-by-pixel flat field would remove it), and −20 to −35 % at the
-lowest Q of the rear bank (< 0.011 Å⁻¹, next to the beam-stop mask). Silica spheres minus D₂O, all banks:
-**Rg = 39.2 ± 1.2 Å (exact 38.7), I(0) = 4.20 ± 0.08 cm⁻¹ (exact 4.37), sasmodels sphere: R = 49.1 ± 0.1 Å (50),
-φ = 1.00 % (1 %), χ²/n = 0.5.** Two pitfalls met on the way (2026-11-05): a too small coverage tolerance let neutrons through the middle
+**Validation** (3 m / 5 m, 10 min each, 2026-11-05, with the flat field; the D₂O tested is a measurement
+independent of the calibration): D₂O reduced alone flat within ±3 % on all banks except their first and last Q bin
+(−16 to +10 %), and −20 to −35 % at the lowest Q of the rear bank (< 0.011 Å⁻¹, next to the beam-stop mask); without
+the flat field the middle and front banks deviated by up to +20 % / −12 % at their edges. Silica spheres minus D₂O,
+all banks: **Rg = 38.9 ± 1.2 Å (exact 38.7), I(0) = 4.18 ± 0.08 cm⁻¹ (exact 4.37), sasmodels sphere:
+R = 49.2 ± 0.1 Å (50), φ = 1.00 % (1 %), χ²/n = 0.4.** Two pitfalls met on the way (2026-11-05): a too small coverage tolerance let neutrons through the middle
 banks (+25 % at the edges of the rear bank), and looking the pixels up along the direction from the sample center smeared the counts by the beam size next to the beam stop.
 
 ## Easy test case: dilute silica spheres
@@ -177,7 +183,7 @@ processes: the easy case takes 2 min (compilation + downstream part), Rg = 39.3 
    pixel (removes the bank-edge deviations), the resolution for the fits (sasmodels `dq`); the samples of the
    notebook series (Nafion membrane, catalyst layer, porous electrode).
 3. Done on 2026-11-04: collimations 5 m and 8 m, rear detector at 5 or 10 m, pulse skipping (§ Configurations).
-   To do: understand the 4 % low level with a short collimation and the detector at 10 m; more samples.
+   The 4 % low level with a short collimation and the detector at 10 m was frame overlap: refused since.
 4. Done on 2026-11-04: twin server, console and NICOS (`../nicos/nicos_twin/loki/`, ESS GUI of LoKI), analysis
    notebook, container image, live data with Kafka and just-bin-it (rear panel, sample of the neutrons;
    `../nicos/README.md`, "Live data"), web page `LoKI_virtual.ipynb`.

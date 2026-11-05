@@ -5,9 +5,11 @@ the virtual instruments as it drives the real ones: the same program, the same G
 (`move`, `count`, `scan`, `nexusfile_open`...). The twin (McStas, hybrid model, data files) runs in the background;
 the user never sees McStas.
 
-Status (2026-11-04): **ODIN and LoKI** on Windows (services, ESS GUI, measurements written to the proposal folder);
-ODIN on Linux in the container image (`../container/`), checked by the smoke test of every build (no GUI in the
-container yet). Student step-by-step guide: `../TUTORIAL.md`.
+Status (2026-11-05): **ODIN and LoKI** on Windows and on Linux in the container image (`../container/`): services,
+ESS GUI, measurements written to the proposal folder, live data (Kafka, just-bin-it), sample changer with the
+students' own samples. In the container the NICOS window opens on the Linux desktop shown in the browser (JupyterLab
+launcher "Desktop"), checked with a screenshot at every build. NICOS is used at the MSc level and in the free
+beamtime; BSc students use the web pages. Student step-by-step guide: `../TUTORIAL.md`.
 
 ## 1. How NICOS is organized at ESS, and in the twins
 
@@ -112,7 +114,7 @@ Devices of **ODIN** (`nicos_twin/odin/setups/odin.py`):
 | `det` | Timepix3 imaging detector, preset `t` (s); image 128 × 128 |
 | read-only (setup `choppers`) | `wfm1_speed`, `wfm1_delay` … `foc5_speed`, `foc5_delay` (Hz, ms; names of the ODIN NeXus file; 0 when the mode stops the chopper), `pulse_skipping`, `wfmc_separation` |
 
-Devices of **LoKI** (`nicos_twin/loki/setups/loki.py`), first version:
+Devices of **LoKI** (`nicos_twin/loki/setups/loki.py`):
 
 | NICOS device | Values |
 |---|---|
@@ -270,17 +272,19 @@ The commands are those of `../container/Containerfile`.
   (tab Instrument interaction → Detector image) after a count.
 - LoKI: `move(heavy_shutter, 'Open', fast_shutter, 'Open')`, `with nexusfile_open('silica spheres, 10 min'):
   count(t=600)` → `data/loki/2026/3001/raw/loki_000001.h5` (I(Q) of the 3 banks), in 25 s once the simulations are
-  cached.
+  cached. Since 2026-11-05 the file is a NeXus event file of the real LoKI's format (`loki_000001.nxs`, ~1 min).
+- Samples (2026-11-05, Windows, scripted session): an unknown sample refused with the list (built-in and the student's
+  own sample of the proposal), `sample_info()` (description, drawing saved in `<proposal>/samples/`), the student's
+  sample mounted and measured, the sample name set in the experiment.
 - Linux (container, every build): ODIN services and a measurement through NICOS with `nexusfile_open`
   (`../container/smoke_test.py`).
 
 ## 9. Still to do
-- NICOS GUI for students when the twin runs in the container or on a server: the daemon accepts connections from
-  its own computer only (`daemon.py`: `server = 'localhost'`). Options: a NICOS GUI in the browser (noVNC), or the
-  daemon opened to the network with real passwords (the demo accounts above must then be changed).
+- Done (2026-11-05): the NICOS GUI in the browser (desktop of the container, noVNC). For a NICOS client on another
+  computer, the daemon would have to be opened to the network with real passwords (it listens on `localhost`).
 - Closer to ESS: the twin publishing its events to Kafka and the real ESS file-writer writing the NeXus files (one
   file per `nexusfile_open` block), and devices as simulated EPICS process variables, so that the unmodified
   `nicos_ess` setups can be used. To discuss with ESS (ECDC), who built such test set-ups (simulated AMOR, NeXus
   streamer).
-- LoKI in the container image (official model and its precomputed upstream part).
+- Done (2026-11-04): LoKI in the container image.
 - DREAM and BIFROST: `nicos_twin/dream/`, `nicos_twin/bifrost/` once their twins have devices.

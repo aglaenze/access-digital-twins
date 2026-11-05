@@ -86,14 +86,14 @@ def direct_beam(file, bank):
     info = lnx.read_twin(file)
     folder = os.path.basename(_front_folder(info))
     dist = float(info["detector_distance"])
-    path = f"{LUT_DIR}/direct_beam_{folder}_det{dist:g}m_{bank}.h5"
+    path = f"{LUT_DIR}/direct_beam_ff_{folder}_det{dist:g}m_{bank}.h5"
     if os.path.isfile(path):
         return sc.io.load_hdf5(path)
     os.makedirs(LUT_DIR, exist_ok=True)
     runs = _calibration_runs(info)
     l_min, l_max = float(info["l_min"]), float(info["l_max"])
     edges = sc.geomspace("wavelength", l_min, l_max, 9, unit="angstrom")
-    wf = workflow(runs["d2o"], bank, direct=_plain_direct_beam())
+    wf = workflow(runs["d2o"], bank, direct=_plain_direct_beam())          # with the flat field
     wf[Filename[SampleRun]] = runs["d2o"]
     wf[Filename[TransmissionRun[SampleRun]]] = runs["d2o"]
     wf[Filename[EmptyBeamRun]] = runs["empty_beam"]
@@ -138,6 +138,81 @@ def _calibration_runs(info):
 
 
 _DETS = {}
+FLAT_BLOCK = 32                    # pixels along a tube grouped in one cell of the flat field
+
+
+def _flat_field_provider():
+    """Provider of esssans' SolidAngle that multiplies the solid angle of each pixel by its efficiency (flat field)."""
+    from typing import NewType
+    import scippnexus as snx
+    from ess.sans import normalization
+    from ess.sans.types import DetectorPixelShape, EmptyDetector, NeXusTransformation, Position, RunType, SolidAngle
+    global PixelEfficiency
+    PixelEfficiency = NewType("PixelEfficiency", sc.Variable)
+
+    def solid_angle_flat_field(data: EmptyDetector[RunType], pixel_shape: DetectorPixelShape[RunType],
+                               transform: NeXusTransformation[snx.NXdetector, RunType],
+                               sample_position: Position[snx.NXsample, RunType],
+                               efficiency: PixelEfficiency) -> SolidAngle[RunType]:
+        omega = normalization.solid_angle(data, pixel_shape, transform, sample_position)
+        return SolidAngle[RunType](omega * efficiency)
+    return solid_angle_flat_field
+
+
+PixelEfficiency = None
+_FLAT = _flat_field_provider()
+
+
+def flat_field(file, bank, wf=None):
+    """Efficiency of the pixels of `bank` relative to the bank (1 = average), measured as at a real SANS instrument
+    with a flat scatterer: the twin's D₂O calibration run (one hour). Counts / solid angle, in cells (one tube, FLAT_BLOCK
+    pixels along it, the 4 layers and 7 straws together: a few thousand counts each), normalized to the median cell.
+    It corrects what one factor per bank cannot: the pixels near the edges of the middle and front banks receive more
+    or fewer neutrons than their solid angle says (overlapping layers and straws). Kept in the calibration folder."""
+    from ess.sans.types import EmptyBeamRun, Filename, RawDetector, SampleRun, SolidAngle, TransmissionRun
+    info = lnx.read_twin(file)
+    folder = os.path.basename(_front_folder(info))
+    dist = float(info["detector_distance"])
+    path = f"{LUT_DIR}/flat_field_{folder}_det{dist:g}m_{bank}.npy"
+    if os.path.isfile(path):
+        cells = np.load(path)
+    else:
+        runs = _calibration_runs(info)
+        w = workflow(runs["d2o"], bank, direct=_plain_direct_beam(), flat=False)
+        w[Filename[SampleRun]] = runs["d2o"]
+        w[Filename[TransmissionRun[SampleRun]]] = runs["d2o"]
+        w[Filename[EmptyBeamRun]] = runs["empty_beam"]
+        raw = w.compute(RawDetector[SampleRun])
+        counts = raw.bins.size().values.astype(float) if raw.bins is not None else raw.values
+        omega = w.compute(SolidAngle[SampleRun]).values
+        mask = w.compute(_masks_type())
+        hidden = np.zeros(counts.shape, bool)
+        for m in mask.values():
+            hidden |= m.values
+        L, T, S, P = counts.shape
+        nb = P // FLAT_BLOCK
+        c = np.where(hidden, 0, counts)[..., :nb * FLAT_BLOCK].reshape(L, T, S, nb, FLAT_BLOCK).sum(axis=(0, 2, 4))
+        o = np.where(hidden, 0, omega)[..., :nb * FLAT_BLOCK].reshape(L, T, S, nb, FLAT_BLOCK).sum(axis=(0, 2, 4))
+        with np.errstate(invalid="ignore", divide="ignore"):
+            r = np.where((c >= 200) & (o > 0), c / o, np.nan)
+        cells = np.where(np.isfinite(r), r / np.nanmedian(r), 1.0)
+        os.makedirs(LUT_DIR, exist_ok=True)
+        np.save(path, cells)
+    if wf is None:
+        return cells
+    from ess.sans.types import DetectorIDs
+    ids = wf.compute(DetectorIDs)
+    L, T, S, P = ids.shape
+    eff = np.repeat(cells, FLAT_BLOCK, axis=1)[:, :P]
+    if eff.shape[1] < P:
+        eff = np.pad(eff, ((0, 0), (0, P - eff.shape[1])), constant_values=1.0)
+    eff = np.broadcast_to(eff[None, :, None, :], (L, T, S, P)).copy()
+    return sc.array(dims=list(ids.dims), values=eff)
+
+
+def _masks_type():
+    from ess.sans.types import DetectorMasks
+    return DetectorMasks
 
 
 def masks(file, bank, wf):
@@ -161,8 +236,9 @@ def masks(file, bank, wf):
     return {"beam stop and shadows": mask}
 
 
-def workflow(file, bank="loki_detector_0", wavelength_bins=None, q_bins=None, direct=None):
-    """LokiWorkflow with the parameters of the ESS notebook, for the configuration of `file`."""
+def workflow(file, bank="loki_detector_0", wavelength_bins=None, q_bins=None, direct=None, flat=True):
+    """LokiWorkflow with the parameters of the ESS notebook, for the configuration of `file`; flat: with the flat field
+    of the pixels (flat_field)."""
     from ess import loki
     from ess.sans.types import (BeamCenter, CorrectForGravity, DetectorMasks, DirectBeam, Filename,
                                 LookupTableFilename, NeXusDetectorName, QBins, ReturnEvents, SampleRun,
@@ -177,10 +253,14 @@ def workflow(file, bank="loki_detector_0", wavelength_bins=None, q_bins=None, di
     wf[UncertaintyBroadcastMode] = UncertaintyBroadcastMode.upper_bound
     wf[ReturnEvents] = False
     wf[BeamCenter] = sc.vector([0.0, 0.0, 0.0], unit="m")          # the twin's beam is centered on the axis
-    wf[DirectBeam] = direct if direct is not None else direct_beam(file, bank)
     wf[Filename[SampleRun]] = file          # (replaced by the caller; here for the pixel numbers of the masks)
-    wf[DetectorMasks] = masks(file, bank, wf)
     wf[LookupTableFilename] = lookup_table(file)
+    wf.insert(_FLAT)
+    # pixel numbers needed by the flat field and the masks: before the masks are set (that removes their provider)
+    eff = flat_field(file, bank, wf) if flat else sc.scalar(1.0)
+    wf[DetectorMasks] = masks(file, bank, wf)
+    wf[PixelEfficiency] = eff
+    wf[DirectBeam] = direct if direct is not None else direct_beam(file, bank)
     return wf
 
 

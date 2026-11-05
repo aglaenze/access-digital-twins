@@ -9,7 +9,7 @@ boxes; copy them exactly.
 | Instrument | Technique | Web page | Console | NICOS | Python script |
 |---|---|:-:|:-:|:-:|:-:|
 | ODIN | neutron imaging | yes | yes | yes | yes |
-| LoKI | small-angle scattering (SANS) | yes | yes | yes | yes (first version) |
+| LoKI | small-angle scattering (SANS) | yes | yes | yes | yes |
 | DREAM, BIFROST | diffraction, inelastic scattering | — | — | — | — (waiting for the official McStas models) |
 
 The installation (part 1) is common to all twins. **You choose the instrument when you start it** (console:
@@ -48,8 +48,10 @@ launcher of the repository, `container/run_twin.ps1` (Windows: right-click > *Ru
 `bash container/run_twin.sh` (macOS, Linux). It downloads the image the first time, starts it and opens the
 catalogue in your browser. The steps below do the same by hand.
 
-1. **Install Docker Desktop**: https://www.docker.com/products/docker-desktop/ — install, restart if asked, then
-   start Docker Desktop and wait until it says "Engine running". (On Windows it may ask to enable WSL 2: accept.)
+1. **Install Podman Desktop** (https://podman-desktop.io, free) or **Docker Desktop**
+   (https://www.docker.com/products/docker-desktop/; paid for large organizations) — install, restart if asked, then
+   start it and wait until its engine runs. (On Windows it may ask to enable WSL 2: accept.) With Podman, type
+   `podman` instead of `docker` in the commands below. Macs with Apple Silicon (M1–M4) get an image made for them.
 2. **Open a terminal**: on Windows "PowerShell", on macOS "Terminal".
 3. **Download the image** (a few GB, a few minutes):
    ```
@@ -315,7 +317,7 @@ tomography (rotate the sample with
 
 ## Part 6 — Other instruments
 
-### LoKI (small-angle neutron scattering) — first version
+### LoKI (small-angle neutron scattering)
 
 The LoKI twin can be used from a web page, from Python, from the console and from NICOS, with both routes: route A
 (the container contains it) and route B (step 9 of the installation). It needs about 6 GB of free memory during a

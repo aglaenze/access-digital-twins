@@ -20,7 +20,7 @@ analysis notebook of the instrument (`gen_notebooks.py`). Exercises planned: `ca
 | Instrument | Folder | Technique | Status |
 |---|---|---|---|
 | ODIN | `odin/` — **read `odin/README.md`** | neutron imaging (Bragg edges, tomography, chopper modes) | working (hybrid and mcstas modes, web pages, NICOS, live data with Kafka) |
-| LoKI | `loki/` — read `loki/README.md` | small-angle neutron scattering (SANS) | first version: silica spheres, 3 collimations, 2 detector distances, pulse skipping; web page, Python, console, NICOS, live data |
+| LoKI | `loki/` — read `loki/README.md` | small-angle neutron scattering (SANS) | working: NeXus event files of the real LoKI's format reduced with esssans, sasmodels fits; 3 collimations, 2 detector distances, pulse skipping; web page, Python, console, NICOS, live data |
 | DREAM | — | powder diffraction (bispectral, time-of-flight; also single-crystal) | to do (waiting for the official McStas model) |
 | BIFROST | — | inelastic scattering: indirect-geometry time-of-flight spectrometer (cold neutrons, multiplexing analysers) | to do (waiting for the official McStas model) |
 
@@ -37,7 +37,10 @@ twin/
 ├── nicos/               NICOS: setup package nicos_twin (one sub-package per instrument, as nicos_ess) + launcher — read nicos/README.md
 ├── container/           container image (McStas + twins + NICOS + JupyterLab), built by GitHub Actions — read container/README.md
 ├── odin/                everything specific to ODIN — read odin/README.md
-└── loki/                LoKI (first version) — read loki/README.md
+├── loki/                everything specific to LoKI — read loki/README.md
+├── sample_library.py    the samples (one YAML file each: odin/samples, loki/samples, <proposal>/samples)
+├── Catalogue.ipynb      start page: the catalogue of exercises (gen_catalogue.py)
+└── Sample_builder.ipynb the sample builder of the free beamtime (gen_sample_builder.py)
 ```
 Results (outside the repository and OneDrive, no spaces in the path: McStas needs it): `<TWIN_RUN_ROOT>/<instrument>/`,
 data recorded with NICOS in `<TWIN_RUN_ROOT>/data/<instrument>/<year>/<proposal>/raw/` (as at ESS); environment variable `TWIN_RUN_ROOT`, default `~/McStas_runs/twin`
@@ -84,9 +87,9 @@ replay, chopper diagrams, progressive tomography, 3D neutron trajectories): `odi
 `voila odin/ODIN_mission.ipynb`, `python odin/show_3d.py`.
 
 ODIN data are NeXus files (ESS format), reduced with the official ESS code (`odin/odin_reduction.py`, built on
-`essimaging`); LoKI data are I(Q) per detector bank (first version). Each instrument has a step-by-step analysis
-notebook for the students: `odin/ODIN_analysis.ipynb` (transmission, Bragg edges) and `loki/LoKI_analysis.ipynb`
-(Guinier and sphere-model fits).
+`essimaging`); LoKI data are NeXus event files of the real LoKI's format, reduced with `esssans`
+(`loki/loki_reduction.py`). Each instrument has a step-by-step analysis notebook for the students:
+`odin/ODIN_analysis.ipynb` (transmission, Bragg edges) and `loki/LoKI_analysis.ipynb` (reduction, Guinier, sasmodels).
 
 ## Python environments
 
