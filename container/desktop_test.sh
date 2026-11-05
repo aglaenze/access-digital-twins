@@ -24,6 +24,7 @@ win=$(xdotool search --name "^NICOS" 2>/dev/null | head -1)
 if [ -n "$win" ]; then
   echo "PASS the NICOS window is open in the control room ($(xdotool getwindowgeometry "$win" | tr '\n' ' '))"; rc=0
 else
-  echo "FAIL no NICOS window"; tail -40 /tmp/nicos_odin.log 2>/dev/null; cat /tmp/control_room.log 2>/dev/null; rc=1
+  echo "FAIL no NICOS window"; tail -40 /tmp/nicos_odin.log 2>/dev/null; cat /tmp/control_room.log 2>/dev/null
+  echo "--- nicos_gui.log"; tail -60 "${TWIN_RUN_ROOT:-/data/twin}/nicos/nicos_gui.log" 2>/dev/null; rc=1
 fi
 exit $rc
