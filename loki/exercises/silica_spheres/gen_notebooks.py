@@ -36,6 +36,12 @@ def write(cells, name):
     print("written", name, len(cells), "cells")
 
 
+SAMPLE_CELL = r"""sys.path.insert(0, os.path.abspath("../../.."))  # the sample library (twin/sample_library.py)
+import sample_library as sl, matplotlib.pyplot as plt
+for name, hidden in sl.exercise_hidden("exercise.yml").items():
+    spec = sl.load("loki")[name]
+    print(sl.describe("loki", spec, hidden))
+    sl.draw("loki", spec, hidden=hidden, fig=plt.figure(figsize=(10, 3.5))); plt.show()"""
 md = lambda s: nbf.v4.new_markdown_cell(s.strip())
 code = lambda s: nbf.v4.new_code_cell(s.strip())
 src = nbf.read(SOURCE, as_version=4).cells
@@ -50,9 +56,29 @@ files (sample, solvent, empty beam) to the scattering curve $I(Q)$ in absolute u
 (`esssans`). Parts 5 and 6 are yours: **you write the Guinier analysis and the model fit**, and check cells tell you
 whether your results are right (the twin knows the true sample). Part 7 is about the method.
 
-Measure first, on the web page `loki/LoKI_virtual.ipynb` or in NICOS (empty beam, D₂O, silica spheres, same
-configuration), or leave `FOLDER = None` below to start with a demonstration session.
-"""), code(PATH_CELL)]
+Measure first in NICOS (empty beam, D₂O, silica spheres, same configuration; your files are in the folder of your
+proposal, `f"{TWIN_RUN_ROOT}/data/loki/<year>/<proposal>/raw"`), or leave `FOLDER = None` below to start with a
+demonstration session.
+
+**The measurements in NICOS** (open NICOS - LoKI on the Desktop of JupyterLab, log in as `student` / `student`, give
+a proposal number in the *Experiment* panel, then type in the command line or the *Scripting* tab):
+```
+move(heavy_shutter, 'Open', fast_shutter, 'Open')
+move(collimation, '3m', detector_distance, 5)
+move(sample_holder, 'empty_beam')
+with nexusfile_open('empty beam'):
+    count(t=60)
+move(sample_holder, 'd2o')
+with nexusfile_open('D2O'):
+    count(t=600)
+move(sample_holder, 'silica_spheres')
+with nexusfile_open('silica spheres'):
+    count(t=600)
+```
+Why: the solvent is subtracted from the sample, the empty beam is the reference of the transmission; all three in the
+same configuration (3 m collimation, detector at 5 m: Q from 0.006 to 0.5 Å⁻¹, enough for particles of a few nm).
+"""), code(PATH_CELL), md("**Your sample** (from the sample library; what you have to measure is shown as ?):"),
+       code(SAMPLE_CELL)]
 msc += [clean(c) for c in src[i1:i5]]
 msc += [md(r"""
 ## 5. Your turn: Guinier analysis

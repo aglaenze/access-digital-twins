@@ -89,8 +89,21 @@ fast = w.ToggleButtons(options=["closed", "open"], value=st["shutter"], descript
 coll = w.ToggleButtons(options=["3m", "5m", "8m"], value=st["collimation"], description="Collimation")
 skip = w.ToggleButtons(options=["off", "on"], value=st["pulse_skipping"], description="Pulse skipping")
 dist = w.ToggleButtons(options=[("5 m", 5.0), ("10 m", 10.0)], value=st["detector_distance"], description="Detector")
-smp = w.ToggleButtons(options=[("silica spheres", "silica_spheres"), ("D2O", "d2o"), ("empty beam", "empty_beam")],
-                      value=st["sample"], description="Sample")
+import sample_library as sl
+HIDDEN = sl.exercise_hidden("exercises/silica_spheres/exercise.yml")   # what the students have to measure
+smp = w.Dropdown(options=[(loki.sample_spec(n).get("name", n), n) for n in loki.samples()], value=st["sample"],
+                 description="Sample", layout=w.Layout(width="420px"))
+smp_out = w.Output()
+
+def show_sample(_=None):
+    with smp_out:
+        clear_output(wait=True)
+        spec = loki.sample_spec(smp.value)
+        sl.draw("loki", spec, hidden=HIDDEN.get(smp.value, []), fig=plt.figure(figsize=(10, 3.2)))
+        plt.show()
+
+smp.observe(show_sample, "value")
+show_sample()
 ttime = w.Dropdown(options=[10, 30, 60, 120, 300, 600, 1800], value=60, description="Time (s)")
 title = w.Text(value="", placeholder="e.g. silica 3m", description="Title")
 button = w.Button(description="Count", button_style="primary", icon="play", layout=w.Layout(width="auto"))
@@ -130,7 +143,7 @@ def do_count(_):
 
 button.on_click(do_count)
 show_readings()
-display(w.VBox([smp, heavy, fast, coll, skip, dist, ttime, title, button, info, out]))
+display(w.VBox([smp, smp_out, heavy, fast, coll, skip, dist, ttime, title, button, info, out]))
 """)
 
 md(r"""

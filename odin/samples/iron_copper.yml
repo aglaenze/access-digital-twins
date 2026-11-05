@@ -1,0 +1,8 @@
+name: Iron and copper, side by side
+description: >-
+  Two plates joined side by side, 5 mm thick: α-iron on the left, copper on the right. Two crystal structures (bcc and
+  fcc): their Bragg edges are at different wavelengths, which makes a map of the materials possible.
+formula: Fe / Cu
+volumes:
+  - {material: Fe_sg229_Iron-alpha.ncmat, center_mm: [-2.5, 0, 0], size_mm: [5, 10, 5]}
+  - {material: Cu_sg225.ncmat, center_mm: [2.5, 0, 0], size_mm: [5, 10, 5]}

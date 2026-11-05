@@ -45,6 +45,33 @@ odin = VirtualOdin(session=os.environ.get("ODIN_SESSION", "student"))
 """)
 
 md(r"""
+## 0. Your sample
+
+Choose the sample to mount on the stage. The drawing shows it as the neutrons see it (left: the 14 mm field of view
+of the camera, dashed) and from above (right: its thickness along the beam). The exercise of this page uses the
+**iron plate**; the other samples are there to compare.
+""")
+
+code(r"""
+import sample_library as sl
+smp = w.Dropdown(options=[(odin.sample_spec(n).get("name", n), n) for n in odin.samples()],
+                 value=odin.status()["sample"], description="Sample", layout=w.Layout(width="420px"))
+smp_out = w.Output()
+
+def show_sample(_=None):
+    with smp_out:
+        clear_output(wait=True)
+        spec = odin.sample_spec(smp.value)
+        print(sl.describe("odin", spec))
+        sl.draw("odin", spec, fig=plt.figure(figsize=(10, 4)))
+        plt.show()
+
+smp.observe(show_sample, "value")
+show_sample()
+display(w.VBox([smp, smp_out]))
+""")
+
+md(r"""
 ## 1. Operate the instrument
 
 After each count, a replay shows the detector filling up neutron by neutron, as on a live display; the
@@ -99,7 +126,7 @@ def do_count(_):
         try:
             mode, delta = chop.value
             odin.move(choppers=mode, wfm_delta=delta, shutter=shut.value, pinhole=pinh.value, diffuser=diff.value,
-                      stage_x=stage.value / 1000)
+                      stage_x=stage.value / 1000, sample=smp.value)
             print("Measuring...")
             f = odin.count(ttime.value, title=title.value)
             clear_output()

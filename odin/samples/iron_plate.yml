@@ -1,0 +1,5 @@
+name: Iron plate, 5 mm
+description: A plate of α-iron (ferrite, body-centered cubic), 10 mm × 10 mm, 5 mm thick, centered in the beam.
+formula: Fe
+volumes:
+  - {material: Fe_sg229_Iron-alpha.ncmat, center_mm: [0, 0, 0], size_mm: [10, 10, 5]}

@@ -22,6 +22,7 @@ Limits (told to students): Timepix3 field of view 14 mm × 14 mm; "mcstas" mode:
 neutrons, a long count reuses them (warning); "hybrid" mode: neutrons scattered by the sample are neglected.
 """
 import datetime as _dt
+import hashlib
 import json
 import os
 import shutil
@@ -34,6 +35,8 @@ import odin_paths as paths                      # noqa: E402  (sets sys.path)
 import odin_mcstas as tw                        # noqa: E402
 import odin_nexus as nx                         # noqa: E402
 import odin_hybrid as hy                        # noqa: E402
+sys.path.insert(0, os.path.dirname(paths.HERE))
+import sample_library as sl                     # noqa: E402  (twin/sample_library.py: the samples, one file each)
 
 RUN_ROOT = paths.RUN_ROOT
 BUILD = paths.BUILD
@@ -105,11 +108,13 @@ FAULTS = {
 }
 REFERENCE_SAMPLE = "iron_plate"    # McStas instrument used for the open-beam simulations of the hybrid model
 
-SAMPLES = {
-    # α-iron (ferrite) plate, 10 mm × 10 mm, 5 mm thick, centered in the field of view (deliberately simple)
-    "iron_plate": dict(volumes=[("Fe_sg229_Iron-alpha.ncmat", (0.0, 0.0, 0.0), (0.010, 0.010, 0.005))],
-                       name="Fe plate 5 mm", formula="Fe"),
-}
+def _odin_sample(spec):
+    return dict(volumes=sl.odin_volumes(spec), name=spec.get("name", spec["id"]), formula=spec.get("formula", ""))
+
+
+# Built-in samples: odin/samples/*.yml (sample_library). The games add their mystery plates here; the students' own
+# samples (sample builder) are read from the samples folder next to their data (VirtualOdin.samples()).
+SAMPLES = {n: _odin_sample(s) for n, s in sl.load("odin").items()}
 
 
 # --------------------------------------------------------------------------- devices
@@ -188,8 +193,29 @@ class VirtualOdin:
         self.number = self._last_number()
 
     # ------------------------------------------------------------------ NICOS-like commands
+    def samples(self):
+        """{name: sample} available: built-in (and games), then the student's own (samples folder next to the data)."""
+        out = dict(SAMPLES)
+        for n, spec in sl.load("odin", self.folder).items():
+            if spec["source"] == "student" and n not in out and not sl.validate("odin", spec):
+                out[n] = _odin_sample(spec)
+        self.devices["sample"].choices = tuple(out)
+        return out
+
+    def sample_spec(self, name=None):
+        """The description of a sample (sample_library format), for display."""
+        name = name or self.devices["sample"].value
+        lib = sl.load("odin", self.folder)
+        if name in lib:
+            return lib[name]
+        s = self.samples()[name]           # a mystery plate of a game: its material is not told
+        return dict(id=name, name=s["name"], hidden=["material"], volumes=[
+            dict(material=v[0], center_mm=[c * 1e3 for c in v[1]], size_mm=[d * 1e3 for d in v[2]]) for v in s["volumes"]])
+
     def move(self, **settings):
         """Sets one or several devices: odin.move(stage_x=0.5, shutter="open")."""
+        if "sample" in settings:
+            self.samples()                 # a sample made since the start is available at once
         for name, v in settings.items():
             if name not in self.devices:
                 if name in self.readings():
@@ -239,6 +265,7 @@ class VirtualOdin:
             self.folder = folder
             self.log_file = os.path.join(folder, "log.jsonl")
             self.number = self._last_number()
+            self.samples()
 
     def count(self, t, title="", write=True):
         """Measures for t seconds; returns the path of the NeXus file written.
@@ -268,7 +295,7 @@ class VirtualOdin:
                 raise ValueError(f"about {expected:.2g} counts expected, above the twin's limit of {MAX_COUNTS:.0e} "
                                  f"counts per file: count for at most {t * MAX_COUNTS / expected:.1f} s here "
                                  f"(or use a smaller pinhole / another chopper mode)")
-            T = hy.volumes_transmission(SAMPLES[state["sample"]]["volumes"], state["stage_x"], state["stage_rot"])
+            T = hy.volumes_transmission(self.samples()[state["sample"]]["volumes"], state["stage_x"], state["stage_rot"])
             counts = model.counts(t, transmission=T, rng=self.rng, beam_factor=beam_factor)
         else:
             counts = nx.counts_from_mcpl(self.simulate(state), t, field=FIELD, rng=self.rng,
@@ -289,7 +316,7 @@ class VirtualOdin:
         self.number += 1
         out_file = f"{self.folder}/odin_{self.number:06d}.nxs"
         r = nx.write_nexus(counts, out_file, t, title=title or f"run {self.number}",
-                           sample_name=SAMPLES[state["sample"]]["name"], det_dist=tw.DET_DIST, charge=charge,
+                           sample_name=self.samples()[state["sample"]]["name"], det_dist=tw.DET_DIST, charge=charge,
                            pulses_per_frame=ppf,
                            settings=self._nexus_settings() | nx.chopper_settings(state["choppers"], state["wfm_delta"]))
         self.last_n_counts = r["n_counts"]
@@ -372,15 +399,19 @@ class VirtualOdin:
         return self._models[key]
 
     def _instrument(self, sample):
-        if sample not in self._back:
+        vols = self.samples()[sample]["volumes"]
+        key = (sample, repr(vols))
+        if key not in self._back:
             os.makedirs(BUILD, exist_ok=True)
             shutil.copy(os.path.join(COMPONENTS, "Graphite_Diffuser_focus.comp"), BUILD)   # McStas searches BUILD
-            self._back[sample] = tw.build_back(
-                f"ODIN_twin_{sample}_{'focus' if self.focus else 'phys'}", BUILD,
-                sample=_with_rotation(_union_boxes(SAMPLES[sample]["volumes"])), det_size=FOV,
+            # the name carries a fingerprint of the geometry: a sample changed under the same name is simulated again
+            tag = sample if sample in SAMPLES else f"{sample}_{hashlib.md5(repr(vols).encode()).hexdigest()[:6]}"
+            self._back[key] = tw.build_back(
+                f"ODIN_twin_{tag}_{'focus' if self.focus else 'phys'}", BUILD,
+                sample=_with_rotation(_union_boxes(vols)), det_size=FOV,
                 diffuser=not self.focus, before_sample=_focused_diffuser if self.focus else None,
                 sample_monitors=True)   # monitors needed: Runner.complete() checks their data
-        return self._back[sample]
+        return self._back[key]
 
     def _upstream(self, state):
         """(short tag, MCPL file) of the precomputed upstream part for the chopper mode of the state."""

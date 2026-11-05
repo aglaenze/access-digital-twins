@@ -9,6 +9,9 @@ question: >-
   the spacing of the atomic planes.
 learn: Time of flight, transmission (dark, open beam, sample), Bragg's law, counting statistics, fitting.
 status: ready
+# samples of the library used by the exercise (odin/samples/*.yml); hidden: properties not shown to the students
+samples:
+  iron_plate: {}
 modes:
   bsc:
     label: Guided web page
@@ -19,8 +22,8 @@ modes:
   msc:
     label: Notebook with tasks
     what: >-
-      The same measurement, then the analysis in code: the reduction with the ESS software is given, you write the
-      Bragg-edge model and the fit, an automatic check tells you if your result is right.
+      You measure in NICOS (the commands are given), then analyze in code: the reduction with the ESS software is given, you
+      write the Bragg-edge model and the fit, an automatic check tells you if your result is right.
     duration: half a day
     open: lab
     file: odin/exercises/iron_bragg_edges/ODIN_iron_msc.ipynb

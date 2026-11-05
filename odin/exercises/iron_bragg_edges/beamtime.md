@@ -30,5 +30,9 @@ the plane spacing $d$ of a reference: a **5 mm iron plate**. The beamtime commit
 4. Analyze them with the starter notebook `ODIN_iron_beamtime.ipynb` (next to this file). The tools are there; the
    decisions are yours.
 
+**Samples**: the sample changer (`sample_holder`) holds the iron plate and other samples of the library (`sample_info()`
+describes the one mounted). For your own questions you can also design a sample with the **sample builder**
+(`Sample_builder.ipynb`, catalogue): it is saved with your proposal and appears on the sample changer.
+
 The NICOS commands of the twin are listed in `nicos/README.md`; the physics of Bragg edges is explained in the guided
 notebook `odin/ODIN_analysis.ipynb`, if you need it.

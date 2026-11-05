@@ -1,0 +1,5 @@
+name: D2O (solvent alone)
+description: The solvent alone, heavy water in the same 1 mm cell (the "background" measurement of a SANS experiment).
+model: none
+solvent: {d2o_fraction: 1.0}
+thickness_mm: 1

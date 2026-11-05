@@ -111,6 +111,30 @@ class TwinSwitch(TwinDevice, Moveable):
         return status.OK, ""
 
 
+class TwinSampleChanger(TwinSwitch):
+    """The sample changer: its list of samples comes from the twin (built-in samples, then the student's own samples
+    of the current proposal, made with the sample builder), so a new sample can be mounted at once."""
+    parameter_overrides = {"states": Override(mandatory=False, default=[])}
+
+    def _sync(self):
+        exp = session.experiment
+        if exp and exp.propinfo.get("proposal"):
+            try:
+                _request(self.twinurl, "/folder", {"folder": proposal_folder()}, timeout=30)
+            except InvalidValueError:
+                pass
+        return list(_request(self.twinurl, "/devices", timeout=30)[self.twindevice]["choices"] or [])
+
+    def doIsAllowed(self, target):
+        names = self._sync()
+        if target in names:
+            return True, ""
+        return False, f"samples available: {names} (make your own with the sample builder of JupyterLab)"
+
+    def doStart(self, target):
+        self._twin_move(target)
+
+
 class TwinReadable(TwinDevice, Readable):
     """A read-only value of the twin that follows from the settings (e.g. speed and delay of a chopper, set by the
     chopper mode), as the readback devices of the real instrument. read() always asks the twin (a value kept in the

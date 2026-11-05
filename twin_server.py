@@ -14,6 +14,7 @@ JSON over http://127.0.0.1:<port> (local connections only):
     GET  /devices                        -> description of the devices (unit, limits, choices, help)
     GET  /log                            -> actions of the session
     POST /move   {"device": value, ...}
+    POST /folder {"folder": "..."}       -> files (and the student's samples) in this folder
     POST /count  {"t": 10, "title": "...", "image": false, "write": true, "folder": null}
                  -> {"file", "number", "n_counts", ["image": detector image for live displays]}
                  write=false: no file (live image only), as a count outside a file-writing job at ESS;
@@ -73,6 +74,8 @@ class Handler(BaseHTTPRequestHandler):
                                          running=RUNNING["action"], last_number=INSTR.number, folder=INSTR.folder,
                                          mode=INSTR.mode, ready=READY.is_set()))
         if self.path == "/devices":
+            if hasattr(INSTR, "samples"):
+                INSTR.samples()            # the student's own samples appear in the list at once
             out = {n: dict(value=d.value, unit=d.unit, limits=d.limits,
                            choices=_json(d.choices) if d.choices else None, help=d.help)
                    for n, d in INSTR.devices.items()}
@@ -81,6 +84,17 @@ class Handler(BaseHTTPRequestHandler):
                     unit, hlp = INSTR.readings_help(n)
                     out[n] = dict(value=_json(v), unit=unit, limits=None, choices=None, help=hlp, readonly=True)
             return self._reply(200, out)
+        if self.path == "/sample":                             # the mounted sample: description and drawing
+            import matplotlib
+            matplotlib.use("Agg")
+            import sample_library as sl
+            spec = INSTR.sample_spec()
+            text = sl.describe(INSTR_NAME, spec)
+            folder = sl.user_folder(INSTR.folder)
+            os.makedirs(folder, exist_ok=True)
+            png = f"{folder}/{spec['id']}.png"
+            sl.draw(INSTR_NAME, spec).savefig(png, dpi=90)
+            return self._reply(200, dict(name=spec["id"], text=text, png=png))
         if self.path == "/log":
             lines = []
             if os.path.isfile(INSTR.log_file):
@@ -103,6 +117,11 @@ class Handler(BaseHTTPRequestHandler):
             return self._reply(409, dict(error=f"instrument busy ({RUNNING['action']})"))
         try:
             RUNNING["action"] = self.path
+            if self.path == "/folder":                     # data folder (NICOS proposal): its samples too
+                if not os.path.isabs(args.get("folder", "")):
+                    raise ValueError(f"folder must be an absolute path: {args.get('folder')}")
+                INSTR.use_folder(args["folder"])
+                return self._reply(200, dict(folder=INSTR.folder))
             if self.path == "/move":
                 INSTR.move(**args)
                 return self._reply(200, dict(devices=INSTR.status()))

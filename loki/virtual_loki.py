@@ -24,6 +24,9 @@ import loki_paths as paths
 import loki_mcstas as lm
 import loki_samples as ls
 import loki_nexus as lnx
+import sys as _sys
+_sys.path.insert(0, os.path.dirname(paths.HERE))
+import sample_library as sl   # noqa: E402  (twin/sample_library.py: the samples, one file each)
 
 # Configurations of the beamline upstream of the sample (collimation length): upstream part of the official model
 # (source and sample apertures, wavelength band l_min–l_max that sets the chopper phases) and number of reuses of each
@@ -88,7 +91,7 @@ class VirtualLoki:
             Device("pulse_skipping", "off", ("off", "on"),
                    "on: choppers at 7 Hz, one source pulse in two, wavelength band twice as wide (3 m collimation)"),
             Device("detector_distance", 5.0, DETECTOR_DISTANCES, "distance sample -> rear detector bank", unit="m"),
-            Device("sample", "silica_spheres", tuple(ls.SAMPLES), "sample in the beam"),
+            Device("sample", "silica_spheres", tuple(sl.load("loki")), "sample in the beam (sample changer)"),
         ]}
         self.choices = {n: d.choices for n, d in self.devices.items()}
         self.folder = None
@@ -147,6 +150,8 @@ class VirtualLoki:
             self.log_file = os.path.join(folder, "log.jsonl")
             nums = [int(f[5:11]) for f in os.listdir(folder) if f.startswith("loki_") and f.endswith((".nxs", ".h5"))]
             self.number = max(nums, default=0)
+            if hasattr(self, "choices"):
+                self.samples()
 
     @staticmethod
     def image_shape():
@@ -156,7 +161,24 @@ class VirtualLoki:
             return int(round(h / lm.TUBE_PITCH)) * lm.STRAWS, int(round(w / lm.PIX_ALONG))
         return int(round(h / lm.PIX_ALONG)), int(round(w / lm.TUBE_PITCH)) * lm.STRAWS
 
+    def samples(self):
+        """{name: (function, kwargs, thickness, mu_abs, mu_rem)} available: built-in samples (loki/samples/*.yml), then
+        the student's own (samples folder next to the data, sample builder)."""
+        out = {}
+        for n, spec in sl.load("loki", self.folder).items():
+            if spec["source"] == "built-in" or not sl.validate("loki", spec):
+                out[n] = sl.loki_sample(spec)
+        self.devices["sample"].choices = tuple(out)
+        self.choices["sample"] = tuple(out)
+        return out
+
+    def sample_spec(self, name=None):
+        """The description of a sample (sample_library format), for display."""
+        return sl.load("loki", self.folder)[name or self.state["sample"]]
+
     def move(self, **settings):
+        if "sample" in settings:
+            self.samples()                 # a sample made since the start is available at once
         for k, v in settings.items():
             if k not in self.choices:
                 if k in self.readings():
@@ -197,7 +219,7 @@ class VirtualLoki:
         cfg, repeat, reardet = self.config(st)["front"], self.config(st)["repeat"], float(st["detector_distance"])
         band, skip = self.band(st), self.pulseskip(st)
         front = lm.front(mpi=self.mpi, **cfg)
-        fn, kw, thick, mu_abs, mu_rem = ls.SAMPLES[st["sample"]]
+        fn, kw, thick, mu_abs, mu_rem = self.samples()[st["sample"]]
         if reardet not in self._det:
             self._det[reardet] = lm.Detector(reardet)
         det = self._det[reardet]
@@ -281,7 +303,7 @@ class VirtualLoki:
         for c, (freq, a, b) in chopper_settings(*self.band(st), skip).items():
             n1, n2 = ("bw_chopper1", "bw_chopper2") if c == "ch1" else ("fo_chopper1", "fo_chopper2")
             choppers[n1], choppers[n2] = (freq, a), (freq, b)
-        fn, kw, thick, _, _ = ls.SAMPLES[st["sample"]]
+        fn, kw, thick, _, _ = self.samples()[st["sample"]]
         truth = {} if fn is None else {k: v for k, v in fn(**kw)[2].items() if np.isscalar(v)}
         info = {k: float(v) for k, v in cfg.items()}                  # configuration (finds the wavelength table)
         info.update(pulseskip=int(skip), event_sampling=sampling, sample_thickness_m=float(thick),

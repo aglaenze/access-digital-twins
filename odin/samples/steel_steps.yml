@@ -1,0 +1,9 @@
+name: Steel step wedge, 2-4-6 mm
+description: >-
+  Three steps of α-iron (ferritic steel) side by side, 4 mm wide and 10 mm high, 2, 4 and 6 mm thick: the same
+  material, three thicknesses (Beer-Lambert law, transmission versus thickness).
+formula: Fe
+volumes:
+  - {material: Fe_sg229_Iron-alpha.ncmat, center_mm: [-4, 0, 0], size_mm: [4, 10, 2]}
+  - {material: Fe_sg229_Iron-alpha.ncmat, center_mm: [0, 0, 0], size_mm: [4, 10, 4]}
+  - {material: Fe_sg229_Iron-alpha.ncmat, center_mm: [4, 0, 0], size_mm: [4, 10, 6]}

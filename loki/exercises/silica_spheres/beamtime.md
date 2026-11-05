@@ -21,6 +21,10 @@ committee asks for:
   do you need for particles of a few nanometers?), counting times, which reference measurements the reduction needs.
 - Mistakes are allowed, as at a real instrument. Some combinations are refused by the instrument: find out why.
 
+**Samples**: `sample_info()` describes the sample mounted. To go further (another particle size, a contrast with
+H₂O/D₂O), design your own sample with the **sample builder** (`Sample_builder.ipynb`, catalogue): it is saved with
+your proposal and appears on the sample changer.
+
 ## How to
 
 1. Open **NICOS LoKI**: in JupyterLab, *File > New Launcher > Desktop*, then the menu *Applications > NICOS - LoKI*

@@ -1,0 +1,3 @@
+name: Empty beam
+description: Nothing on the sample position (the transmission reference of a SANS experiment).
+empty: true

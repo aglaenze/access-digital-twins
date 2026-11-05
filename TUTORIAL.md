@@ -301,6 +301,10 @@ r["image"].plot()          # transmission image
 ```
 (files 1, 2, 3 = dark, open beam, sample, in the order you measured them).
 
+**Other samples**: the page and NICOS offer several samples (`steel_steps`, `iron_copper`, ...;
+`move(sample_holder, 'steel_steps')`, `sample_info()` describes it). For a free beamtime you can design your own with
+the sample builder, `Sample_builder.ipynb` (see README.md, "Samples").
+
 **Going further**: other chopper modes (`move(choppers, "natural")`, `"white"`; in NICOS, the devices `wfm1_speed`,
 `bpc1_delay`, ... show the speed and delay of each chopper, which follow the mode: compare them in the three modes),
 tomography (rotate the sample with

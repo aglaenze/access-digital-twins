@@ -37,6 +37,12 @@ def write(cells, name):
     print("written", name, len(cells), "cells")
 
 
+SAMPLE_CELL = r"""sys.path.insert(0, os.path.abspath("../../.."))  # the sample library (twin/sample_library.py)
+import sample_library as sl, matplotlib.pyplot as plt
+for name, hidden in sl.exercise_hidden("exercise.yml").items():
+    spec = sl.load("odin")[name]
+    print(sl.describe("odin", spec, hidden))
+    sl.draw("odin", spec, hidden=hidden, fig=plt.figure(figsize=(10, 3.5))); plt.show()"""
 md = lambda s: nbf.v4.new_markdown_cell(s.strip())
 code = lambda s: nbf.v4.new_code_cell(s.strip())
 src = nbf.read(SOURCE, as_version=4).cells
@@ -55,9 +61,27 @@ Parts 1 to 5 are guided: they take your files from the raw neutrons to the trans
 official ESS reduction. Part 6 is yours: **you write the model and the fit**, and a check cell tells you whether your
 result is right (the twin knows the true sample). Part 7 is about the method itself: a systematic error to track down.
 
-Measure first, on the web page `odin/ODIN_virtual.ipynb` or in NICOS (a dark, an open beam and the iron plate), or
-leave `FOLDER = None` below to start with a short demonstration session.
-"""), code(PATH_CELL)]
+Measure first in NICOS (a dark, an open beam and the iron plate; your files are in the folder of your proposal,
+`f"{TWIN_RUN_ROOT}/data/odin/<year>/<proposal>/raw"`), or leave `FOLDER = None` below to start with a short
+demonstration session.
+
+**The measurements in NICOS** (open NICOS - ODIN on the Desktop of JupyterLab, log in as `student` / `student`, give
+a proposal number in the *Experiment* panel, then type in the command line or the *Scripting* tab):
+```
+move(shutter, 'closed')
+with nexusfile_open('dark'):
+    count(t=30)
+move(shutter, 'open', stage_x, 500)
+with nexusfile_open('open beam'):
+    count(t=60)
+move(stage_x, 0)
+with nexusfile_open('iron plate'):
+    count(t=60)
+```
+Why these settings: the choppers (WFM, δ = 0.30 m) and the pinhole stay the same for the three runs, so that the
+open beam can divide the sample run; the stage is moved 500 mm aside for the open beam (the field of view is 14 mm).
+"""), code(PATH_CELL), md("**Your sample** (from the sample library; what you have to measure is shown as ?):"),
+       code(SAMPLE_CELL)]
 for c in src[i1:i6]:
     msc.append(FOLDER_CELL if c.cell_type == "code" and c.source.lstrip().startswith("from odin_paths import TWIN_RUN_ROOT")
                and "FOLDER" in c.source else clean(c))

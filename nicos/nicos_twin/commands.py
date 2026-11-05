@@ -21,7 +21,7 @@ from nicos.utils import printTable
 
 from nicos_twin.devices import proposal_folder
 
-__all__ = ["nexusfile_open", "start_filewriting", "stop_filewriting", "list_filewriting_jobs"]
+__all__ = ["nexusfile_open", "start_filewriting", "stop_filewriting", "list_filewriting_jobs", "sample_info"]
 
 _JOBS = []          # dicts: number, title, start, stop, files
 
@@ -102,3 +102,19 @@ def list_filewriting_jobs():
               time.strftime(fmt, time.localtime(j["stop"])) if j["stop"] else '', ', '.join(j["files"])]
              for j in _JOBS]
     printTable(['job', 'status', 'title', 'start time', 'stop time', 'files'], items, session.log.info)
+
+
+@usercommand
+def sample_info():
+    """Describes the sample mounted on the instrument (material, shape, sizes) and saves its drawing.
+
+    >>> sample_info()
+    """
+    from nicos_twin.devices import _request
+    dev = session.getDevice("sample_holder")
+    if session.experiment.propinfo.get("proposal"):
+        _request(dev.twinurl, "/folder", {"folder": proposal_folder()}, timeout=30)
+    r = _request(dev.twinurl, "/sample", timeout=120)
+    for line in r["text"].splitlines():
+        session.log.info(line)
+    session.log.info("drawing of the sample: %s (open it in JupyterLab)", r["png"])

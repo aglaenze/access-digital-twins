@@ -1,0 +1,8 @@
+name: Silica nanoparticles in D2O
+description: Monodisperse silica spheres dispersed in heavy water, dilute (no interaction), in a 1 mm cell.
+model: sphere
+parameters: {radius: 50}
+particle: silica
+volume_fraction: 0.01
+solvent: {d2o_fraction: 1.0}
+thickness_mm: 1

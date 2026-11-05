@@ -90,8 +90,9 @@ def card(e):
         extra = ""
         if key == "beamtime":
             extra = (f'<div class="extra"><a href="../../desktop/" target="_blank">Desktop (NICOS)</a>'
-                     f'<a href="{link(dict(open="lab", file=m["analysis"]))}" target="_blank">starter notebook</a></div>'
-                     if m.get("analysis") else "")
+                     f'<a href="{link(dict(open="lab", file=m["analysis"]))}" target="_blank">starter notebook</a>'
+                     f'<a href="{link(dict(open="voila", file="Sample_builder.ipynb"))}" target="_blank">sample builder</a>'
+                     '</div>' if m.get("analysis") else "")
         modes.append(f'<div style="flex:1 1 280px"><a class="mode" style="background:{color};display:block" '
                      f'href="{link(m)}" target="_blank"><span class="badge">{label} · {esc(m.get("duration", ""))}</span>'
                      f'<b>{esc(m["label"])}</b><span>{esc(m.get("what", ""))}</span></a>{extra}</div>')
@@ -131,7 +132,7 @@ display(HTML(CSS + TABS + " ".join(css) + "</style>" + '<div class="cat tabs"><h
 
 md(r"""
 **How the three ways in differ.** The **BSc** page gives the settings and explains them; you measure with a button
-and answer questions. The **MSc** notebook shows the code: the reduction with the ESS software is given, and you write
+and answer questions (no NICOS at this level). The **MSc** level measures in NICOS (the commands are given), then the notebook shows the code: the reduction with the ESS software is given, and you write
 the analysis yourself, with automatic checks. The **beamtime** is the real thing: a proposal, a budget, the NICOS
 control program of the instrument (open it from the *Desktop* of JupyterLab), and your own decisions.
 """)

@@ -177,6 +177,13 @@ Installation (route B, Windows): Java (`conda create -n kafka -c conda-forge ope
 (the Kafka devices of the ESS NICOS need the last three). In the container everything is
 installed: `docker run ... -e TWIN_LIVE=1 ... nicos`.
 
+### Samples
+
+`sample_holder` (device `TwinSampleChanger`) is the sample changer: its list comes from the twin, i.e. the built-in
+samples of the instrument and the student's own samples of the current proposal (made with `Sample_builder.ipynb`,
+saved in `<proposal>/samples/`): `move(sample_holder, 'steel_steps')`. `sample_info()` prints the description of the
+mounted sample (materials, sizes; for LoKI particles, solvent, cell) and saves its drawing in `<proposal>/samples/`.
+
 ## 4. Files
 
 | File | Role |
