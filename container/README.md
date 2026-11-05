@@ -23,6 +23,7 @@ and runs identically on a laptop, a DTU server, UCloud or ESS's VISA.
 | `environment-nicos.yml` | environment of NICOS (Python 3.12, numpy 1.26); NICOS's `requirements.txt` is installed on top |
 | `start.sh` | entry point: `jupyter` (default), `voila`, `nicos`, `test`, or any command |
 | `run_twin.ps1`, `run_twin.sh`, `app_icon.*` | the twins as an app on a laptop (Windows; macOS/Linux): installs the icon, pulls, starts, opens the app window, stops when it is closed |
+| `run_app_local.ps1`, `control_room_local.py`, `open_nicos.ipynb` | the same app without the container, on a Windows computer where the twins are installed by hand (route B; teachers, developers): icon "ESS digital twins (local)", port 8890; *Open NICOS* opens the choice of the instrument and NICOS as windows of the computer |
 | `app_config/` | Jupyter settings of the app: no JupyterLab interface switcher, no file browser in the notebook view |
 | `control_room.sh`, `control_room.py` | the "desktop" behind *Open NICOS*: the choice of the instrument, then the NICOS window alone, full screen and logged in |
 | `desktop_test.sh`, `browser_desktop_test.sh` | GitHub Actions: the control room (choice of the instrument, then the NICOS window), and the app start page and the control room in Chrome (screenshots kept as an artifact of the run) |

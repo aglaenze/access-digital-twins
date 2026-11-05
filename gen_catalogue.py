@@ -34,6 +34,9 @@ import yaml
 from IPython.display import display, HTML
 
 ROOT = os.path.abspath(".")
+# Open NICOS: in the container, the control room (remote screen, /desktop/); in the local app (twins installed by
+# hand, container/run_app_local.ps1), a page that opens the control room as windows of the computer
+NICOS_URL = "../../voila/render/container/open_nicos.ipynb" if os.environ.get("TWIN_APP_LOCAL") else "../../desktop/"
 INSTRUMENTS = {
     "odin": dict(name="ODIN", kind="Imaging", text="Radiography and tomography with neutrons, wavelength by wavelength"),
     "loki": dict(name="LoKI", kind="Small-angle scattering", text="Sizes and shapes of nanostructures, 1-100 nm"),
@@ -130,7 +133,7 @@ def card(e):
             modes.append(f'<div style="flex:1 1 280px"><a class="mode" style="background:{color};display:block" '
                          f'href="{link(m)}" target="_blank">{head}</a></div>')
             continue
-        nicos = '<a class="btn nicos" href="../../desktop/" target="_blank">Open NICOS</a>' if m.get("nicos") or key == "msc" else ""
+        nicos = f'<a class="btn nicos" href="{NICOS_URL}" target="_blank">Open NICOS</a>' if m.get("nicos") or key == "msc" else ""
         if key == "msc":
             btns = f'<a class="btn" href="{link(m)}" target="_blank">Open the notebook</a>{nicos}'
             extra = ""

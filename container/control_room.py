@@ -3,7 +3,8 @@ ESS instrument. Prints the chosen instrument (odin, loki) and exits; started by 
 NICOS for that instrument. Runs with the Python of the nicos environment (PyQt5).
 
 Test mode: CONTROL_ROOM_INSTRUMENT=odin chooses ODIN by itself after CONTROL_ROOM_DELAY seconds (default 5);
-CONTROL_ROOM_SCREENSHOT=<file.png> saves a picture of the screen.
+CONTROL_ROOM_SCREENSHOT=<file.png> saves a picture of the screen. CONTROL_ROOM_WINDOWED=1: a window instead of the
+full screen (local app on a computer with its own desktop, control_room_local.py).
 """
 import os
 import sys
@@ -24,7 +25,8 @@ def main():
                     " font-size: 22px; text-align: left;}"
                     "QPushButton:hover {background: #33968A;}")
     lay = QVBoxLayout(w)
-    lay.setContentsMargins(200, 120, 200, 120)
+    windowed = bool(os.environ.get("CONTROL_ROOM_WINDOWED"))
+    lay.setContentsMargins(*((40, 30, 40, 30) if windowed else (200, 120, 200, 120)))
     lay.setSpacing(24)
     title = QLabel("Which instrument?")
     title.setStyleSheet("font-size: 40px; font-weight: bold;")
@@ -52,7 +54,13 @@ def main():
     shot = os.environ.get("CONTROL_ROOM_SCREENSHOT")             # (documentation: a picture of this screen)
     if shot:
         QTimer.singleShot(800, lambda: w.grab().save(shot))
-    w.showFullScreen()
+    if windowed:
+        w.resize(860, 520)
+        w.show()
+        w.raise_()
+        w.activateWindow()
+    else:
+        w.showFullScreen()
     app.exec_()
     print(choice.get("instrument", ""))
 

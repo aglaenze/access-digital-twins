@@ -7,6 +7,7 @@
 # Needs Podman Desktop (free, recommended) or Docker Desktop, both with WSL2. Teachers: TWIN_IMAGE, TWIN_PORT.
 $ErrorActionPreference = "Continue"
 Add-Type -AssemblyName System.Windows.Forms
+[System.Net.WebRequest]::DefaultWebProxy = $null      # no proxy for localhost (the detection of the proxy makes the first requests time out)
 $AppName = "ESS digital twins"
 $Image = if ($env:TWIN_IMAGE) { $env:TWIN_IMAGE } else { "ghcr.io/aglaenze/access-digital-twins:latest" }
 $Port = if ($env:TWIN_PORT) { $env:TWIN_PORT } else { "8888" }
