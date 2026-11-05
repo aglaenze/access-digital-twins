@@ -115,6 +115,8 @@ def sample_info():
     if session.experiment.propinfo.get("proposal"):
         _request(dev.twinurl, "/folder", {"folder": proposal_folder()}, timeout=30)
     r = _request(dev.twinurl, "/sample", timeout=120)
+    ascii_ = {"α": "alpha", "γ": "gamma", "×": "x", "Å": "A", "²": "2", "₂": "2", "⁻": "-", "¹": "1", "ρ": "rho",
+              "φ": "phi"}                        # the NICOS log of a Windows console cannot write them
     for line in r["text"].splitlines():
-        session.log.info(line)
+        session.log.info("".join(ascii_.get(c, c) for c in line))
     session.log.info("drawing of the sample: %s (open it in JupyterLab)", r["png"])

@@ -2,8 +2,8 @@
 # The digital twins on your own computer (macOS, Linux), as an app: downloads the container image the first time,
 # starts it, and opens the catalogue of exercises in your web browser. Needs Podman (free, recommended) or Docker.
 #   bash run_twin.sh            # then work in the browser; Ctrl+C here to stop
-# Your files stay in the volume "twin-data" (kept between sessions). Apple Silicon (M1-M4): the image is built for
-# Intel/AMD processors and runs emulated, more slowly.
+# Your files stay in the volume "twin-data" (kept between sessions). The image exists for Intel/AMD and for ARM
+# (Apple Silicon M1-M4): Podman or Docker downloads the right one.
 set -e
 IMAGE="${TWIN_IMAGE:-ghcr.io/aglaenze/access-digital-twins:latest}"
 PORT="${TWIN_PORT:-8888}"

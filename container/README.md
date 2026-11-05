@@ -67,10 +67,12 @@ GB, once), start it with the volume `twin-data`, and open the catalogue in the b
 Podman Desktop on Windows and macOS) or Docker (Docker Desktop is paid for organizations of more than 250 people).
 On Windows and macOS both run a small Linux virtual machine (WSL2 on Windows), which the first installation sets up.
 Limits of a laptop: the first measurement of a new sample or configuration runs McStas (minutes on 4 cores instead of
-seconds to a minute on a server); Apple Silicon Macs run the image emulated (built for Intel/AMD), more slowly; and
-no central logbook (teaching follow-up, didactics research) unless the files are collected.
+seconds to a minute on a server), and no central logbook (teaching follow-up, didactics research) unless the files
+are collected. The image exists for Intel/AMD (amd64) and ARM (arm64: Apple Silicon Macs, ARM servers): GitHub
+Actions builds and tests both, each on its own machine, and `:latest` holds both (Podman and Docker pick the right
+one; `:latest-amd64` and `:latest-arm64` name them explicitly). On ARM the NICOS window uses Qt 5 from conda-forge.
 
 ## Still to do
 
 - JupyterHub (one container per student, accounts) for a course; where to run it (DTU server, UCloud, VISA).
-- An image for ARM processors (Apple Silicon), built by GitHub Actions as well.
+- Check the ARM image on a real Apple Silicon Mac (tested on GitHub's ARM machines only).

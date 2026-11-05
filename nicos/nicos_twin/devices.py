@@ -133,6 +133,10 @@ class TwinSampleChanger(TwinSwitch):
 
     def doStart(self, target):
         self._twin_move(target)
+        try:                               # the sample of the experiment (Sample panel of the ESS GUI, file metadata)
+            session.experiment.sample.samplename = str(target)
+        except Exception:                  # noqa: BLE001 (no sample device in this setup)
+            pass
 
 
 class TwinReadable(TwinDevice, Readable):
