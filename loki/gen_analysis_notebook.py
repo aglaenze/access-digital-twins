@@ -204,8 +204,9 @@ The ESS workflow (`esssans`, `LokiWorkflow`, the same code as for the real LoKI)
 3. **normalization** by the incident monitor: per wavelength, how many neutrons were sent;
 4. **transmission** $T(\lambda)$: the transmission monitor of the sample (or solvent) run divided by that of the empty
    beam, each normalized by its incident monitor;
-5. **solid angle** of each pixel, and the **direct-beam function** $D(\lambda)$, the calibration that makes the result
-   absolute (measured by the instrument team with a standard of known cross-section);
+5. **solid angle** of each pixel times its efficiency (the **flat field**: not all pixels detect equally well; the
+   instrument team measures it with a flat scatterer), and the **direct-beam function** $D(\lambda)$, the calibration
+   that makes the result absolute (measured with a standard of known cross-section);
 6. **background subtraction**: $I_\text{sample} - I_\text{solvent}$, each normalized as above.
 
 The result, divided by the thickness of the sample (1 mm), is the differential scattering cross-section per unit
