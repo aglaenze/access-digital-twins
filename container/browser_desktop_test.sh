@@ -5,8 +5,9 @@
 set -u
 IMAGE="${1:-twin:test}"
 mkdir -p shots && chmod 777 shots
+# (bash -c: a first word "jupyter" would be taken by start.sh as its own entry point, with a random token)
 docker run -d --name jl -p 8888:8888 -e TWIN_MPI=4 "$IMAGE" \
-  jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --IdentityProvider.token=test --ServerApp.root_dir=/home/mambauser/twin
+  bash -c "exec jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --IdentityProvider.token=test --ServerApp.root_dir=/home/mambauser/twin"
 for i in $(seq 1 60); do curl -sf "http://localhost:8888/api/status?token=test" > /dev/null && break; sleep 2; done
 echo "desktop page: HTTP $(curl -s -o /dev/null -w '%{http_code}' "http://localhost:8888/desktop/?token=test")"
 CHROME=$(command -v google-chrome || command -v chromium || command -v chromium-browser)
