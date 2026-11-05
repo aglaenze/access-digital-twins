@@ -48,6 +48,19 @@ def main():
         b.clicked.connect(lambda _, k=key: pick(k))
         lay.addWidget(b)
     lay.addStretch(1)
+    request = os.path.expanduser("~/.control_room_request")    # written by the button "Open NICOS" of an exercise
+
+    def follow_request():
+        if os.path.isfile(request):
+            with open(request) as f:
+                key = f.read().strip()
+            os.remove(request)
+            if key in dict((k, n) for k, n, _ in INSTRUMENTS):
+                pick(key)
+
+    poll = QTimer()
+    poll.timeout.connect(follow_request)
+    poll.start(1000)
     auto = os.environ.get("CONTROL_ROOM_INSTRUMENT")
     if auto:
         QTimer.singleShot(int(float(os.environ.get("CONTROL_ROOM_DELAY", "5")) * 1000), lambda: pick(auto))

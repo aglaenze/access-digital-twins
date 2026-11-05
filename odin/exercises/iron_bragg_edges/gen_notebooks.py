@@ -65,7 +65,7 @@ Measure first in NICOS (a dark, an open beam and the iron plate; your files are 
 `f"{TWIN_RUN_ROOT}/data/odin/<year>/<proposal>/raw"`), or leave `FOLDER = None` below to start with a short
 demonstration session.
 
-**The measurements in NICOS** (click *Open NICOS* in the app and choose ODIN: NICOS opens, ready; give a proposal
+**The measurements in NICOS** (click *Open NICOS* in the app: NICOS of ODIN opens, ready; give a proposal
 number in the *Experiment* panel, then type in the command line or the *Scripting* tab):
 ```
 move(shutter, 'closed')
@@ -80,7 +80,7 @@ with nexusfile_open('iron plate'):
 ```
 Why these settings: the choppers (WFM, δ = 0.30 m) and the pinhole stay the same for the three runs, so that the
 open beam can divide the sample run; the stage is moved 500 mm aside for the open beam (the field of view is 14 mm).
-"""), code(PATH_CELL), md("**Your sample** (from the sample library; what you have to measure is shown as ?):"),
+"""), code(PATH_CELL), md("**Your sample** (from the sample library):"),
        code(SAMPLE_CELL)]
 for c in src[i1:i6]:
     msc.append(FOLDER_CELL if c.cell_type == "code" and c.source.lstrip().startswith("from odin_paths import TWIN_RUN_ROOT")

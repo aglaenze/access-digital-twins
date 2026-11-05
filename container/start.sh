@@ -16,6 +16,7 @@ case "${1:-jupyter}" in
   jupyter) fetch
            mkdir -p "$TWIN_RUN_ROOT/work" && ln -sfn "$TWIN_RUN_ROOT/work" "$HOME/twin/work"   # students' notebooks, kept
            export JUPYTER_CONFIG_PATH="$HOME/twin/container/app_config"                        # no file browser
+           export JUPYTER_PATH="$HOME/twin/container/app_data"                                 # Voila template (formulas)
            [ $# -gt 0 ] && shift
            exec jupyter server --ip=0.0.0.0 --port=8888 --no-browser --ServerApp.root_dir="$HOME/twin" \
                 --ServerApp.default_url=/voila/render/Catalogue.ipynb "$@" ;;

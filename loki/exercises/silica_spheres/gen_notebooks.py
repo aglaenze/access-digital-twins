@@ -60,7 +60,7 @@ Measure first in NICOS (empty beam, D₂O, silica spheres, same configuration; y
 proposal, `f"{TWIN_RUN_ROOT}/data/loki/<year>/<proposal>/raw"`), or leave `FOLDER = None` below to start with a
 demonstration session.
 
-**The measurements in NICOS** (click *Open NICOS* in the app and choose LoKI: NICOS opens, ready; give a proposal
+**The measurements in NICOS** (click *Open NICOS* in the app: NICOS of LoKI opens, ready; give a proposal
 number in the *Experiment* panel, then type in the command line or the *Scripting* tab):
 ```
 move(heavy_shutter, 'Open', fast_shutter, 'Open')
@@ -77,7 +77,7 @@ with nexusfile_open('silica spheres'):
 ```
 Why: the solvent is subtracted from the sample, the empty beam is the reference of the transmission; all three in the
 same configuration (3 m collimation, detector at 5 m: Q from 0.006 to 0.5 Å⁻¹, enough for particles of a few nm).
-"""), code(PATH_CELL), md("**Your sample** (from the sample library; what you have to measure is shown as ?):"),
+"""), code(PATH_CELL), md("**Your sample** (from the sample library):"),
        code(SAMPLE_CELL)]
 msc += [clean(c) for c in src[i1:i5]]
 msc += [md(r"""

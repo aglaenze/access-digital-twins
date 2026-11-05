@@ -25,7 +25,7 @@ and runs identically on a laptop, a DTU server, UCloud or ESS's VISA.
 | `run_twin.ps1`, `run_twin.sh`, `app_icon.*` | the twins as an app on a laptop (Windows; macOS/Linux): installs the icon, pulls, starts, opens the app window, stops when it is closed |
 | `run_app_local.ps1`, `control_room_local.py`, `open_nicos.ipynb` | the same app without the container, on a Windows computer where the twins are installed by hand (route B; teachers, developers): icon "ESS digital twins (local)", port 8890; *Open NICOS* opens the choice of the instrument and NICOS as windows of the computer |
 | `app_config/` | Jupyter settings of the app: no JupyterLab interface switcher, no file browser in the notebook view |
-| `control_room.sh`, `control_room.py` | the "desktop" behind *Open NICOS*: the choice of the instrument, then the NICOS window alone, full screen and logged in |
+| `control_room.sh`, `control_room.py`, `open_nicos.ipynb` | the "desktop" behind *Open NICOS*: NICOS of the instrument of the exercise (asked by the page `open_nicos.ipynb`; otherwise a choice of the instrument), the NICOS window alone, full screen and logged in |
 | `desktop_test.sh`, `browser_desktop_test.sh` | GitHub Actions: the control room (choice of the instrument, then the NICOS window), and the app start page and the control room in Chrome (screenshots kept as an artifact of the run) |
 | `fetch_fronts.py` | downloads the precomputed McStas upstream parts (release `fronts-v1`) into `$TWIN_RUN_ROOT/odin/front/` |
 | `smoke_test.py` | test run after each build: tools, a measurement with the virtual ODIN compared with NCrystal, NICOS services and a measurement recorded through NICOS (`nexusfile_open`, as at ESS) |

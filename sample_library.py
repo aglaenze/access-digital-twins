@@ -240,11 +240,26 @@ def describe(instrument, spec, hidden=()):
                              for p, v in (spec.get("parameters") or {}).items())
             lines.append(f"  particles: {q('particle', spec.get('particle', '?'))}, shape {q('model', spec['model'])}"
                          f" ({pars}), volume fraction {q('volume_fraction', f'{100 * float(spec['volume_fraction']):g} %')}")
+    if hidden:
+        lines.append("  ? = not given: this is what you have to measure")
     return "\n".join(lines)
+
+
+def _sharp_figures():
+    """In Jupyter, figures drawn at twice the resolution (sharp on all screens) instead of the default 72 dpi PNG."""
+    try:
+        from IPython import get_ipython
+        ip = get_ipython()
+        if ip is not None:
+            from matplotlib_inline.backend_inline import set_matplotlib_formats
+            set_matplotlib_formats("retina")
+    except Exception:
+        pass
 
 
 def draw(instrument, spec, hidden=(), fig=None):
     """Figure of the sample as the student would see it on the sample table (hidden properties not shown)."""
+    _sharp_figures()
     import matplotlib.pyplot as plt
     from matplotlib.patches import Circle, Rectangle
     hidden = set(hidden or spec.get("hidden", []))

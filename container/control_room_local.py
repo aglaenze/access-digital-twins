@@ -1,5 +1,5 @@
 """The control room of the local app (twins installed by hand, no container: container/run_app_local.ps1): the choice
-of the instrument (control_room.py, in a window), then NICOS with its window (nicos/start_nicos.py), stopped when the
+of the instrument (given with --instrument by the button, otherwise control_room.py in a window), then NICOS with its window (nicos/start_nicos.py), stopped when the
 NICOS window is closed. Started by the button "Open NICOS" of the catalogue, through container/open_nicos.ipynb.
 Does nothing if NICOS is already running (its daemon answers on port 1301)."""
 import os
@@ -26,9 +26,11 @@ def nicos_running():
 def main():
     if nicos_running():
         return
-    env = dict(os.environ, CONTROL_ROOM_WINDOWED="1")
-    instr = subprocess.run([NICOS_PY, os.path.join(HERE, "control_room.py")], capture_output=True, text=True,
-                           env=env, creationflags=NO_WINDOW).stdout.strip()
+    instr = sys.argv[sys.argv.index("--instrument") + 1] if "--instrument" in sys.argv else ""
+    if not instr:      # (no instrument given: the choice in a window)
+        env = dict(os.environ, CONTROL_ROOM_WINDOWED="1")
+        instr = subprocess.run([NICOS_PY, os.path.join(HERE, "control_room.py")], capture_output=True, text=True,
+                               env=env, creationflags=NO_WINDOW).stdout.strip()
     if instr:
         subprocess.run([sys.executable, os.path.join(ROOT, "nicos", "start_nicos.py"), "--instrument", instr,
                         "--until-gui-closes"], cwd=ROOT, creationflags=NO_WINDOW,

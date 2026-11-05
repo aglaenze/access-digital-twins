@@ -27,7 +27,7 @@ your proposal and appears on the sample changer.
 
 ## How to
 
-1. Click **Open NICOS** (above) and choose LoKI: the NICOS window of the instrument opens, ready.
+1. Click **Open NICOS** (above): the NICOS window of LoKI opens, ready.
 2. Enter the proposal number **3001** in the *Experiment* panel.
 3. Record data with `nexusfile_open`, e.g. `with nexusfile_open('silica 3m'): count(t=600)`.
    Your files go to `data/loki/2026/3001/raw`.

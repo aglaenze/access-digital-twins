@@ -1,0 +1,14 @@
+{#- The pages of the app: the "lab" template of Voila, plus MathJax for the formulas of the markdown cells (the lab
+    template of Voila 0.5 removes it, so $...$ stayed as raw text). Selected by app_config/voila.json. -#}
+{%- extends 'lab/index.html.j2' -%}
+{%- block html_head_js_mathjax -%}
+<script>
+window.MathJax = {
+  tex: {inlineMath: [['$', '$'], ['\(', '\)']], displayMath: [['$$', '$$'], ['\[', '\]']], processEscapes: true},
+  options: {skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']}
+};
+// cells arrive one by one (progressive rendering): typeset again when the page is complete, and after the widgets
+window.addEventListener('load', () => setTimeout(() => window.MathJax.typesetPromise && window.MathJax.typesetPromise(), 1500));
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-chtml.js"></script>
+{%- endblock html_head_js_mathjax -%}

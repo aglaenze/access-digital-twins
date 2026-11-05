@@ -268,8 +268,9 @@ just-bin-it, installed as in `nicos/README.md`, "Live data"). A count then takes
 `live_tof`), as on the real instrument where the neutrons are streamed by Kafka and histogrammed by just-bin-it.
 
 ### With the graphical interface (route A, in the container: in your browser)
-In the app: button **Open NICOS** of an MSc or beamtime exercise (by hand: the address `/desktop/` of the server).
-The control room opens in a new window: click **ODIN** (or LoKI); after about a minute the NICOS window is there,
+In the app: button **Open NICOS** of an MSc or beamtime exercise: NICOS of the instrument of the exercise opens (by
+hand: the address `/desktop/` of the server, where you choose the instrument).
+The control room opens in a new window; after about a minute the NICOS window is there,
 full screen and logged in. Continue as in steps 1–3 above. Close the NICOS window to stop NICOS and come back to the
 choice of the instrument.
 

@@ -22,7 +22,7 @@ the plane spacing *d* of a reference: a **5 mm iron plate**. The beamtime commit
 
 ## How to
 
-1. Click **Open NICOS** (above) and choose ODIN: the NICOS window of the instrument opens, ready.
+1. Click **Open NICOS** (above): the NICOS window of ODIN opens, ready.
 2. Enter the proposal number **1234** in the *Experiment* panel. Without it NICOS does not record data, as at ESS.
 3. Record data with `nexusfile_open`, e.g. `with nexusfile_open('my title'): count(t=60)`.
    Your files go to `data/odin/2026/1234/raw`.

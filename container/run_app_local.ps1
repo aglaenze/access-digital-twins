@@ -50,6 +50,7 @@ if (-not ($Token -and (Alive $Token))) {
     $Token = -join ((48..57) + (97..122) | Get-Random -Count 24 | ForEach-Object { [char]$_ })
     Set-Content $TokFile $Token
     $env:JUPYTER_CONFIG_PATH = Join-Path $Twin "container\app_config"
+    $env:JUPYTER_PATH = Join-Path $Twin "container\app_data"          # Voila template of the app (formulas)
     $env:TWIN_APP_LOCAL = "1"
     # (through cmd for the log file: Start-Process -RedirectStandardError would keep this script waiting)
     $Log = Join-Path $State "server.log"

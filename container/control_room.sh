@@ -11,7 +11,11 @@ xfwm4 --compositor=off >/dev/null 2>&1 &                      # window manager (
 NICOS_PY=/opt/conda/envs/nicos/bin/python
 TWIN_PY=/opt/conda/envs/mcstas/bin/python
 while true; do
-  instr=$($NICOS_PY container/control_room.py 2>/tmp/control_room.log)
+  if [ -s "$HOME/.control_room_request" ]; then              # the button "Open NICOS" of an exercise: its instrument
+    instr=$(cat "$HOME/.control_room_request"); rm -f "$HOME/.control_room_request"
+  else                                                         # otherwise the choice (it also follows the button)
+    instr=$($NICOS_PY container/control_room.py 2>/tmp/control_room.log)
+  fi
   [ -z "$instr" ] && { sleep 1; continue; }
   $TWIN_PY nicos/start_nicos.py --instrument "$instr" --until-gui-closes --session nicos \
     > "/tmp/nicos_$instr.log" 2>&1 &
