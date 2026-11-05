@@ -105,7 +105,7 @@ def show_sample(_=None):
         clear_output(wait=True)
         spec = loki.sample_spec(smp.value)
         sl.draw("loki", spec, hidden=HIDDEN.get(smp.value, []), fig=plt.figure(figsize=(10, 3.2)))
-        plt.show()
+        sl.show()
 
 smp.observe(show_sample, "value")
 show_sample()

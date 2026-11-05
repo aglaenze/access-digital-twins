@@ -42,7 +42,7 @@ import sample_library as sl, matplotlib.pyplot as plt
 for name, hidden in sl.exercise_hidden("exercise.yml").items():
     spec = sl.load("odin")[name]
     print(sl.describe("odin", spec, hidden))
-    sl.draw("odin", spec, hidden=hidden, fig=plt.figure(figsize=(10, 3.5))); plt.show()"""
+    sl.draw("odin", spec, hidden=hidden, fig=plt.figure(figsize=(10, 3.5))); sl.show()"""
 md = lambda s: nbf.v4.new_markdown_cell(s.strip())
 code = lambda s: nbf.v4.new_code_cell(s.strip())
 src = nbf.read(SOURCE, as_version=4).cells

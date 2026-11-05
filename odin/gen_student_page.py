@@ -69,7 +69,7 @@ def show_sample(_=None):
         spec = odin.sample_spec(smp.value)
         print(sl.describe("odin", spec))
         sl.draw("odin", spec, fig=plt.figure(figsize=(10, 4)))
-        plt.show()
+        sl.show()
 
 smp.observe(show_sample, "value")
 show_sample()

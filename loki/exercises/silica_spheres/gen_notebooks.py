@@ -41,7 +41,7 @@ import sample_library as sl, matplotlib.pyplot as plt
 for name, hidden in sl.exercise_hidden("exercise.yml").items():
     spec = sl.load("loki")[name]
     print(sl.describe("loki", spec, hidden))
-    sl.draw("loki", spec, hidden=hidden, fig=plt.figure(figsize=(10, 3.5))); plt.show()"""
+    sl.draw("loki", spec, hidden=hidden, fig=plt.figure(figsize=(10, 3.5))); sl.show()"""
 md = lambda s: nbf.v4.new_markdown_cell(s.strip())
 code = lambda s: nbf.v4.new_code_cell(s.strip())
 src = nbf.read(SOURCE, as_version=4).cells

@@ -62,7 +62,7 @@ def _hint(item, hints):
     if not hints:
         return ""
     n = sum(1 for a in item["answers"]) - (1 if item["state"] == "right" else 0)
-    return " **Hint:** " + hints[min(max(n, 1), len(hints)) - 1]
+    return "<br>**Hint:** " + hints[min(max(n, 1), len(hints)) - 1]
 
 
 def _run_root():
@@ -174,6 +174,7 @@ class Quiz:
                 return
             known = next((txt for v, txt in mistakes if close(x, v)), None)
             msg = known or ("too large." if x > value else "too small.")
+            msg = msg if msg.rstrip()[-1:] in ".!?" else msg + "."
             fb.value = _box("no", f"**Not quite**: {x:g} {unit} is {msg}" + _hint(item, hints))
             reveal.layout.display = ""
 

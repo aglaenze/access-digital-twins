@@ -130,7 +130,7 @@ def view(_):
             return
         print(sl.describe(instr.value, spec))
         sl.draw(instr.value, spec, fig=plt.figure(figsize=(10, 4)))
-        plt.show()
+        sl.show()
         if instr.value == "loki":
             q, I, truth = sl.loki_cross_section(spec)
             fig, ax = plt.subplots(figsize=(6, 4))

@@ -245,21 +245,24 @@ def describe(instrument, spec, hidden=()):
     return "\n".join(lines)
 
 
-def _sharp_figures():
-    """In Jupyter, figures drawn at twice the resolution (sharp on all screens) instead of the default 72 dpi PNG."""
-    try:
-        from IPython import get_ipython
-        ip = get_ipython()
-        if ip is not None:
-            from matplotlib_inline.backend_inline import set_matplotlib_formats
-            set_matplotlib_formats("retina")
-    except Exception:
-        pass
+def show(fig=None):
+    """Shows a figure in Jupyter at twice the resolution (sharp on all screens), at its normal size. Used instead of
+    plt.show() after draw(): the global "retina" setting of matplotlib could block Voila pages."""
+    import io
+    import struct
+    import matplotlib.pyplot as plt
+    from IPython.display import Image, display
+    fig = fig or plt.gcf()
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=2 * fig.dpi, bbox_inches="tight")
+    plt.close(fig)
+    data = buf.getvalue()
+    width = struct.unpack(">I", data[16:20])[0] // 2              # PNG header: width in pixels
+    display(Image(data=data, width=width))
 
 
 def draw(instrument, spec, hidden=(), fig=None):
     """Figure of the sample as the student would see it on the sample table (hidden properties not shown)."""
-    _sharp_figures()
     import matplotlib.pyplot as plt
     from matplotlib.patches import Circle, Rectangle
     hidden = set(hidden or spec.get("hidden", []))
