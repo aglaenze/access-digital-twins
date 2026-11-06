@@ -23,6 +23,7 @@ RUN cmake --preset=release && cmake --build --preset=release --target kafka-to-n
 RUN K2N="$(find build/Release -type f -name kafka-to-nexus -perm -u+x | head -1)" \
     && mkdir -p /dist/bin /dist/lib && cp "$K2N" /dist/bin/ \
     && find build/Release -name '*.so*' \( -type f -o -type l \) -exec cp -a {} /dist/lib/ \; \
+    && find /root/.conan/data -path '*/package/*/lib/*.so*' \( -type f -o -type l \) -exec cp -a {} /dist/lib/ \; \
     && ldd "$K2N" | awk '/=> \// {print $3}' | grep -v -E '^/lib|^/usr/lib' | xargs -r -I{} cp -L {} /dist/lib/ \
     && cp /K2N_VERSION /dist/
 # every library found (otherwise the build stops here)
