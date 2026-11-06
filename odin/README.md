@@ -1,6 +1,8 @@
 # ODIN digital twin: complete guide
 
 *Created 2026-11-03.* Part of the ACCESS digital twins (`../README.md`). NICOS: `../nicos/README.md`.
+**The McStas model of ODIN is the official one of ESS**: https://git.esss.dk/dmsc-instrumentmodels/odin (packages
+`ODIN_instr` and `odin_support`; commit `ea4fc94e` in the container), not written here.
 This folder contains a virtual ODIN that is operated like the real instrument, writes NeXus files in the ESS format,
 and whose data go through the official ESS reduction code (`essimaging`). It is a teaching tool: everything is
 explained, and every approximation is stated and checked.

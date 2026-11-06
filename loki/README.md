@@ -4,6 +4,8 @@
 arrangement of objects from ~1 to ~100 nm (particles, pores, polymers, membranes). This folder is the start of its
 digital twin, built like the ODIN twin (`../odin/`), from the official McStas model of LoKI and from the French LoKI
 notebook series of this project, where every step of the simulation and of the reduction is explained and validated.
+**The McStas model of LoKI is the official one of ESS**: https://git.esss.dk/dmsc-instrumentmodels/LOKI
+(`instr/LOKI_main.instr`; commit `00fc29c7` in the container), not written here.
 
 **Status (2026-11-05): NeXus event files in the format of the real LoKI, reduced with the ESS software (`esssans`),
 analyzed with `sasmodels` (the engine of SasView).** Three collimations, two detector distances, pulse skipping

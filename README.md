@@ -63,7 +63,22 @@ twin/
 Results (outside the repository and OneDrive, no spaces in the path: McStas needs it): `<TWIN_RUN_ROOT>/<instrument>/`,
 data recorded with NICOS in `<TWIN_RUN_ROOT>/data/<instrument>/<year>/<proposal>/raw/` (as at ESS); environment variable `TWIN_RUN_ROOT`, default `~/McStas_runs/twin`
 (`C:/Users/<user>/McStas_runs/twin` on Windows). Each instrument folder is self-contained (its McStas engine, components,
-pages); the McStas models of the instruments themselves are the official ESS ones, installed as Python packages.
+pages); the McStas models of the instruments themselves are the official ESS ones (below).
+
+## Where the instrument models come from
+
+The McStas models of the instruments are **not** written here: they are the official models of ESS, maintained by
+the instrument teams and DMSC in the group **dmsc-instrumentmodels** of the ESS GitLab, https://git.esss.dk/dmsc-instrumentmodels/:
+
+| Instrument | Official model | Used as | Version in the container |
+|---|---|---|---|
+| ODIN | https://git.esss.dk/dmsc-instrumentmodels/odin | Python packages `ODIN_instr` and `odin_support` (`pip install -e`) | commit `ea4fc94e` |
+| LoKI | https://git.esss.dk/dmsc-instrumentmodels/LOKI | the instrument file `instr/LOKI_main.instr` (`LOKI_REPO`) | commit `00fc29c7` |
+
+The twins cut these models in two (upstream part, recorded once as MCPL files; the sample and detector part, simulated
+at each count), add the samples, the NeXus files of the real instruments and NICOS; the physics of the instruments
+(source, guides, choppers, detectors) is that of the official models. The versions are fixed in
+`container/Containerfile` (`ODIN_COMMIT`, `LOKI_COMMIT`); the details are in `odin/README.md` and `loki/README.md`.
 
 ## Samples
 
