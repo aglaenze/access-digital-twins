@@ -1,4 +1,4 @@
-# One exercise of the catalogue (python gen_catalogue.py, at the root of the repository).
+# One exercise of the catalogue of the app (read by container/twin_app.py: no generation needed).
 title: Unknown metals (game)
 instrument: odin
 technique: Wavelength-resolved imaging (Bragg edges)

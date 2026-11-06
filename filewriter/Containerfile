@@ -19,10 +19,11 @@ WORKDIR /src
 RUN conan install . -if=build/Release -s build_type=Release --build=missing --profile=linux_x86_64_gcc11
 RUN cmake --preset=release && cmake --build --preset=release --target kafka-to-nexus
 # the program and the shared libraries it needs, in one folder
-RUN mkdir -p /dist/bin /dist/lib && cp "$(find build/Release -type f -name kafka-to-nexus -perm -u+x | head -1)" /dist/bin/ \
+# (the libraries: as the built program finds them, in the build tree and in the Conan cache, e.g. libcrypt.so.2)
+RUN K2N="$(find build/Release -type f -name kafka-to-nexus -perm -u+x | head -1)" \
+    && mkdir -p /dist/bin /dist/lib && cp "$K2N" /dist/bin/ \
     && find build/Release -name '*.so*' \( -type f -o -type l \) -exec cp -a {} /dist/lib/ \; \
-    && LD_LIBRARY_PATH=/dist/lib ldd /dist/bin/kafka-to-nexus | awk '/=> \// {print $3}' | grep -v -E '^/lib|^/usr/lib|^/dist' \
-       | xargs -r -I{} cp -L {} /dist/lib/ \
+    && ldd "$K2N" | awk '/=> \// {print $3}' | grep -v -E '^/lib|^/usr/lib' | xargs -r -I{} cp -L {} /dist/lib/ \
     && cp /K2N_VERSION /dist/
 # every library found (otherwise the build stops here)
 RUN if LD_LIBRARY_PATH=/dist/lib ldd /dist/bin/kafka-to-nexus | grep "not found"; then exit 1; fi

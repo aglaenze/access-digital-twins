@@ -1,4 +1,4 @@
-# Exercises planned but not built yet: shown greyed in the catalogue (Catalogue.ipynb).
+# Exercises planned but not built yet: shown greyed in the catalogue of the app.
 # An exercise that is built has its own folder <instrument>/exercises/<name>/ with an exercise.yml.
 - title: Inside an object without opening it
   instrument: odin

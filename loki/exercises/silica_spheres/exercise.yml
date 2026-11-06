@@ -1,4 +1,4 @@
-# One exercise of the catalogue (python gen_catalogue.py, at the root of the repository).
+# One exercise of the catalogue of the app (read by container/twin_app.py: no generation needed).
 # Paths are relative to the root of the repository.
 title: How big are these nanoparticles?
 instrument: loki

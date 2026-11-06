@@ -166,7 +166,7 @@ async function selftest(out) {
     await js(`document.querySelector("#recovery form button").click(); true`);
     const t0 = Date.now();
     await wait(`(!document.querySelector("#app").classList.contains("hidden") && document.querySelectorAll(".ex").length > 0)
-      || document.querySelector("#auth-error").textContent !== ""`, 1200);
+      || document.querySelector("#auth-error").textContent !== ""`, 3000);   // (container: the first start downloads GB)
     const err = await js(`document.querySelector("#auth-error").textContent`);
     if (err) log("error shown: " + err);
     check("signed in", await js(`!document.querySelector("#app").classList.contains("hidden")`), t0);

@@ -170,7 +170,7 @@ class Backend {
           throw new Error("The server stopped: see " + path.join(this.dataDir, "server.log"));
         }
         // the first start of the container downloads the recorded beams (MCPL files): up to ~15 min
-        const limit = this.mode === "container" ? 20 * 60000 : 4 * 60000;
+        const limit = this.mode === "container" ? 45 * 60000 : 4 * 60000;
         if (Date.now() - t0 > limit) throw new Error(`The server did not answer within ${limit / 60000} minutes.`);
         const f = Math.min(0.95, 0.4 + (Date.now() - t0) / 60000 * 0.5);
         this.onStatus("Starting the instruments…", f);

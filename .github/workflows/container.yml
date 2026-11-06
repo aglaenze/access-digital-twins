@@ -65,9 +65,6 @@ jobs:
           mkdir -p shots && chmod 777 shots
           docker run --rm -v "$PWD/shots:/data/shots" -e TWIN_MPI=4 twin:test bash container/desktop_test.sh /data/shots
 
-      - name: Desktop and catalogue in the web browser (screenshots)
-        continue-on-error: true
-        run: bash container/browser_desktop_test.sh twin:test
 
       - uses: actions/setup-node@v4
         if: matrix.arch == 'amd64'

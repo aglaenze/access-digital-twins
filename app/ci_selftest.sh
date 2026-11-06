@@ -11,7 +11,7 @@ node node_modules/electron/install.js            # the Electron binary (in case 
 mkdir -p "$OUT"
 DATA="$(mktemp -d)"
 TWIN_BACKEND=container TWIN_ENGINE=docker TWIN_IMAGE="$IMAGE" TWIN_APP_DATA="$DATA" TWIN_APP_SELFTEST="$OUT" \
-  timeout 1800 xvfb-run -a -s "-screen 0 1600x1000x24" npx electron . --no-sandbox || rc=$?
+  timeout 3600 xvfb-run -a -s "-screen 0 1600x1000x24" npx electron . --no-sandbox || rc=$?
 cat "$OUT/selftest.log" || true
 echo "--- server log of the container"; docker logs ess-twins-app 2>&1 | tail -30 || true
 grep -q "SELFTEST PASSED" "$OUT/selftest.log"

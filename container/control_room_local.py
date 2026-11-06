@@ -1,4 +1,4 @@
-"""The control room of the local app (twins installed by hand, no container: container/run_app_local.ps1): the choice
+"""The control room of the local app (twins installed by hand, no container: the app in local mode, app/README.md): the choice
 of the instrument (given with --instrument by the button, otherwise control_room.py in a window), then NICOS with its window (nicos/start_nicos.py), stopped when the
 NICOS window is closed. Started by the button "Open NICOS" of the catalogue, through container/open_nicos.ipynb.
 Does nothing if NICOS is already running (its daemon answers on port 1301)."""

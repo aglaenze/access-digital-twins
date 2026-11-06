@@ -20,8 +20,8 @@ at ESS. The examples of parts 2–4 use **ODIN** (iron plate); part 6 gives the 
 a web page, a console, or NICOS, the control software of the real ESS instruments. Part 5 tells you where your data are
 and how to analyze them; part 6 covers the other instruments.
 
-**In a course** you will rather start from the **catalogue of exercises** (`Catalogue.ipynb`, the start page of the
-container): choose the instrument, then an exercise, then the way in: a guided web page (BSc), a notebook with tasks
+**In a course** you will rather use the **app** (first section above): its catalogue of exercises: choose the
+instrument, then an exercise, then the way in: a guided web page (BSc), a notebook with tasks
 and automatic checks (MSc), or a beamtime with NICOS (a proposal, a budget, your own decisions).
 
 Expect: 20–60 min for the installation (mostly downloads), a few minutes per measurement session.
@@ -30,30 +30,29 @@ Expect: 20–60 min for the installation (mostly downloads), a few minutes per m
 
 ## Students: the app (nothing else to read)
 
-1. Install **Podman Desktop** (https://podman-desktop.io, free) and start it once (it sets itself up).
-2. Download the launcher: [run_twin.ps1](container/run_twin.ps1) (Windows) or [run_twin.sh](container/run_twin.sh)
-   (macOS, Linux). **Windows**: right-click it > *Run with PowerShell*. **macOS, Linux**: in a terminal,
-   `bash run_twin.sh`. This is done **once**: it puts the icon **ESS digital twins** on your desktop, downloads the
-   twins (several GB, 10–30 min) and opens the app.
-3. From then on: **double-click ESS digital twins**. A window opens on the catalogue of exercises: choose the
-   instrument, the exercise and your level. To stop, close the window (macOS: *Quit*, ⌘Q).
+1. Install **Podman Desktop** (https://podman-desktop.io, free) and start it once: it sets itself up. The app runs the
+   instruments in it.
+2. Download the app for your computer from https://github.com/aglaenze/access-digital-twins/releases/tag/app-latest:
+   **Windows** the `.exe`, **macOS** the `.dmg` (`arm64` for Apple Silicon M1–M4, `x64` for Intel), **Linux** the
+   `.AppImage`. Install it (Windows: double-click; it installs for you only, no administrator rights; macOS: drag it
+   to *Applications*).
+   The app is not signed yet: **Windows** says "Windows protected your PC": *More info* > *Run anyway*; **macOS**
+   refuses the first time: *System Settings* > *Privacy & Security* > *Open Anyway*.
+3. Open **ESS digital twins**. The first time it downloads the instruments (several GB, 10–30 min, once). Create your
+   account (name, email, password); **write down the recovery code** it shows: it lets you choose a new password if
+   you forget yours.
 
-Each exercise gives you a **role and a mission** (why the measurement matters), and its questions are interactive:
-click *Check*; a wrong answer is explained, and you can show the answer; *My results* gives your score and a report to
-download. Besides the exercises, each instrument offers a **free beamtime**: your own question, your own samples.
+Then: choose an instrument and an exercise in the catalogue; it opens in a tab of the app; come back to the catalogue
+when you want: your work is kept (answers, measurements, notebooks). Each exercise gives you a **role and a mission**;
+its questions are interactive (a wrong answer is explained, with a hint; you can show the answer). At the end of an
+exercise, **Submit my work** makes a file: save it and send it to your teacher (email, or the course page).
 
-What you see depends on your level. **BSc**: only this window (a guided page; no code, no NICOS). **MSc and free
-beamtime**: the notebook of your exercise (your own copy, kept between sessions) and the button **Open NICOS**: the
-control room of the instrument opens, you choose ODIN or LoKI, and the NICOS window is there, logged in. There are no
-files to look for and no other program to learn.
+What you see depends on your level. **BSc**: guided pages, no code, no NICOS. **MSc**: a notebook; you measure first
+in NICOS (button *Open NICOS* in the notebook, step by step), then you analyze. **Beamtime** and **free beamtime**: your
+proposal, your sample (the sample builder), NICOS and your analysis, all from the starter notebook.
 
 The rest of this guide is for teachers and for students who want to go further (console, scripts, local installation).
-**New (teachers, for now): the app** [app/](app/README.md): a real application window with accounts (sign in with
-your name, email and a password), the catalogue with your progress, the exercises in tabs, and *Submit* at the end of each exercise (a file to send to your teacher).
-Students will get it as an installer.
-
-With the local installation (route B, Windows), the same app exists without the container: run
-`container/run_app_local.ps1` once (right-click > *Run with PowerShell*), then double-click **ESS digital twins (local)**.
+Teachers with the local installation (route B, Windows) run the app from the repository: `twin/app/README.md`.
 
 ---
 
@@ -98,7 +97,7 @@ with JupyterLab and all the files (for teachers, and for the console and script 
    http://127.0.0.1:8888/lab?token=3f2a...
    ```
 5. **Open that address** (the one with `127.0.0.1` and the token) in your browser: you see JupyterLab, with the files
-   of the twin on the left. The start page of the exercises is `Catalogue.ipynb`: right-click > *Open With > Voilà*.
+   of the twin on the left (the exercises themselves are used through the app).
 6. **Check that everything works** (optional, 2 min): in JupyterLab, *File → New → Terminal*, then
    ```
    python container/smoke_test.py
