@@ -32,7 +32,9 @@ state (started, submitted) are put aside in `TWIN_RUN_ROOT/progress/<account>/_o
 measurements stay); the next opening makes a clean copy (`/twin/reset`, `../container/twin_kernels.py` not involved).
 
 **Kernels kept ready** (`../container/twin_kernels.py`, faster pages): **off** by default (`TWIN_KERNEL_POOL=1` to try):
-a notebook given a kept kernel froze once in two tries on 2026-11-06; fresh kernels never did.
+a notebook given a kept kernel froze once in two tries on 2026-11-06; fresh kernels never did. Two faults found
+and fixed since (a kept kernel lost its folder and the student's environment when restarted; a start without
+environment failed when the pool was empty), the freeze itself not reproduced.
 
 **Password forgotten.** The accounts are on this computer: no email can reset a password. At the creation of an
 account the app shows a **recovery code** (once; only its hash is kept); *Forgot your password?* on the sign-in screen

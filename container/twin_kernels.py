@@ -9,7 +9,10 @@ student, the address of the page: QUERY_STRING...), as a new kernel would have; 
 
 Used by the server of the app (app/backend.js, container/start.sh) only with TWIN_KERNEL_POOL=1: OFF by default.
 On 2026-11-06 a notebook given a kept kernel froze once in two tries (its cells stopped running, without error), a
-fresh kernel never did; to be understood before it is used.
+fresh kernel never did. Found and fixed on 2026-11-07 (test: 4 notebooks run through the server, cells with matplotlib,
+widgets, sleeps, then Restart kernel): a kept kernel restarted in the folder of the server, without the student's
+environment (a new kernel restarts in the folder of its notebook); and a kernel asked for without an environment while
+the pool was empty failed to start (error 500). The freeze itself was not reproduced: still off by default.
 """
 import asyncio
 import json
@@ -77,11 +80,17 @@ class PooledKernelManager(AsyncMappingKernelManager):
                 self.log.warning("twin_kernels: kept kernel %s not usable (%s)", kid, e)
                 await super().shutdown_kernel(kid, now=True)
                 continue
+            # a restart (Restart kernel in JupyterLab) relaunches the kernel with its launch arguments: those of a new
+            # kernel of this notebook, not those of the pool (folder of the server, environment without the student)
+            launch = self.get_kernel(kid)._launch_args
+            if isinstance(launch, dict):
+                launch.update(cwd=os.path.abspath(cwd), env=environ)
             self.log.info("twin_kernels: kernel %s given for %s", kid, path)
             asyncio.ensure_future(self.fill())
             return kid
-        kid = await super().start_kernel(*args, kernel_id=kernel_id, path=path, kernel_name=kernel_name, env=env,
-                                         **kwargs)
+        if env is not None:                                  # (env=None given on would fail in jupyter_client)
+            kwargs["env"] = env
+        kid = await super().start_kernel(*args, kernel_id=kernel_id, path=path, kernel_name=kernel_name, **kwargs)
         asyncio.ensure_future(self.fill())
         return kid
 
