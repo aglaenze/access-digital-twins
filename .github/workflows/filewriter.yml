@@ -40,7 +40,8 @@ jobs:
       - name: It runs
         run: |
           docker run --rm filewriter:test cat /opt/kafka-to-nexus/K2N_VERSION
-          docker run --rm filewriter:test kafka-to-nexus --help | head -40
+          docker run --rm filewriter:test kafka-to-nexus --help > help.txt   # (fails here if it does not start)
+          head -40 help.txt
       - name: Publish
         if: github.event_name != 'pull_request'
         run: |

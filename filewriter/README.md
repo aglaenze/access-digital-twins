@@ -9,7 +9,7 @@ file-writer writes them, from the streams of the twin, as at ESS.
 | Step | What | Status |
 |---|---|---|
 | 1 | Build `kafka-to-nexus` from its sources (Linux only: C++, Conan 1 with the configuration of ECDC); image `ghcr.io/aglaenze/access-digital-twins-filewriter` (`Containerfile`, workflow `filewriter.yml`) | started |
-| 2 | The twin publishes what the file-writer reads: the neutrons (`ev44`, already done for the live data), the values of the devices (`f144`: a small "forwarder" of the twin), the monitors | to do |
+| 2 | The twin publishes what the file-writer reads: the neutrons (`ev44`, already done for the live data), the values of the devices (`f144`: `kafka/forwarder.py`, `TWIN_FORWARD=1`), the monitors | devices done 2026-11-06 (checked with the local Kafka: 29 values at start, then each change); monitors to do |
 | 3 | NICOS sends the start/stop commands (`pl72`/`6s4t`) with the NeXus structure (JSON) of the instrument, built from the template of the real file (the devices of the ESS NICOS for the file-writer, `nicos_ess`) | to do |
 | 4 | Compare the file of the file-writer with the file of the twin; the ESS reduction (essimaging, esssans) on it; then the twin stops writing its own files | to do |
 
