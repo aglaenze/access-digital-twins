@@ -68,7 +68,36 @@ def fake_measurement(src, out, start_ns):
     return out
 
 
+def topics_tool(argv, brokers="127.0.0.1:9092"):
+    """--create-topics T...: creates them (one partition); --show-topics T...: the kinds of the messages on them."""
+    from confluent_kafka import Consumer, TopicPartition
+    from confluent_kafka.admin import AdminClient, NewTopic
+    names = argv[1:]
+    if argv[0] == "--create-topics":
+        admin = AdminClient({"bootstrap.servers": brokers})
+        existing = admin.list_topics(timeout=20).topics
+        new = [NewTopic(t, 1, 1) for t in names if t not in existing]
+        for fut in (admin.create_topics(new).values() if new else []):
+            fut.result(30)
+        print("topics created:", [t.topic for t in new])
+        return
+    c = Consumer({"bootstrap.servers": brokers, "group.id": f"show-{time.time()}", "enable.auto.commit": False})
+    for t in names:
+        lo, hi = c.get_watermark_offsets(TopicPartition(t, 0), timeout=20)
+        c.assign([TopicPartition(t, 0, lo)])
+        kinds = []
+        while len(kinds) < hi - lo:
+            m = c.poll(5)
+            if m is None:
+                break
+            if not m.error():
+                kinds.append(m.value()[4:8].decode(errors="replace"))
+        print(f"{t}: {hi - lo} messages: {' '.join(kinds)}")
+
+
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] in ("--create-topics", "--show-topics"):
+        return topics_tool(sys.argv[1:])
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("--root", required=True)
     p.add_argument("--instrument", required=True)

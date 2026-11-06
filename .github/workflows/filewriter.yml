@@ -76,12 +76,18 @@ jobs:
           status=0
           for instr in odin loki; do
             src=$ODIN_SRC; [ $instr = loki ] && src=$LOKI_SRC
+            # its topics exist before it starts (it would not see a topic created after its subscription)
+            python filewriter/e2e_test.py --create-topics ${instr}_filewriter ${instr}_filewriter_pool
             docker run -d --name fw_$instr --network host -v /tmp/fw:/tmp/fw filewriter:test kafka-to-nexus \
               --brokers 127.0.0.1:9092 --command-status-topic ${instr}_filewriter \
-              --job-pool-topic ${instr}_filewriter_pool --hdf-output-prefix / --hdf-template-prefix /tmp/fw/templates
+              --job-pool-topic ${instr}_filewriter_pool --hdf-output-prefix / --hdf-template-prefix /tmp/fw/templates \
+              -v Debug
+            sleep 10
             echo "::group::$instr"
             timeout 900 python filewriter/e2e_test.py --root /tmp/fw --instrument $instr --src "$src" || status=1
-            echo "--- file-writer log"; docker logs fw_$instr 2>&1 | tail -40
+            echo "--- file-writer"; docker ps -a --filter name=fw_$instr; docker logs fw_$instr 2>&1 | tail -60
+            echo "--- messages on the topics of the file-writer"
+            python filewriter/e2e_test.py --show-topics ${instr}_filewriter ${instr}_filewriter_pool || true
             kafka_up || { echo "--- Kafka is down:"; docker ps -a; docker logs kafka 2>&1 | tail -60; }
             echo "::endgroup::"
             docker rm -f fw_$instr
