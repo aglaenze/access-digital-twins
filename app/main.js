@@ -209,6 +209,7 @@ async function selftest(out) {
       await new Promise((r) => setTimeout(r, 1000));
     }
     const m = /^(\d+)\/(\d+) errors (\d+)/.exec(st);
+    log("locked cells: " + await js(`document.querySelectorAll(".pane.on webview")[0].executeJavaScript("(() => { const w = window.jupyterapp.shell.currentWidget; const cs = w.content.widgets; return cs.filter(c => c.readOnly).length + ' read-only of ' + cs.length; })()")`).catch((e) => "?"));
     check(`notebook run at opening (${st})`, !!m && m[3] === "0" && (m[1] === m[2] || / stop$/.test(st)), t3);
     await new Promise((r) => setTimeout(r, 2000));
     await shot("5_notebook");

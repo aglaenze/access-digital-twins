@@ -28,6 +28,20 @@ def clean(c):
     return c
 
 
+# The cells where the student works stay free; all the others are locked (they still run): a student cannot break
+# the notebook by mistake, and can always add cells of their own.
+FREE_CODE = ("# your", "= None", "PROPOSAL =", "FOLDER =", "DARK, OPEN, SAMPLE =", "SAMPLE = ", "ROI =")
+FREE_TEXT = ("## Results for the committee", "## My question", "## My answer", "## Your analysis")
+
+
+def lock(c):
+    free = (c.cell_type == "code" and (not c.source.strip() or any(k in c.source for k in FREE_CODE))) or \
+           (c.cell_type == "markdown" and c.source.startswith(FREE_TEXT))
+    if not free:
+        c.metadata["editable"] = False
+        c.metadata["deletable"] = False
+
+
 HIDDEN_START = ("q.", "q_.", "import submit", "nb_tools.", "import nb_tools" + chr(10) + "nb_tools.nicos(")
 
 
@@ -49,6 +63,8 @@ def write(cells, name):
             if c.source.lstrip().startswith(HIDDEN_START) or "nb_tools.proposal(" in c.source:
                 c.metadata["jupyter"] = {"source_hidden": True}
         out.append(c)
+    for c in out:
+        lock(c)
     cells = out
     nb["cells"] = cells
     nb["metadata"] = {"kernelspec": {"display_name": "Python 3", "language": "python", "name": "python3"},

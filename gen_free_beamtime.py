@@ -65,6 +65,10 @@ def main():
                      "your notebook."))
         cells.append(nbf.v4.new_code_cell(f"import submit" + chr(10) + f"_ = submit.Submit(\"{instr}/exercises/free_beamtime\", "
                                           f"\"free\", title=\"Free beamtime on {name}\")"))
+        cells[-1].metadata["jupyter"] = {"source_hidden": True}
+        for c in (cells[0], cells[-2], cells[-1]):        # the cells made here are locked too (they still run)
+            c.metadata["editable"] = False
+            c.metadata["deletable"] = False
         out = os.path.join(ROOT, instr, "exercises", "free_beamtime")
         os.makedirs(out, exist_ok=True)
         f = os.path.join(out, f"{name}_free_beamtime.ipynb")
