@@ -27,7 +27,7 @@ def clean(c):
     return c
 
 
-HIDDEN_START = ("q.", "q_.", "import submit", "import nb_tools" + chr(10) + "nb_tools.nicos(")
+HIDDEN_START = ("q.", "q_.", "import submit", "nb_tools.", "import nb_tools" + chr(10) + "nb_tools.nicos(")
 
 
 def write(cells, name):
@@ -45,7 +45,7 @@ def write(cells, name):
                     out.append(c)
                     c = nbf.v4.new_code_cell(tail)
                     break
-            if c.source.lstrip().startswith(HIDDEN_START):
+            if c.source.lstrip().startswith(HIDDEN_START) or "nb_tools.proposal(" in c.source:
                 c.metadata["jupyter"] = {"source_hidden": True}
         out.append(c)
     cells = out
@@ -246,8 +246,12 @@ up to you. Keep notes of your choices: they are part of your report.
            "rg, drg, i0 = None, None, None                     # Guinier [Å, Å, cm⁻¹]\n"
            "radius, dradius, phi, dphi = None, None, None, None  # sphere model [Å, Å, -, -]\n"
            "ex.check_guinier(rg, drg, i0)\nex.check_sphere(radius, dradius, phi, dphi)")]
-bt[1:1] = [md("**Your beamtime.** Your proposal (below, folded), NICOS to measure, the sample builder for your own samples:"),
-          code("import sys, os\nsys.path.insert(0, os.path.abspath(\"../../..\"))\nimport nb_tools\nnb_tools.beamtime_tools(\"loki\", \"loki/exercises/silica_spheres/beamtime.md\")")]
+bt[1:1] = [md('**Your proposal** (click to open it):'),
+           code('import sys, os' + chr(10) + 'sys.path.insert(0, os.path.abspath("../../.."))' + chr(10) + 'import nb_tools' + chr(10) + 'nb_tools.proposal("loki/exercises/silica_spheres/beamtime.md")'),
+           md("## 1. Your sample\n\nThe sample changer of LoKI holds the samples of the library (in NICOS, `sample_info()` describes the one mounted). For your own question, design a sample with the sample builder: particles of the kinds you choose (spheres, cylinders, core-shell spheres, as many kinds as you want) in a H2O/D2O solvent. It is saved with your proposal and appears on the sample changer of NICOS: `move(sample_holder, 'its_name')`."),
+           code('nb_tools.sample_builder("loki", "3001")'),
+           md("## 2. Your measurements, in NICOS\n\nTab *Experiment*: give the *Proposal ID* of your proposal, then **Apply**. Record with `with nexusfile_open('my title'): count(t=60)`; your files go to the folder of your proposal (below). The measurements and their counting times are your decisions: your budget is in your proposal."),
+           code('nb_tools.nicos("loki")')]
 bt += [md("## Submit your work\n\nWhen you are done: save this notebook (*Save*), then submit. The file for your teacher is made from your measurements and your notebook."),
        code("import submit\n_ = submit.Submit(\"loki/exercises/silica_spheres\", \"beamtime\")")]
 write(bt, "LoKI_silica_beamtime.ipynb")

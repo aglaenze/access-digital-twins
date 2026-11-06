@@ -73,3 +73,5 @@ body .twq-ans { background: var(--tw-soft); color: var(--tw-text); }
 .widget-radio-box { height: auto !important; }
 .twq .widget-checkbox, .twq .widget-checkbox label { height: auto !important; white-space: normal !important; line-height: 1.45; }
 .twq .widget-button.mod-primary { align-self: flex-start; }
+/* icon-only buttons (remove a volume of the sample builder) */
+.jupyter-button[title="remove"] { padding: 0 !important; min-width: 40px; width: 40px !important; }

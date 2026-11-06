@@ -18,18 +18,24 @@ function toast(text, ms = 5000) {
 }
 
 // ------------------------------------------------------------------ sign in
-let creating = false;
-function setMode(c) {
-  creating = c;
-  $("#auth").classList.toggle("new", c);
-  $("#tab-in").classList.toggle("on", !c);
-  $("#tab-new").classList.toggle("on", c);
-  $("#go").textContent = c ? "Create my account" : "Sign in";
-  $("#f-pw").autocomplete = c ? "new-password" : "off";
+let creating = false, resetting = false;
+const GO = () => (resetting ? "Set my new password" : creating ? "Create my account" : "Sign in");
+function setMode(c, reset = false) {
+  creating = c && !reset;
+  resetting = reset;
+  $("#auth").classList.toggle("new", creating);
+  $("#auth").classList.toggle("reset", resetting);
+  $("#tab-in").classList.toggle("on", !creating);
+  $("#tab-new").classList.toggle("on", creating);
+  $("#go").textContent = GO();
+  $("#f-pw-label").textContent = resetting ? "New password" : "Password";
+  $("#f-pw").autocomplete = creating || resetting ? "new-password" : "off";
   $("#auth-error").textContent = "";
 }
 $("#tab-in").onclick = () => setMode(false);
 $("#tab-new").onclick = () => setMode(true);
+$("#forgot").onclick = (e) => { e.preventDefault(); setMode(false, true); };
+$("#back-in").onclick = (e) => { e.preventDefault(); setMode(false); };
 
 function showStatus(s) {
   const pct = Math.round((s.fraction || 0) * 100);
@@ -58,28 +64,41 @@ T.status().then(showStatus);
 
 $("#auth").onsubmit = async (e) => {
   e.preventDefault();
-  const form = { name: $("#f-name").value, email: $("#f-email").value, password: $("#f-pw").value };
+  const form = { name: $("#f-name").value, email: $("#f-email").value, password: $("#f-pw").value,
+                 code: $("#f-code").value };
   $("#go").disabled = true;
   $("#go").textContent = "Starting the instruments…";
   try {
-    const r = creating ? await T.createAccount(form) : await T.signIn(form);
+    const r = resetting ? await T.resetPassword(form) : creating ? await T.createAccount(form) : await T.signIn(form);
     if (r.error) { $("#auth-error").textContent = r.error; return; }
+    if (r.recovery) {                     // a new account: its recovery code, shown once
+      $("#recovery-code").textContent = r.recovery;
+      $("#recovery").showModal();
+      await new Promise((ok) => $("#recovery").addEventListener("close", ok, { once: true }));
+    }
     server = { base: r.base, token: r.token };
     user = r.user;
     $("#f-pw").value = "";
+    $("#f-code").value = "";
+    setMode(false);
     enterApp();
   } catch (err) {
     $("#auth-error").textContent = "The instruments did not start: " + (err.message || err);
   } finally {
     $("#go").disabled = false;
-    $("#go").textContent = creating ? "Create my account" : "Sign in";
+    $("#go").textContent = GO();
   }
 };
 
 // ------------------------------------------------------------------ the app
 function enterApp() {
-  $("#login").classList.add("hidden");
-  $("#app").classList.remove("hidden");
+  // a fade: the sign-in screen dissolves while the app comes up
+  const login = $("#login"), appv = $("#app");
+  login.classList.add("leaving");
+  setTimeout(() => { login.classList.add("hidden"); login.classList.remove("leaving"); }, 450);
+  appv.classList.add("entering");
+  appv.classList.remove("hidden");
+  requestAnimationFrame(() => requestAnimationFrame(() => appv.classList.remove("entering")));
   const initials = user.name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join("");
   $("#avatar").textContent = initials;
   $("#me-name").textContent = user.name;
@@ -165,11 +184,11 @@ function level(e, k, m, i) {
   const d = `data-dir="${esc(e.dir)}" data-mode="${k}" data-label="${esc(label)}"`;
   const go = p.status === "new" ? "Start" : (p.status === "done" ? "Open again" : "Continue");
   let acts;
-  if (k === "bsc") acts = `<button class="btn ${p.status === "new" ? "soft" : "go"}" data-act="open" ${d}>${go}</button>`;
+  if (k === "bsc") acts = `<button class="btn go" data-act="open" ${d}>${go}</button>`;
   // (NICOS and the sample builder are opened from the notebook itself: measuring is part of the exercise)
-  else if (k === "msc") acts = `<button class="btn ${p.status === "new" ? "soft" : "go"}" data-act="open" ${d}>${go === "Start" ? "Open the notebook" : go}</button>`;
+  else if (k === "msc") acts = `<button class="btn go" data-act="open" ${d}>${go === "Start" ? "Open the notebook" : go}</button>`;
   else acts = `<button class="btn" data-act="sheet" data-i="${i}" data-k="${k}">Your proposal</button>
-      <button class="btn ${p.status === "new" ? "soft" : "go"}" data-act="open" data-what="analysis" ${d}>Starter notebook</button>`;
+      <button class="btn go" data-act="open" data-what="analysis" ${d}>Starter notebook</button>`;
   return `<div class="level"><div class="row"><span class="chip ${k}">${LEVEL[k] || k}</span><span class="dur">${esc(m.duration || "")}</span></div>
     <span class="label">${esc(m.label)}</span><span class="what">${esc(m.what)}</span>
     <div class="prog"><div class="row"><span>${esc(p.text)}</span><b>${p.pct ? p.pct + " %" : ""}</b></div>

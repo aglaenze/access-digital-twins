@@ -26,6 +26,15 @@ then shows *Submitted*. *Export all my work* (menu of the account)
 saves a zip file (the logbooks of the questions, the notebooks, the logbook of the measurements) to send to the
 teacher; `../progress_summary.py` turns the files of a class into one table.
 
+**Password forgotten.** The accounts are on this computer: no email can reset a password. At the creation of an
+account the app shows a **recovery code** (once; only its hash is kept); *Forgot your password?* on the sign-in screen
+sets a new password with the email and this code. A student who did not sign out is signed in again at the next start.
+
+**The sample builder** (`../gen_sample_builder.py`) opens from the beamtime notebooks for their instrument and proposal
+(nothing to choose): ODIN, as many blocks, spheres and vertical cylinders as wanted (`sample_library`: shapes, overlap
+check; the twin: McStas `Union_sphere`/`Union_cylinder`, path lengths of the hybrid mode); LoKI, as many kinds of
+particles as wanted (their scattering adds up: dilute).
+
 **Where things are.** Logbooks: `TWIN_RUN_ROOT/progress/<account>/`; measurements of the pages:
 `TWIN_RUN_ROOT/<instrument>/<account>/`; notebooks: `work/<account>/`. NICOS data stay in the proposal folders
 (`data/<instrument>/<year>/<proposal>`), shared by the accounts of one computer.

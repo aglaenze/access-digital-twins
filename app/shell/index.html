@@ -40,13 +40,18 @@
         <input id="f-name" type="text" autocomplete="off" placeholder="As your teacher knows you"></div>
       <div class="field"><label for="f-email">Email</label>
         <input id="f-email" type="email" autocomplete="off" placeholder="name@student.dtu.dk" required></div>
-      <div class="field"><label for="f-pw">Password</label>
+      <div class="field only-reset"><label for="f-code">Recovery code</label>
+        <input id="f-code" type="text" autocomplete="off" placeholder="XXXX-XXXX-XXXX" spellcheck="false"></div>
+      <div class="field"><label for="f-pw" id="f-pw-label">Password</label>
         <input id="f-pw" type="password" autocomplete="off" required>
         <span class="hint only-new">At least 8 characters.</span></div>
       <div id="auth-error" class="error" role="alert"></div>
       <button id="go" type="submit" class="primary big">Sign in</button>
-      <p class="small only-new">Your account and your work stay on this computer. Your teacher receives them only when you
-        hand in.</p>
+      <p class="small only-in"><a href="#" id="forgot">Forgot your password?</a></p>
+      <p class="small only-reset">The recovery code was shown when you created your account. Without it, ask your teacher
+        to create a new account for you. <a href="#" id="back-in">Back to sign in</a></p>
+      <p class="small only-new">Your account and your work stay on this computer. Your teacher receives them only when you submit
+        an exercise.</p>
     </form>
     <div class="boot">
       <div class="boot-row"><span id="boot-text">Starting…</span><span id="boot-pct"></span></div>
@@ -94,6 +99,10 @@
   </div>
 </div>
 
+<dialog id="recovery"><div class="sheet-body"><h2>Your recovery code</h2>
+  <p>Write it down (or take a photo). If you forget your password, it lets you choose a new one: <i>Forgot your
+  password?</i> on the sign-in screen. It is shown only now.</p>
+  <p id="recovery-code" class="code"></p></div><form method="dialog"><button class="primary">I have written it down</button></form></dialog>
 <dialog id="sheet"><div class="sheet-body"></div><form method="dialog"><button class="primary">Close</button></form></dialog>
 <div id="toast" role="status"></div>
 <script src="app.js"></script>

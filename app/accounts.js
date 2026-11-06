@@ -42,10 +42,13 @@ class Accounts {
     const id = Accounts.id(email);
     if (db.users[id]) return { error: "An account with this email exists already on this computer: sign in." };
     const salt = crypto.randomBytes(16).toString("hex");
+    const recovery = Accounts.recoveryCode();
+    const rsalt = crypto.randomBytes(16).toString("hex");
     db.users[id] = { id, name, email, salt, hash: Accounts.hash(password, salt),
+                     rsalt, rhash: Accounts.hash(recovery, rsalt),
                      created: new Date().toISOString(), last: new Date().toISOString() };
     this.save(db);
-    return { user: this.public(db.users[id]) };
+    return { user: this.public(db.users[id]), recovery };
   }
 
   signIn({ email, password }) {
@@ -56,6 +59,33 @@ class Accounts {
     if (!crypto.timingSafeEqual(Buffer.from(h, "hex"), Buffer.from(u.hash, "hex"))) {
       return { error: "Wrong password." };
     }
+    u.last = new Date().toISOString();
+    this.save(db);
+    return { user: this.public(u) };
+  }
+
+  // The recovery code: shown once at the creation of the account, to choose a new password if it is forgotten (the
+  // accounts are on this computer: there is no email to reset it). Only its hash is kept.
+  static recoveryCode() {
+    const abc = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";              // no 0/O, 1/I: easy to copy
+    const b = crypto.randomBytes(12);
+    let s = "";
+    for (let i = 0; i < 12; i++) s += abc[b[i] % abc.length] + (i % 4 === 3 && i < 11 ? "-" : "");
+    return s;
+  }
+
+  reset({ email, code, password }) {
+    const db = this.load();
+    const u = db.users[Accounts.id(email)];
+    const clean = String(code || "").toUpperCase().replace(/[^A-Z0-9]/g, "").replace(/(.{4})(?=.)/g, "$1-");
+    if (!u || !u.rhash) return { error: "No account with this email on this computer." };
+    const h = Accounts.hash(clean, u.rsalt);
+    if (!crypto.timingSafeEqual(Buffer.from(h, "hex"), Buffer.from(u.rhash, "hex"))) {
+      return { error: "This recovery code is not right." };
+    }
+    if (String(password || "").length < 8) return { error: "The new password needs at least 8 characters." };
+    u.salt = crypto.randomBytes(16).toString("hex");
+    u.hash = Accounts.hash(password, u.salt);
     u.last = new Date().toISOString();
     this.save(db);
     return { user: this.public(u) };

@@ -59,18 +59,29 @@ FOCUS = dict(focus_xw=0.020, focus_yh=0.020, focus_z=tw.Z_SAMPLE + tw.DET_DIST -
 
 # --------------------------------------------------------------------------- samples
 def _union_boxes(volumes):
-    """McStas sample (Union) made of boxes [(NCrystal cfg, center (m), dims (m)), ...], placed relative to the stage
-    axis. The same volumes are used by the hybrid mode (odin_hybrid.volumes_transmission)."""
+    """McStas sample (Union) made of volumes [(NCrystal cfg, center (m), dims (m)[, shape]), ...], placed relative to
+    the stage axis: boxes (no shape), spheres (diameter dims[0]) and cylinders (vertical, diameter dims[0], height
+    dims[1]). The same volumes are used by the hybrid mode (odin_hybrid.volumes_transmission)."""
     def f(instr):
         mats = {}
-        for cfg, _, _ in volumes:
-            if cfg not in mats:
-                mats[cfg] = f"mat_{len(mats)}"
-                instr.add_component(mats[cfg], "Union_NCrystal_material", AT=0, RELATIVE="origin").set_parameters(
-                    cfg=f'"{cfg}"')
-        for i, (cfg, center, dims) in enumerate(volumes):
-            instr.add_component(f"box_{i}", "Union_box", AT=list(center), RELATIVE="sample_arm").set_parameters(
-                material_string=f'"{mats[cfg]}"', priority=10 + i, xwidth=dims[0], yheight=dims[1], zdepth=dims[2])
+        for v in volumes:
+            if v[0] not in mats:
+                mats[v[0]] = f"mat_{len(mats)}"
+                instr.add_component(mats[v[0]], "Union_NCrystal_material", AT=0, RELATIVE="origin").set_parameters(
+                    cfg=f'"{v[0]}"')
+        for i, v in enumerate(volumes):
+            cfg, center, dims = v[:3]
+            shape = v[3] if len(v) > 3 else "box"
+            common = dict(material_string=f'"{mats[cfg]}"', priority=10 + i)
+            if shape == "sphere":
+                instr.add_component(f"sphere_{i}", "Union_sphere", AT=list(center), RELATIVE="sample_arm"
+                                    ).set_parameters(radius=dims[0] / 2, **common)
+            elif shape == "cylinder":                         # Union_cylinder: axis along y (vertical)
+                instr.add_component(f"cylinder_{i}", "Union_cylinder", AT=list(center), RELATIVE="sample_arm"
+                                    ).set_parameters(radius=dims[0] / 2, yheight=dims[1], **common)
+            else:
+                instr.add_component(f"box_{i}", "Union_box", AT=list(center), RELATIVE="sample_arm").set_parameters(
+                    xwidth=dims[0], yheight=dims[1], zdepth=dims[2], **common)
         instr.add_component("union_master", "Union_master", AT=0, RELATIVE="origin").set_parameters(
             enable_refraction=0, enable_reflection=0)
     return f
@@ -210,7 +221,8 @@ class VirtualOdin:
             return lib[name]
         s = self.samples()[name]           # a mystery plate of a game: its material is not told
         return dict(id=name, name=s["name"], hidden=["material"], volumes=[
-            dict(material=v[0], center_mm=[c * 1e3 for c in v[1]], size_mm=[d * 1e3 for d in v[2]]) for v in s["volumes"]])
+            dict(material=v[0], center_mm=[c * 1e3 for c in v[1]], size_mm=[d * 1e3 for d in v[2]],
+                 **({"shape": v[3]} if len(v) > 3 else {})) for v in s["volumes"]])
 
     def move(self, **settings):
         """Sets one or several devices: odin.move(stage_x=0.5, shutter="open")."""

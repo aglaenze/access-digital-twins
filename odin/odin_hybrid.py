@@ -123,26 +123,46 @@ def box_path_length(x, y, center, dims, rot_deg):
     return np.clip(tmax - tmin, 0, None)
 
 
+def sphere_path_length(x, y, center, diameter):
+    """Path length (m) through a sphere for rays along the beam (z) passing at (x, y): a chord."""
+    r2 = (diameter / 2) ** 2 - (np.asarray(x) - center[0]) ** 2 - (np.asarray(y) - center[1]) ** 2
+    return 2 * np.sqrt(np.clip(r2, 0, None))
+
+
+def cylinder_path_length(x, y, center, diameter, height):
+    """Path length (m) through a vertical cylinder (axis y: the rotation of the stage does not change it) for rays
+    along the beam (z) passing at (x, y)."""
+    r2 = (diameter / 2) ** 2 - (np.asarray(x) - center[0]) ** 2
+    return np.where(np.abs(np.asarray(y) - center[1]) <= height / 2, 2 * np.sqrt(np.clip(r2, 0, None)), 0.0)
+
+
 def sigma_tot(cfg, lam):
     """Σ_tot(λ) in m⁻¹ (NCrystal gives cm⁻¹)."""
     return 100.0 * tw.sigma_tot(cfg, np.asarray(lam, dtype=float))
 
 
 def volumes_transmission(volumes, stage_x, stage_rot, lam_grid=np.linspace(0.3, 20.0, 4000)):
-    """Function T(x, y, λ) for a sample made of boxes [(NCrystal cfg, center (m), dims (m)), ...], centers given with
+    """Function T(x, y, λ) for a sample made of volumes [(NCrystal cfg, center (m), dims (m)[, shape]), ...] (boxes,
+    spheres, vertical cylinders), centers given with
     respect to the rotation-stage axis; the stage is translated by stage_x then rotated by stage_rot (degrees) about
     the vertical axis. Σ_tot(λ) is interpolated on a grid covering all chopper modes (NCrystal called once)."""
     th = np.radians(stage_rot)
     c, s = np.cos(th), np.sin(th)
     vols = []
-    for cfg, (cx, cy, cz), dims in volumes:
+    for v in volumes:                     # (cfg, center, dims[, shape]): boxes, spheres, vertical cylinders
+        cfg, (cx, cy, cz), dims = v[:3]
         center = (stage_x + c * cx + s * cz, cy, -s * cx + c * cz)
-        vols.append((sigma_tot(cfg, lam_grid), center, dims))
+        vols.append((sigma_tot(cfg, lam_grid), center, dims, v[3] if len(v) > 3 else "box"))
 
     def T(x, y, lam):
         mu = np.zeros(len(x))
-        for sig, center, dims in vols:
-            L = box_path_length(x, y, center, dims, stage_rot)
+        for sig, center, dims, shape in vols:
+            if shape == "sphere":
+                L = sphere_path_length(x, y, center, dims[0])
+            elif shape == "cylinder":
+                L = cylinder_path_length(x, y, center, dims[0], dims[1])
+            else:
+                L = box_path_length(x, y, center, dims, stage_rot)
             k = L > 0
             mu[k] += np.interp(lam[k], lam_grid, sig) * L[k]
         return np.exp(-mu)

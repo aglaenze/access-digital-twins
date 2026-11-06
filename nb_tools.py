@@ -2,7 +2,8 @@
 
     import nb_tools
     nb_tools.nicos("odin")                         # the button Open NICOS (MSc: part 0, measure yourself)
-    nb_tools.beamtime_tools("odin", "odin/exercises/iron_bragg_edges/beamtime.md")   # proposal, NICOS, sample builder
+    nb_tools.proposal("odin/exercises/iron_bragg_edges/beamtime.md")   # the proposal sheet, folded
+    nb_tools.sample_builder("odin", "1234")           # the sample builder of this instrument and proposal
     nb_tools.need_measurements(FOLDER, "odin")     # stops the notebook, clearly, while there is nothing to analyze
 
 The buttons are links: in the app they open a tab (NICOS: on the desktop of this computer, or the control room of the
@@ -26,23 +27,40 @@ def _button(label, href, main=False):
     return f'<a href="{href}" target="_blank" style="{MAIN if main else SECOND}">{html.escape(label)}</a>'
 
 
+def _centered(button, note):
+    display(HTML(f'<div style="text-align:center; margin:28px 0 30px">{button}'
+                 f'<div style="color:#5B6779; font-size:13px; margin-top:6px">{html.escape(note)}</div></div>'))
+
+
 def nicos(instr):
-    """The button Open NICOS of an instrument."""
-    display(HTML(_button(f"Open NICOS ({NAMES.get(instr, instr)})",
-                         f"/voila/render/container/open_nicos.ipynb?instrument={instr}", main=True)
-                 + '<span style="color:#5B6779; font-size:13px">NICOS opens in about a minute, logged in.</span>'))
+    """The button Open NICOS of an instrument (centered)."""
+    _centered(_button(f"Open NICOS ({NAMES.get(instr, instr)})",
+                      f"/voila/render/container/open_nicos.ipynb?instrument={instr}", main=True),
+              "NICOS opens in about a minute, logged in.")
+
+
+def sample_builder(instr, proposal=""):
+    """The button Sample builder (centered), for this instrument and proposal: nothing to choose on the page."""
+    _centered(_button("Sample builder", f"/voila/render/Sample_builder.ipynb?instrument={instr}&proposal={proposal}",
+                      main=True),
+              "Design your sample (as many blocks, cylinders, spheres or kinds of particles as you want), then save it "
+              "with your proposal: it appears on the sample changer of NICOS.")
 
 
 def beamtime_tools(instr, proposal=None):
-    """Your proposal (the sheet, folded), Open NICOS, Sample builder."""
-    parts = [_button(f"Open NICOS ({NAMES.get(instr, instr)})",
-                     f"/voila/render/container/open_nicos.ipynb?instrument={instr}", main=True),
-             _button("Sample builder", "/voila/render/Sample_builder.ipynb")]
-    display(HTML("".join(parts)))
+    """Your proposal (folded), then the sample builder and NICOS (older notebooks)."""
     if proposal:
+        globals()["proposal"](proposal)
+    sample_builder(instr)
+    nicos(instr)
+
+
+def proposal(path):
+    """The proposal sheet (beamtime.md of the exercise), folded."""
+    if path:
         try:
             import mistune
-            with open(os.path.join(ROOT, proposal), encoding="utf-8") as f:
+            with open(os.path.join(ROOT, path), encoding="utf-8") as f:
                 sheet = mistune.html(f.read())
             display(HTML('<details style="margin-top:8px; border:1px solid #E2E7EE; border-radius:10px; padding:8px 14px">'
                          '<summary style="cursor:pointer; font-weight:600">Your proposal (click to open)</summary>'
