@@ -65,7 +65,11 @@ jobs:
             -e KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1 -e KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1 \
             -e KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS=0 -e KAFKA_NUM_PARTITIONS=1 \
             -e KAFKA_MESSAGE_MAX_BYTES=16777216 -e KAFKA_REPLICA_FETCH_MAX_BYTES=16777216 apache/kafka:3.9.1
-          for i in $(seq 60); do (echo > /dev/tcp/localhost/9092) 2>/dev/null && break; sleep 2; done
+          # the broker answers (metadata), not only its port open; its log if it does not
+          kafka_up() { python -c "from confluent_kafka.admin import AdminClient; AdminClient({'bootstrap.servers': 'localhost:9092'}).list_topics(timeout=5)" 2>/dev/null; }
+          for i in $(seq 60); do kafka_up && break; sleep 3; done
+          if ! kafka_up; then docker ps -a; docker logs kafka 2>&1 | tail -60; exit 1; fi
+          echo "Kafka up"
           ODIN_SRC=$(python -c "import ess.odin.data as d; print(d.iron_simulation_ob_small())")
           LOKI_SRC=$(python -c "from ess.loki.data import loki_coda_file; print(loki_coda_file())")
           mkdir -p /tmp/fw
@@ -78,6 +82,7 @@ jobs:
             echo "::group::$instr"
             timeout 900 python filewriter/e2e_test.py --root /tmp/fw --instrument $instr --src "$src" || status=1
             echo "--- file-writer log"; docker logs fw_$instr 2>&1 | tail -40
+            kafka_up || { echo "--- Kafka is down:"; docker ps -a; docker logs kafka 2>&1 | tail -60; }
             echo "::endgroup::"
             docker rm -f fw_$instr
           done
