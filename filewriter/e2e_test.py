@@ -1,7 +1,7 @@
 """End-to-end test of the twin with the ESS file-writer (run by .github/workflows/filewriter.yml, on Linux): a Kafka
 broker and kafka-to-nexus are running; this script plays the twin and NICOS for one job, then compares the files.
 
-    python filewriter/e2e_test.py --root /tmp/fw --instrument odin --src <real ODIN file> [--brokers localhost:9092]
+    python filewriter/e2e_test.py --root /tmp/fw --instrument odin --src <real ODIN file> [--brokers 127.0.0.1:9092]
 
 The file-writer must be started with
     --brokers <brokers> --command-status-topic <instrument>_filewriter --job-pool-topic <instrument>_filewriter_pool
@@ -73,7 +73,7 @@ def main():
     p.add_argument("--root", required=True)
     p.add_argument("--instrument", required=True)
     p.add_argument("--src", required=True)
-    p.add_argument("--brokers", default="localhost:9092")
+    p.add_argument("--brokers", default="127.0.0.1:9092")
     a = p.parse_args()
     instr = a.instrument
     root = os.path.abspath(a.root)

@@ -58,15 +58,15 @@ jobs:
           pip install --quiet h5py numpy "confluent-kafka>=2.14,<3" "ess-streaming-data-types>=0.27,<0.28" pooch ipywidgets essimaging esssans
           docker run -d --name kafka --network host \
             -e KAFKA_NODE_ID=1 -e KAFKA_PROCESS_ROLES=broker,controller \
-            -e KAFKA_LISTENERS=PLAINTEXT://localhost:9092,CONTROLLER://localhost:9093 \
-            -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092 -e KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER \
+            -e KAFKA_LISTENERS=PLAINTEXT://127.0.0.1:9092,CONTROLLER://127.0.0.1:9093 \
+            -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://127.0.0.1:9092 -e KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER \
             -e KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT \
-            -e KAFKA_CONTROLLER_QUORUM_VOTERS=1@localhost:9093 -e KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1 \
+            -e KAFKA_CONTROLLER_QUORUM_VOTERS=1@127.0.0.1:9093 -e KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1 \
             -e KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1 -e KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1 \
             -e KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS=0 -e KAFKA_NUM_PARTITIONS=1 \
             -e KAFKA_MESSAGE_MAX_BYTES=16777216 -e KAFKA_REPLICA_FETCH_MAX_BYTES=16777216 apache/kafka:3.9.1
           # the broker answers (metadata), not only its port open; its log if it does not
-          kafka_up() { python -c "from confluent_kafka.admin import AdminClient; AdminClient({'bootstrap.servers': 'localhost:9092'}).list_topics(timeout=5)" 2>/dev/null; }
+          kafka_up() { python -c "from confluent_kafka.admin import AdminClient; AdminClient({'bootstrap.servers': '127.0.0.1:9092'}).list_topics(timeout=5)" 2>/dev/null; }
           for i in $(seq 60); do kafka_up && break; sleep 3; done
           if ! kafka_up; then docker ps -a; docker logs kafka 2>&1 | tail -60; exit 1; fi
           echo "Kafka up"
@@ -77,7 +77,7 @@ jobs:
           for instr in odin loki; do
             src=$ODIN_SRC; [ $instr = loki ] && src=$LOKI_SRC
             docker run -d --name fw_$instr --network host -v /tmp/fw:/tmp/fw filewriter:test kafka-to-nexus \
-              --brokers localhost:9092 --command-status-topic ${instr}_filewriter \
+              --brokers 127.0.0.1:9092 --command-status-topic ${instr}_filewriter \
               --job-pool-topic ${instr}_filewriter_pool --hdf-output-prefix / --hdf-template-prefix /tmp/fw/templates
             echo "::group::$instr"
             timeout 900 python filewriter/e2e_test.py --root /tmp/fw --instrument $instr --src "$src" || status=1

@@ -233,7 +233,14 @@ class FileWriterControl:
         self.producer = producer(brokers)
         self.consumer = Consumer({"bootstrap.servers": brokers, "group.id": f"twin-{uuid.uuid4()}",
                                   "enable.auto.commit": False, "fetch.message.max.bytes": 16_000_000})
-        _, hi = self.consumer.get_watermark_offsets(TopicPartition(command_topic, 0), timeout=20)
+        for attempt in range(10):                   # a topic just created may have no leader yet; the bootstrap
+            try:                                    # connection may be dropped (localhost resolved to ::1 first)
+                _, hi = self.consumer.get_watermark_offsets(TopicPartition(command_topic, 0), timeout=20)
+                break
+            except Exception:                       # noqa: BLE001
+                if attempt == 9:
+                    raise
+                time.sleep(2)
         self.consumer.assign([TopicPartition(command_topic, 0, hi)])
 
     def _send(self, payload):
