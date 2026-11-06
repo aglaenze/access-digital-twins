@@ -1,0 +1,30 @@
+# The ESS file-writer (kafka-to-nexus, ECDC), built from its sources: step 1 of filewriter/README.md.
+# Built by GitHub Actions (.github/workflows/filewriter.yml); the image is ghcr.io/aglaenze/access-digital-twins-filewriter.
+#   docker build -f filewriter/Containerfile -t filewriter .
+#   docker run --rm filewriter kafka-to-nexus --help
+# The version of kafka-to-nexus is the ref K2N_REF (a tag or a commit of github.com/ess-dmsc/kafka-to-nexus, the
+# mirror of gitlab.esss.lu.se/ecdc/ess-dmsc/kafka-to-nexus).
+FROM ubuntu:22.04 AS build
+ARG K2N_REF=main
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential git ninja-build python3-pip pkg-config curl ca-certificates perl autoconf automake libtool \
+    && rm -rf /var/lib/apt/lists/* \
+    && pip3 install --no-cache-dir "conan<2" "cmake>=3.26,<4"
+# Conan 1 with the configuration of ECDC (remotes, profiles: linux_x86_64_gcc11 = the gcc 11 of Ubuntu 22.04)
+RUN conan config install https://github.com/ess-dmsc/conan-configuration.git
+RUN git clone https://github.com/ess-dmsc/kafka-to-nexus.git /src && cd /src && git checkout "$K2N_REF" \
+    && git log -1 --format="kafka-to-nexus %H %cd" | tee /K2N_VERSION
+WORKDIR /src
+RUN conan install . -if=build/Release -s build_type=Release --build=missing --profile=linux_x86_64_gcc11
+RUN cmake --preset=release && cmake --build --preset=release --target kafka-to-nexus
+# the program and the shared libraries it needs, in one folder
+RUN mkdir -p /dist/bin /dist/lib && cp "$(find build/Release -type f -name kafka-to-nexus -perm -u+x | head -1)" /dist/bin/ \
+    && ldd /dist/bin/kafka-to-nexus | awk '/=> \// {print $3}' | grep -v -E '^/lib|^/usr/lib' | xargs -r -I{} cp {} /dist/lib/ \
+    && cp /K2N_VERSION /dist/
+
+FROM ubuntu:22.04
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
+COPY --from=build /dist /opt/kafka-to-nexus
+ENV PATH="/opt/kafka-to-nexus/bin:${PATH}" LD_LIBRARY_PATH="/opt/kafka-to-nexus/lib"
+CMD ["kafka-to-nexus", "--help"]

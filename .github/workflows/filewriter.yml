@@ -1,0 +1,49 @@
+# Step 1 of filewriter/README.md: build the ESS file-writer (kafka-to-nexus) from its sources, check that it runs,
+# publish the image ghcr.io/aglaenze/access-digital-twins-filewriter. Long (a C++ build with its dependencies).
+name: filewriter
+
+on:
+  push:
+    branches: [main]
+    paths: ["filewriter/**", ".github/workflows/filewriter.yml"]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "kafka-to-nexus ref (tag or commit)"
+        default: "main"
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 300
+    steps:
+      - name: Free disk space on the runner
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+          df -h /
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build kafka-to-nexus
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: filewriter/Containerfile
+          load: true
+          tags: filewriter:test
+          build-args: K2N_REF=${{ github.event.inputs.ref || 'main' }}
+          cache-from: type=gha,scope=filewriter
+          cache-to: type=gha,mode=max,scope=filewriter
+      - name: It runs
+        run: |
+          docker run --rm filewriter:test cat /opt/kafka-to-nexus/K2N_VERSION
+          docker run --rm filewriter:test kafka-to-nexus --help | head -40
+      - name: Publish
+        if: github.event_name != 'pull_request'
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker tag filewriter:test "ghcr.io/${{ github.repository }}-filewriter:latest"
+          docker push "ghcr.io/${{ github.repository }}-filewriter:latest"
