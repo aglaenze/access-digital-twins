@@ -440,6 +440,18 @@ class VirtualOdin:
         return tag, tw.mcpl_path(folder, "guide_exit")
 
     # ------------------------------------------------------------------ files, log
+    @staticmethod
+    def nexus_template():
+        """The real ODIN file the twin's files are made from (also the template of the ESS file-writer, filewriter/)."""
+        return nx.template_file()
+
+    @staticmethod
+    def nexus_static(f):
+        """The static changes the twin makes to the real file in each of its files (f: h5py file open for writing);
+        used for the template of the ESS file-writer (filewriter/twin_filewriter.make_template)."""
+        nx._replace(f[f"{nx.DET}/transformations"], "translation", np.float64(tw.DET_DIST))
+        nx._replace(f["entry"], "experiment_description", b"ACCESS digital twin (McStas simulation)")
+
     def _nexus_settings(self):
         out = {}
         for d in self.devices.values():

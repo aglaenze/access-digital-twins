@@ -273,6 +273,19 @@ class VirtualLoki:
                                 n_events=r["n_events"], event_sampling=r["sampling"], state=self.state))
         return path
 
+    @staticmethod
+    def nexus_template():
+        """The real LoKI file the twin's files are made from (also the template of the ESS file-writer, filewriter/)."""
+        return lnx.template()
+
+    @staticmethod
+    def nexus_static(f):
+        """The static changes the twin makes to the real file in each of its files (f: h5py file open for writing):
+        the source at the distance of the McStas model (as loki_nexus.write); used for the template of the ESS
+        file-writer (filewriter/twin_filewriter.make_template)."""
+        src = f["entry/instrument/source/transformations"]
+        src[list(src)[0]][...] = lm.L1
+
     def _write_nexus(self, path, sim, t, start, title):
         """Events of the measurement (all banks, monitors m1 and m3) in a NeXus file of the real LoKI's format."""
         st = self.state

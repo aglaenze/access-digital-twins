@@ -7,17 +7,21 @@ group = 'optional'
 # (nicos_twin.devices.TwinJustBinItDetector), listed first so that just-bin-it is configured before the stream.
 # The twin streams the Timepix3 pixels grouped in blocks of 32 x 32 (128 x 128 superpixels, ids 1..16384) to keep
 # the live histograms small; the files keep the full pixels.
+# source = 'odin_detector': only these superpixel events; with the ESS file-writer (filewriter/), the twin also
+# publishes the full pixels on the same topic, as source 'timepix3' (the name in the real ODIN file).
 BROKERS = ['127.0.0.1:9092']
 
 devices = dict(
     live_image = device('nicos_ess.devices.datasources.just_bin_it.JustBinItImage',
         description = 'live detector image (128 x 128 superpixels of 32 x 32 Timepix3 pixels)',
-        hist_topic = 'odin_visualisation', data_topic = 'odin_detector', brokers = BROKERS,
+        hist_topic = 'odin_visualisation', data_topic = 'odin_detector', source = 'odin_detector',
+        brokers = BROKERS,
         unit = 'evts', hist_type = '2-D DET', det_width = 128, det_height = 128, det_range = (1, 16385),
     ),
     live_tof = device('nicos_ess.devices.datasources.just_bin_it.JustBinItImage',
         description = 'live spectrum of the arrival times after the source pulse (0-71.4 ms)',
-        hist_topic = 'odin_visualisation', data_topic = 'odin_detector', brokers = BROKERS,
+        hist_topic = 'odin_visualisation', data_topic = 'odin_detector', source = 'odin_detector',
+        brokers = BROKERS,
         unit = 'evts', hist_type = '1-D TOF', tof_range = (0, 71428571), num_bins = 300, det_range = (1, 16385),
     ),
     jbi = device('nicos_twin.devices.TwinJustBinItDetector',

@@ -18,6 +18,13 @@ RUN git clone https://github.com/ess-dmsc/kafka-to-nexus.git /src && cd /src && 
 WORKDIR /src
 RUN conan install . -if=build/Release -s build_type=Release --build=missing --profile=linux_x86_64_gcc11
 RUN cmake --preset=release && cmake --build --preset=release --target kafka-to-nexus
+# libcrypt.so.2: needed by a prebuilt Conan package of ECDC (built on a distribution with libxcrypt), absent from
+# Ubuntu (only libcrypt.so.1): built from the sources of libxcrypt (the copy below finds it in /opt/xcrypt)
+RUN apt-get update && apt-get install -y --no-install-recommends xz-utils && rm -rf /var/lib/apt/lists/* \
+    && curl -fsSL https://github.com/besser82/libxcrypt/releases/download/v4.4.36/libxcrypt-4.4.36.tar.xz \
+       | tar -xJ -C /tmp && cd /tmp/libxcrypt-4.4.36 \
+    && ./configure --prefix=/opt/xcrypt --disable-obsolete-api --disable-static --disable-werror > /dev/null \
+    && make -j"$(nproc)" > /dev/null && make install > /dev/null && ls -l /opt/xcrypt/lib
 # the program and the shared libraries it needs, in one folder
 # (the libraries: as the built program finds them, in the build tree and in the Conan cache, e.g. libcrypt.so.2)
 RUN K2N="$(find build/Release -type f -name kafka-to-nexus -perm -u+x | head -1)" \

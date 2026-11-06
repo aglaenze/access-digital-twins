@@ -28,6 +28,16 @@ Broker: variable TWIN_KAFKA (default 127.0.0.1:9092).
 Device values (Kafka, as the EPICS forwarder of ESS; optional, TWIN_FORWARD=1): the values of all the devices are
 published at start and after each /move to the topic <instrument>_devices (f144 messages, kafka/forwarder.py), for the
 ESS file-writer.
+The ESS file-writer (kafka-to-nexus, filewriter/README.md; optional, Linux):
+    POST /filewriter/start {"title", "proposal", "folder"}  -> {"job", "file"}: makes the template of the file-writer
+                 (from the real ESS file of the instrument, once), starts a job (pl72 on <instrument>_filewriter),
+                 publishes the last value of every device (f144); then each /count also publishes its neutrons and
+                 device values (ev44, f144: topics and sources of the real file), at the times of its pulses, and
+                 lasts the counting time (as on the instrument)
+    POST /filewriter/stop {}  -> {"file", "error", "twin_files", "differences", "report"}: stops the job, waits for
+                 the file, compares it with the twin's own files of the job (filewriter/compare.py)
+    The file-writer must see the data folders at the same paths (--hdf-output-prefix /) and the templates in
+    TWIN_FW_TEMPLATES (default <TWIN_RUN_ROOT>/filewriter/templates; its --hdf-template-prefix).
 One measurement at a time (as on the instrument): a command received during a measurement is refused (code 409,
 "instrument busy"), but /status always answers.
 """
@@ -36,6 +46,7 @@ import json
 import os
 import sys
 import threading
+import time
 import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -51,6 +62,76 @@ RUNNING = {"action": None}
 READY, GO, STOP = threading.Event(), threading.Event(), threading.Event()     # live streaming (Kafka)
 STREAMER = {}
 FORWARDER = {}
+FW = {}                                             # the ESS file-writer: control, producer, the job running
+
+
+def _fw():
+    sys.path.insert(0, os.path.join(HERE, "filewriter"))
+    import twin_filewriter
+    return twin_filewriter
+
+
+def _fw_start(args):
+    """Starts a job of the ESS file-writer (POST /filewriter/start)."""
+    if FW.get("job"):
+        raise ValueError(f"a file-writing job is already running ({FW['file']})")
+    tf = _fw()
+    brokers = os.environ.get("TWIN_KAFKA", "127.0.0.1:9092")
+    if args.get("folder"):
+        if not os.path.isabs(args["folder"]):
+            raise ValueError(f"folder must be an absolute path: {args['folder']}")
+        INSTR.use_folder(args["folder"])
+    src = INSTR.nexus_template()
+    run_root = os.environ.get("TWIN_RUN_ROOT", os.path.join(os.path.expanduser("~"), "McStas_runs", "twin"))
+    root = os.environ.get("TWIN_FW_TEMPLATES", os.path.join(run_root, "filewriter", "templates"))
+    template = os.path.join(root, INSTR_NAME, f"{INSTR_NAME}.hdf")
+    if not os.path.isfile(template) or os.path.getmtime(template) < os.path.getmtime(src):
+        tf.make_template(src, template, getattr(INSTR, "nexus_static", None))
+    if "control" not in FW:
+        FW["control"] = tf.FileWriterControl(brokers, f"{INSTR_NAME}_filewriter")
+        FW["producer"] = tf.producer(brokers)
+    folder = INSTR.folder
+    n = 1 + sum(1 for f in os.listdir(folder) if f.startswith(f"{INSTR_NAME}_job_") and f.endswith(".hdf"))
+    path = f"{folder}/{INSTR_NAME}_job_{n:06d}.hdf"
+    sample = INSTR.status().get("sample", "")
+    try:
+        sample = INSTR.samples()[sample].get("name", sample)
+    except Exception:                               # noqa: BLE001
+        pass
+    start_ns = time.time_ns()
+    job = FW["control"].start(tf.nexus_structure(src, args.get("title", ""), str(args.get("proposal", "")),
+                                                 str(sample)), path, INSTR_NAME, start_ns=start_ns)
+    # the last value of every device, as the EPICS forwarder: from the twin's last file (its settings), or the real one
+    files = sorted(f for f in os.listdir(folder) if f.startswith(f"{INSTR_NAME}_0") and f.endswith(".nxs"))
+    last = os.path.join(folder, files[-1]) if files else src
+    tf.publish(FW["producer"], tf.snapshot_messages(last, start_ns + 1_000_000))
+    FW.update(job=job, file=path, twin_files=[])
+    return dict(job=job, file=path)
+
+
+def _fw_stop():
+    """Stops the job, waits for the file, compares it with the twin's files (POST /filewriter/stop)."""
+    if not FW.get("job"):
+        raise ValueError("no file-writing job is running")
+    job, path, twins = FW["job"], FW["file"], FW["twin_files"]
+    FW["job"] = None
+    FW["control"].stop(job)
+    _, error = FW["control"].wait_done(job, timeout=600)
+    out = dict(file=path, error=error, twin_files=twins)
+    if error is None and twins and os.path.isfile(path):
+        import compare
+        out["differences"], out["report"] = compare.compare(path, twins, log=lambda *_: None)
+    return out
+
+
+def _fw_publish(f):
+    """The neutrons and device values of the measurement in file f, to the file-writer: at the times of its pulses,
+    in a thread (joined before /count answers: the count lasts its counting time, as on the instrument)."""
+    tf = _fw()
+    th = threading.Thread(target=tf.publish, args=(FW["producer"], tf.count_messages(f)), kwargs=dict(pace=True),
+                          daemon=True)
+    th.start()
+    return th
 
 
 def _forward(only_changes=True):
@@ -150,6 +231,10 @@ class Handler(BaseHTTPRequestHandler):
                     raise ValueError(f"folder must be an absolute path: {args.get('folder')}")
                 INSTR.use_folder(args["folder"])
                 return self._reply(200, dict(folder=INSTR.folder))
+            if self.path == "/filewriter/start":
+                return self._reply(200, _fw_start(args))
+            if self.path == "/filewriter/stop":
+                return self._reply(200, _fw_stop())
             if self.path == "/move":
                 INSTR.move(**args)
                 _forward()
@@ -161,8 +246,13 @@ class Handler(BaseHTTPRequestHandler):
                     INSTR.use_folder(args["folder"])
                 f = INSTR.count(float(args["t"]), title=args.get("title", ""), write=args.get("write", True))
                 out = dict(file=f, number=INSTR.number, n_counts=getattr(INSTR, "last_n_counts", None))
+                fw = _fw_publish(f) if f and FW.get("job") else None
                 if args.get("stream") and f:
                     out["streamed"] = _stream(f, hold=args.get("hold", False))
+                if fw is not None:
+                    fw.join()
+                    FW["twin_files"].append(f)
+                    out["filewriter"] = FW["file"]
                 if args.get("image"):                          # detector image for live displays (NICOS)
                     out["image"] = INSTR.last_image.tolist()
                 return self._reply(200, out)

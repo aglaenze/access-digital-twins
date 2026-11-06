@@ -10,6 +10,11 @@ Here the twin writes the files itself, one per count, in the proposal folder, wi
 commands set that title and keep the list of "jobs", so that ESS scripts run unchanged. Difference with ESS: at
 ESS, everything recorded inside one nexusfile_open block (several counts, a scan) goes into ONE file; the twin
 writes one file per count.
+
+With the ESS file-writer (TWIN_FILEWRITER=1 for NICOS; Linux, filewriter/README.md): as at ESS, start_filewriting
+starts a job of the file-writer (through the twin server, POST /filewriter/start) and everything recorded until
+stop_filewriting goes into ONE file of the file-writer (<instrument>_job_NNNNNN.hdf in the proposal folder); the twin
+still writes its own files, one per count, and stop_filewriting compares them with the file-writer's.
 """
 import os
 import time
@@ -24,6 +29,16 @@ from nicos_twin.devices import proposal_folder
 __all__ = ["nexusfile_open", "start_filewriting", "stop_filewriting", "list_filewriting_jobs", "sample_info"]
 
 _JOBS = []          # dicts: number, title, start, stop, files
+
+
+def _filewriter():
+    """True if the ESS file-writer writes the files (TWIN_FILEWRITER=1)."""
+    return os.environ.get("TWIN_FILEWRITER") == "1"
+
+
+def _twin(path, args, timeout):
+    from nicos_twin.devices import _request
+    return _request(session.getDevice("sample_holder").twinurl, path, args, timeout=timeout)
 
 
 def _data_files(folder):
@@ -71,8 +86,14 @@ def start_filewriting(experiment_title=None):
         session.log.info('Setting experiment title to: %s', experiment_title)
         exp.update(title=experiment_title)
     folder = proposal_folder()
-    _JOBS.append(dict(number=len(_JOBS) + 1, title=exp.title, start=time.time(), stop=None, folder=folder,
-                      before=_data_files(folder), files=[]))
+    job = dict(number=len(_JOBS) + 1, title=exp.title, start=time.time(), stop=None, folder=folder,
+               before=_data_files(folder), files=[], fw=None)
+    if _filewriter():
+        r = _twin("/filewriter/start", {"title": exp.title, "proposal": str(exp.propinfo.get('proposal')),
+                                         "folder": folder}, timeout=300)
+        job["fw"] = r["file"]
+        session.log.info('file-writer job %s: %s', r["job"], r["file"])
+    _JOBS.append(job)
     session.log.info('Filewriting started')
 
 
@@ -84,6 +105,18 @@ def stop_filewriting(job_number=None):
     if job_number is not None:
         active = [j for j in active if j["number"] == job_number]
     for j in active:
+        if j.get("fw"):
+            r = _twin("/filewriter/stop", {}, timeout=900)
+            if r.get("error"):
+                session.log.error('file-writer: %s', r["error"])
+            else:
+                session.log.info('file written by the file-writer: %s', r["file"])
+            if "differences" in r:
+                (session.log.info if r["differences"] == 0 else session.log.warning)(
+                    'compared with the %d file(s) of the twin: %s', len(r["twin_files"]),
+                    'same data' if r["differences"] == 0 else '%d difference(s)' % r["differences"])
+                for line in r.get("report", []):
+                    session.log.info(line)
         j["stop"] = time.time()
         j["files"] = sorted(_data_files(j["folder"]) - j["before"])
         if j["files"]:
