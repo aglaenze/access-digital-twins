@@ -52,7 +52,8 @@ def main():
                 c.source = f'nb_tools.sample_builder("{instr}", "1000")'
             if c.cell_type == "markdown" and c.source.startswith("## 2. Your measurements, in NICOS"):
                 c.source = c.source.replace("the *Proposal ID* of your proposal", "your *Proposal ID* (the number of "
-                                            "PROPOSAL below)").replace(" your budget is in your proposal.", " no budget.")
+                                            "PROPOSAL below)").replace(" your budget is in your proposal.", " no budget.").replace(" (e.g. `iron_plate`)", "").replace(" (e.g. `silica_spheres`, `d2o`, `empty_beam`)", "").replace(
+                                            "(e.g. `iron_plate`)", "(`sample_info()`)")
             if c.cell_type == "code" and "FOLDER = " in c.source and f"/{number}/raw" in c.source:
                 c.source = (f"from {instr}_paths import TWIN_RUN_ROOT\nimport datetime\n"
                             f"PROPOSAL = \"1000\"          # your proposal number (the one entered in NICOS)\n"

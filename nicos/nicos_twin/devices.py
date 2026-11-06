@@ -129,7 +129,8 @@ class TwinSampleChanger(TwinSwitch):
         names = self._sync()
         if target in names:
             return True, ""
-        return False, f"samples available: {names} (make your own with the sample builder of JupyterLab)"
+        return False, (f"samples available: {names} (your own samples: the sample builder, button of your starter "
+                       "notebook, saved with the proposal applied in the Experiment panel)")
 
     def doStart(self, target):
         self._twin_move(target)
