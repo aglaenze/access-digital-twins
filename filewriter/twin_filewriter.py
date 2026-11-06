@@ -216,16 +216,21 @@ def _utc(t_ns):
 
 
 class FileWriterControl:
-    """Starts and stops jobs of a file-writer listening on `command_topic` (its --command-status-topic), as NICOS
-    does at ESS: pl72 (start), 6s4t (stop); the file-writer answers (answ) and reports the end of the file (wrdn)."""
+    """Starts and stops jobs of a file-writer, as NICOS does at ESS (nicos_ess/devices/datasinks/file_writer.py):
+    the start (pl72) goes to the job pool (`pool_topic`, the --job-pool-topic of the file-writer, default
+    `<command_topic>_pool`) and names `command_topic` as the control topic of the job: the file-writer then answers
+    there (answ), takes the stop (6s4t) there and reports the end of the file there (wrdn)."""
 
-    def __init__(self, brokers, command_topic):
+    def __init__(self, brokers, command_topic, pool_topic=None):
         from confluent_kafka import Consumer, TopicPartition
         from confluent_kafka.admin import AdminClient, NewTopic
         self.brokers, self.topic = brokers, command_topic
+        self.pool_topic = pool_topic or f"{command_topic}_pool"
         admin = AdminClient({"bootstrap.servers": brokers})
-        if command_topic not in admin.list_topics(timeout=20).topics:
-            for fut in admin.create_topics([NewTopic(command_topic, 1, 1)]).values():
+        existing = admin.list_topics(timeout=20).topics
+        new = [NewTopic(t, 1, 1) for t in (command_topic, self.pool_topic) if t not in existing]
+        if new:
+            for fut in admin.create_topics(new).values():
                 try:
                     fut.result()
                 except Exception:                  # noqa: BLE001  (created meanwhile)
@@ -243,8 +248,8 @@ class FileWriterControl:
                 time.sleep(2)
         self.consumer.assign([TopicPartition(command_topic, 0, hi)])
 
-    def _send(self, payload):
-        self.producer.produce(self.topic, payload)
+    def _send(self, payload, topic=None):
+        self.producer.produce(topic or self.topic, payload)
         self.producer.flush(30)
 
     def _wait(self, job_id, kind, timeout):
@@ -270,9 +275,11 @@ class FileWriterControl:
         from streaming_data_types.action_response_answ import ActionOutcome
         job_id = job_id or str(uuid.uuid4())
         start_ns = start_ns or time.time_ns()
-        self._send(serialise_pl72(job_id, filename, start_time=_utc(start_ns), run_name=os.path.basename(filename),
-                                  nexus_structure=json.dumps(structure), instrument_name=instrument,
-                                  broker=self.brokers))
+        stop = _utc(start_ns) + datetime.timedelta(days=365.25 * 10)      # as NICOS: open-ended, until the stop
+        self._send(serialise_pl72(job_id, filename, start_time=_utc(start_ns), stop_time=stop,
+                                  run_name=os.path.basename(filename), nexus_structure=json.dumps(structure),
+                                  instrument_name=instrument, broker=self.brokers, control_topic=self.topic),
+                   topic=self.pool_topic)
         r = self._wait(job_id, b"answ", timeout)
         if r.outcome != ActionOutcome.Success:
             raise RuntimeError(f"the file-writer refused the job: {r.message}")
