@@ -80,6 +80,10 @@ class Submit:
                 f"<body style='font-family:sans-serif'><h2>{html.escape(self.title)} ({self.mode})</h2>"
                 f"<p><b>{html.escape(name or '(no name)')}</b> {html.escape(email)} · account {html.escape(uid or '-')}</p>"
                 f"<p>Submitted {now:%Y-%m-%d %H:%M}</p><p>{html.escape(summary)}</p></body></html>"))
+            z.writestr("submission.json", json.dumps(dict(            # read by progress_summary.py (teachers)
+                name=name, email=email, account=uid, exercise=self.exercise, mode=self.mode, title=self.title,
+                submitted=now.isoformat(timespec="minutes"), quiz=self.quiz.name if self.quiz is not None else None,
+                summary=summary), indent=1))
             if self.quiz is not None:
                 for ext in (".jsonl", ".meta.json"):
                     f = os.path.join(prog, self.quiz.name + ext)

@@ -3,7 +3,9 @@ const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("twins", {
   status: () => ipcRenderer.invoke("status"),
-  recent: () => ipcRenderer.invoke("recent"),
+  session: () => ipcRenderer.invoke("session"),
+  hasAccounts: () => ipcRenderer.invoke("has-accounts"),
+  resume: () => ipcRenderer.invoke("resume"),
   createAccount: (form) => ipcRenderer.invoke("create-account", form),
   signIn: (form) => ipcRenderer.invoke("sign-in", form),
   signOut: () => ipcRenderer.invoke("sign-out"),

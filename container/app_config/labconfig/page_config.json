@@ -1,4 +1,5 @@
 {
+  "exposeAppInBrowser": true,
   "disabledExtensions": {
     "@jupyter-notebook/lab-extension:interface-switcher": true,
     "@jupyter-notebook/lab-extension:launch-tree": true,

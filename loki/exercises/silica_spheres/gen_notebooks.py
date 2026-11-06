@@ -27,8 +27,28 @@ def clean(c):
     return c
 
 
+HIDDEN_START = ("q.", "q_.", "import submit", "import nb_tools" + chr(10) + "nb_tools.nicos(")
+
+
 def write(cells, name):
+    """The code of the questions and of the solutions (the answers are in it), of Submit and of the NICOS button is
+    hidden: only their widgets show. A solution (q.solution) after a check gets its own hidden cell."""
     nb = nbf.v4.new_notebook()
+    out = []
+    for c in cells:
+        if c.cell_type == "code":
+            for key in ("q.solution(", "q_.solution("):
+                i = c.source.find(key)
+                if i > 0:
+                    head, tail = c.source[:i].rstrip(), c.source[i:]
+                    c.source = head
+                    out.append(c)
+                    c = nbf.v4.new_code_cell(tail)
+                    break
+            if c.source.lstrip().startswith(HIDDEN_START):
+                c.metadata["jupyter"] = {"source_hidden": True}
+        out.append(c)
+    cells = out
     nb["cells"] = cells
     nb["metadata"] = {"kernelspec": {"display_name": "Python 3", "language": "python", "name": "python3"},
                       "language_info": {"name": "python"}}
@@ -62,27 +82,7 @@ files (sample, solvent, empty beam) to the scattering curve $I(Q)$ in absolute u
 (`esssans`). Parts 5 and 6 are yours: **you write the Guinier analysis and the model fit**, and check cells tell you
 whether your results are right (the twin knows the true sample). Part 7 is about the method.
 
-Measure first in NICOS (empty beam, D₂O, silica spheres, same configuration; your files are in the folder of your
-proposal, `f"{TWIN_RUN_ROOT}/data/loki/<year>/<proposal>/raw"`), or leave `FOLDER = None` below to start with a
-demonstration session.
-
-**The measurements in NICOS** (click *Open NICOS* in the app: NICOS of LoKI opens, ready; give a proposal
-number in the *Experiment* panel, then type in the command line or the *Scripting* tab):
-```
-move(heavy_shutter, 'Open', fast_shutter, 'Open')
-move(collimation, '3m', detector_distance, 5)
-move(sample_holder, 'empty_beam')
-with nexusfile_open('empty beam'):
-    count(t=60)
-move(sample_holder, 'd2o')
-with nexusfile_open('D2O'):
-    count(t=600)
-move(sample_holder, 'silica_spheres')
-with nexusfile_open('silica spheres'):
-    count(t=600)
-```
-Why: the solvent is subtracted from the sample, the empty beam is the reference of the transmission; all three in the
-same configuration (3 m collimation, detector at 5 m: Q from 0.006 to 0.5 Å⁻¹, enough for particles of a few nm).
+You start by measuring, in NICOS (part 0), as a user of ESS would.
 """), code(PATH_CELL), md("**Your sample** (from the sample library):"),
        code(SAMPLE_CELL)]
 msc += [clean(c) for c in src[i1:i5]]
@@ -194,11 +194,26 @@ q_.report()
 """)]
 msc += [md("## Submit your work\n\nWhen you are done: save this notebook (*Save*), then submit. The file for your teacher is made from your answers, your measurements and your notebook."),
         code("import submit\n_ = submit.Submit(\"loki/exercises/silica_spheres\", \"msc\", quiz=q_)")]
+# --- part 0: the student measures in NICOS (step by step), as at ESS; no demonstration session
+PART0 = [md("\n## 0. Your measurements, in NICOS\n\nAs at ESS, you measure with **NICOS**, the control software of the instrument: you type the commands, NICOS moves\nthe devices, counts and writes the data files. Nobody measures for you: if a file is wrong, you will see it in the\nlogbook (part 1) and measure again.\n\n1. **Open NICOS** with the button below. After about a minute the NICOS window of LoKI is there, logged in.\n2. **Your proposal.** Tab *Experiment*: write a *Proposal ID* (`3001`, or the number your teacher gives you), a title,\n   your name in *Users*, then **Apply**. Without a proposal NICOS refuses to record data, as at ESS. Another number?\n   Write it in `PROPOSAL` (part 1).\n3. **The configuration.** Tab *Instrument interaction*, in the command line (one line, then Enter):\n   `move(heavy_shutter, 'Open', fast_shutter, 'Open')`, then `move(collimation, '3m', detector_distance, 5)`:\n   3 m collimation, detector at 5 m, Q from 0.006 to 0.5 Å⁻¹, enough for particles of a few nm.\n4. **The empty beam** (the reference of the transmission): `move(sample_holder, 'empty_beam')`, then\n   `with nexusfile_open('empty beam'): count(t=60)`.\n5. **The solvent**: `move(sample_holder, 'd2o')`, then `with nexusfile_open('D2O'): count(t=600)`.\n6. **The sample**: `move(sample_holder, 'silica_spheres')`, then `with nexusfile_open('silica spheres'): count(t=600)`.\n   Watch the *Detector image*: the scattering around the beam stop.\n7. **Check.** `list_filewriting_jobs()` lists your three files. Come back here and run the notebook:\n   menu *Run > Run All Cells*.\n\nThe first count of a new configuration takes about a minute (the twin simulates it). Several lines at once: tab\n*Scripting*, then *Run*. Why three measurements: the solvent is subtracted from the sample, the empty beam is the\nreference of the transmission; all three in the same configuration.\n"), code('import nb_tools\nnb_tools.nicos("loki")')]
+_k0 = next(k for k, c in enumerate(msc) if c.cell_type == "code" and "exercise_hidden" in c.source) + 1
+msc[_k0:_k0] = PART0
+for c in msc:
+    if c.cell_type == "markdown" and c.source.startswith("## 1."):
+        c.source = '## 1. Your files\n\nYour files are in the folder of your proposal, `data/<instrument>/<year>/<proposal>/raw`, as at ESS. Write in\n`PROPOSAL` the *Proposal ID* you gave in NICOS (part 0). If there is no file yet, the notebook stops here and tells you.'
+    if c.cell_type == "code" and c.source.lstrip().startswith("from loki_paths import TWIN_RUN_ROOT") and "FOLDER" in c.source:
+        c.source = ('from loki_paths import TWIN_RUN_ROOT          # root of the results of the twins\n'
+                    'import datetime\n'
+                    'PROPOSAL = "3001"                              # the Proposal ID you gave in NICOS (part 0)\n'
+                    'FOLDER = f"{TWIN_RUN_ROOT}/data/loki/{datetime.date.today().year}/{PROPOSAL}/raw"')
+    if c.cell_type == "code" and "if FOLDER is None:" in c.source:
+        _a, _b = c.source.index("if FOLDER is None:"), c.source.index('print("folder:"')
+        c.source = (c.source[:_a] + 'import nb_tools\nnb_tools.need_measurements(FOLDER, "loki")   '
+                    '# stops here, with a message, while there is no file\n' + c.source[_b:])
 import sys as _sys
 _sys.path.insert(0, os.path.abspath(os.path.join(HERE, '..', '..', '..')))
-from nbfig import figure_cell
-_k = next((i for i, c in enumerate(msc) if 'Your mission' in c.source), 0)
-msc.insert(_k + 1, figure_cell('sans_particles.png', 'What you measure: the particles in the liquid scatter at small angles, and their size sets the shape of the curve I(Q).'))
+from nbfig import figure_cell, insert_after_mission
+insert_after_mission(msc, figure_cell('sans_particles.png', 'What you measure: the particles in the liquid scatter at small angles, and their size sets the shape of the curve I(Q).'))
 write(msc, "LoKI_silica_msc.ipynb")
 
 # --------------------------------------------------------------------------- beamtime starter
@@ -206,11 +221,12 @@ i2, i3 = section(src, "## 2."), section(src, "## 3.")
 imports = next(c for c in src if c.cell_type == "code" and "import loki_reduction as red" in c.source)
 logbook = next(c for c in src[i2:i3] if c.cell_type == "code" and "show_table" in c.source)
 imports = clean(imports)
-imports.source = imports.source.split("if FOLDER is None:")[0].rstrip()
+imports.source = (imports.source.split("if FOLDER is None:")[0].rstrip()
+                  + "\nimport nb_tools\nnb_tools.need_measurements(FOLDER, \"loki\")   # stops here while there is no file")
 bt = [md(r"""
 # Beamtime on LoKI: starter notebook
 
-Your proposal is in `beamtime.md`. This notebook only gives you the tools; what to measure and how to analyze it is
+Your proposal is just below (folded), with the buttons *Open NICOS* and *Sample builder*. This notebook only gives you the tools; what to measure and how to analyze it is
 up to you. Keep notes of your choices: they are part of your report.
 
 **Tools**
@@ -230,6 +246,8 @@ up to you. Keep notes of your choices: they are part of your report.
            "rg, drg, i0 = None, None, None                     # Guinier [Å, Å, cm⁻¹]\n"
            "radius, dradius, phi, dphi = None, None, None, None  # sphere model [Å, Å, -, -]\n"
            "ex.check_guinier(rg, drg, i0)\nex.check_sphere(radius, dradius, phi, dphi)")]
+bt[1:1] = [md("**Your beamtime.** Your proposal (below, folded), NICOS to measure, the sample builder for your own samples:"),
+          code("import sys, os\nsys.path.insert(0, os.path.abspath(\"../../..\"))\nimport nb_tools\nnb_tools.beamtime_tools(\"loki\", \"loki/exercises/silica_spheres/beamtime.md\")")]
 bt += [md("## Submit your work\n\nWhen you are done: save this notebook (*Save*), then submit. The file for your teacher is made from your measurements and your notebook."),
        code("import submit\n_ = submit.Submit(\"loki/exercises/silica_spheres\", \"beamtime\")")]
 write(bt, "LoKI_silica_beamtime.ipynb")

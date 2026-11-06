@@ -197,10 +197,15 @@ class Open(Base):
         dst = os.path.join(self.root, dst_rel)
         if not os.path.isfile(dst):
             nb = nbformat.read(src, as_version=4)
+            # the copy is elsewhere (work/<user>/...): its paths go through TWIN_ROOT (set by this server for the
+            # kernels), never through the folders of one computer
+            root = 'os.environ.get("TWIN_ROOT", os.path.abspath("../../.."))'
+            instr = os.path.basename(instr_dir)
+            yml = os.path.relpath(os.path.join(ex_dir, "exercise.yml"), self.root).replace(os.sep, "/")
             for c in nb.cells:
-                c.source = (c.source.replace('os.path.abspath("../../..")', repr(self.root))
-                            .replace('os.path.abspath("../..")', repr(instr_dir))
-                            .replace('"exercise.yml"', repr(os.path.join(ex_dir, "exercise.yml"))))
+                c.source = (c.source.replace('os.path.abspath("../../..")', root)
+                            .replace('os.path.abspath("../..")', f'os.path.join({root}, "{instr}")')
+                            .replace('"exercise.yml"', f'os.path.join({root}, "{yml}")'))
             os.makedirs(os.path.dirname(dst), exist_ok=True)
             nbformat.write(nb, dst)
         return dst_rel
@@ -263,6 +268,7 @@ def _load_jupyter_server_extension(serverapp):
         ("catalogue", Catalogue), ("user", User), ("open", Open), ("nicos", Nicos), ("handin", Handin)]])
     # the twin root on the path of the server (quiz.py: the progress shown in the catalogue)
     root = os.path.abspath(os.path.expanduser(serverapp.root_dir))
+    os.environ["TWIN_ROOT"] = root            # the kernels find the twin from the students' copies (work/<user>/...)
     if root not in sys.path:
         sys.path.insert(0, root)
     serverapp.log.info("twin_app: /twin/ API of the app loaded")

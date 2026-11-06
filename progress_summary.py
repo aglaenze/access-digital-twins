@@ -1,41 +1,85 @@
-"""Follow-up of a class (teachers): the answers of the students to the interactive questions (quiz.py), read from
-their progress files, as a table and a CSV file.
+"""For the teacher: the work submitted by a class, as one table (and a CSV file).
 
-Each student (or group) has a run folder (TWIN_RUN_ROOT: in the container the volume /data/twin, on a laptop
-~/McStas_runs/twin) with progress/<quiz>.jsonl. Collect the folders of the class in one place (one sub-folder per
-student, e.g. unzipped from their submissions), then:
+The students press *Submit my work* at the end of an exercise (submit.py): a zip file is made, which they send to the
+teacher (email, course page). Put all the files received in one folder, then:
 
-    python progress_summary.py <folder of the class> [--csv summary.csv]
-    python progress_summary.py ~/McStas_runs/twin                        # one student: yourself
+    python progress_summary.py <folder> [--csv summary.csv]
 
-For each student and each quiz: questions answered right, right at the first try, answers shown, solutions opened.
+One line per submitted file (the newest file of a student for an exercise counts; older ones are listed with
+"older"): name, email, exercise, level, date, questions answered right (at the first try), answers shown, solutions
+opened. The folder may also hold unzipped folders with progress/<...>.jsonl (the "Export all my work" files, or the
+data folder of a student, ~/McStas_runs/twin): they are read too, one line per logbook.
 """
 import argparse
 import csv
 import glob
+import io
 import json
 import os
+import zipfile
 
 
-def read(progress_dir):
-    out = {}
-    for f in sorted(glob.glob(os.path.join(progress_dir, "*.jsonl"))):
-        q = {}
-        for line in open(f, encoding="utf-8"):
-            try:
-                e = json.loads(line)
-            except ValueError:
-                continue
-            s = q.setdefault(e["question"], dict(tries=0, right=False, first=None, opened=False))
-            s["tries"] += 1
-            if e.get("answer") == "opened":
-                s["opened"] = True
-                continue
-            if s["first"] is None:
-                s["first"] = bool(e.get("right"))
-            s["right"] = s["right"] or bool(e.get("right"))
-        out[os.path.splitext(os.path.basename(f))[0]] = q
-    return out
+def summarize(lines, total=None):
+    """Logbook lines of quiz.py -> dict of counts."""
+    q = {}
+    for line in lines:
+        try:
+            e = json.loads(line)
+        except ValueError:
+            continue
+        s = q.setdefault(e.get("question"), dict(tries=0, right=False, first=None, revealed=False, opened=False))
+        if e.get("answer") == "opened":
+            s["opened"] = True
+            continue
+        if e.get("answer") == "revealed":
+            s["revealed"] = True
+            continue
+        s["tries"] += 1
+        if s["first"] is None:
+            s["first"] = bool(e.get("right"))
+        s["right"] = s["right"] or bool(e.get("right"))
+    answered = [s for s in q.values() if s["first"] is not None or s["revealed"]]
+    return dict(questions=total or len(answered), right=sum(s["right"] for s in q.values()),
+                first_try=sum(bool(s["first"]) for s in q.values()),
+                shown=sum(s["revealed"] and not s["right"] for s in q.values()),
+                solutions_opened=sum(s["opened"] for s in q.values()))
+
+
+def from_zip(path):
+    rows = []
+    with zipfile.ZipFile(path) as z:
+        names = z.namelist()
+        sub = next((n for n in names if n.endswith("submission.json")), None)
+        if sub:                                            # a file made by Submit
+            info = json.loads(z.read(sub))
+            logs = [n for n in names if n.startswith(os.path.dirname(sub)) and n.endswith(".jsonl") and "/questions/" in "/" + n]
+            metas = [n for n in names if n.endswith(".meta.json")]
+            total = json.loads(z.read(metas[0])).get("questions") if metas else None
+            lines = [l for n in logs for l in io.TextIOWrapper(z.open(n), encoding="utf-8")]
+            rows.append(dict(name=info.get("name", ""), email=info.get("email", ""), exercise=info.get("exercise", ""),
+                             level=info.get("mode", ""), submitted=info.get("submitted", ""),
+                             **(summarize(lines, total) if lines else dict(questions=0, right=0, first_try=0, shown=0,
+                                                                          solutions_opened=0)),
+                             file=os.path.basename(path)))
+        else:                                              # a file of "Export all my work"
+            for n in names:
+                if "/progress/" in n and n.endswith(".jsonl"):
+                    who = n.split("/")[0]
+                    lines = list(io.TextIOWrapper(z.open(n), encoding="utf-8"))
+                    rows.append(dict(name=who, email="", exercise=os.path.basename(n)[:-6], level="", submitted="",
+                                     **summarize(lines), file=os.path.basename(path)))
+    return rows
+
+
+def from_folder(folder):
+    rows = []
+    for d in sorted(glob.glob(os.path.join(folder, "**", "progress"), recursive=True)):
+        for f in sorted(glob.glob(os.path.join(d, "**", "*.jsonl"), recursive=True)):
+            who = os.path.relpath(os.path.dirname(f), folder)
+            with open(f, encoding="utf-8") as fh:
+                rows.append(dict(name=who, email="", exercise=os.path.basename(f)[:-6], level="", submitted="",
+                                 **summarize(fh), file=os.path.relpath(f, folder)))
+    return rows
 
 
 def main():
@@ -43,25 +87,33 @@ def main():
     a.add_argument("folder")
     a.add_argument("--csv")
     o = a.parse_args()
-    dirs = sorted(glob.glob(os.path.join(o.folder, "**", "progress"), recursive=True))
     rows = []
-    for d in dirs:
-        student = os.path.relpath(os.path.dirname(d), o.folder) or "."
-        for quiz, qs in read(d).items():
-            answered = [s for s in qs.values() if s["first"] is not None]
-            rows.append(dict(student=student, quiz=quiz, questions=len(answered),
-                             right=sum(s["right"] for s in answered), first_try=sum(bool(s["first"]) for s in answered),
-                             solutions_opened=sum(s["opened"] for s in qs.values())))
+    for f in sorted(glob.glob(os.path.join(o.folder, "**", "*.zip"), recursive=True)):
+        try:
+            rows += from_zip(f)
+        except (zipfile.BadZipFile, ValueError, KeyError) as e:
+            print("skipped", f, e)
+    rows += from_folder(o.folder)
     if not rows:
-        print("no progress files found under", o.folder)
+        print("nothing found under", o.folder)
         return
-    w = {k: max(len(k), *(len(str(r[k])) for r in rows)) for k in rows[0]}
-    print("  ".join(k.ljust(w[k]) for k in w))
+    newest = {}
+    for r in rows:                                       # the newest submission of a student for an exercise counts
+        k = (r["email"] or r["name"], r["exercise"], r["level"])
+        if k not in newest or r["submitted"] > newest[k]["submitted"]:
+            newest[k] = r
     for r in rows:
-        print("  ".join(str(r[k]).ljust(w[k]) for k in w))
+        r["status"] = "" if newest[(r["email"] or r["name"], r["exercise"], r["level"])] is r else "older"
+    rows.sort(key=lambda r: (r["exercise"], r["level"], r["name"], r["submitted"]))
+    cols = ["name", "email", "exercise", "level", "submitted", "questions", "right", "first_try", "shown",
+            "solutions_opened", "status", "file"]
+    w = {k: max(len(k), *(len(str(r[k])) for r in rows)) for k in cols}
+    print("  ".join(k.ljust(w[k]) for k in cols))
+    for r in rows:
+        print("  ".join(str(r[k]).ljust(w[k]) for k in cols))
     if o.csv:
         with open(o.csv, "w", newline="", encoding="utf-8") as f:
-            wr = csv.DictWriter(f, fieldnames=list(rows[0]))
+            wr = csv.DictWriter(f, fieldnames=cols)
             wr.writeheader()
             wr.writerows(rows)
         print("written", o.csv)

@@ -25,7 +25,7 @@ function setMode(c) {
   $("#tab-in").classList.toggle("on", !c);
   $("#tab-new").classList.toggle("on", c);
   $("#go").textContent = c ? "Create my account" : "Sign in";
-  $("#f-pw").autocomplete = c ? "new-password" : "current-password";
+  $("#f-pw").autocomplete = c ? "new-password" : "off";
   $("#auth-error").textContent = "";
 }
 $("#tab-in").onclick = () => setMode(false);
@@ -43,11 +43,18 @@ function showStatus(s) {
 T.on("status", showStatus);
 T.status().then(showStatus);
 
-T.recent().then((list) => {
-  if (!list.length) { setMode(true); return; }
-  $("#recent").innerHTML = "On this computer: " + list.map((u) => `<b data-email="${esc(u.email)}">${esc(u.name)}</b>`).join(" · ");
-  $("#recent").querySelectorAll("b").forEach((b) => b.onclick = () => { $("#f-email").value = b.dataset.email; $("#f-pw").focus(); });
-});
+// The student who did not sign out is signed in again at once; otherwise an empty form (no remembered email)
+(async () => {
+  const s = await T.session();
+  if (!s) { if (!(await T.hasAccounts())) setMode(true); return; }
+  $("#auth").classList.add("hidden");
+  $("#boot-text").textContent = `Welcome back, ${s.name}: starting the instruments…`;
+  try {
+    const r = await T.resume();
+    if (r && r.user) { server = { base: r.base, token: r.token }; user = r.user; enterApp(); return; }
+  } catch { /* the form below */ }
+  $("#auth").classList.remove("hidden");
+})();
 
 $("#auth").onsubmit = async (e) => {
   e.preventDefault();
@@ -90,10 +97,8 @@ $("#signout").onclick = async () => {
   user = null;
   $("#app").classList.add("hidden");
   $("#login").classList.remove("hidden");
-  T.recent().then((list) => {
-    $("#recent").innerHTML = "On this computer: " + list.map((u) => `<b data-email="${esc(u.email)}">${esc(u.name)}</b>`).join(" · ");
-    $("#recent").querySelectorAll("b").forEach((b) => b.onclick = () => { $("#f-email").value = b.dataset.email; $("#f-pw").focus(); });
-  });
+  $("#auth").reset();
+  $("#auth").classList.remove("hidden");
   setMode(false);
 };
 $("#handin").onclick = async () => {
@@ -145,9 +150,7 @@ function renderCatalogue() {
   $("#free").innerHTML = free ? `<article class="free"><div class="txt"><span class="tech">No exercise · MSc and beyond</span>
       <h3>Free beamtime on ${esc(I.name)}</h3><p>Your own question, your own samples, your own measurements: as in a real beamtime at ESS.
       The starter notebook asks for your question and your plan first.</p></div>
-      <div class="acts"><button class="btn go" data-act="nicos" data-instr="${instr}">Open NICOS</button>
-      <button class="btn" data-act="file" data-file="${esc(free)}" data-kind="notebook" data-label="${esc(I.name)} · Free beamtime">Starter notebook</button>
-      <button class="btn" data-act="file" data-file="Sample_builder.ipynb" data-kind="page" data-label="Sample builder">Sample builder</button></div></article>` : "";
+      <div class="acts"><button class="btn go" data-act="file" data-file="${esc(free)}" data-kind="notebook" data-label="${esc(I.name)} · Free beamtime">Starter notebook</button></div></article>` : "";
   $("#free").querySelectorAll("[data-act]").forEach((b) => b.onclick = () => act(b.dataset));
 }
 
@@ -163,12 +166,10 @@ function level(e, k, m, i) {
   const go = p.status === "new" ? "Start" : (p.status === "done" ? "Open again" : "Continue");
   let acts;
   if (k === "bsc") acts = `<button class="btn ${p.status === "new" ? "soft" : "go"}" data-act="open" ${d}>${go}</button>`;
-  else if (k === "msc") acts = `<button class="btn ${p.status === "new" ? "soft" : "go"}" data-act="open" ${d}>${go === "Start" ? "Open the notebook" : go}</button>
-      <button class="btn" data-act="nicos" data-instr="${e.instrument}">Open NICOS</button>`;
-  else acts = `<button class="btn soft" data-act="sheet" data-i="${i}" data-k="${k}">Your proposal</button>
-      <button class="btn" data-act="nicos" data-instr="${e.instrument}">Open NICOS</button>
-      <button class="btn ${p.status === "new" ? "" : "go"}" data-act="open" data-what="analysis" ${d}>Starter notebook</button>
-      <button class="btn" data-act="file" data-file="Sample_builder.ipynb" data-kind="page" data-label="Sample builder">Sample builder</button>`;
+  // (NICOS and the sample builder are opened from the notebook itself: measuring is part of the exercise)
+  else if (k === "msc") acts = `<button class="btn ${p.status === "new" ? "soft" : "go"}" data-act="open" ${d}>${go === "Start" ? "Open the notebook" : go}</button>`;
+  else acts = `<button class="btn" data-act="sheet" data-i="${i}" data-k="${k}">Your proposal</button>
+      <button class="btn ${p.status === "new" ? "soft" : "go"}" data-act="open" data-what="analysis" ${d}>Starter notebook</button>`;
   return `<div class="level"><div class="row"><span class="chip ${k}">${LEVEL[k] || k}</span><span class="dur">${esc(m.duration || "")}</span></div>
     <span class="label">${esc(m.label)}</span><span class="what">${esc(m.what)}</span>
     <div class="prog"><div class="row"><span>${esc(p.text)}</span><b>${p.pct ? p.pct + " %" : ""}</b></div>
@@ -218,7 +219,7 @@ function activate(key) {
 $("#tab-cat").onclick = () => activate("cat");
 
 function openTab(url, kind, label) {
-  const key = url.split("?")[0];
+  const key = url.split("?")[0] + (url.includes("instrument=") ? "?" + url.split("?")[1] : "");   // (NICOS: one tab per instrument)
   if (tabs.has(key)) { activate(key); return; }
   const btn = document.createElement("button");
   btn.className = "tab";
@@ -243,6 +244,35 @@ function openTab(url, kind, label) {
   view.addEventListener("did-fail-load", (e) => { if (e.errorCode !== -3) { done(); toast("The page did not load: " + e.errorDescription); } });
   const path = kind === "notebook" ? decodeURIComponent(key.replace(/^\/notebooks\//, "")) : null;
   const t = { btn, pane, view, kind, path, label };
+  if (kind === "notebook") {
+    // a notebook opens already run: all its cells are executed once the kernel is ready (Notebook 7 exposes its
+    // commands: exposeAppInBrowser in container/app_config/labconfig/page_config.json)
+    view.addEventListener("did-stop-loading", () => {
+      t.running = true;
+      if (tabs.get(activeKey) === t) $("#saved").textContent = "Running the notebook…";
+      view.executeJavaScript(`(async () => {
+        for (let i = 0; i < 240; i++) {
+          const a = window.jupyterapp, w = a && a.shell && a.shell.currentWidget;
+          if (w && w.sessionContext && w.content && w.content.widgets && w.content.widgets.length) {
+            await w.sessionContext.ready;
+            await a.commands.execute("notebook:run-all-cells");
+            // back to where the notebook stopped (a message such as "measure in NICOS first"), or to the top
+            const cells = w.content.widgets;
+            let k = cells.findIndex((c) => c.model.type === "code" &&
+              c.model.outputs.toJSON().some((o) => o.output_type === "error"));
+            if (k < 0) k = 0;
+            try { w.content.activeCellIndex = k; await w.content.scrollToCell(cells[k], "start"); } catch (e) { /* older API */ }
+            return "done";
+          }
+          await new Promise((r) => setTimeout(r, 500));
+        }
+        return "no notebook";
+      })()`).catch(() => "error").then(() => {
+        t.running = false;
+        if (tabs.get(activeKey) === t) $("#saved").textContent = t.savedAt ? `Saved ${t.savedAt}` : "Ready";
+      });
+    }, { once: true });
+  }
   tabs.set(key, t);
   btn.onclick = (e) => { if (e.target.closest(".x")) closeTab(key); else activate(key); };
   activate(key);
@@ -281,6 +311,9 @@ T.on("open-url", (url) => {
   if (!server) return;
   const u = new URL(url);
   const p = u.pathname + (u.search ? u.search.replace(/([?&])token=[^&]*&?/, "$1").replace(/[?&]$/, "") : "");
-  const name = decodeURIComponent(u.pathname.split("/").pop() || "Page").replace(/\.ipynb$/, "");
+  const instr = u.searchParams.get("instrument");
+  const file = decodeURIComponent(u.pathname.split("/").pop() || "Page").replace(/\.ipynb$/, "");
+  const name = file === "open_nicos" ? `NICOS · ${({ odin: "ODIN", loki: "LoKI" })[instr] || ""}`
+    : file === "Sample_builder" ? "Sample builder" : file;
   openTab(p, u.pathname.startsWith("/notebooks/") ? "notebook" : "page", name);
 });

@@ -28,8 +28,28 @@ def clean(c):
     return c
 
 
+HIDDEN_START = ("q.", "q_.", "import submit", "import nb_tools" + chr(10) + "nb_tools.nicos(")
+
+
 def write(cells, name):
+    """The code of the questions and of the solutions (the answers are in it), of Submit and of the NICOS button is
+    hidden: only their widgets show. A solution (q.solution) after a check gets its own hidden cell."""
     nb = nbf.v4.new_notebook()
+    out = []
+    for c in cells:
+        if c.cell_type == "code":
+            for key in ("q.solution(", "q_.solution("):
+                i = c.source.find(key)
+                if i > 0:
+                    head, tail = c.source[:i].rstrip(), c.source[i:]
+                    c.source = head
+                    out.append(c)
+                    c = nbf.v4.new_code_cell(tail)
+                    break
+            if c.source.lstrip().startswith(HIDDEN_START):
+                c.metadata["jupyter"] = {"source_hidden": True}
+        out.append(c)
+    cells = out
     nb["cells"] = cells
     nb["metadata"] = {"kernelspec": {"display_name": "Python 3", "language": "python", "name": "python3"},
                       "language_info": {"name": "python"}}
@@ -67,25 +87,7 @@ Parts 1 to 5 are guided: they take your files from the raw neutrons to the trans
 official ESS reduction. Part 6 is yours: **you write the model and the fit**, and a check cell tells you whether your
 result is right (the twin knows the true sample). Part 7 is about the method itself: a systematic error to track down.
 
-Measure first in NICOS (a dark, an open beam and the iron plate; your files are in the folder of your proposal,
-`f"{TWIN_RUN_ROOT}/data/odin/<year>/<proposal>/raw"`), or leave `FOLDER = None` below to start with a short
-demonstration session.
-
-**The measurements in NICOS** (click *Open NICOS* in the app: NICOS of ODIN opens, ready; give a proposal
-number in the *Experiment* panel, then type in the command line or the *Scripting* tab):
-```
-move(shutter, 'closed')
-with nexusfile_open('dark'):
-    count(t=30)
-move(shutter, 'open', stage_x, 500)
-with nexusfile_open('open beam'):
-    count(t=60)
-move(stage_x, 0)
-with nexusfile_open('iron plate'):
-    count(t=60)
-```
-Why these settings: the choppers (WFM, δ = 0.30 m) and the pinhole stay the same for the three runs, so that the
-open beam can divide the sample run; the stage is moved 500 mm aside for the open beam (the field of view is 14 mm).
+You start by measuring, in NICOS (part 0), as a user of ESS would.
 """), code(PATH_CELL), md("**Your sample** (from the sample library):"),
        code(SAMPLE_CELL)]
 for c in src[i1:i6]:
@@ -199,11 +201,26 @@ q.report()
 """)]
 msc += [md("## Submit your work\n\nWhen you are done: save this notebook (*Save*), then submit. The file for your teacher is made from your answers, your measurements and your notebook."),
         code("import submit\n_ = submit.Submit(\"odin/exercises/iron_bragg_edges\", \"msc\", quiz=q)")]
+# --- part 0: the student measures in NICOS (step by step), as at ESS; no demonstration session
+PART0 = [md("\n## 0. Your measurements, in NICOS\n\nAs at ESS, you measure with **NICOS**, the control software of the instrument: you type the commands, NICOS moves\nthe devices, counts and writes the data files. Nobody measures for you: if a file is wrong (shutter forgotten, sample\nin the wrong place), you will see it in part 2 and measure again.\n\n1. **Open NICOS** with the button below. After about a minute the NICOS window of ODIN is there, logged in.\n2. **Your proposal.** Tab *Experiment*: write a *Proposal ID* (`1234`, or the number your teacher gives you), a title,\n   your name in *Users*, then **Apply**. Without a proposal NICOS refuses to record data, as at ESS. Another number?\n   Write it in `PROPOSAL` (part 1).\n3. **The dark.** Tab *Instrument interaction*, in the command line (one line, then Enter):\n   `move(shutter, 'closed')`, then `with nexusfile_open('dark'): count(t=30)`.\n   The *Detector image* stays almost empty: a few counts of background.\n4. **The open beam.** `move(shutter, 'open', stage_x, 500)`: the stage goes 500 mm aside, so the plate is out of the\n   14 mm field of view. Then `with nexusfile_open('open beam'): count(t=60)`.\n5. **The iron plate.** `move(stage_x, 0)`, then `with nexusfile_open('iron plate'): count(t=60)`. The image now shows\n   the plate: a darker square.\n6. **Check.** `list_filewriting_jobs()` lists your three files. Come back here and run the notebook:\n   menu *Run > Run All Cells*.\n\nSeveral lines at once: tab *Scripting*, then *Run*. Why these settings: the choppers (WFM, δ = 0.30 m) and the pinhole\nstay the same for the three runs, so that the open beam can divide the sample run.\n"), code('import nb_tools\nnb_tools.nicos("odin")')]
+_k0 = next(k for k, c in enumerate(msc) if c.cell_type == "code" and "exercise_hidden" in c.source) + 1
+msc[_k0:_k0] = PART0
+for c in msc:
+    if c.cell_type == "markdown" and c.source.startswith("## 1."):
+        c.source = '## 1. Your files\n\nYour files are in the folder of your proposal, `data/<instrument>/<year>/<proposal>/raw`, as at ESS. Write in\n`PROPOSAL` the *Proposal ID* you gave in NICOS (part 0). If there is no file yet, the notebook stops here and tells you.'
+    if c.cell_type == "code" and c.source.lstrip().startswith("from odin_paths import TWIN_RUN_ROOT") and "FOLDER" in c.source:
+        c.source = ('from odin_paths import TWIN_RUN_ROOT          # root of the results of the twins\n'
+                    'import datetime\n'
+                    'PROPOSAL = "1234"                              # the Proposal ID you gave in NICOS (part 0)\n'
+                    'FOLDER = f"{TWIN_RUN_ROOT}/data/odin/{datetime.date.today().year}/{PROPOSAL}/raw"')
+    if c.cell_type == "code" and "if FOLDER is None:" in c.source:
+        _a, _b = c.source.index("if FOLDER is None:"), c.source.index('print("folder:"')
+        c.source = (c.source[:_a] + 'import nb_tools\nnb_tools.need_measurements(FOLDER, "odin")   '
+                    '# stops here, with a message, while there is no file\n' + c.source[_b:])
 import sys as _sys
 _sys.path.insert(0, os.path.abspath(os.path.join(HERE, '..', '..', '..')))
-from nbfig import figure_cell
-_k = next((i for i, c in enumerate(msc) if 'Your mission' in c.source), 0)
-msc.insert(_k + 1, figure_cell('iron_structures.png', 'What you have to decide: α-iron (left) or γ-iron (middle)? Each structure has its own atomic planes, hence its own Bragg edges (right).'))
+from nbfig import figure_cell, insert_after_mission
+insert_after_mission(msc, figure_cell('iron_structures.png', 'What you have to decide: α-iron (left) or γ-iron (middle)? Each structure has its own atomic planes, hence its own Bragg edges (right).'))
 write(msc, "ODIN_iron_msc.ipynb")
 
 # --------------------------------------------------------------------------- beamtime starter
@@ -211,11 +228,12 @@ i2, i3 = section(src, "## 2."), section(src, "## 3.")
 imports = next(c for c in src if c.cell_type == "code" and "import odin_reduction as red" in c.source)
 logbook = next(c for c in src[i2:i3] if c.cell_type == "code" and "show_table" in c.source)
 starter_imports = clean(imports)
-starter_imports.source = starter_imports.source.split("if FOLDER is None:")[0].rstrip()   # no demonstration session
+starter_imports.source = (starter_imports.source.split("if FOLDER is None:")[0].rstrip()   # no demonstration session
+                          + "\nimport nb_tools\nnb_tools.need_measurements(FOLDER, \"odin\")   # stops here while there is no file")
 bt = [md(r"""
 # Beamtime on ODIN: starter notebook
 
-Your proposal is in `beamtime.md`. This notebook only gives you the tools; what to measure and how to analyze it is
+Your proposal is just below (folded), with the buttons *Open NICOS* and *Sample builder*. This notebook only gives you the tools; what to measure and how to analyze it is
 up to you. Keep notes of your choices: they are part of your report.
 
 **Tools**
@@ -234,6 +252,8 @@ up to you. Keep notes of your choices: they are part of your report.
            "lam_edge, dlam_edge = None, None     # your (110) edge and its uncertainty [Å]\n"
            "a_fe, da_fe = None, None             # your lattice parameter and its uncertainty [Å]\n"
            "ex.check_edge(lam_edge, dlam_edge)\nex.check_lattice(a_fe, da_fe)")]
+bt[1:1] = [md("**Your beamtime.** Your proposal (below, folded), NICOS to measure, the sample builder for your own samples:"),
+          code("import sys, os\nsys.path.insert(0, os.path.abspath(\"../../..\"))\nimport nb_tools\nnb_tools.beamtime_tools(\"odin\", \"odin/exercises/iron_bragg_edges/beamtime.md\")")]
 bt += [md("## Submit your work\n\nWhen you are done: save this notebook (*Save*), then submit. The file for your teacher is made from your measurements and your notebook."),
        code("import submit\n_ = submit.Submit(\"odin/exercises/iron_bragg_edges\", \"beamtime\")")]
 write(bt, "ODIN_iron_beamtime.ipynb")

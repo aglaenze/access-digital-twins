@@ -61,6 +61,11 @@ class Accounts {
     return { user: this.public(u) };
   }
 
+  get(id) {
+    const u = this.load().users[id];
+    return u ? this.public(u) : null;
+  }
+
   recent(n = 4) {
     return Object.values(this.load().users).sort((a, b) => (b.last || "").localeCompare(a.last || ""))
       .slice(0, n).map((u) => this.public(u));

@@ -3,7 +3,8 @@
 //              developers: the code as it is). Chosen when that Python is found and the app runs from the repository.
 //   container: the image of the twins in Podman or Docker (students): pulled the first time, the data in the volume
 //              "twin-data".
-// Settings (environment or <userData>/settings.json): TWIN_BACKEND (local|container), TWIN_PYTHON, TWIN_IMAGE.
+// Settings (environment or <userData>/settings.json): TWIN_BACKEND (local|container), TWIN_PYTHON, TWIN_IMAGE,
+// TWIN_ENGINE (podman|docker).
 const { spawn, execFile } = require("child_process");
 const crypto = require("crypto");
 const fs = require("fs");
@@ -106,7 +107,8 @@ class Backend {
   }
 
   async startContainer() {
-    const eng = which(["podman", "docker"]);
+    const want = process.env.TWIN_ENGINE || this.settings.engine;          // podman or docker; by default the first found
+    const eng = which(want ? [want] : ["podman", "docker"]);
     if (!eng) {
       const e = new Error("Podman is needed to run the instruments. Install Podman Desktop (free), then open this app again.");
       e.url = "https://podman-desktop.io";

@@ -22,13 +22,13 @@ committee asks for:
 - Mistakes are allowed, as at a real instrument. Some combinations are refused by the instrument: find out why.
 
 **Samples**: `sample_info()` describes the sample mounted. To go further (another particle size, a contrast with
-H₂O/D₂O), design your own sample with the **sample builder** (button *Sample builder*, above): it is saved with
+H₂O/D₂O), design your own sample with the **sample builder** (button *Sample builder* at the top of your starter notebook): it is saved with
 your proposal and appears on the sample changer.
 
 ## How to
 
-1. Click **Open NICOS** (above): the NICOS window of LoKI opens, ready.
+1. Click **Open NICOS** (at the top of your starter notebook): the NICOS window of LoKI opens, ready.
 2. Enter the proposal number **3001** in the *Experiment* panel.
 3. Record data with `nexusfile_open`, e.g. `with nexusfile_open('silica 3m'): count(t=600)`.
    Your files go to `data/loki/2026/3001/raw`.
-4. Analyze them with the **starter notebook** (above).
+4. Analyze them with the **starter notebook** (button *Starter notebook* of the catalogue).

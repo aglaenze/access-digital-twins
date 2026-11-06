@@ -65,13 +65,24 @@ app.on("web-contents-created", (_e, wc) => {
 });
 
 ipcMain.handle("status", () => status);
-ipcMain.handle("recent", () => accounts().recent());
+// The open session: the student signed in and not signed out (session.json); the app reopens it at the next start
+const sessionFile = () => path.join(app.getPath("userData"), "session.json");
+function openSession() {
+  try {
+    const id = JSON.parse(fs.readFileSync(sessionFile(), "utf-8")).id;
+    return accounts().get(id);
+  } catch { return null; }
+}
+ipcMain.handle("session", () => { const u = openSession(); return u ? { name: u.name } : null; });
+ipcMain.handle("has-accounts", () => accounts().recent(1).length > 0);
+ipcMain.handle("resume", async () => { const u = openSession(); return u ? signedIn(u) : null; });
 ipcMain.handle("open-external", (_e, url) => shell.openExternal(url));
 
 async function signedIn(user) {
   await ready;
   await backend.request("POST", "/twin/user", user);
   current = user;
+  fs.writeFileSync(sessionFile(), JSON.stringify({ id: user.id }));
   return { user, base: backend.base, token: backend.token };
 }
 
@@ -83,7 +94,7 @@ ipcMain.handle("sign-in", async (_e, form) => {
   const r = accounts().signIn(form);
   return r.error ? r : signedIn(r.user);
 });
-ipcMain.handle("sign-out", async () => { current = null; return true; });
+ipcMain.handle("sign-out", async () => { current = null; fs.rmSync(sessionFile(), { force: true }); return true; });
 
 ipcMain.handle("api", async (_e, method, p, body) => {
   await ready;
@@ -130,11 +141,26 @@ async function selftest(out) {
   try {
     await new Promise((r) => setTimeout(r, 1500));
     await shot("1_login");
+    if (await js(`document.querySelector("#auth").classList.contains("hidden")`)) {   // a session was open
+      const t = Date.now();
+      check("resumed without signing in", await wait(`!document.querySelector("#app").classList.contains("hidden")`, 1200), t);
+      await new Promise((r) => setTimeout(r, 1500));
+      await shot("1b_resumed");
+      await js(`document.querySelector("#signout").click(); true`);
+      await new Promise((r) => setTimeout(r, 1500));
+      check("signed out, empty form", await js(`!document.querySelector("#login").classList.contains("hidden") &&
+        document.querySelector("#f-email").value === "" && !document.querySelector("#auth").classList.contains("hidden")`), t);
+      throw { stack: "end of the resume test (not an error)", resume: true };
+    }
     await js(`document.querySelector("#tab-new").click(); document.querySelector("#f-name").value = "Sam Selftest";
       document.querySelector("#f-email").value = "sam.selftest@example.org"; document.querySelector("#f-pw").value = "selftest-123";
       document.querySelector("#auth").requestSubmit(); true`);
     const t0 = Date.now();
-    check("signed in", await wait(`!document.querySelector("#app").classList.contains("hidden") && document.querySelectorAll(".ex").length > 0`, 1200), t0);
+    await wait(`(!document.querySelector("#app").classList.contains("hidden") && document.querySelectorAll(".ex").length > 0)
+      || document.querySelector("#auth-error").textContent !== ""`, 1200);
+    const err = await js(`document.querySelector("#auth-error").textContent`);
+    if (err) log("error shown: " + err);
+    check("signed in", await js(`!document.querySelector("#app").classList.contains("hidden")`), t0);
     await new Promise((r) => setTimeout(r, 1500));
     await shot("2_catalogue");
     const t1 = Date.now();
@@ -164,15 +190,26 @@ async function selftest(out) {
     const t2 = Date.now();
     await js(`document.querySelector('[data-act="open"][data-mode="msc"]').click(); true`);
     check("notebook loaded", await wait(`document.querySelectorAll(".pane .loading").length === 0 && document.querySelectorAll(".pane webview").length === 2`, 300), t2);
-    await new Promise((r) => setTimeout(r, 5000));
+    const t3 = Date.now();
+    const nbState = `document.querySelectorAll(".pane.on webview")[0].executeJavaScript("(() => { const w = window.jupyterapp && window.jupyterapp.shell.currentWidget; if (!w || !w.content) return 'none'; const cs = w.content.widgets.filter(c => c.model.type === 'code' && c.model.sharedModel.source.trim()); const done = cs.filter(c => c.model.executionCount).length; const errs = cs.filter(c => c.model.outputs.toJSON().some(o => o.output_type === 'error' && o.ename !== 'MeasureFirst')).length; const stop = cs.some(c => c.model.outputs.toJSON().some(o => o.ename === 'MeasureFirst')); return done + '/' + cs.length + ' errors ' + errs + (stop ? ' stop' : ''); })()")`;
+    let st = "";
+    for (let i = 0; i < 300; i++) {
+      st = await js(nbState).catch(() => "?");
+      const m = /^(\d+)\/(\d+)/.exec(st);
+      if ((m && +m[1] === +m[2] && +m[2] > 0) || / stop$/.test(st)) break;
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+    const m = /^(\d+)\/(\d+) errors (\d+)/.exec(st);
+    check(`notebook run at opening (${st})`, !!m && m[3] === "0" && (m[1] === m[2] || / stop$/.test(st)), t3);
+    await new Promise((r) => setTimeout(r, 2000));
     await shot("5_notebook");
     await js(`document.querySelector("#tab-cat").click(); true`);
     await new Promise((r) => setTimeout(r, 2500));
     await shot("4_catalogue_again");
     log("progress: " + await js(`[...document.querySelectorAll(".prog .row span")].slice(0, 3).map(s => s.textContent).join(" | ")`));
   } catch (e) {
-    log("ERROR " + e.stack);
-    failed = true;
+    if (e && e.resume) log(e.stack);
+    else { log("ERROR " + e.stack); failed = true; }
   }
   log(failed ? "SELFTEST FAILED" : "SELFTEST PASSED");
   process.exitCode = failed ? 1 : 0;

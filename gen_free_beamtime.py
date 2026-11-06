@@ -43,6 +43,10 @@ def main():
             "## My question\n\n(what, on which sample, why; what result would answer it)\n\n## My plan\n\n"
             "(measurements, references, configuration, counting times, and why)"))
         for c in cells:
+            if c.cell_type == "code" and "nb_tools.beamtime_tools(" in c.source:        # no proposal sheet here
+                c.source = c.source.split("nb_tools.beamtime_tools(")[0] + f'nb_tools.beamtime_tools("{instr}")'
+            if c.cell_type == "markdown" and c.source.startswith("**Your beamtime.**"):
+                c.source = "**Your beamtime.** NICOS to measure, the sample builder for your own samples:"
             if c.cell_type == "code" and "FOLDER = " in c.source and f"/{number}/raw" in c.source:
                 c.source = (f"from {instr}_paths import TWIN_RUN_ROOT\nimport datetime\n"
                             f"PROPOSAL = \"1000\"          # your proposal number (the one entered in NICOS)\n"

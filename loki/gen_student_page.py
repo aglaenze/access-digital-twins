@@ -405,9 +405,8 @@ _ = submit.Submit("loki/exercises/silica_spheres", "bsc", quiz=q)
 
 import sys as _sys
 _sys.path.insert(0, os.path.dirname(HERE))
-from nbfig import figure_cell
-_k = next((i for i, c in enumerate(cells) if 'Your mission' in c.source), 0)
-cells.insert(_k + 1, figure_cell('sans_particles.png', 'What you measure: the particles in the liquid scatter at small angles, and their size sets the shape of the curve I(Q).'))
+from nbfig import figure_cell, insert_after_mission
+insert_after_mission(cells, figure_cell('sans_particles.png', 'What you measure: the particles in the liquid scatter at small angles, and their size sets the shape of the curve I(Q).'))
 nb = nbf.v4.new_notebook()
 nb["cells"] = cells
 nb["metadata"]["kernelspec"] = {"name": "python3", "display_name": "Python 3", "language": "python"}

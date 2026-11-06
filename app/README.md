@@ -49,6 +49,31 @@ ODIN BSc page (answers a question), the MSc notebook, and saves screenshots:
 
     TWIN_RUN_ROOT=<empty folder> TWIN_APP_DATA=<empty folder> TWIN_APP_SELFTEST=<folder for the screenshots> electron .
 
+## The notebooks of the exercises
+
+- **MSc**: the student measures first, in NICOS, as at ESS: part 0 of the notebook gives the button *Open NICOS*
+  (`../nb_tools.py`) and the steps (proposal, dark, open beam, sample...). Part 1 reads the files of the proposal
+  (`PROPOSAL`); without files the notebook stops there with a message (`nb_tools.need_measurements`), no hidden
+  simulation.
+- **Beamtime and free beamtime**: the proposal (folded), *Open NICOS* and *Sample builder* are at the top of the starter
+  notebook; the catalogue only opens the notebook.
+- A notebook opens **already run**: the app runs all its cells once the kernel is ready (Notebook 7 exposes its
+  commands: `exposeAppInBrowser` in `../container/app_config/labconfig/page_config.json`), then shows where it stopped.
+- The code of the questions and of the solutions (the answers are in it) is hidden; only their widgets show.
+- The students' copies (`work/<account>/...`) find the twin through `TWIN_ROOT` (set by the server of the app): no path
+  of one computer in them.
+
+## For the teacher: collecting the work
+
+*Submit my work* (end of each exercise) makes a zip file on the student's computer (with `submission.json`: name,
+email, exercise, level, date, score); the student sends it to the teacher (email, course page): there is no central
+server (accounts are local). Put the files received in one folder, then
+
+    python progress_summary.py <folder> [--csv class.csv]
+
+gives one table: who, which exercise and level, when, questions right (at the first try), answers shown, solutions
+opened (the newest file of a student counts). A central collection (a server, or the course page) would need a server.
+
 ## Installers
 
 GitHub Actions (`.github/workflows/app.yml`) builds them at every change of `app/` and publishes them on the release
