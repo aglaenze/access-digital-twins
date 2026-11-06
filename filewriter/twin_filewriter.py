@@ -1,0 +1,286 @@
+"""The twin and the ESS file-writer (kafka-to-nexus): what the twin needs to have its files written as at ESS
+(filewriter/README.md, steps 2 and 3).
+
+How it works at ESS, and here:
+  * every stream of a real ESS file says where its data came from: the group has the attributes `writer_module`
+    (f144: values of a device, ev44: neutron events), `source` (EPICS PV name, detector or monitor name) and `topic`
+    (Kafka topic), e.g. entry/instrument/timepix3/data: ev44, source "timepix3", topic "odin_detector";
+  * the file-writer starts from a TEMPLATE file of the instrument (the static data: geometry, pixel tables...), found
+    at <hdf-template-prefix>/<instrument>/<instrument>.hdf, and adds what the start command (pl72) describes: the
+    streams to record, and the values of this run (title, proposal, sample);
+  * the twin publishes on the same topics, with the same source names, what the real instrument publishes: the
+    neutrons of each pulse (ev44) and the values of its devices (f144). The template, the start command and the
+    messages are all made from the real ESS file that the twin uses for its own files, so they cannot disagree.
+
+    make_template(src, out, patch)       the template of the file-writer (src: the real file used by the twin)
+    nexus_structure(src, title, ...)     the "nexus_structure" of the start command
+    snapshot_messages(src, t_ns)         the last value of every device (the EPICS forwarder at the start of a job)
+    count_messages(twin_file)            the neutrons and device values of one twin measurement
+    publish(producer, messages, pace)    sends them (pace: at their times, as on the instrument)
+    FileWriterControl                    start / stop a job, wait for the file (pl72, 6s4t, answ, wrdn)
+
+Needs h5py, numpy, confluent-kafka, ess-streaming-data-types. Not done by the twin (yet): the chopper top-dead-center
+timestamps (tdct): they stay those of the real file, in the template.
+"""
+import datetime
+import json
+import os
+import shutil
+import time
+import uuid
+
+import h5py
+import numpy as np
+
+PUBLISHED = ("f144", "ev44")          # the streams the twin publishes; the others (tdct) stay static, in the template
+PER_RUN = ("entry/title", "entry/experiment_identifier", "entry/start_time", "entry/end_time", "entry/sample/name",
+           "entry/twin")             # values of a run: given by the start command (mdat: start and end times)
+DTYPES = {"float64": "double", "float32": "float", "int8": "int8", "uint8": "uint8", "int16": "int16",
+          "uint16": "uint16", "int32": "int32", "uint32": "uint32", "int64": "int64", "uint64": "uint64",
+          "bool": "uint8"}
+
+
+def _s(v):
+    return v.decode() if isinstance(v, bytes) else str(v)
+
+
+def streams(f, modules=PUBLISHED):
+    """[(path, module, source, topic)] of the stream groups of an open h5py file."""
+    out = []
+
+    def visit(name, o):
+        if isinstance(o, h5py.Group) and "writer_module" in o.attrs and _s(o.attrs["writer_module"]) in modules:
+            out.append((name, _s(o.attrs["writer_module"]), _s(o.attrs.get("source", "")),
+                        _s(o.attrs.get("topic", ""))))
+    f.visititems(visit)
+    return out
+
+
+# --------------------------------------------------------------------------- the template
+def make_template(src, out, patch=None):
+    """Writes the template of the file-writer: the real file `src` without the streams the twin publishes and without
+    the values of a run (they come with the start command). patch(f): the static changes the twin makes to its own
+    files (e.g. the detector distance of the model), applied first. Returns out."""
+    os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
+    tmp = out + ".tmp"
+    shutil.copyfile(src, tmp)
+    with h5py.File(tmp, "r+") as f:
+        if patch is not None:
+            patch(f)
+        for path, *_ in streams(f):
+            del f[path]
+        for p in PER_RUN:
+            if p in f:
+                del f[p]
+        for k in [k for k in f["entry"] if k.startswith("user_")]:       # no real users in the twin's files
+            del f["entry"][k]
+        f["entry"].attrs["twin_template"] = "template of the ESS file-writer, made by the digital twin"
+    os.replace(tmp, out)
+    return out
+
+
+# --------------------------------------------------------------------------- the start command
+def _module(f, path, module, source, topic):
+    if module == "ev44":
+        return {"module": "ev44", "config": {"source": source, "topic": topic}}
+    v = f[path].get("value")
+    cfg = {"source": source, "topic": topic, "dtype": "double"}
+    if v is not None:
+        if v.dtype.name not in DTYPES:          # strings: f144 has none
+            return None
+        cfg["dtype"] = DTYPES[v.dtype.name]
+        if "units" in v.attrs:
+            cfg["value_units"] = _s(v.attrs["units"])
+        if v.ndim > 1:
+            cfg["array_size"] = int(np.prod(v.shape[1:]))
+    return {"module": "f144", "config": cfg}
+
+
+def _string(name, value):
+    return {"module": "dataset", "config": {"name": name, "values": str(value), "dtype": "string"}}
+
+
+def nexus_structure(src, title="", proposal="", sample_name=""):
+    """The nexus_structure (dict) of the start command: the groups down to every stream of `src`, each stream as its
+    writer module (same source and topic as in the real file), and the values of the run."""
+    root = {"children": []}
+    nodes = {"": root}
+
+    def group(path):
+        if path in nodes:
+            return nodes[path]
+        parent, _, name = path.rpartition("/")
+        g = {"type": "group", "name": name, "children": []}
+        group(parent)["children"].append(g)
+        nodes[path] = g
+        return g
+
+    with h5py.File(src, "r") as f:
+        for path, module, source, topic in streams(f):
+            m = _module(f, path, module, source, topic)
+            if m is not None:
+                group(path)["children"].append(m)
+    entry = group("entry")
+    entry["children"] += [_string("title", title), _string("experiment_identifier", proposal),
+                          {"module": "mdat", "config": {"items": ["start_time", "end_time"]}}]
+    group("entry/sample")["children"].append(_string("name", sample_name))
+    return root
+
+
+# --------------------------------------------------------------------------- the messages
+def _f144(source, value, t_ns):
+    from streaming_data_types import serialise_f144
+    return serialise_f144(source, value, int(t_ns))
+
+
+def snapshot_messages(src, t_ns):
+    """[(t_ns, topic, payload)]: the last value of every device of `src` (f144), stamped t_ns. At ESS the EPICS
+    forwarder publishes each PV when it changes; the file-writer then has a value for every device of the file."""
+    out = []
+    with h5py.File(src, "r") as f:
+        for path, module, source, topic in streams(f, ("f144",)):
+            v = f[path].get("value")
+            if v is None or v.shape[0] == 0 or v.dtype.name not in DTYPES:
+                continue
+            out.append((int(t_ns), topic, _f144(source, np.asarray(v[-1]), t_ns)))
+    return out
+
+
+def count_messages(twin_file, message_id=0):
+    """[(t_ns, topic, payload)] of one measurement of the twin (its NeXus file): one ev44 message per pulse with
+    neutrons and per detector bank or monitor, and the device values recorded during the measurement (f144). The
+    times are those of the file. Pulses without neutrons are not sent (the file-writer would not write them)."""
+    from streaming_data_types import serialise_ev44
+    out = []
+    with h5py.File(twin_file, "r") as f:
+        st = streams(f)
+        t0 = None
+        for path, module, source, topic in st:
+            if module != "ev44":
+                continue
+            g = f[path]
+            etz, idx = g["event_time_zero"][()].astype(np.int64), g["event_index"][()].astype(np.int64)
+            eto = np.round(g["event_time_offset"][()]).astype(np.int32)
+            eid = g["event_id"][()].astype(np.int32)
+            if len(etz):
+                t0 = etz[0] if t0 is None else min(t0, etz[0])
+            bounds = np.append(idx, len(eid))
+            for k in range(len(etz)):
+                a, b = bounds[k], bounds[k + 1]
+                if b <= a:
+                    continue
+                message_id += 1
+                out.append((int(etz[k]), topic, serialise_ev44(source, message_id, np.array([etz[k]], np.int64),
+                                                              np.array([0], np.int32), eto[a:b], eid[a:b])))
+        if t0 is not None:
+            for path, module, source, topic in st:
+                if module != "f144":
+                    continue
+                g = f[path]
+                if "time" not in g or "value" not in g or g["value"].dtype.name not in DTYPES:
+                    continue
+                t, v = g["time"][()].astype(np.int64), g["value"][()]
+                for k in np.nonzero(t >= t0)[0]:
+                    out.append((int(t[k]), topic, _f144(source, np.asarray(v[k]), t[k])))
+    out.sort(key=lambda m: m[0])
+    return out
+
+
+def publish(producer, messages, pace=False, stop=None):
+    """Sends [(t_ns, topic, payload)]; pace: each message not before its time (wall clock), as the instrument
+    produces them. Returns the number sent."""
+    n = 0
+    for t_ns, topic, payload in messages:
+        if pace:
+            wait = (t_ns - time.time_ns()) / 1e9
+            if wait > 0:
+                time.sleep(wait)
+        if stop is not None and stop.is_set():
+            break
+        producer.produce(topic, payload, timestamp=t_ns // 1_000_000)
+        producer.poll(0)
+        n += 1
+    producer.flush(30)
+    return n
+
+
+def producer(brokers):
+    from confluent_kafka import Producer
+    return Producer({"bootstrap.servers": brokers, "message.max.bytes": 16_000_000,
+                     "queue.buffering.max.kbytes": 1_048_576, "linger.ms": 5})
+
+
+# --------------------------------------------------------------------------- start / stop a job
+def _utc(t_ns):
+    return datetime.datetime.fromtimestamp(t_ns / 1e9, datetime.timezone.utc)
+
+
+class FileWriterControl:
+    """Starts and stops jobs of a file-writer listening on `command_topic` (its --command-status-topic), as NICOS
+    does at ESS: pl72 (start), 6s4t (stop); the file-writer answers (answ) and reports the end of the file (wrdn)."""
+
+    def __init__(self, brokers, command_topic):
+        from confluent_kafka import Consumer, TopicPartition
+        from confluent_kafka.admin import AdminClient, NewTopic
+        self.brokers, self.topic = brokers, command_topic
+        admin = AdminClient({"bootstrap.servers": brokers})
+        if command_topic not in admin.list_topics(timeout=20).topics:
+            for fut in admin.create_topics([NewTopic(command_topic, 1, 1)]).values():
+                try:
+                    fut.result()
+                except Exception:                  # noqa: BLE001  (created meanwhile)
+                    pass
+        self.producer = producer(brokers)
+        self.consumer = Consumer({"bootstrap.servers": brokers, "group.id": f"twin-{uuid.uuid4()}",
+                                  "enable.auto.commit": False, "fetch.message.max.bytes": 16_000_000})
+        _, hi = self.consumer.get_watermark_offsets(TopicPartition(command_topic, 0), timeout=20)
+        self.consumer.assign([TopicPartition(command_topic, 0, hi)])
+
+    def _send(self, payload):
+        self.producer.produce(self.topic, payload)
+        self.producer.flush(30)
+
+    def _wait(self, job_id, kind, timeout):
+        """The next message `kind` (b"answ" or b"wrdn") about job_id, deserialised; TimeoutError if none."""
+        from streaming_data_types import deserialise_answ, deserialise_wrdn
+        end = time.time() + timeout
+        while time.time() < end:
+            m = self.consumer.poll(1.0)
+            if m is None or m.error() or m.value() is None or len(m.value()) < 8:
+                continue
+            if m.value()[4:8] != kind:
+                continue
+            r = (deserialise_answ if kind == b"answ" else deserialise_wrdn)(m.value())
+            if r.job_id == job_id:
+                return r
+        raise TimeoutError(f"no {kind.decode()} message of the file-writer for job {job_id} in {timeout:.0f} s "
+                           f"(is it running? topic {self.topic})")
+
+    def start(self, structure, filename, instrument, start_ns=None, job_id=None, timeout=60):
+        """Starts a job writing `filename` (as the file-writer sees it) from the template of `instrument`. Returns
+        the job id; RuntimeError if the file-writer refuses."""
+        from streaming_data_types import serialise_pl72
+        from streaming_data_types.action_response_answ import ActionOutcome
+        job_id = job_id or str(uuid.uuid4())
+        start_ns = start_ns or time.time_ns()
+        self._send(serialise_pl72(job_id, filename, start_time=_utc(start_ns), run_name=os.path.basename(filename),
+                                  nexus_structure=json.dumps(structure), instrument_name=instrument,
+                                  broker=self.brokers))
+        r = self._wait(job_id, b"answ", timeout)
+        if r.outcome != ActionOutcome.Success:
+            raise RuntimeError(f"the file-writer refused the job: {r.message}")
+        return job_id
+
+    def stop(self, job_id, stop_ns=None, timeout=60):
+        """Sets the stop time of the job (now by default)."""
+        from streaming_data_types import serialise_6s4t
+        from streaming_data_types.action_response_answ import ActionOutcome
+        self._send(serialise_6s4t(job_id, stop_time=_utc(stop_ns or time.time_ns()), command_id=str(uuid.uuid4())))
+        r = self._wait(job_id, b"answ", timeout)
+        if r.outcome != ActionOutcome.Success:
+            raise RuntimeError(f"the file-writer refused to stop the job: {r.message}")
+
+    def wait_done(self, job_id, timeout=120):
+        """Waits for the end of the file; returns (file name, error message or None)."""
+        r = self._wait(job_id, b"wrdn", timeout)
+        return r.file_name, (r.message or "error") if r.error_encountered else None

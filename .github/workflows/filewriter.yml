@@ -48,3 +48,37 @@ jobs:
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
           docker tag filewriter:test "ghcr.io/${{ github.repository }}-filewriter:latest"
           docker push "ghcr.io/${{ github.repository }}-filewriter:latest"
+      # Steps 2 to 4: the twin's streams written by the file-writer, compared with the twin's own file (ODIN, LoKI).
+      # A Kafka broker and kafka-to-nexus on the runner; filewriter/e2e_test.py plays the twin and NICOS.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: The twin with the file-writer, end to end
+        run: |
+          pip install --quiet h5py numpy "confluent-kafka>=2.14,<3" "ess-streaming-data-types>=0.27,<0.28" essimaging esssans
+          docker run -d --name kafka --network host \
+            -e KAFKA_NODE_ID=1 -e KAFKA_PROCESS_ROLES=broker,controller \
+            -e KAFKA_LISTENERS=PLAINTEXT://localhost:9092,CONTROLLER://localhost:9093 \
+            -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092 -e KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER \
+            -e KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT \
+            -e KAFKA_CONTROLLER_QUORUM_VOTERS=1@localhost:9093 -e KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1 \
+            -e KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1 -e KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1 \
+            -e KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS=0 -e KAFKA_NUM_PARTITIONS=1 \
+            -e KAFKA_MESSAGE_MAX_BYTES=16777216 -e KAFKA_REPLICA_FETCH_MAX_BYTES=16777216 apache/kafka:3.9.1
+          for i in $(seq 60); do (echo > /dev/tcp/localhost/9092) 2>/dev/null && break; sleep 2; done
+          ODIN_SRC=$(python -c "import ess.odin.data as d; print(d.iron_simulation_ob_small())")
+          LOKI_SRC=$(python -c "from ess.loki.data import loki_coda_file; print(loki_coda_file())")
+          mkdir -p /tmp/fw
+          status=0
+          for instr in odin loki; do
+            src=$ODIN_SRC; [ $instr = loki ] && src=$LOKI_SRC
+            docker run -d --name fw_$instr --network host -v /tmp/fw:/tmp/fw filewriter:test kafka-to-nexus \
+              --brokers localhost:9092 --command-status-topic ${instr}_filewriter \
+              --job-pool-topic ${instr}_filewriter_pool --hdf-output-prefix / --hdf-template-prefix /tmp/fw/templates
+            echo "::group::$instr"
+            timeout 900 python filewriter/e2e_test.py --root /tmp/fw --instrument $instr --src "$src" || status=1
+            echo "--- file-writer log"; docker logs fw_$instr 2>&1 | tail -40
+            echo "::endgroup::"
+            docker rm -f fw_$instr
+          done
+          exit $status

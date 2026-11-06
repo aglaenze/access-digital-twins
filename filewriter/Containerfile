@@ -26,8 +26,17 @@ RUN K2N="$(find build/Release -type f -name kafka-to-nexus -perm -u+x | head -1)
     && find /root/.conan/data -path '*/package/*/lib/*.so*' \( -type f -o -type l \) -exec cp -a {} /dist/lib/ \; \
     && ldd "$K2N" | awk '/=> \// {print $3}' | grep -v -E '^/lib|^/usr/lib' | xargs -r -I{} cp -L {} /dist/lib/ \
     && cp /K2N_VERSION /dist/
+# a library still not found (e.g. libcrypt.so.2): looked for in the whole build image, and copied
+RUN for pass in 1 2 3; do \
+      for n in $(LD_LIBRARY_PATH=/dist/lib ldd /dist/bin/kafka-to-nexus /dist/lib/*.so* 2>/dev/null \
+                 | awk '/not found/ {print $1}' | sort -u); do \
+        f="$(find / -xdev -name "$n" \( -type f -o -type l \) -not -path '/dist/*' 2>/dev/null | head -1)"; \
+        echo "missing $n: found at '$f'"; [ -n "$f" ] && cp -L "$f" /dist/lib/; \
+      done; \
+    done; true
 # every library found (otherwise the build stops here)
-RUN if LD_LIBRARY_PATH=/dist/lib ldd /dist/bin/kafka-to-nexus | grep "not found"; then exit 1; fi
+RUN if LD_LIBRARY_PATH=/dist/lib ldd /dist/bin/kafka-to-nexus | grep "not found"; then \
+      find / -xdev -name 'libcrypt*' -not -path '/proc/*' 2>/dev/null; exit 1; fi
 
 FROM ubuntu:22.04
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
