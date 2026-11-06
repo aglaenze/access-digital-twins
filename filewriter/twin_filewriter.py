@@ -212,9 +212,13 @@ def producer(brokers):
 
 # --------------------------------------------------------------------------- start / stop a job
 def nicos_uuid():
-    """A job or command id the file-writer accepts: a UUID with 5 at position 14 and 8 at position 19, as those of
-    NICOS (kafka-to-nexus src/CommandSystem/Handler.cpp, isValidUUID); others are refused ("job id was invalid")."""
+    """A job or command id the file-writer accepts (kafka-to-nexus src/CommandSystem/Handler.cpp, isValidUUID; others
+    are refused, "job id was invalid"): the form of a UUID, digits only up to position 14, 5 at position 14 and 8 at
+    position 19."""
     u = list(str(uuid.uuid4()))
+    for i in range(14):
+        if u[i] != "-":
+            u[i] = str(int(u[i], 16) % 10)
     u[14], u[19] = "5", "8"
     return "".join(u)
 
