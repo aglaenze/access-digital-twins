@@ -21,7 +21,7 @@ case "${1:-jupyter}" in
            [ $# -gt 0 ] && shift
            exec jupyter server --ip=0.0.0.0 --port=8888 --no-browser --ServerApp.root_dir="$HOME/twin" \
                 --ServerApp.jpserver_extensions="{'twin_app': True}" \
-                --ServerApp.kernel_manager_class=twin_kernels.PooledKernelManager \
+                ${TWIN_KERNEL_POOL:+--ServerApp.kernel_manager_class=twin_kernels.PooledKernelManager} \
                 --ServerApp.default_url=/lab "$@" ;;
   voila)   fetch; exec voila . --Voila.ip=0.0.0.0 --port=8866 --no-browser ;;
   nicos)   fetch; exec python nicos/start_nicos.py --instrument "${TWIN_INSTRUMENT:-odin}" --no-gui --background --session "${TWIN_SESSION:-nicos}" ${TWIN_LIVE:+--live} ;;

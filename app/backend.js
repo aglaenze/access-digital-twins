@@ -103,7 +103,10 @@ class Backend {
     this.proc = spawn(py, ["-m", "jupyter_server", "--no-browser", "--ServerApp.ip=127.0.0.1", `--port=${this.port}`,
                            `--IdentityProvider.token=${this.token}`, `--ServerApp.root_dir=${this.twinDir}`,
                            "--ServerApp.jpserver_extensions={'twin_app': True}",
-                           "--ServerApp.kernel_manager_class=twin_kernels.PooledKernelManager"],
+                           // kernels kept ready (container/twin_kernels.py): off by default, a kept kernel could
+                           // freeze a notebook now and then (2026-11-06); TWIN_KERNEL_POOL=1 to try it
+                           ...(process.env.TWIN_KERNEL_POOL === "1"
+                             ? ["--ServerApp.kernel_manager_class=twin_kernels.PooledKernelManager"] : [])],
                       { cwd: this.twinDir, env, windowsHide: true, stdio: ["ignore", log, log] });
   }
 

@@ -149,7 +149,10 @@ header .right { display: flex; align-items: center; gap: 10px; position: relativ
 .level .row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .chip { font-size: 12px; font-weight: 700; color: #fff; border-radius: 6px; padding: 3px 8px; }
 .chip.bsc { background: var(--teal); } .chip.msc { background: var(--msc); } .chip.beamtime { background: var(--bt); }
-.level .dur { font-size: 12.5px; color: var(--muted); }
+.level .dur { font-size: 12.5px; color: var(--muted); display: flex; align-items: center; gap: 10px; }
+.again { border: 0; background: transparent; color: var(--teal); font-size: 12.5px; font-weight: 600; padding: 0;
+  text-decoration: underline; text-underline-offset: 2px; }
+.again:hover { color: var(--teal-d); }
 .level .label { font-size: 15px; font-weight: 600; }
 .level .what { font-size: 13px; line-height: 1.45; color: var(--muted); }
 .prog { display: flex; flex-direction: column; gap: 6px; align-self: end; }

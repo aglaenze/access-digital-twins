@@ -26,6 +26,14 @@ then shows *Submitted*. *Export all my work* (menu of the account)
 saves a zip file (the logbooks of the questions, the notebooks, the logbook of the measurements) to send to the
 teacher; `../progress_summary.py` turns the files of a class into one table.
 
+**Start again.** Each level already started has a link *Start again* (catalogue): after a confirmation, the tab of
+the exercise is closed without saving, and the student's copy of the notebook, the answers to its questions and its
+state (started, submitted) are put aside in `TWIN_RUN_ROOT/progress/<account>/_old/` (nothing is deleted; the
+measurements stay); the next opening makes a clean copy (`/twin/reset`, `../container/twin_kernels.py` not involved).
+
+**Kernels kept ready** (`../container/twin_kernels.py`, faster pages): **off** by default (`TWIN_KERNEL_POOL=1` to try):
+a notebook given a kept kernel froze once in two tries on 2026-11-06; fresh kernels never did.
+
 **Password forgotten.** The accounts are on this computer: no email can reset a password. At the creation of an
 account the app shows a **recovery code** (once; only its hash is kept); *Forgot your password?* on the sign-in screen
 sets a new password with the email and this code. A student who did not sign out is signed in again at the next start.

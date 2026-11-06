@@ -189,7 +189,10 @@ function level(e, k, m, i) {
   else if (k === "msc") acts = `<button class="btn go" data-act="open" ${d}>${go === "Start" ? "Open the notebook" : go}</button>`;
   else acts = `<button class="btn" data-act="sheet" data-i="${i}" data-k="${k}">Your proposal</button>
       <button class="btn go" data-act="open" data-what="analysis" ${d}>Starter notebook</button>`;
-  return `<div class="level"><div class="row"><span class="chip ${k}">${LEVEL[k] || k}</span><span class="dur">${esc(m.duration || "")}</span></div>
+  const again = p.status === "new" ? "" :
+    `<button class="again" data-act="reset" ${d} data-file="${esc(k === "beamtime" ? m.analysis || "" : m.file || "")}"
+       data-page="${m.open === "voila" ? 1 : 0}" title="Your notebook, your answers and the state of this exercise are put aside: you start from the beginning. Your measurements stay.">Start again</button>`;
+  return `<div class="level"><div class="row"><span class="chip ${k}">${LEVEL[k] || k}</span><span class="dur">${esc(m.duration || "")}${again}</span></div>
     <span class="label">${esc(m.label)}</span><span class="what">${esc(m.what)}</span>
     <div class="prog"><div class="row"><span>${esc(p.text)}</span><b>${p.pct ? p.pct + " %" : ""}</b></div>
       <div class="track"><div class="fill ${k}" style="width:${p.pct}%"></div></div></div>
@@ -209,6 +212,18 @@ async function act(d) {
       const name = catalogue.instruments[d.instr].name;
       if (r.where === "remote") openTab(r.url, "desktop", `NICOS · ${name}`);
       else toast(`NICOS of ${name} opens on your desktop in about a minute, logged in. Close its window to stop it.`, 9000);
+    } else if (d.act === "reset") {
+      const what = d.page === "1" ? "your answers to the questions" : "your notebook and your answers";
+      if (!confirm(`Start "${d.label}" again?\n\n${what[0].toUpperCase() + what.slice(1)} are put aside (kept in a ` +
+                   `folder, not deleted) and you start from the beginning. Your measurements stay.`)) return;
+      // its tab is closed first, without saving (otherwise the old notebook would be written again)
+      const url = d.page === "1" ? `/voila/render/${d.file}`
+        : `/notebooks/work/${user.id}/${d.dir.split("/")[0]}_${d.dir.split("/").pop()}/${d.file.split("/").pop()}`;
+      if (tabs.has(url)) closeTab(url, { save: false });
+      await new Promise((r) => setTimeout(r, 800));
+      const r = await T.api("POST", "/twin/reset", { dir: d.dir, mode: d.mode });
+      toast(r.put_aside && r.put_aside.length ? `Started again. Your previous work is kept in ${r.folder}.` : "Started again.", 8000);
+      loadCatalogue();
     } else if (d.act === "sheet") {
       const e = catalogue.exercises.filter((x) => x.instrument === instr)
         .sort((a, b) => (a.status === "planned") - (b.status === "planned"))[+d.i];
@@ -312,10 +327,10 @@ $("#save").onclick = () => { const t = tabs.get(activeKey); if (t) save(t); };
 setInterval(saveAll, 120000);
 T.on("before-quit", saveAll);
 
-function closeTab(key) {
+function closeTab(key, { save: doSave = true } = {}) {
   const t = tabs.get(key);
   if (!t) return;
-  save(t);
+  if (doSave) save(t);
   setTimeout(() => {
     t.pane.remove();
     if (t.path) T.closeNotebook(t.path);

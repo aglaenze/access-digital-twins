@@ -9,6 +9,9 @@ All requests need the token of the server (header "Authorization: token ...").
                                    (TWIN_USER, sessions of the pages, logbooks of the questions); open kernels stop
     POST /twin/open {dir,mode,what} the address to show for one way into an exercise (a page, or the student's own
                                    copy of a notebook, made on first opening) and records that it was opened
+    POST /twin/reset {dir,mode}    starts one way into an exercise again: the student's copy of its notebook, the
+                                   answers to its questions and its state (started, submitted) are put aside (folder
+                                   _old/ of the student, nothing is deleted); the measurements stay
     POST /twin/nicos {instrument}  opens NICOS of this instrument: windows of this computer (local app), or the control
                                    room of the container (returns the address of the remote screen)
     GET  /twin/handin              the work of the student as a zip file (logbooks, notebooks, measurements logbook)
@@ -165,6 +168,52 @@ class User(Base):
         self.finish(json.dumps(dict(user=uid)))
 
 
+class Reset(Base):
+    @web.authenticated
+    def post(self):
+        import shutil
+        import yaml
+        b = self.body()
+        d, mode = b.get("dir", ""), b.get("mode", "")
+        who = user()
+        if not who or not d or ".." in d.split("/"):
+            raise web.HTTPError(400, "sign in, and give dir and mode")
+        with open(os.path.join(self.root, d, "exercise.yml"), encoding="utf-8") as fh:
+            m = yaml.safe_load(fh)["modes"][mode]
+        stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        old = os.path.join(run_root(), "progress", who, "_old", f"{os.path.basename(d)}_{mode}_{stamp}")
+        moved = []
+
+        def put_aside(path):
+            if os.path.exists(path):
+                os.makedirs(old, exist_ok=True)
+                shutil.move(path, os.path.join(old, os.path.basename(path)))
+                moved.append(os.path.basename(path))
+
+        # the student's copy of the notebook of this way in (made again, clean, at the next opening)
+        instr, ex = d.split("/")[0], os.path.basename(d)
+        rel = m.get("analysis") if mode == "beamtime" else m.get("file")
+        if rel and rel.endswith(".ipynb") and m.get("open") != "voila":
+            put_aside(os.path.join(self.root, "work", who, f"{instr}_{ex}", os.path.basename(rel)))
+        # the answers to its questions
+        q = QUIZ.get((d, mode))
+        if q:
+            for ext in (".jsonl", ".meta.json"):
+                put_aside(os.path.join(run_root(), "progress", who, q + ext))
+        # its state in the catalogue (started, submitted)
+        for name in ("opened.json", "submitted.json"):
+            f = os.path.join(run_root(), "progress", who, name)
+            try:
+                with open(f, encoding="utf-8") as fh:
+                    state = json.load(fh)
+            except (OSError, ValueError):
+                continue
+            if state.pop(f"{d}:{mode}", None) is not None:
+                with open(f, "w", encoding="utf-8") as fh:
+                    json.dump(state, fh)
+        self.finish(json.dumps(dict(reset=True, put_aside=moved, folder=old if moved else None)))
+
+
 class Open(Base):
     @web.authenticated
     def post(self):
@@ -272,7 +321,7 @@ def _jupyter_server_extension_points():
 def _load_jupyter_server_extension(serverapp):
     base = serverapp.web_app.settings["base_url"]
     serverapp.web_app.add_handlers(".*$", [(url_path_join(base, "twin", p), h) for p, h in [
-        ("catalogue", Catalogue), ("user", User), ("open", Open), ("nicos", Nicos), ("handin", Handin)]])
+        ("catalogue", Catalogue), ("user", User), ("open", Open), ("reset", Reset), ("nicos", Nicos), ("handin", Handin)]])
     # the twin root on the path of the server (quiz.py: the progress shown in the catalogue)
     root = os.path.abspath(os.path.expanduser(serverapp.root_dir))
     os.environ["TWIN_ROOT"] = root            # the kernels find the twin from the students' copies (work/<user>/...)

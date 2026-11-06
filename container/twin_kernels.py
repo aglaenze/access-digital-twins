@@ -7,8 +7,9 @@ student, the address of the page: QUERY_STRING...), as a new kernel would have; 
 
     jupyter server --ServerApp.kernel_manager_class=twin_kernels.PooledKernelManager   (container/ in PYTHONPATH)
 
-Used by the server of the app (app/backend.js, container/start.sh). Any problem with a kept kernel: a new kernel is
-started as usual, so this can only save time.
+Used by the server of the app (app/backend.js, container/start.sh) only with TWIN_KERNEL_POOL=1: OFF by default.
+On 2026-11-06 a notebook given a kept kernel froze once in two tries (its cells stopped running, without error), a
+fresh kernel never did; to be understood before it is used.
 """
 import asyncio
 import json

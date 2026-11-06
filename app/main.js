@@ -222,6 +222,10 @@ async function selftest(out) {
     const setX = (row, val) => `(() => { const rows = [...document.querySelectorAll('.widget-hbox')].filter(r => r.querySelector('.jupyter-button [class*=trash], .jupyter-button .fa-trash')); const i = rows[${row}].querySelector('input[type=number]'); i.value = '${val}'; i.dispatchEvent(new Event('input', {bubbles: true})); i.dispatchEvent(new Event('change', {bubbles: true})); return rows.length; })()`;
     const click = (label) => `(() => { const b = [...document.querySelectorAll('button')].find(x => x.textContent.trim() === '${label}'); if (b) b.click(); return !!b; })()`;
     log("no instrument choice: " + await sb(`!document.body.innerText.includes('Instrument') || document.body.innerText.includes('Instrument: ODIN')`));
+    for (let i = 0; i < 60; i++) {           // the widgets of the page come after its loading
+      if (await sb(`[...document.querySelectorAll('button')].some(x => x.textContent.trim() === 'Add a sphere')`)) break;
+      await new Promise((r) => setTimeout(r, 1000));
+    }
     log("add sphere: " + await sb(click("Add a sphere")));
     await new Promise((r) => setTimeout(r, 1500));
     log("add cylinder: " + await sb(click("Add a cylinder")));
@@ -238,6 +242,16 @@ async function selftest(out) {
     await new Promise((r) => setTimeout(r, 2500));
     await shot("4_catalogue_again");
     log("progress: " + await js(`[...document.querySelectorAll(".prog .row span")].slice(0, 3).map(s => s.textContent).join(" | ")`));
+    // Start again: the BSc (submitted) and the MSc (a notebook copy): back to "Not started"
+    await js(`window.confirm = () => true; true`);
+    for (const mode of ["bsc", "msc"]) {
+      const ok = await js(`(() => { const b = document.querySelector('.again[data-mode="${mode}"]'); if (b) b.click(); return !!b; })()`);
+      await new Promise((r) => setTimeout(r, 4000));
+      log(`start again ${mode}: button ${ok}`);
+    }
+    const after = await js(`[...document.querySelectorAll(".prog .row span")].slice(0, 2).map(s => s.textContent).join(" | ")`);
+    check("started again (" + after + ")", after === "Not started | Not started", Date.now());
+    await shot("7_started_again");
   } catch (e) {
     if (e && e.resume) log(e.stack);
     else { log("ERROR " + e.stack); failed = true; }
