@@ -8,7 +8,7 @@ FROM ubuntu:22.04 AS build
 ARG K2N_REF=main
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        build-essential git ninja-build python3-pip pkg-config curl ca-certificates perl autoconf automake libtool \
+        build-essential git ninja-build python3-pip pkg-config curl ca-certificates perl autoconf automake libtool doxygen graphviz \
     && rm -rf /var/lib/apt/lists/* \
     && pip3 install --no-cache-dir "conan<2" "cmake>=3.26,<4"
 # Conan 1 with the configuration of ECDC (remotes, profiles: linux_x86_64_gcc11 = the gcc 11 of Ubuntu 22.04)
