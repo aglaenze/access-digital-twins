@@ -102,7 +102,8 @@ class Backend {
     // jupyter_server directly (not "jupyter server", which starts it as a second process that would outlive us)
     this.proc = spawn(py, ["-m", "jupyter_server", "--no-browser", "--ServerApp.ip=127.0.0.1", `--port=${this.port}`,
                            `--IdentityProvider.token=${this.token}`, `--ServerApp.root_dir=${this.twinDir}`,
-                           "--ServerApp.jpserver_extensions={'twin_app': True}"],
+                           "--ServerApp.jpserver_extensions={'twin_app': True}",
+                           "--ServerApp.kernel_manager_class=twin_kernels.PooledKernelManager"],
                       { cwd: this.twinDir, env, windowsHide: true, stdio: ["ignore", log, log] });
   }
 

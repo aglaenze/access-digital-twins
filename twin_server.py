@@ -25,6 +25,9 @@ Kafka topic <instrument>_detector, pulse by pulse in real time (ev44 messages, k
 written. With "hold": true it first waits for POST /go (NICOS: computed in prepare, streamed from start, so that the
 stream and just-bin-it start together); GET /status has "ready": true while it waits. POST /stop ends a stream.
 Broker: variable TWIN_KAFKA (default 127.0.0.1:9092).
+Device values (Kafka, as the EPICS forwarder of ESS; optional, TWIN_FORWARD=1): the values of all the devices are
+published at start and after each /move to the topic <instrument>_devices (f144 messages, kafka/forwarder.py), for the
+ESS file-writer.
 One measurement at a time (as on the instrument): a command received during a measurement is refused (code 409,
 "instrument busy"), but /status always answers.
 """
@@ -47,6 +50,31 @@ LOCK = threading.Lock()
 RUNNING = {"action": None}
 READY, GO, STOP = threading.Event(), threading.Event(), threading.Event()     # live streaming (Kafka)
 STREAMER = {}
+FORWARDER = {}
+
+
+def _forward(only_changes=True):
+    """Publishes the values of the devices (f144) if TWIN_FORWARD=1; never stops the twin if Kafka is not there."""
+    if os.environ.get("TWIN_FORWARD") != "1":
+        return 0
+    try:
+        if "f" not in FORWARDER:
+            sys.path.insert(0, os.path.join(HERE, "kafka"))
+            import forwarder
+            if not forwarder.available():
+                return 0
+            FORWARDER["f"] = forwarder.Forwarder(os.environ.get("TWIN_KAFKA", "127.0.0.1:9092"),
+                                                 topic=f"{INSTR_NAME}_devices", prefix=INSTR_NAME)
+        values = dict(INSTR.status())
+        if hasattr(INSTR, "readings"):              # read-only values (chopper speeds and delays...)
+            try:
+                values.update(INSTR.readings())
+            except Exception:                       # noqa: BLE001
+                pass
+        return FORWARDER["f"].publish(values, getattr(INSTR, "devices", None), only_changes=only_changes)
+    except Exception as e:                          # noqa: BLE001
+        print(f"[server] forwarder: {e}", flush=True)
+        return 0
 
 
 def _json(v):
@@ -124,6 +152,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self._reply(200, dict(folder=INSTR.folder))
             if self.path == "/move":
                 INSTR.move(**args)
+                _forward()
                 return self._reply(200, dict(devices=INSTR.status()))
             if self.path == "/count":
                 if args.get("folder"):
@@ -188,6 +217,7 @@ def main():
     import importlib
     INSTR = getattr(importlib.import_module(module), cls)(session=a.session, mode=a.mode)
     INSTR_NAME = a.instrument
+    _forward(only_changes=False)                       # the values of all the devices, once at start
     srv = ThreadingHTTPServer(("127.0.0.1", a.port), Handler)
     print(f"Virtual {a.instrument.upper()} ready: http://127.0.0.1:{a.port}  (session {a.session}, files in {INSTR.folder})",
           flush=True)

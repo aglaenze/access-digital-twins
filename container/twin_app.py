@@ -16,6 +16,7 @@ All requests need the token of the server (header "Authorization: token ...").
 The student's things: notebooks in work/<user>/, logbooks in TWIN_RUN_ROOT/progress/<user>/, measurements of the
 pages in the sessions TWIN_RUN_ROOT/<instrument>/<user>/. Accounts and passwords stay in the app (twin/app/accounts.js).
 """
+import asyncio
 import datetime
 import glob
 import io
@@ -153,8 +154,14 @@ class User(Base):
         os.makedirs(os.path.join(run_root(), "progress", uid), exist_ok=True)
         with open(os.path.join(run_root(), "progress", uid, "account.json"), "w", encoding="utf-8") as f:
             json.dump(dict(id=uid, name=b.get("name", ""), email=b.get("email", "")), f)
-        if changed:                                  # kernels of the previous student
-            await self.kernel_manager.shutdown_all()
+        if changed:                                  # kernels of the previous student (not the kept ones of
+            km = self.kernel_manager                 # twin_kernels.py: they get the student's environment when given)
+            kept = set(km.kept()) if hasattr(km, "kept") else set()
+            for kid in list(km.list_kernel_ids()):
+                if kid not in kept:
+                    await km.shutdown_kernel(kid)
+            if hasattr(km, "fill"):
+                asyncio.ensure_future(km.fill())
         self.finish(json.dumps(dict(user=uid)))
 
 
@@ -271,4 +278,7 @@ def _load_jupyter_server_extension(serverapp):
     os.environ["TWIN_ROOT"] = root            # the kernels find the twin from the students' copies (work/<user>/...)
     if root not in sys.path:
         sys.path.insert(0, root)
+    km = serverapp.kernel_manager
+    if hasattr(km, "fill"):                    # kernels kept ready (twin_kernels.py): start filling now
+        serverapp.io_loop.call_later(1.0, lambda: asyncio.ensure_future(km.fill()))
     serverapp.log.info("twin_app: /twin/ API of the app loaded")

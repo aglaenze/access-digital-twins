@@ -364,6 +364,22 @@ positions (6.85/7.15 m, 6.95/7.05 m).
 **9.7 Control station and NICOS** (`example_session.py`; NICOS: `../nicos/README.md` § 8): status, dark, open beam, impossible setting refused, sample, scan,
 log; a command sent during a measurement is refused ("instrument busy"), status remains available.
 
+**9.8 Spheres and cylinders** (2026-11-06; samples of the sample builder: any number of blocks, spheres and vertical
+cylinders, `../sample_library.py`). Checks: the path length integrated over the beam equals the volume (sphere
+65.449 mm³ for 65.450; cylinder within 0.2 %, discretization of the edge); at the center of a sphere T = exp(−Σ·d)
+exactly; the overlap of two volumes is tested on the shapes, not on their bounding boxes. Then the same sample (a
+copper sphere, d = 6 mm, and an α-iron cylinder, d = 3 mm, h = 10 mm; WFM δ = 0.30, 10 s per count) measured in the
+**mcstas** mode (McStas `Union_sphere`, `Union_cylinder`) and in the **hybrid** mode, reduced, compared with the exact
+transmission (Beer–Lambert, NCrystal cross-sections, mean over the region), 2.5–5.5 Å:
+
+| Region | mcstas / exact | hybrid / exact |
+|---|---|---|
+| center of the sphere (2 × 2 mm) | 0.993 | 1.004 |
+| cylinder (0.8 × 4 mm) | 1.028 | 1.010 |
+
+The Bragg edges are where they must be (copper (111) 4.17 Å, α-iron (110) 4.05 Å). The mcstas points scatter a little
+more than their error bars: the statistics of the simulated neutrons over 10 s (the twin warns, `mc_factor`).
+
 ## 10. NICOS
 NICOS drives the twin since 2026-11-03 (Windows, and Linux in the container), organized as at ESS since 2026-11-04:
 the setup package `nicos_twin.odin` is built on `nicos_ess.odin` (the NICOS of the real ODIN), with the same GUI,
