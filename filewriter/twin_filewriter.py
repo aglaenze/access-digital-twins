@@ -211,6 +211,14 @@ def producer(brokers):
 
 
 # --------------------------------------------------------------------------- start / stop a job
+def nicos_uuid():
+    """A job or command id the file-writer accepts: a UUID with 5 at position 14 and 8 at position 19, as those of
+    NICOS (kafka-to-nexus src/CommandSystem/Handler.cpp, isValidUUID); others are refused ("job id was invalid")."""
+    u = list(str(uuid.uuid4()))
+    u[14], u[19] = "5", "8"
+    return "".join(u)
+
+
 def _utc(t_ns):
     return datetime.datetime.fromtimestamp(t_ns / 1e9, datetime.timezone.utc)
 
@@ -273,7 +281,7 @@ class FileWriterControl:
         the job id; RuntimeError if the file-writer refuses."""
         from streaming_data_types import serialise_pl72
         from streaming_data_types.action_response_answ import ActionOutcome
-        job_id = job_id or str(uuid.uuid4())
+        job_id = job_id or nicos_uuid()
         start_ns = start_ns or time.time_ns()
         stop = _utc(start_ns) + datetime.timedelta(days=365.25 * 10)      # as NICOS: open-ended, until the stop
         self._send(serialise_pl72(job_id, filename, start_time=_utc(start_ns), stop_time=stop,
@@ -289,7 +297,7 @@ class FileWriterControl:
         """Sets the stop time of the job (now by default)."""
         from streaming_data_types import serialise_6s4t
         from streaming_data_types.action_response_answ import ActionOutcome
-        self._send(serialise_6s4t(job_id, stop_time=_utc(stop_ns or time.time_ns()), command_id=str(uuid.uuid4())))
+        self._send(serialise_6s4t(job_id, stop_time=_utc(stop_ns or time.time_ns()), command_id=nicos_uuid()))
         r = self._wait(job_id, b"answ", timeout)
         if r.outcome != ActionOutcome.Success:
             raise RuntimeError(f"the file-writer refused to stop the job: {r.message}")

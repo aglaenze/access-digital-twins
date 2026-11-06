@@ -90,6 +90,6 @@ jobs:
             python filewriter/e2e_test.py --show-topics ${instr}_filewriter ${instr}_filewriter_pool || true
             kafka_up || { echo "--- Kafka is down:"; docker ps -a; docker logs kafka 2>&1 | tail -60; }
             echo "::endgroup::"
-            docker rm -f fw_$instr
+            docker stop -t 30 fw_$instr > /dev/null; docker rm -f fw_$instr   # stopped: it leaves its consumer group
           done
           exit $status
