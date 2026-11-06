@@ -132,8 +132,8 @@ red_out = w.Output()
 SPEC = {}
 
 def plot_spectrum():
+    red_out.clear_output(wait=True)   # (outside the 'with': inside it, Voila can hang when the page loads)
     with red_out:
-        clear_output(wait=True)
         if not SPEC:
             return
         fig, ax = plt.subplots(figsize=(11, 4))
@@ -261,6 +261,17 @@ reveal2 = w.Button(description="Show the answer", icon="eye", layout=w.Layout(wi
 gb.on_click(do_guess)
 reveal2.on_click(do_reveal2)
 display(w.VBox([shut2, stage2, b2, out2, guess, w.HBox([gb, reveal2]), gout]))
+""")
+
+md(r"""
+## Submit your work
+
+When you are done, submit: the file for your teacher is made from your answers and your measurements.
+""")
+
+code(r"""
+import submit
+_ = submit.Submit("odin/exercises/unknown_metals", "bsc")
 """)
 
 nb = nbf.v4.new_notebook()

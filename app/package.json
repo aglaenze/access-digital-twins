@@ -1,0 +1,34 @@
+{
+  "name": "ess-digital-twins",
+  "productName": "ESS digital twins",
+  "version": "0.1.0",
+  "description": "The student app of the ESS digital twins: sign in, choose an exercise, work, hand in.",
+  "main": "main.js",
+  "homepage": "https://github.com/aglaenze/access-digital-twins",
+  "author": {
+    "name": "ACCESS project (DTU, University of Copenhagen, ESS)",
+    "email": "agrgl@dtu.dk"
+  },
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --publish never"
+  },
+  "devDependencies": {
+    "electron": "44.9.3",
+    "electron-builder": "26.17.0"
+  },
+  "build": {
+    "appId": "dk.dtu.access.twins",
+    "productName": "ESS digital twins",
+    "artifactName": "ESS-digital-twins-${version}-${os}-${arch}.${ext}",
+    "icon": "icon.png",
+    "files": ["main.js", "backend.js", "accounts.js", "preload.js", "icon.png", "shell/**", "package.json"],
+    "directories": { "output": "dist" },
+    "win": { "target": [{ "target": "nsis", "arch": ["x64"] }] },
+    "nsis": { "oneClick": true, "perMachine": false, "createDesktopShortcut": true, "shortcutName": "ESS digital twins" },
+    "mac": { "target": [{ "target": "dmg", "arch": ["arm64", "x64"] }], "category": "public.app-category.education",
+             "identity": "-" },
+    "linux": { "target": [{ "target": "AppImage", "arch": ["x64"] }], "category": "Education" }
+  }
+}

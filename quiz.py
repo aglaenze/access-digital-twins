@@ -2,7 +2,9 @@
 
 Every question can be answered several times. A wrong answer gets an explanation of why it is wrong; after a first
 try the student can reveal the right answer and its explanation. Answers are kept in a small logbook
-(TWIN_RUN_ROOT/progress/<quiz>.jsonl) and the student can download a report of the session.
+(TWIN_RUN_ROOT/progress/<user>/<quiz>.jsonl, <user> = the account of the app, TWIN_USER; without the app
+TWIN_RUN_ROOT/progress/<quiz>.jsonl) and the student can download a report of the session. When the page or notebook is
+opened again, the questions already answered right (or whose answer was shown) are shown as they were left.
 
     import quiz
     q = quiz.Quiz("odin_iron_bsc")                       # one per page or notebook
@@ -69,13 +71,42 @@ def _run_root():
     return os.environ.get("TWIN_RUN_ROOT", os.path.join(os.path.expanduser("~"), "McStas_runs", "twin"))
 
 
+def progress_dir(user=None):
+    """Folder of the logbooks of one student: progress/<user> (the account of the app), or progress/ without the app."""
+    user = os.environ.get("TWIN_USER", "") if user is None else user
+    return os.path.join(_run_root(), "progress", *([user] if user else []))
+
+
+def _previous(log):
+    """What the logbook says of each question: {id: {"right": bool, "revealed": bool, "answer": last, "tries": n}}."""
+    out = {}
+    try:
+        with open(log, encoding="utf-8") as f:
+            for line in f:
+                try:
+                    e = json.loads(line)
+                except ValueError:
+                    continue
+                s = out.setdefault(e.get("question"), dict(right=False, revealed=False, answer=None, tries=0))
+                if e.get("answer") == "revealed":
+                    s["revealed"] = True
+                    continue
+                s["tries"] += 1
+                if e.get("right"):
+                    s["right"], s["answer"] = True, e.get("answer")
+    except OSError:
+        pass
+    return out
+
+
 class Quiz:
     """The questions of one page or notebook."""
 
     def __init__(self, name):
         self.name = name
         self.items = []          # dicts: id, kind, text, state ("open", "right", "revealed"), tries, answers
-        self.log = os.path.join(_run_root(), "progress", f"{name}.jsonl")
+        self.log = os.path.join(progress_dir(), f"{name}.jsonl")
+        self.before = _previous(self.log)       # the answers of earlier sessions
 
     # ------------------------------------------------------------------ bookkeeping
     def _record(self, item, answer, right):
@@ -91,9 +122,38 @@ class Quiz:
         except OSError:
             pass
 
+    def _revealed(self, item):
+        if item["state"] == "open":
+            item["state"] = "revealed"
+            try:
+                os.makedirs(os.path.dirname(self.log), exist_ok=True)
+                with open(self.log, "a", encoding="utf-8") as f:
+                    f.write(json.dumps({"time": time.strftime("%Y-%m-%d %H:%M:%S"), "question": item["id"],
+                                        "answer": "revealed", "right": False}) + "\n")
+            except OSError:
+                pass
+
     def _new(self, kind, text):
         item = dict(id=f"Q{len(self.items) + 1}", kind=kind, text=text, state="open", tries=0, answers=[])
         self.items.append(item)
+        if kind != "solution":          # the number of questions, for the progress shown in the catalogue of the app
+            n = sum(i["kind"] != "solution" for i in self.items)
+            meta = self.log[:-len(".jsonl")] + ".meta.json"
+            try:
+                old = 0
+                if os.path.isfile(meta):
+                    with open(meta, encoding="utf-8") as f:
+                        old = json.load(f).get("questions", 0)
+                if n > old:
+                    os.makedirs(os.path.dirname(meta), exist_ok=True)
+                    with open(meta, "w", encoding="utf-8") as f:
+                        json.dump({"questions": n}, f)
+            except (OSError, ValueError):
+                pass
+        b = self.before.get(item["id"])
+        if b:
+            item["tries"] = b["tries"]
+            item["state"] = "right" if b["right"] else ("revealed" if b["revealed"] else "open")
         return item
 
     # ------------------------------------------------------------------ question types
@@ -138,14 +198,30 @@ class Quiz:
                             + _hint(item, hints))
             reveal.layout.display = ""
 
-        def on_reveal(_):
-            item["state"] = "revealed" if item["state"] == "open" else item["state"]
+        def show_answer():
             good = "; ".join(f"**{options[k]}**" for k in sorted(right))
             fb.value = _box("ans", f"Answer: {good}. {explanation}")
             reveal.layout.display = "none"
 
+        def on_reveal(_):
+            self._revealed(item)
+            show_answer()
+
         check.on_click(on_check)
         reveal.on_click(on_reveal)
+        b = self.before.get(item["id"])
+        if item["state"] == "right":            # answered right in an earlier session
+            given = b["answer"] or []
+            if multi:
+                for k, box_ in enumerate(boxes):
+                    box_.value = options[k] in given
+            elif given and given[0] in options:
+                picker.value = given[0]
+            fb.value = _box("ok", "**Right** (answered earlier). " + explanation)
+        elif item["state"] == "revealed":
+            show_answer()
+        elif b and b["tries"]:
+            reveal.layout.display = ""
         display(w.VBox([head, picker, w.HBox([check, reveal]), fb]).add_class("twq"))
 
     def number(self, text, value, tol, unit="", mistakes=(), hints=(), explanation="", rel=False, title=None):
@@ -178,13 +254,24 @@ class Quiz:
             fb.value = _box("no", f"**Not quite**: {x:g} {unit} is {msg}" + _hint(item, hints))
             reveal.layout.display = ""
 
-        def on_reveal(_):
-            item["state"] = "revealed" if item["state"] == "open" else item["state"]
+        def show_answer():
             fb.value = _box("ans", f"Answer: **{value:.4g} {unit}**. {explanation}")
             reveal.layout.display = "none"
 
+        def on_reveal(_):
+            self._revealed(item)
+            show_answer()
+
         check.on_click(on_check)
         reveal.on_click(on_reveal)
+        b = self.before.get(item["id"])
+        if item["state"] == "right":            # answered right in an earlier session
+            box.value = f"{b['answer']:g}" if isinstance(b["answer"], (int, float)) else ""
+            fb.value = _box("ok", f"**Right** ({value:.4g} {unit}, answered earlier). " + explanation)
+        elif item["state"] == "revealed":
+            show_answer()
+        elif b and b["tries"]:
+            reveal.layout.display = ""
         display(w.VBox([head, w.HBox([box, w.Label(unit)]), w.HBox([check, reveal]), fb]).add_class("twq"))
 
     def solution(self, title, code="", explanation=""):

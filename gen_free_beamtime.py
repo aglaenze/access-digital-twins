@@ -49,6 +49,11 @@ def main():
                             f"FOLDER = f\"{{TWIN_RUN_ROOT}}/data/{instr}/{{datetime.date.today().year}}/{{PROPOSAL}}/raw\"")
             if c.cell_type == "markdown" and c.source.startswith("## Results for the committee"):
                 c.source = "## My answer\n\n(the answer to your question, with uncertainties; what you would do next)"
+        cells.append(nbf.v4.new_markdown_cell("## Submit your work" + chr(10) + chr(10) + "When you are done: save this "
+                     "notebook (*Save*), then submit. The file for your teacher is made from your measurements and "
+                     "your notebook."))
+        cells.append(nbf.v4.new_code_cell(f"import submit" + chr(10) + f"_ = submit.Submit(\"{instr}/exercises/free_beamtime\", "
+                                          f"\"free\", title=\"Free beamtime on {name}\")"))
         out = os.path.join(ROOT, instr, "exercises", "free_beamtime")
         os.makedirs(out, exist_ok=True)
         f = os.path.join(out, f"{name}_free_beamtime.ipynb")

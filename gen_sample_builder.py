@@ -121,8 +121,8 @@ def spec_now():
     return odin_spec() if instr.value == "odin" else loki_spec()
 
 def view(_):
+    out.clear_output(wait=True)   # (outside the 'with': inside it, Voila can hang when the page loads)
     with out:
-        clear_output(wait=True)
         spec = spec_now()
         errors = sl.validate(instr.value, spec)
         if errors:
@@ -140,8 +140,8 @@ def view(_):
             ax.grid(alpha=0.3, which="both"); plt.show()
 
 def save(_):
+    out.clear_output(wait=True)   # (outside the 'with': inside it, Voila can hang when the page loads)
     with out:
-        clear_output(wait=True)
         if not proposal.value.strip().isdigit():
             print("Give your proposal number (the one entered in NICOS, Experiment panel)."); return
         folder = f"{ROOT}/data/{instr.value}/{datetime.date.today().year}/{proposal.value.strip()}/raw"

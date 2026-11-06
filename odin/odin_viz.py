@@ -143,8 +143,8 @@ def show_live(nexus_file, n_frames=24):
     out = w.Output()
 
     def draw(k):
+        out.clear_output(wait=True)   # (outside the 'with': inside it, Voila can hang when the page loads)
         with out:
-            out.clear_output(wait=True)
             fig, ax = plt.subplots(1, 2, figsize=(11, 4.2), gridspec_kw=dict(width_ratios=[1, 1.4]))
             im = ax[0].imshow(fr["images"][k], origin="lower", extent=fr["extent"], cmap="inferno", vmin=0, vmax=vmax)
             ax[0].set(xlabel="x (mm)", ylabel="y (mm)", title=f"Detector after {fr['times'][k]:.1f} s "

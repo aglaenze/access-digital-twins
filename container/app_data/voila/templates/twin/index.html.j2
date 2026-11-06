@@ -23,4 +23,7 @@ window.MathJax = {
 </script>
 <script async src="{{ resources.base_url }}voila/templates/twin/static/tex-svg-full.js"
         onerror="var s = document.createElement('script'); s.async = true; s.src = 'https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg-full.js'; document.head.appendChild(s);"></script>
+{#- the look of the app (fonts, colors, buttons, questions): static/twin.css -#}
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap">
+<link rel="stylesheet" href="{{ resources.base_url }}voila/templates/twin/static/twin.css">
 {%- endblock html_head_js_mathjax -%}

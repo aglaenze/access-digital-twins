@@ -48,6 +48,10 @@ control room of the instrument opens, you choose ODIN or LoKI, and the NICOS win
 files to look for and no other program to learn.
 
 The rest of this guide is for teachers and for students who want to go further (console, scripts, local installation).
+**New (teachers, for now): the app** [app/](app/README.md): a real application window with accounts (sign in with
+your name, email and a password), the catalogue with your progress, the exercises in tabs, and *Submit* at the end of each exercise (a file to send to your teacher).
+Students will get it as an installer.
+
 With the local installation (route B, Windows), the same app exists without the container: run
 `container/run_app_local.ps1` once (right-click > *Run with PowerShell*), then double-click **ESS digital twins (local)**.
 

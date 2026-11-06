@@ -192,6 +192,13 @@ q_.choice("A new batch has particles 4 times larger (R = 200 Å, Rg = 155 Å). T
          title="Larger particles")
 q_.report()
 """)]
+msc += [md("## Submit your work\n\nWhen you are done: save this notebook (*Save*), then submit. The file for your teacher is made from your answers, your measurements and your notebook."),
+        code("import submit\n_ = submit.Submit(\"loki/exercises/silica_spheres\", \"msc\", quiz=q_)")]
+import sys as _sys
+_sys.path.insert(0, os.path.abspath(os.path.join(HERE, '..', '..', '..')))
+from nbfig import figure_cell
+_k = next((i for i, c in enumerate(msc) if 'Your mission' in c.source), 0)
+msc.insert(_k + 1, figure_cell('sans_particles.png', 'What you measure: the particles in the liquid scatter at small angles, and their size sets the shape of the curve I(Q).'))
 write(msc, "LoKI_silica_msc.ipynb")
 
 # --------------------------------------------------------------------------- beamtime starter
@@ -223,4 +230,6 @@ up to you. Keep notes of your choices: they are part of your report.
            "rg, drg, i0 = None, None, None                     # Guinier [Å, Å, cm⁻¹]\n"
            "radius, dradius, phi, dphi = None, None, None, None  # sphere model [Å, Å, -, -]\n"
            "ex.check_guinier(rg, drg, i0)\nex.check_sphere(radius, dradius, phi, dphi)")]
+bt += [md("## Submit your work\n\nWhen you are done: save this notebook (*Save*), then submit. The file for your teacher is made from your measurements and your notebook."),
+       code("import submit\n_ = submit.Submit(\"loki/exercises/silica_spheres\", \"beamtime\")")]
 write(bt, "LoKI_silica_beamtime.ipynb")

@@ -1,0 +1,268 @@
+"""Jupyter server extension of the app "ESS digital twins" (twin/app, Electron): what the app asks the server.
+
+Loaded by the server of the app (container/start.sh in the container, twin/app/main.js on a computer without the
+container):  jupyter server --ServerApp.jpserver_extensions="{'twin_app': True}"  with container/ in PYTHONPATH.
+All requests need the token of the server (header "Authorization: token ...").
+
+    GET  /twin/catalogue           instruments, exercises (exercise.yml), free beamtimes, the progress of the student
+    POST /twin/user {id,name,email} the student who signs in: the kernels started from now on work for them
+                                   (TWIN_USER, sessions of the pages, logbooks of the questions); open kernels stop
+    POST /twin/open {dir,mode,what} the address to show for one way into an exercise (a page, or the student's own
+                                   copy of a notebook, made on first opening) and records that it was opened
+    POST /twin/nicos {instrument}  opens NICOS of this instrument: windows of this computer (local app), or the control
+                                   room of the container (returns the address of the remote screen)
+    GET  /twin/handin              the work of the student as a zip file (logbooks, notebooks, measurements logbook)
+
+The student's things: notebooks in work/<user>/, logbooks in TWIN_RUN_ROOT/progress/<user>/, measurements of the
+pages in the sessions TWIN_RUN_ROOT/<instrument>/<user>/. Accounts and passwords stay in the app (twin/app/accounts.js).
+"""
+import datetime
+import glob
+import io
+import json
+import os
+import re
+import subprocess
+import sys
+import zipfile
+
+from jupyter_server.base.handlers import APIHandler
+from jupyter_server.utils import url_path_join
+from tornado import web
+
+INSTRUMENTS = {
+    "odin": dict(name="ODIN", kind="Imaging", text="Radiography and tomography with neutrons, wavelength by wavelength"),
+    "loki": dict(name="LoKI", kind="Small-angle scattering", text="Sizes and shapes of nanostructures, 1 to 100 nm"),
+    "dream": dict(name="DREAM", kind="Powder diffraction", text="Not available yet: no official McStas model"),
+    "bifrost": dict(name="BIFROST", kind="Spectroscopy", text="Not available yet: no official McStas model"),
+}
+QUIZ = {  # the quiz (quiz.Quiz name) of each way into an exercise, for the progress shown in the catalogue
+    ("odin/exercises/iron_bragg_edges", "bsc"): "odin_iron_bsc",
+    ("odin/exercises/iron_bragg_edges", "msc"): "odin_iron_msc",
+    ("loki/exercises/silica_spheres", "bsc"): "loki_silica_bsc",
+    ("loki/exercises/silica_spheres", "msc"): "loki_silica_msc",
+}
+SESSION_VARS = ("ODIN_SESSION", "LOKI_SESSION")
+
+
+def run_root():
+    return os.environ.get("TWIN_RUN_ROOT", os.path.join(os.path.expanduser("~"), "McStas_runs", "twin"))
+
+
+def user():
+    return os.environ.get("TWIN_USER", "")
+
+
+def safe_id(s):
+    return re.sub(r"[^a-z0-9]+", "_", (s or "").lower()).strip("_")[:60]
+
+
+class Base(APIHandler):
+    @property
+    def root(self):
+        return os.path.abspath(os.path.expanduser(self.settings["server_root_dir"]))   # (it may start with "~")
+
+    def body(self):
+        try:
+            return json.loads(self.request.body or b"{}")
+        except ValueError:
+            raise web.HTTPError(400, "JSON expected")
+
+    def progress(self):
+        return os.path.join(run_root(), "progress", user()) if user() else None
+
+    def opened(self):
+        p = self.progress()
+        try:
+            with open(os.path.join(p, "opened.json"), encoding="utf-8") as f:
+                return json.load(f)
+        except (OSError, ValueError, TypeError):
+            return {}
+
+
+class Catalogue(Base):
+    @web.authenticated
+    def get(self):
+        import yaml
+        ex = []
+        for f in sorted(glob.glob(os.path.join(self.root, "*", "exercises", "*", "exercise.yml"))):
+            with open(f, encoding="utf-8") as fh:
+                e = yaml.safe_load(fh)
+            e["dir"] = os.path.relpath(os.path.dirname(f), self.root).replace(os.sep, "/")
+            for key, m in (e.get("modes") or {}).items():
+                if m.get("file", "").endswith(".md"):            # the proposal sheet of a beamtime, as HTML
+                    try:
+                        import mistune
+                        with open(os.path.join(self.root, m["file"]), encoding="utf-8") as fh:
+                            m["sheet"] = mistune.html(fh.read())
+                    except Exception:
+                        m["sheet"] = ""
+                m["progress"] = self.mode_progress(e["dir"], key)
+            ex.append(e)
+        planned = os.path.join(self.root, "catalogue_planned.yml")
+        if os.path.isfile(planned):
+            with open(planned, encoding="utf-8") as fh:
+                ex += [dict(e, status="planned") for e in yaml.safe_load(fh) or []]
+        free = {k: f"{k}/exercises/free_beamtime/{v['name']}_free_beamtime.ipynb" for k, v in INSTRUMENTS.items()}
+        free = {k: f for k, f in free.items() if os.path.isfile(os.path.join(self.root, f))}
+        self.finish(json.dumps(dict(instruments=INSTRUMENTS, exercises=ex, free=free, user=user(),
+                                    local=bool(os.environ.get("TWIN_APP_LOCAL")))))
+
+    def mode_progress(self, d, mode):
+        """{"status": "new" | "started" | "done", "text": ..., "pct": 0-100}"""
+        out = dict(status="new", text="Not started", pct=0)
+        when = self.opened().get(f"{d}:{mode}")
+        if when:
+            out.update(status="started", text=f"Started {when[:10]}", pct=5)
+        q, p = QUIZ.get((d, mode)), self.progress()
+        sub = {}
+        try:
+            with open(os.path.join(p, "submitted.json"), encoding="utf-8") as f:
+                sub = json.load(f)
+        except (OSError, ValueError, TypeError):
+            pass
+        if q and p and os.path.isfile(os.path.join(p, q + ".meta.json")):
+            try:
+                with open(os.path.join(p, q + ".meta.json"), encoding="utf-8") as f:
+                    total = json.load(f).get("questions", 0)
+                import quiz
+                done = sum(1 for s in quiz._previous(os.path.join(p, q + ".jsonl")).values()
+                           if s["right"] or s["revealed"])
+                if total:
+                    pct = round(100 * done / total)
+                    out.update(status="done" if done >= total else "started", pct=pct,
+                               text=f"Questions: {done} of {total}")
+            except (OSError, ValueError, ImportError):
+                pass
+        if sub.get(f"{d}:{mode}"):
+            out.update(status="done", pct=100, text=f"Submitted {sub[f'{d}:{mode}'][:10]}")
+        return out
+
+
+class User(Base):
+    @web.authenticated
+    async def post(self):
+        b = self.body()
+        uid = safe_id(b.get("id"))
+        if not uid:
+            raise web.HTTPError(400, "id needed")
+        changed = uid != user()
+        os.environ.update(TWIN_USER=uid, TWIN_USER_NAME=b.get("name", ""), TWIN_USER_EMAIL=b.get("email", ""))
+        for v in SESSION_VARS:                       # the pages measure in the session of the student
+            os.environ[v] = uid
+        os.makedirs(os.path.join(run_root(), "progress", uid), exist_ok=True)
+        with open(os.path.join(run_root(), "progress", uid, "account.json"), "w", encoding="utf-8") as f:
+            json.dump(dict(id=uid, name=b.get("name", ""), email=b.get("email", "")), f)
+        if changed:                                  # kernels of the previous student
+            await self.kernel_manager.shutdown_all()
+        self.finish(json.dumps(dict(user=uid)))
+
+
+class Open(Base):
+    @web.authenticated
+    def post(self):
+        b = self.body()
+        d, mode, what = b.get("dir", ""), b.get("mode", ""), b.get("what", "file")
+        rel = b.get("file")
+        if not rel:
+            import yaml
+            with open(os.path.join(self.root, d, "exercise.yml"), encoding="utf-8") as fh:
+                m = yaml.safe_load(fh)["modes"][mode]
+            rel = m["analysis"] if what == "analysis" else m["file"]
+            kind = "page" if (m.get("open") == "voila" and what == "file") else "notebook"
+        else:
+            kind = b.get("kind", "notebook")
+        if not os.path.isfile(os.path.join(self.root, rel)) or ".." in rel.split("/"):
+            raise web.HTTPError(404, rel)
+        if kind == "page":
+            url = "/voila/render/" + rel
+        else:
+            url = "/notebooks/" + self.personal_copy(rel)
+        if d and mode and self.progress():
+            o = self.opened()
+            o.setdefault(f"{d}:{mode}", datetime.datetime.now().isoformat(timespec="minutes"))
+            os.makedirs(self.progress(), exist_ok=True)
+            with open(os.path.join(self.progress(), "opened.json"), "w", encoding="utf-8") as f:
+                json.dump(o, f)
+        self.finish(json.dumps(dict(url=url, kind=kind)))
+
+    def personal_copy(self, rel):
+        """The student's own copy of a notebook (made once, then kept), its relative paths made absolute."""
+        import nbformat
+        src = os.path.join(self.root, rel)
+        ex_dir = os.path.dirname(src)
+        instr_dir = os.path.dirname(os.path.dirname(ex_dir))
+        who = user() or "guest"
+        dst_rel = f"work/{who}/{os.path.basename(instr_dir)}_{os.path.basename(ex_dir)}/{os.path.basename(rel)}"
+        dst = os.path.join(self.root, dst_rel)
+        if not os.path.isfile(dst):
+            nb = nbformat.read(src, as_version=4)
+            for c in nb.cells:
+                c.source = (c.source.replace('os.path.abspath("../../..")', repr(self.root))
+                            .replace('os.path.abspath("../..")', repr(instr_dir))
+                            .replace('"exercise.yml"', repr(os.path.join(ex_dir, "exercise.yml"))))
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            nbformat.write(nb, dst)
+        return dst_rel
+
+
+class Nicos(Base):
+    @web.authenticated
+    def post(self):
+        instr = self.body().get("instrument", "")
+        if instr not in ("odin", "loki"):
+            raise web.HTTPError(400, "instrument: odin or loki")
+        if os.environ.get("TWIN_APP_LOCAL"):          # windows of this computer
+            flags = 0
+            if os.name == "nt":
+                flags = subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_BREAKAWAY_FROM_JOB
+            cmd = [sys.executable, os.path.join(self.root, "container", "control_room_local.py"), "--instrument", instr]
+            try:
+                subprocess.Popen(cmd, cwd=self.root, creationflags=flags, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            except OSError:
+                subprocess.Popen(cmd, cwd=self.root, creationflags=flags & ~0x01000000, stdout=subprocess.DEVNULL,
+                                 stderr=subprocess.DEVNULL)
+            self.finish(json.dumps(dict(where="desktop")))
+        else:                                          # the control room of the container (remote screen)
+            with open(os.path.expanduser("~/.control_room_request"), "w") as f:
+                f.write(instr)
+            self.finish(json.dumps(dict(where="remote", url="/desktop/")))
+
+
+class Handin(Base):
+    @web.authenticated
+    def get(self):
+        who = user()
+        if not who:
+            raise web.HTTPError(400, "nobody signed in")
+        buf = io.BytesIO()
+        rr = run_root()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+            for f in glob.glob(os.path.join(rr, "progress", who, "*")):
+                z.write(f, f"{who}/progress/{os.path.basename(f)}")
+            for f in glob.glob(os.path.join(self.root, "work", who, "**", "*.ipynb"), recursive=True):
+                if ".ipynb_checkpoints" not in f:
+                    z.write(f, f"{who}/notebooks/" + os.path.relpath(f, os.path.join(self.root, "work", who)).replace(os.sep, "/"))
+            for instr in ("odin", "loki"):
+                f = os.path.join(rr, instr, who, "log.jsonl")
+                if os.path.isfile(f):
+                    z.write(f, f"{who}/measurements_{instr}.jsonl")
+        name = f"{who}_{datetime.date.today().isoformat()}.zip"
+        self.set_header("Content-Type", "application/zip")
+        self.set_header("Content-Disposition", f'attachment; filename="{name}"')
+        self.finish(buf.getvalue())
+
+
+def _jupyter_server_extension_points():
+    return [{"module": "twin_app"}]
+
+
+def _load_jupyter_server_extension(serverapp):
+    base = serverapp.web_app.settings["base_url"]
+    serverapp.web_app.add_handlers(".*$", [(url_path_join(base, "twin", p), h) for p, h in [
+        ("catalogue", Catalogue), ("user", User), ("open", Open), ("nicos", Nicos), ("handin", Handin)]])
+    # the twin root on the path of the server (quiz.py: the progress shown in the catalogue)
+    root = os.path.abspath(os.path.expanduser(serverapp.root_dir))
+    if root not in sys.path:
+        sys.path.insert(0, root)
+    serverapp.log.info("twin_app: /twin/ API of the app loaded")

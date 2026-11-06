@@ -26,7 +26,18 @@ import shutil
 import subprocess
 
 import numpy as np
-import mcstasscript as ms
+
+
+class _LazyMcStasScript:
+    """McStasScript is imported on first use (it takes about 1 s, and the pages only need it to simulate)."""
+
+    def __getattr__(self, name):
+        import mcstasscript
+        globals()["ms"] = mcstasscript
+        return getattr(mcstasscript, name)
+
+
+ms = _LazyMcStasScript()
 
 import odin_paths
 

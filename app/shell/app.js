@@ -1,0 +1,286 @@
+// The shell of the app: sign in, the catalogue (GET /twin/catalogue), the open exercises as tabs (<webview>).
+const T = window.twins;
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+let server = null;          // {base, token}
+let user = null;
+let catalogue = null;
+let instr = localStorage.getItem("instr") || "odin";
+const tabs = new Map();     // key -> {btn, pane, view, kind, path}
+let activeKey = "cat";
+
+function toast(text, ms = 5000) {
+  const t = $("#toast");
+  t.textContent = text;
+  t.classList.add("on");
+  clearTimeout(t._h);
+  t._h = setTimeout(() => t.classList.remove("on"), ms);
+}
+
+// ------------------------------------------------------------------ sign in
+let creating = false;
+function setMode(c) {
+  creating = c;
+  $("#auth").classList.toggle("new", c);
+  $("#tab-in").classList.toggle("on", !c);
+  $("#tab-new").classList.toggle("on", c);
+  $("#go").textContent = c ? "Create my account" : "Sign in";
+  $("#f-pw").autocomplete = c ? "new-password" : "current-password";
+  $("#auth-error").textContent = "";
+}
+$("#tab-in").onclick = () => setMode(false);
+$("#tab-new").onclick = () => setMode(true);
+
+function showStatus(s) {
+  const pct = Math.round((s.fraction || 0) * 100);
+  $("#boot-text").textContent = s.error ? s.text : s.text;
+  $("#boot-pct").textContent = s.error ? "" : (pct >= 100 ? "Ready" : pct + " %");
+  $("#boot-bar").style.width = (s.error ? 100 : pct) + "%";
+  $(".boot").classList.toggle("err", !!s.error);
+  $("#boot-link").classList.toggle("hidden", !s.url);
+  $("#boot-link").onclick = (e) => { e.preventDefault(); T.openExternal(s.url); };
+}
+T.on("status", showStatus);
+T.status().then(showStatus);
+
+T.recent().then((list) => {
+  if (!list.length) { setMode(true); return; }
+  $("#recent").innerHTML = "On this computer: " + list.map((u) => `<b data-email="${esc(u.email)}">${esc(u.name)}</b>`).join(" · ");
+  $("#recent").querySelectorAll("b").forEach((b) => b.onclick = () => { $("#f-email").value = b.dataset.email; $("#f-pw").focus(); });
+});
+
+$("#auth").onsubmit = async (e) => {
+  e.preventDefault();
+  const form = { name: $("#f-name").value, email: $("#f-email").value, password: $("#f-pw").value };
+  $("#go").disabled = true;
+  $("#go").textContent = "Starting the instruments…";
+  try {
+    const r = creating ? await T.createAccount(form) : await T.signIn(form);
+    if (r.error) { $("#auth-error").textContent = r.error; return; }
+    server = { base: r.base, token: r.token };
+    user = r.user;
+    $("#f-pw").value = "";
+    enterApp();
+  } catch (err) {
+    $("#auth-error").textContent = "The instruments did not start: " + (err.message || err);
+  } finally {
+    $("#go").disabled = false;
+    $("#go").textContent = creating ? "Create my account" : "Sign in";
+  }
+};
+
+// ------------------------------------------------------------------ the app
+function enterApp() {
+  $("#login").classList.add("hidden");
+  $("#app").classList.remove("hidden");
+  const initials = user.name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join("");
+  $("#avatar").textContent = initials;
+  $("#me-name").textContent = user.name;
+  $("#menu-email").textContent = user.email;
+  activate("cat");
+  loadCatalogue();
+}
+
+$("#me").onclick = (e) => { e.stopPropagation(); $("#menu").classList.toggle("hidden"); };
+document.addEventListener("click", () => $("#menu").classList.add("hidden"));
+$("#signout").onclick = async () => {
+  saveAll();
+  for (const key of [...tabs.keys()]) closeTab(key);
+  await T.signOut();
+  user = null;
+  $("#app").classList.add("hidden");
+  $("#login").classList.remove("hidden");
+  T.recent().then((list) => {
+    $("#recent").innerHTML = "On this computer: " + list.map((u) => `<b data-email="${esc(u.email)}">${esc(u.name)}</b>`).join(" · ");
+    $("#recent").querySelectorAll("b").forEach((b) => b.onclick = () => { $("#f-email").value = b.dataset.email; $("#f-pw").focus(); });
+  });
+  setMode(false);
+};
+$("#handin").onclick = async () => {
+  saveAll();
+  await new Promise((r) => setTimeout(r, 800));
+  const r = await T.handIn();
+  if (r.file) toast(`Saved: ${r.file}. To hand in one exercise, use Submit at the end of the exercise.`, 9000);
+  else if (r.error) toast(r.error);
+};
+
+// ------------------------------------------------------------------ catalogue
+const ICON_TARGET = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="5"></circle><circle cx="12" cy="12" r="1"></circle></svg>';
+const LEVEL = { bsc: "BSc", msc: "MSc", beamtime: "Beamtime" };
+
+async function loadCatalogue() {
+  try {
+    catalogue = await T.api("GET", "/twin/catalogue");
+  } catch (e) {
+    $("#exercises").innerHTML = `<p class="error">The catalogue could not be read: ${esc(e.message)}</p>`;
+    return;
+  }
+  renderCatalogue();
+}
+
+function renderCatalogue() {
+  const c = catalogue;
+  const count = (k) => c.exercises.filter((e) => e.instrument === k && e.status !== "planned").length;
+  if (!count(instr)) instr = Object.keys(c.instruments).find((k) => count(k)) || "odin";
+  $("#instruments").innerHTML = Object.entries(c.instruments).map(([k, i]) => {
+    const n = count(k);
+    return `<button class="instr ${k === instr ? "on" : ""}" data-k="${k}" ${n ? "" : "disabled"}>
+      <span class="top"><span class="name">${esc(i.name)}</span><span class="badge">${n ? n + (n > 1 ? " exercises" : " exercise") : "Later"}</span></span>
+      <span class="kind">${esc(i.kind)}</span><span class="text">${esc(i.text)}</span></button>`;
+  }).join("");
+  $("#instruments").querySelectorAll(".instr").forEach((b) => b.onclick = () => {
+    instr = b.dataset.k; localStorage.setItem("instr", instr); renderCatalogue();
+  });
+  const I = c.instruments[instr];
+  $("#ex-title").textContent = `Exercises on ${I.name}`;
+  const ex = c.exercises.filter((e) => e.instrument === instr);
+  ex.sort((a, b) => (a.status === "planned") - (b.status === "planned"));
+  $("#exercises").innerHTML = ex.map((e, i) => e.status === "planned"
+    ? `<article class="ex planned"><div><span class="tech">${esc(e.technique)} · planned</span><h3>${esc(e.title)}</h3></div><p class="q">${esc(e.question)}</p></article>`
+    : `<article class="ex"><div><span class="tech">${esc(e.technique)}</span><h3>${esc(e.title)}</h3></div>
+       ${e.mission ? `<div class="mission">${ICON_TARGET}<span><b>Your mission.</b> ${esc(e.mission)}</span></div>` : ""}
+       <div class="levels">${Object.entries(e.modes || {}).map(([k, m]) => level(e, k, m, i)).join("")}</div></article>`).join("");
+  $("#exercises").querySelectorAll("[data-act]").forEach((b) => b.onclick = () => act(b.dataset));
+  const free = c.free[instr];
+  $("#free").innerHTML = free ? `<article class="free"><div class="txt"><span class="tech">No exercise · MSc and beyond</span>
+      <h3>Free beamtime on ${esc(I.name)}</h3><p>Your own question, your own samples, your own measurements: as in a real beamtime at ESS.
+      The starter notebook asks for your question and your plan first.</p></div>
+      <div class="acts"><button class="btn go" data-act="nicos" data-instr="${instr}">Open NICOS</button>
+      <button class="btn" data-act="file" data-file="${esc(free)}" data-kind="notebook" data-label="${esc(I.name)} · Free beamtime">Starter notebook</button>
+      <button class="btn" data-act="file" data-file="Sample_builder.ipynb" data-kind="page" data-label="Sample builder">Sample builder</button></div></article>` : "";
+  $("#free").querySelectorAll("[data-act]").forEach((b) => b.onclick = () => act(b.dataset));
+}
+
+function short(title) {
+  const t = title.replace(/\?$/, "").replace(/^How (far apart are|big are) /, "").replace(/ \(game\)$/, "");
+  return t.length > 28 ? t.slice(0, 27) + "…" : t;
+}
+
+function level(e, k, m, i) {
+  const p = m.progress || { status: "new", text: "Not started", pct: 0 };
+  const label = `${catalogue.instruments[e.instrument].name} · ${short(e.title)} · ${LEVEL[k] || k}`;
+  const d = `data-dir="${esc(e.dir)}" data-mode="${k}" data-label="${esc(label)}"`;
+  const go = p.status === "new" ? "Start" : (p.status === "done" ? "Open again" : "Continue");
+  let acts;
+  if (k === "bsc") acts = `<button class="btn ${p.status === "new" ? "soft" : "go"}" data-act="open" ${d}>${go}</button>`;
+  else if (k === "msc") acts = `<button class="btn ${p.status === "new" ? "soft" : "go"}" data-act="open" ${d}>${go === "Start" ? "Open the notebook" : go}</button>
+      <button class="btn" data-act="nicos" data-instr="${e.instrument}">Open NICOS</button>`;
+  else acts = `<button class="btn soft" data-act="sheet" data-i="${i}" data-k="${k}">Your proposal</button>
+      <button class="btn" data-act="nicos" data-instr="${e.instrument}">Open NICOS</button>
+      <button class="btn ${p.status === "new" ? "" : "go"}" data-act="open" data-what="analysis" ${d}>Starter notebook</button>
+      <button class="btn" data-act="file" data-file="Sample_builder.ipynb" data-kind="page" data-label="Sample builder">Sample builder</button>`;
+  return `<div class="level"><div class="row"><span class="chip ${k}">${LEVEL[k] || k}</span><span class="dur">${esc(m.duration || "")}</span></div>
+    <span class="label">${esc(m.label)}</span><span class="what">${esc(m.what)}</span>
+    <div class="prog"><div class="row"><span>${esc(p.text)}</span><b>${p.pct ? p.pct + " %" : ""}</b></div>
+      <div class="track"><div class="fill ${k}" style="width:${p.pct}%"></div></div></div>
+    <div class="acts">${acts}</div></div>`;
+}
+
+async function act(d) {
+  try {
+    if (d.act === "open") {
+      const r = await T.api("POST", "/twin/open", { dir: d.dir, mode: d.mode, what: d.what || "file" });
+      openTab(r.url, r.kind, d.what === "analysis" ? d.label.replace(/Beamtime$/, "Beamtime notebook") : d.label);
+    } else if (d.act === "file") {
+      const r = await T.api("POST", "/twin/open", { file: d.file, kind: d.kind });
+      openTab(r.url, r.kind, d.label);
+    } else if (d.act === "nicos") {
+      const r = await T.api("POST", "/twin/nicos", { instrument: d.instr });
+      const name = catalogue.instruments[d.instr].name;
+      if (r.where === "remote") openTab(r.url, "desktop", `NICOS · ${name}`);
+      else toast(`NICOS of ${name} opens on your desktop in about a minute, logged in. Close its window to stop it.`, 9000);
+    } else if (d.act === "sheet") {
+      const e = catalogue.exercises.filter((x) => x.instrument === instr)
+        .sort((a, b) => (a.status === "planned") - (b.status === "planned"))[+d.i];
+      $("#sheet .sheet-body").innerHTML = e.modes[d.k].sheet || "";
+      $("#sheet").showModal();
+    }
+  } catch (e) {
+    toast("Could not open: " + (e.message || e), 8000);
+  }
+}
+
+// ------------------------------------------------------------------ tabs
+function activate(key) {
+  activeKey = key;
+  $("#tab-cat").classList.toggle("on", key === "cat");
+  $("#pane-cat").classList.toggle("on", key === "cat");
+  for (const [k, t] of tabs) {
+    t.btn.classList.toggle("on", k === key);
+    t.pane.classList.toggle("on", k === key);
+  }
+  const t = tabs.get(key);
+  $("#save").classList.toggle("hidden", !(t && t.kind === "notebook"));
+  $("#saved").textContent = !t ? "" : t.kind === "notebook" ? (t.savedAt ? `Saved ${t.savedAt}` : "") :
+    t.kind === "page" ? "Your answers are saved as you go" : "";
+  if (key === "cat" && user) loadCatalogue();
+}
+$("#tab-cat").onclick = () => activate("cat");
+
+function openTab(url, kind, label) {
+  const key = url.split("?")[0];
+  if (tabs.has(key)) { activate(key); return; }
+  const btn = document.createElement("button");
+  btn.className = "tab";
+  btn.innerHTML = `<span class="dot loading"></span><span>${esc(label)}</span><span class="x" role="button" aria-label="Close ${esc(label)}">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></span>`;
+  const pane = document.createElement("section");
+  pane.className = "pane";
+  const view = document.createElement("webview");
+  view.setAttribute("partition", "persist:twins");
+  view.setAttribute("allowpopups", "");
+  view.src = server.base + url + (url.includes("?") ? "&" : "?") + "token=" + server.token;
+  const cover = document.createElement("div");
+  cover.className = "loading";
+  cover.innerHTML = `<div class="spinner"></div><span>Opening ${esc(label)}…</span><span class="small" data-t></span>`;
+  pane.append(view, cover);
+  $("#stage").append(pane);
+  $("#tabs").append(btn);
+  const t0 = Date.now();
+  const tick = setInterval(() => { cover.querySelector("[data-t]").textContent = Math.round((Date.now() - t0) / 1000) + " s"; }, 1000);
+  const done = () => { clearInterval(tick); cover.remove(); btn.querySelector(".dot").classList.remove("loading"); };
+  view.addEventListener("did-stop-loading", done, { once: true });
+  view.addEventListener("did-fail-load", (e) => { if (e.errorCode !== -3) { done(); toast("The page did not load: " + e.errorDescription); } });
+  const path = kind === "notebook" ? decodeURIComponent(key.replace(/^\/notebooks\//, "")) : null;
+  const t = { btn, pane, view, kind, path, label };
+  tabs.set(key, t);
+  btn.onclick = (e) => { if (e.target.closest(".x")) closeTab(key); else activate(key); };
+  activate(key);
+}
+
+function save(t) {
+  if (t.kind !== "notebook") return;
+  try {
+    t.view.focus();
+    t.view.sendInputEvent({ type: "keyDown", keyCode: "S", modifiers: ["control"] });
+    t.view.sendInputEvent({ type: "keyUp", keyCode: "S", modifiers: ["control"] });
+    t.savedAt = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    if (tabs.get(activeKey) === t) $("#saved").textContent = `Saved ${t.savedAt}`;
+  } catch { /* not loaded yet */ }
+}
+function saveAll() { for (const t of tabs.values()) save(t); }
+$("#save").onclick = () => { const t = tabs.get(activeKey); if (t) save(t); };
+setInterval(saveAll, 120000);
+T.on("before-quit", saveAll);
+
+function closeTab(key) {
+  const t = tabs.get(key);
+  if (!t) return;
+  save(t);
+  setTimeout(() => {
+    t.pane.remove();
+    if (t.path) T.closeNotebook(t.path);
+  }, t.kind === "notebook" ? 700 : 0);
+  t.btn.remove();
+  tabs.delete(key);
+  if (activeKey === key) activate("cat");
+}
+
+// links of the pages that open a new window: a new tab
+T.on("open-url", (url) => {
+  if (!server) return;
+  const u = new URL(url);
+  const p = u.pathname + (u.search ? u.search.replace(/([?&])token=[^&]*&?/, "$1").replace(/[?&]$/, "") : "");
+  const name = decodeURIComponent(u.pathname.split("/").pop() || "Page").replace(/\.ipynb$/, "");
+  openTab(p, u.pathname.startsWith("/notebooks/") ? "notebook" : "page", name);
+});

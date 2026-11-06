@@ -1,0 +1,206 @@
+// ESS digital twins: the student app (Electron).
+//   The window shows the shell (shell/index.html): sign in, the catalogue, and each open exercise in a tab (a
+//   <webview> on the Jupyter server of backend.js: Voila pages and notebooks). The server starts with the app, while
+//   the student signs in. Accounts: accounts.js (on this computer). The student's work: container/twin_app.py.
+const { app, BrowserWindow, ipcMain, dialog, shell, session } = require("electron");
+const fs = require("fs");
+const path = require("path");
+const { Accounts } = require("./accounts");
+const { Backend } = require("./backend");
+
+const TWIN_DIR = process.env.TWIN_DIR || path.resolve(__dirname, "..");   // (TWIN_DIR: a packaged app on the twin folder)
+let win = null;
+let backend = null;
+let ready = null;          // promise of the server address
+let status = { text: "Starting…", fraction: 0, error: null };
+let current = null;        // the student signed in
+const accounts = () => new Accounts(app.getPath("userData"));
+
+function settings() {
+  try { return JSON.parse(fs.readFileSync(path.join(app.getPath("userData"), "settings.json"), "utf-8")); } catch { return {}; }
+}
+
+function send(channel, ...a) {
+  if (win && !win.isDestroyed()) win.webContents.send(channel, ...a);
+}
+
+function startBackend() {
+  backend = new Backend({
+    dataDir: app.getPath("userData"), twinDir: TWIN_DIR, settings: settings(),
+    onStatus: (text, fraction) => { status = { text, fraction, error: null }; send("status", status); },
+  });
+  ready = backend.start().catch((e) => {
+    status = { text: e.message, fraction: 0, error: true, url: e.url || null };
+    send("status", status);
+    throw e;
+  });
+  ready.catch(() => {});
+}
+
+function createWindow() {
+  win = new BrowserWindow({
+    width: 1400, height: 900, minWidth: 960, minHeight: 640, backgroundColor: "#0B1626", show: false,
+    title: "ESS digital twins", icon: path.join(__dirname, "icon.png"), autoHideMenuBar: true,
+    webPreferences: { preload: path.join(__dirname, "preload.js"), webviewTag: true, contextIsolation: true },
+  });
+  win.removeMenu();
+  win.once("ready-to-show", () => win.show());
+  win.loadFile(path.join(__dirname, "shell", "index.html"));
+  win.on("close", (e) => {           // the open notebooks are saved first
+    if (win.__closing) return;
+    e.preventDefault();
+    win.__closing = true;
+    send("before-quit");
+    setTimeout(() => win.destroy(), 1500);
+  });
+}
+
+// links that open a new window in a page (target=_blank): a new tab of the app, or the browser for other sites
+app.on("web-contents-created", (_e, wc) => {
+  wc.setWindowOpenHandler(({ url }) => {
+    if (backend && backend.base && url.startsWith(backend.base)) send("open-url", url);
+    else if (/^https?:/.test(url)) shell.openExternal(url);
+    return { action: "deny" };
+  });
+});
+
+ipcMain.handle("status", () => status);
+ipcMain.handle("recent", () => accounts().recent());
+ipcMain.handle("open-external", (_e, url) => shell.openExternal(url));
+
+async function signedIn(user) {
+  await ready;
+  await backend.request("POST", "/twin/user", user);
+  current = user;
+  return { user, base: backend.base, token: backend.token };
+}
+
+ipcMain.handle("create-account", async (_e, form) => {
+  const r = accounts().create(form);
+  return r.error ? r : signedIn(r.user);
+});
+ipcMain.handle("sign-in", async (_e, form) => {
+  const r = accounts().signIn(form);
+  return r.error ? r : signedIn(r.user);
+});
+ipcMain.handle("sign-out", async () => { current = null; return true; });
+
+ipcMain.handle("api", async (_e, method, p, body) => {
+  await ready;
+  return backend.request(method, p, body, { timeout: 120000 });
+});
+
+// a notebook tab closed: its kernel stops (a Voila page stops its own)
+ipcMain.handle("close-notebook", async (_e, nbPath) => {
+  try {
+    const ss = await backend.request("GET", "/api/sessions");
+    for (const s of ss) if (s.path === nbPath) await backend.request("DELETE", "/api/sessions/" + s.id);
+  } catch { /* nothing to stop */ }
+});
+
+ipcMain.handle("hand-in", async () => {
+  if (!current) return { error: "Sign in first." };
+  const { buf } = await backend.request("GET", "/twin/handin", undefined, { raw: true, timeout: 120000 });
+  const name = `${current.id}_${new Date().toISOString().slice(0, 10)}.zip`;
+  const r = await dialog.showSaveDialog(win, {
+    title: "Export all my work", defaultPath: path.join(app.getPath("documents"), name),
+    filters: [{ name: "Zip file", extensions: ["zip"] }],
+    message: "Save the file, then send it to your teacher (email, or the course page).",
+  });
+  if (r.canceled || !r.filePath) return { canceled: true };
+  fs.writeFileSync(r.filePath, buf);
+  shell.showItemInFolder(r.filePath);
+  return { file: r.filePath, size: buf.length };
+});
+
+// Self-test without showing anything (TWIN_APP_SELFTEST=<folder for the screenshots>, TWIN_APP_DATA=<data folder>):
+// creates an account, shows the catalogue, opens the first BSc page, saves screenshots, quits.
+if (process.env.TWIN_APP_DATA) app.setPath("userData", process.env.TWIN_APP_DATA);
+
+async function selftest(out) {
+  const wc = win.webContents;
+  const shot = async (name) => fs.writeFileSync(path.join(out, name + ".png"),
+    (await wc.capturePage()).toPNG());
+  const js = (code) => wc.executeJavaScript(code);
+  const wait = async (cond, s) => { for (let i = 0; i < s * 2; i++) { if (await js(cond)) return true; await new Promise((r) => setTimeout(r, 500)); } return false; };
+  const log = (m) => fs.appendFileSync(path.join(out, "selftest.log"), new Date().toISOString().slice(11, 19) + " " + m + "\n");
+  let failed = false;
+  const check = (what, ok, t) => { log(`${what}: ${ok} (${(Date.now() - t) / 1000} s)`); if (!ok) failed = true; };
+  fs.mkdirSync(out, { recursive: true });
+  try {
+    await new Promise((r) => setTimeout(r, 1500));
+    await shot("1_login");
+    await js(`document.querySelector("#tab-new").click(); document.querySelector("#f-name").value = "Sam Selftest";
+      document.querySelector("#f-email").value = "sam.selftest@example.org"; document.querySelector("#f-pw").value = "selftest-123";
+      document.querySelector("#auth").requestSubmit(); true`);
+    const t0 = Date.now();
+    check("signed in", await wait(`!document.querySelector("#app").classList.contains("hidden") && document.querySelectorAll(".ex").length > 0`, 1200), t0);
+    await new Promise((r) => setTimeout(r, 1500));
+    await shot("2_catalogue");
+    const t1 = Date.now();
+    await js(`document.querySelector('[data-act="open"][data-mode="bsc"]').click(); true`);
+    check("page loaded", await wait(`document.querySelectorAll(".pane .loading").length === 0 && document.querySelectorAll(".pane webview").length === 1`, 300), t1);
+    await new Promise((r) => setTimeout(r, 4000));
+    await shot("3_exercise");
+    await js(`document.querySelector(".pane.on webview").executeJavaScript(
+      "var q = document.querySelectorAll('.twq')[1]; if (q) { q.scrollIntoView(); var i = q.querySelector('input');" +
+      " i.value = '4.05'; i.dispatchEvent(new Event('input', {bubbles: true})); i.dispatchEvent(new Event('change', {bubbles: true}));" +
+      " setTimeout(function () { q.querySelector('button').click(); }, 500); } !!q")`);
+    await new Promise((r) => setTimeout(r, 3500));
+    await shot("3b_question");
+    await js(`document.querySelector(".pane.on webview").executeJavaScript(
+      "var i = document.querySelector('img[alt]'); if (i) i.scrollIntoView(); !!(i && i.naturalWidth)").then(String)`)
+      .then((r) => log("figure shown: " + r));
+    await new Promise((r) => setTimeout(r, 1000));
+    await shot("3c_figure");
+    await js(`document.querySelector(".pane.on webview").executeJavaScript(
+      "var b = [...document.querySelectorAll('button')].find(x => x.textContent.includes('Submit my work'));" +
+      " if (b) { b.scrollIntoView(); b.click(); } b ? true : [...document.querySelectorAll('button')].slice(-3).map(x => x.textContent).join(' | ')")`)
+      .then((r) => log("submit button: " + r));
+    await new Promise((r) => setTimeout(r, 3000));
+    await shot("3d_submitted");
+    await js(`document.querySelector("#tab-cat").click(); true`);
+    await new Promise((r) => setTimeout(r, 1500));
+    const t2 = Date.now();
+    await js(`document.querySelector('[data-act="open"][data-mode="msc"]').click(); true`);
+    check("notebook loaded", await wait(`document.querySelectorAll(".pane .loading").length === 0 && document.querySelectorAll(".pane webview").length === 2`, 300), t2);
+    await new Promise((r) => setTimeout(r, 5000));
+    await shot("5_notebook");
+    await js(`document.querySelector("#tab-cat").click(); true`);
+    await new Promise((r) => setTimeout(r, 2500));
+    await shot("4_catalogue_again");
+    log("progress: " + await js(`[...document.querySelectorAll(".prog .row span")].slice(0, 3).map(s => s.textContent).join(" | ")`));
+  } catch (e) {
+    log("ERROR " + e.stack);
+    failed = true;
+  }
+  log(failed ? "SELFTEST FAILED" : "SELFTEST PASSED");
+  process.exitCode = failed ? 1 : 0;
+  win.__closing = true;
+  win.destroy();
+}
+
+app.setAppUserModelId("dk.dtu.access.twins");   // its own icon and group in the Windows taskbar
+app.whenReady().then(() => {
+  session.fromPartition("persist:twins").on("will-download", (_e, item) => {
+    item.setSaveDialogOptions({ title: "Save the file for your teacher",
+                                defaultPath: path.join(app.getPath("documents"), item.getFilename()) });
+  });
+  startBackend();
+  createWindow();
+  if (process.env.TWIN_APP_SELFTEST) {   // painted, but out of the screen and out of the taskbar
+    win.setSkipTaskbar(true);
+    win.setPosition(-20000, 0);
+    const show = win.showInactive.bind(win);
+    win.show = () => show();
+    win.once("ready-to-show", () => selftest(process.env.TWIN_APP_SELFTEST));
+  }
+});
+
+app.on("window-all-closed", async () => {
+  if (backend) await backend.stop();
+  app.exit(process.exitCode || 0);
+});
+
+if (!app.requestSingleInstanceLock()) app.quit();
+else app.on("second-instance", () => { if (win) { if (win.isMinimized()) win.restore(); win.focus(); } });

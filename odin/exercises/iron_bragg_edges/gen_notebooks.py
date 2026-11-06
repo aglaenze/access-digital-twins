@@ -197,6 +197,13 @@ q.choice("How is such a systematic error corrected at a real instrument?",
          title="Calibration")
 q.report()
 """)]
+msc += [md("## Submit your work\n\nWhen you are done: save this notebook (*Save*), then submit. The file for your teacher is made from your answers, your measurements and your notebook."),
+        code("import submit\n_ = submit.Submit(\"odin/exercises/iron_bragg_edges\", \"msc\", quiz=q)")]
+import sys as _sys
+_sys.path.insert(0, os.path.abspath(os.path.join(HERE, '..', '..', '..')))
+from nbfig import figure_cell
+_k = next((i for i, c in enumerate(msc) if 'Your mission' in c.source), 0)
+msc.insert(_k + 1, figure_cell('iron_structures.png', 'What you have to decide: α-iron (left) or γ-iron (middle)? Each structure has its own atomic planes, hence its own Bragg edges (right).'))
 write(msc, "ODIN_iron_msc.ipynb")
 
 # --------------------------------------------------------------------------- beamtime starter
@@ -227,4 +234,6 @@ up to you. Keep notes of your choices: they are part of your report.
            "lam_edge, dlam_edge = None, None     # your (110) edge and its uncertainty [Å]\n"
            "a_fe, da_fe = None, None             # your lattice parameter and its uncertainty [Å]\n"
            "ex.check_edge(lam_edge, dlam_edge)\nex.check_lattice(a_fe, da_fe)")]
+bt += [md("## Submit your work\n\nWhen you are done: save this notebook (*Save*), then submit. The file for your teacher is made from your measurements and your notebook."),
+       code("import submit\n_ = submit.Submit(\"odin/exercises/iron_bragg_edges\", \"beamtime\")")]
 write(bt, "ODIN_iron_beamtime.ipynb")

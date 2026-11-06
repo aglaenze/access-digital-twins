@@ -69,6 +69,19 @@ jobs:
         continue-on-error: true
         run: bash container/browser_desktop_test.sh twin:test
 
+      - uses: actions/setup-node@v4
+        if: matrix.arch == 'amd64'
+        with:
+          node-version: 22
+
+      - name: The app (Electron) with this image, container mode (self-test, screenshots)
+        # does not block the publication of the image: the app is tested here, its installers are built by app.yml
+        if: matrix.arch == 'amd64'
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash app/ci_selftest.sh twin:test "$PWD/shots/app"
+
       - name: Keep the screenshots
         if: always()
         uses: actions/upload-artifact@v4

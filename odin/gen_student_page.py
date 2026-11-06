@@ -59,13 +59,13 @@ of the camera, dashed) and from above (right: its thickness along the beam). The
 
 code(r"""
 import sample_library as sl
+from page_output import into
 smp = w.Dropdown(options=[(odin.sample_spec(n).get("name", n), n) for n in odin.samples()],
                  value=odin.status()["sample"], description="Sample", layout=w.Layout(width="420px"))
 smp_out = w.Output()
 
 def show_sample(_=None):
-    with smp_out:
-        clear_output(wait=True)
+    with into(smp_out):   # (collected, then shown: see page_output.py)
         spec = odin.sample_spec(smp.value)
         print(sl.describe("odin", spec))
         sl.draw("odin", spec, fig=plt.figure(figsize=(10, 4)))
@@ -180,8 +180,7 @@ def refresh_list():
              os.path.join(odin.folder, m["details"]["file"])) for m in ms]
     for dd in (pick_E, pick_O, pick_N):
         dd.options = opts
-    with listing:
-        clear_output()
+    with into(listing):
         if not ms:
             print("No measurement yet.")
         for m in ms:
@@ -375,6 +374,22 @@ q.choice("So why does the wavelength spectrum make no sense in white mode?",
 q.report()
 """)
 
+md(r"""
+## 5. Submit your work
+
+When you are done, submit: the file for your teacher is made from your answers and your measurements.
+""")
+
+code(r"""
+import submit
+_ = submit.Submit("odin/exercises/iron_bragg_edges", "bsc", quiz=q)
+""")
+
+import sys as _sys
+_sys.path.insert(0, os.path.dirname(HERE))
+from nbfig import figure_cell
+_k = next((i for i, c in enumerate(cells) if 'Your mission' in c.source), 0)
+cells.insert(_k + 1, figure_cell('iron_structures.png', 'What you have to decide: α-iron (left) or γ-iron (middle)? Each structure has its own atomic planes, hence its own Bragg edges (right).'))
 nb = nbf.v4.new_notebook()
 nb["cells"] = cells
 nb["metadata"]["kernelspec"] = {"name": "python3", "display_name": "Python 3", "language": "python"}

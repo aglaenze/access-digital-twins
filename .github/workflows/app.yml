@@ -1,0 +1,64 @@
+# The installers of the app (twin/app, Electron) for the students: Windows (.exe), macOS (.dmg, Apple Silicon and
+# Intel), Linux (.AppImage). Built at every change of app/ on main, and published on the release "app-latest":
+# https://github.com/aglaenze/access-digital-twins/releases/tag/app-latest
+# Not signed yet (no certificate): Windows and macOS warn at the first start (see app/README.md).
+name: app
+
+on:
+  push:
+    branches: [main]
+    paths: ["app/**", ".github/workflows/app.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write     # the release with the installers
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --no-audit --no-fund
+      - run: node node_modules/electron/install.js
+      - name: Build the installer
+        run: npx electron-builder --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installer-${{ matrix.os }}
+          path: |
+            app/dist/*.exe
+            app/dist/*.dmg
+            app/dist/*.AppImage
+          if-no-files-found: error
+
+  release:
+    needs: build
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: installers
+          merge-multiple: true
+      - run: ls -la installers
+      - name: Publish on the release "app-latest" (replaces the files of the previous build)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh release view app-latest -R "$REPO" > /dev/null 2>&1 || \
+            gh release create app-latest -R "$REPO" --title "The app (latest build)" --prerelease \
+              --notes "Installers of the app ESS digital twins, rebuilt at every change. Windows: the .exe; macOS: the .dmg (arm64 = Apple Silicon); Linux: the .AppImage. Not signed yet: see app/README.md."
+          gh release upload app-latest installers/* -R "$REPO" --clobber

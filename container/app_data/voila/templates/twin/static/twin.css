@@ -1,0 +1,75 @@
+/* The look of the app (twin/app/shell/style.css) on the Voila pages: fonts, colors, cards, buttons, questions. */
+:root {
+  --tw-text: #142033; --tw-muted: #5B6779; --tw-line: #E2E7EE; --tw-line2: #CBD3DE; --tw-soft: #EEF2F6;
+  --tw-teal: #0E7C70; --tw-teal-d: #0A5F56; --tw-teal-l: #E7F5F3; --tw-ink: #0B1626; --tw-ink2: #22354F;
+  --tw-red: #9B2C1C; --tw-red-bg: #FDF0EE; --tw-amber-bg: #FFF6E8;
+  --jp-ui-font-family: Inter, "Segoe UI", system-ui, sans-serif;
+  --jp-content-font-family: Inter, "Segoe UI", system-ui, sans-serif;
+  --jp-content-font-color1: #142033;
+  --jp-widgets-font-size: 14px;
+}
+/* the theme of JupyterLab: its main color becomes the teal of the app (buttons, focus, progress) */
+body {
+  --jp-brand-color0: #0A5F56; --jp-brand-color1: #0E7C70; --jp-brand-color2: #5FB3A8; --jp-brand-color3: #E7F5F3;
+  --jp-accept-color-normal: #0E7C70; --jp-accept-color-hover: #0A5F56; --jp-accept-color-active: #0A5F56;
+  --jp-info-color1: #22354F; --jp-success-color1: #0E7C70; --jp-warn-color1: #B4562B;
+}
+body, body.jp-Notebook, .jp-Notebook { background: #F5F7FA !important; color: var(--tw-text); }
+body { font-family: Inter, "Segoe UI", system-ui, sans-serif; }
+#rendered_cells, .jp-Notebook { max-width: 1120px; margin: 0 auto !important; padding: 18px 28px 64px !important; }
+.jp-Cell { padding: 0 !important; }
+.jp-RenderedHTMLCommon { font-size: 15px; line-height: 1.6; color: var(--tw-text); }
+.jp-RenderedHTMLCommon h1, .jp-RenderedHTMLCommon h2, .jp-RenderedHTMLCommon h3 {
+  font-family: "Space Grotesk", "Segoe UI", system-ui, sans-serif; font-weight: 600; color: var(--tw-text); }
+.jp-RenderedHTMLCommon h1 { font-size: 30px; margin: 18px 0 10px; }
+.jp-RenderedHTMLCommon h2 { font-size: 23px; margin: 34px 0 8px; padding-top: 22px; border-top: 1px solid var(--tw-line); }
+.jp-RenderedHTMLCommon h3 { font-size: 18px; margin: 22px 0 6px; }
+.jp-RenderedHTMLCommon strong { color: #0B1626; }
+.jp-RenderedHTMLCommon code { background: var(--tw-soft); border-radius: 5px; padding: 1px 5px; }
+.jp-RenderedHTMLCommon a { color: var(--tw-teal); }
+.jp-RenderedHTMLCommon table { border-collapse: collapse; }
+.jp-RenderedHTMLCommon td, .jp-RenderedHTMLCommon th { border: 1px solid var(--tw-line); padding: 6px 10px; }
+.jp-OutputArea-output pre { font-size: 13px; line-height: 1.45; color: #2B3648; }
+.jp-OutputArea-output img { max-width: 100%; height: auto; }
+
+/* widgets */
+.jupyter-widgets.widget-button, .jupyter-button {
+  height: 38px; border-radius: 9px; font-family: inherit; font-size: 14px; font-weight: 600; padding: 0 16px;
+  background: #fff; color: var(--tw-text); border: 1px solid var(--tw-line2); box-shadow: none; }
+.jupyter-button:hover:enabled { background: var(--tw-soft); box-shadow: none; }
+.jupyter-button.mod-primary, .jupyter-button.mod-success { background: var(--tw-teal) !important; color: #fff !important; border-color: var(--tw-teal) !important; }
+.jupyter-button.mod-primary:hover:enabled, .jupyter-button.mod-success:hover:enabled { background: var(--tw-teal-d); }
+.jupyter-button.mod-info { background: var(--tw-ink2) !important; color: #fff !important; border-color: var(--tw-ink2) !important; }
+.jupyter-button.mod-warning { background: #B4562B; color: #fff; border-color: #B4562B; }
+.jupyter-button.mod-active, .widget-toggle-button.mod-active { background: var(--tw-teal-l); color: var(--tw-teal-d); border-color: var(--tw-teal); }
+.widget-toggle-buttons .widget-toggle-button { border-radius: 8px; margin-right: 6px; }
+.widget-dropdown select, .widget-text input, .widget-textarea textarea {
+  height: 36px; border-radius: 8px; border: 1px solid var(--tw-line2); font-family: inherit; font-size: 14px; padding: 0 10px; background: #fff; }
+.widget-dropdown select:focus, .widget-text input:focus { outline: 2px solid var(--tw-teal); outline-offset: 1px; }
+.widget-label, .widget-label-basic { font-size: 14px; color: var(--tw-text); }
+.widget-radio-box label { font-size: 14.5px; line-height: 1.5; }
+.widget-radio-box input, .widget-checkbox input { accent-color: var(--tw-teal); }
+.progress-bar { background: var(--tw-teal) !important; }
+
+/* questions (quiz.py) */
+body .twq { background: #fff; border: 1px solid var(--tw-line); border-radius: 14px; padding: 16px 20px; margin: 14px 0; }
+body .twq-q { font-family: "Space Grotesk", "Segoe UI", system-ui, sans-serif; font-size: 13px; font-weight: 700; color: #fff;
+  background: var(--tw-teal); display: inline-block; border-radius: 6px; padding: 2px 8px; margin-bottom: 8px; }
+body .twq-fb { border-radius: 10px; border-left: 0; padding: 10px 14px; font-size: 14.5px; }
+body .twq-ok { background: var(--tw-teal-l); color: #0B3B35; }
+body .twq-no { background: var(--tw-red-bg); color: #5A1E14; }
+body .twq-no strong { color: var(--tw-red); }
+body .twq-ans { background: var(--tw-soft); color: var(--tw-text); }
+
+/* the loading spinner of Voila */
+#loading { font-family: Inter, "Segoe UI", system-ui, sans-serif; color: var(--tw-muted); }
+.twq .jupyter-button, .twq .widget-button { width: auto !important; min-width: 110px; margin-right: 8px; }
+/* questions: the text box grows with its text (a long question overlapped its options) */
+.twq .widget-htmlmath, .twq .widget-html { height: auto !important; line-height: 1.5 !important; }
+.twq .widget-htmlmath-content, .twq .widget-html-content { line-height: 1.5 !important; white-space: normal; }
+/* long options of a question wrap onto several lines without overlapping the next one */
+.widget-radio-box label, .widget-radio-box .widget-label { height: auto !important; min-height: 24px; line-height: 1.45 !important; white-space: normal !important; display: flex; flex-direction: row-reverse; justify-content: flex-end; align-items: flex-start; gap: 8px; margin: 3px 0; }
+.widget-radio-box input { margin-top: 3px; flex-shrink: 0; }
+.widget-radio-box { height: auto !important; }
+.twq .widget-checkbox, .twq .widget-checkbox label { height: auto !important; white-space: normal !important; line-height: 1.45; }
+.twq .widget-button.mod-primary { align-self: flex-start; }

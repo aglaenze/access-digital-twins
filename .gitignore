@@ -12,3 +12,7 @@ loki/build/
 *.mcpl
 *.mcpl.gz
 work/
+
+# The app (Electron): dependencies and builds
+app/node_modules/
+app/dist/

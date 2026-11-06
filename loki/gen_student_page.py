@@ -95,14 +95,14 @@ coll = w.ToggleButtons(options=["3m", "5m", "8m"], value=st["collimation"], desc
 skip = w.ToggleButtons(options=["off", "on"], value=st["pulse_skipping"], description="Pulse skipping")
 dist = w.ToggleButtons(options=[("5 m", 5.0), ("10 m", 10.0)], value=st["detector_distance"], description="Detector")
 import sample_library as sl
+from page_output import into
 HIDDEN = sl.exercise_hidden("exercises/silica_spheres/exercise.yml")   # what the students have to measure
 smp = w.Dropdown(options=[(loki.sample_spec(n).get("name", n), n) for n in loki.samples()], value=st["sample"],
                  description="Sample", layout=w.Layout(width="420px"))
 smp_out = w.Output()
 
 def show_sample(_=None):
-    with smp_out:
-        clear_output(wait=True)
+    with into(smp_out):   # (collected, then shown: see page_output.py)
         spec = loki.sample_spec(smp.value)
         sl.draw("loki", spec, hidden=HIDDEN.get(smp.value, []), fig=plt.figure(figsize=(10, 3.2)))
         sl.show()
@@ -116,8 +116,7 @@ info = w.Output()
 out = w.Output()
 
 def show_readings():
-    with info:
-        clear_output()
+    with into(info):
         r = loki.readings()
         print(f"Choppers: {r['ch1_speed']:g} Hz, wavelength band {r['wavelength_band']}; "
               f"bandwidth chopper opens {r['ch1a_delay']:.1f} ms after the pulse, "
@@ -178,8 +177,7 @@ def refresh_list():
     ms = measurements()
     pick.options = [(f"{os.path.basename(m['details']['file'])}: {m['details']['title'] or '(no title)'}",
                      m["details"]["file"]) for m in ms if red.kind(m["details"]["state"]) == "sample"]
-    with listing:
-        clear_output()
+    with into(listing):
         if not ms:
             print("No measurement yet.")
         for m in ms:
@@ -394,6 +392,22 @@ q.choice("With pulse skipping the choppers let one ESS pulse in two through. Why
 q.report()
 """)
 
+md(r"""
+## Submit your work
+
+When you are done, submit: the file for your teacher is made from your answers and your measurements.
+""")
+
+code(r"""
+import submit
+_ = submit.Submit("loki/exercises/silica_spheres", "bsc", quiz=q)
+""")
+
+import sys as _sys
+_sys.path.insert(0, os.path.dirname(HERE))
+from nbfig import figure_cell
+_k = next((i for i, c in enumerate(cells) if 'Your mission' in c.source), 0)
+cells.insert(_k + 1, figure_cell('sans_particles.png', 'What you measure: the particles in the liquid scatter at small angles, and their size sets the shape of the curve I(Q).'))
 nb = nbf.v4.new_notebook()
 nb["cells"] = cells
 nb["metadata"]["kernelspec"] = {"name": "python3", "display_name": "Python 3", "language": "python"}
