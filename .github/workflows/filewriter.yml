@@ -55,7 +55,7 @@ jobs:
           python-version: "3.12"
       - name: The twin with the file-writer, end to end
         run: |
-          pip install --quiet h5py numpy "confluent-kafka>=2.14,<3" "ess-streaming-data-types>=0.27,<0.28" essimaging esssans
+          pip install --quiet h5py numpy "confluent-kafka>=2.14,<3" "ess-streaming-data-types>=0.27,<0.28" pooch essimaging esssans
           docker run -d --name kafka --network host \
             -e KAFKA_NODE_ID=1 -e KAFKA_PROCESS_ROLES=broker,controller \
             -e KAFKA_LISTENERS=PLAINTEXT://localhost:9092,CONTROLLER://localhost:9093 \
