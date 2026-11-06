@@ -75,8 +75,21 @@ def make_template(src, out, patch=None):
         for k in [k for k in f["entry"] if k.startswith("user_")]:       # no real users in the twin's files
             del f["entry"][k]
         f["entry"].attrs["twin_template"] = "template of the ESS file-writer, made by the digital twin"
-    os.replace(tmp, out)
+    # written again in the format of HDF5 1.10 or later: the file-writer opens its copy in SWMR mode, which needs a
+    # superblock of version 3 (the real files have an older one); this also drops the space of the deleted streams
+    with h5py.File(tmp, "r") as f, h5py.File(out + ".new", "w", libver=("v110", "latest")) as g:
+        for k, v in f.attrs.items():
+            g.attrs[k] = v
+        for name in f:
+            f.copy(f[name], g, name=name)
+    os.remove(tmp)
+    os.replace(out + ".new", out)
     return out
+
+
+def superblock_version(path):
+    with h5py.File(path, "r") as f:
+        return f.id.get_create_plist().get_version()[0]
 
 
 # --------------------------------------------------------------------------- the start command
