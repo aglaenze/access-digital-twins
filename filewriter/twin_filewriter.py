@@ -35,6 +35,9 @@ import numpy as np
 PUBLISHED = ("f144", "ev44")          # the streams the twin publishes; the others (tdct) stay static, in the template
 PER_RUN = ("entry/title", "entry/experiment_identifier", "entry/start_time", "entry/end_time", "entry/sample/name",
            "entry/twin")             # values of a run: given by the start command (mdat: start and end times)
+# root attributes the file-writer writes into each of its files (HDFFile.cpp, write_common_attributes): not in the
+# template, where it could not create them again ("attribute already exists"); template_version stays (it reads it)
+FILE_ATTRS = ("HDF5_Version", "file_name", "creator", "file_time", "dynamic_version")
 DTYPES = {"float64": "double", "float32": "float", "int8": "int8", "uint8": "uint8", "int16": "int16",
           "uint16": "uint16", "int32": "int32", "uint32": "uint32", "int64": "int64", "uint64": "uint64",
           "bool": "uint8"}
@@ -79,7 +82,8 @@ def make_template(src, out, patch=None):
     # superblock of version 3 (the real files have an older one); this also drops the space of the deleted streams
     with h5py.File(tmp, "r") as f, h5py.File(out + ".new", "w", libver=("v110", "latest")) as g:
         for k, v in f.attrs.items():
-            g.attrs[k] = v
+            if k not in FILE_ATTRS:
+                g.attrs[k] = v
         for name in f:
             f.copy(f[name], g, name=name)
     os.remove(tmp)
