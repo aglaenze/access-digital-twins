@@ -289,6 +289,11 @@ class FileWriterControl:
             m = self.consumer.poll(1.0)
             if m is None or m.error() or m.value() is None or len(m.value()) < 8:
                 continue
+            if kind == b"answ" and m.value()[4:8] == b"wrdn":       # the job ended while an answer was awaited
+                w = deserialise_wrdn(m.value())
+                if w.job_id == job_id:
+                    raise RuntimeError(f"the file-writer ended job {job_id}: error={w.error_encountered} "
+                                       f"message={w.message!r} file={w.file_name!r}")
             if m.value()[4:8] != kind:
                 continue
             r = (deserialise_answ if kind == b"answ" else deserialise_wrdn)(m.value())

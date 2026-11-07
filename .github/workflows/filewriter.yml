@@ -84,11 +84,11 @@ jobs:
               --job-pool-topic ${instr}_filewriter_pool --hdf-output-prefix / --hdf-template-prefix /tmp/fw/templates
             sleep 10
             echo "::group::$instr"
-            timeout 900 python filewriter/e2e_test.py --root /tmp/fw --instrument $instr --src "$src" || status=1
+            timeout 900 python -u filewriter/e2e_test.py --root /tmp/fw --instrument $instr --src "$src" || status=1
             echo "--- file-writer"; docker ps -a --filter name=fw_$instr; docker logs fw_$instr 2>&1 | tail -60
-            echo "--- its log (syslog only, no console output)"; sudo journalctl -t kafka-to-nexus --no-pager -o cat | grep -v 'WriterModule finished but no writes' | tail -120
+            echo "--- its log (syslog only, no console output)"; sudo journalctl -t kafka-to-nexus --no-pager -o cat | grep -v -E 'WriterModule finished but no writes|constructor called' | tail -120; echo '(end of its log)'
             echo "--- messages on the topics of the file-writer"
-            python filewriter/e2e_test.py --show-topics ${instr}_filewriter ${instr}_filewriter_pool || true
+            echo "(show-topics)"; timeout 120 python -u filewriter/e2e_test.py --show-topics ${instr}_filewriter ${instr}_filewriter_pool || echo "show-topics exit $?"
             kafka_up || { echo "--- Kafka is down:"; docker ps -a; docker logs kafka 2>&1 | tail -60; }
             echo "::endgroup::"
             docker stop -t 30 fw_$instr > /dev/null; docker rm -f fw_$instr   # stopped: it leaves its consumer group
