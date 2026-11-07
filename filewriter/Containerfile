@@ -46,7 +46,10 @@ RUN if LD_LIBRARY_PATH=/dist/lib ldd /dist/bin/kafka-to-nexus | grep "not found"
       find / -xdev -name 'libcrypt*' -not -path '/proc/*' 2>/dev/null; exit 1; fi
 
 FROM ubuntu:22.04
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
+# tzdata: the time zones (/usr/share/zoneinfo), read when the file-writer writes the time of a file (file_time)
+# (without them: "discover_tz_dir failed to find zoneinfo", and no file is written)
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates tzdata \
+    && rm -rf /var/lib/apt/lists/*
 COPY --from=build /dist /opt/kafka-to-nexus
 ENV PATH="/opt/kafka-to-nexus/bin:${PATH}" LD_LIBRARY_PATH="/opt/kafka-to-nexus/lib"
 CMD ["kafka-to-nexus", "--help"]
