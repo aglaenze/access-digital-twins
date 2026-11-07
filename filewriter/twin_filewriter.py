@@ -244,6 +244,32 @@ def _utc(t_ns):
     return datetime.datetime.fromtimestamp(t_ns / 1e9, datetime.timezone.utc)
 
 
+def structure_topics(node):
+    """The Kafka topics named in a nexus structure (the config of its writer modules)."""
+    out = set()
+    if isinstance(node, dict):
+        t = (node.get("config") or {}).get("topic") if isinstance(node.get("config"), dict) else None
+        if t:
+            out.add(t)
+        for c in node.get("children", []):
+            out |= structure_topics(c)
+    return out
+
+
+def ensure_topics(brokers, names):
+    """Creates the topics that do not exist yet (one partition each)."""
+    from confluent_kafka.admin import AdminClient, NewTopic
+    admin = AdminClient({"bootstrap.servers": brokers})
+    existing = admin.list_topics(timeout=20).topics
+    new = [NewTopic(t, 1, 1) for t in sorted(set(names)) if t not in existing]
+    for fut in (admin.create_topics(new).values() if new else []):
+        try:
+            fut.result(30)
+        except Exception:                          # noqa: BLE001  (created meanwhile)
+            pass
+    return [t.topic for t in new]
+
+
 class FileWriterControl:
     """Starts and stops jobs of a file-writer, as NICOS does at ESS (nicos_ess/devices/datasinks/file_writer.py):
     the start (pl72) goes to the job pool (`pool_topic`, the --job-pool-topic of the file-writer, default
@@ -252,18 +278,9 @@ class FileWriterControl:
 
     def __init__(self, brokers, command_topic, pool_topic=None):
         from confluent_kafka import Consumer, TopicPartition
-        from confluent_kafka.admin import AdminClient, NewTopic
         self.brokers, self.topic = brokers, command_topic
         self.pool_topic = pool_topic or f"{command_topic}_pool"
-        admin = AdminClient({"bootstrap.servers": brokers})
-        existing = admin.list_topics(timeout=20).topics
-        new = [NewTopic(t, 1, 1) for t in (command_topic, self.pool_topic) if t not in existing]
-        if new:
-            for fut in admin.create_topics(new).values():
-                try:
-                    fut.result()
-                except Exception:                  # noqa: BLE001  (created meanwhile)
-                    pass
+        ensure_topics(brokers, (command_topic, self.pool_topic))
         self.producer = producer(brokers)
         self.consumer = Consumer({"bootstrap.servers": brokers, "group.id": f"twin-{uuid.uuid4()}",
                                   "enable.auto.commit": False, "fetch.message.max.bytes": 16_000_000})
@@ -309,6 +326,9 @@ class FileWriterControl:
         from streaming_data_types.action_response_answ import ActionOutcome
         job_id = job_id or nicos_uuid()
         start_ns = start_ns or time.time_ns()
+        # every topic of the structure must exist when the job starts (the file-writer ends it otherwise: "Unable to
+        # set up consumer ... as this topic does not exist"); at ESS they always exist
+        ensure_topics(self.brokers, structure_topics(structure))
         stop = _utc(start_ns) + datetime.timedelta(days=365.25 * 10)      # as NICOS: open-ended, until the stop
         self._send(serialise_pl72(job_id, filename, start_time=_utc(start_ns), stop_time=stop,
                                   run_name=os.path.basename(filename), nexus_structure=json.dumps(structure),
