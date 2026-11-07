@@ -91,7 +91,11 @@ def topics_tool(argv, brokers="127.0.0.1:9092"):
             if m is None:
                 break
             if not m.error():
-                kinds.append(m.value()[4:8].decode(errors="replace"))
+                v = m.value()
+                kinds.append(v[4:8].decode(errors="replace"))
+                if v[4:8] in (b"answ", b"wrdn"):          # the answers of the file-writer, in full
+                    from streaming_data_types import deserialise_answ, deserialise_wrdn
+                    print("   ", kinds[-1], (deserialise_answ if v[4:8] == b"answ" else deserialise_wrdn)(v))
         print(f"{t}: {hi - lo} messages: {' '.join(kinds)}")
 
 
