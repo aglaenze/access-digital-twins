@@ -34,20 +34,20 @@ def _sorted(t0, tof, pid):
     return t0[order], tof[order], pid[order]
 
 
-def open_fw(path, tries=10):
-    """Opens a file of the file-writer for reading. It writes in SWMR mode: the flag "open for write" may stay in its
-    superblock (or the file not be closed yet); a reader in SWMR mode is then allowed, as for a file being written."""
+def open_fw(path, wait=120):
+    """Opens a file of the file-writer for reading, once the file-writer has closed it. It writes in SWMR mode, and
+    after its "finished writing" message (wrdn) it opens the file once more to add the metadata (start and end
+    times): until then a normal opening fails ("already open for write"), and a reader would make that last step
+    fail (the file locked). So: normal opening, tried again for `wait` seconds; only then a reader in SWMR mode."""
     import time
-    for i in range(tries):
+    end = time.time() + wait
+    while True:
         try:
             return h5py.File(path, "r")
         except OSError:
-            try:
+            if time.time() > end:
                 return h5py.File(path, "r", swmr=True)
-            except OSError:
-                if i == tries - 1:
-                    raise
-                time.sleep(2)
+            time.sleep(2)
 
 
 def compare(fw_file, twin_files, log=print):
