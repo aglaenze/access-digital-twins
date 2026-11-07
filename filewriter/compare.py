@@ -34,6 +34,22 @@ def _sorted(t0, tof, pid):
     return t0[order], tof[order], pid[order]
 
 
+def open_fw(path, tries=10):
+    """Opens a file of the file-writer for reading. It writes in SWMR mode: the flag "open for write" may stay in its
+    superblock (or the file not be closed yet); a reader in SWMR mode is then allowed, as for a file being written."""
+    import time
+    for i in range(tries):
+        try:
+            return h5py.File(path, "r")
+        except OSError:
+            try:
+                return h5py.File(path, "r", swmr=True)
+            except OSError:
+                if i == tries - 1:
+                    raise
+                time.sleep(2)
+
+
 def compare(fw_file, twin_files, log=print):
     """Returns (number of differences, report lines)."""
     lines, bad = [], 0
@@ -44,7 +60,7 @@ def compare(fw_file, twin_files, log=print):
         lines.append(("  ok  " if ok else "  DIFF ") + text)
         log(lines[-1])
 
-    with h5py.File(fw_file, "r") as fw:
+    with open_fw(fw_file) as fw:
         twins = [h5py.File(p, "r") for p in twin_files]
         try:
             st = streams(twins[0])
