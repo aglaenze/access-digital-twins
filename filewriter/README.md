@@ -1,4 +1,4 @@
-# The ESS file-writer in the twins (work in progress, started 2026-11-06)
+# The ESS file-writer in the twins (started 2026-11-06; end to end with the real file-writer since 2026-11-07)
 
 At ESS the data files are not written by NICOS nor by the instrument: NICOS sends a *start* command to the
 **file-writer** (`kafka-to-nexus`, by ECDC), which then reads the Kafka streams (the neutrons of the detectors and
@@ -8,10 +8,10 @@ the streams of the twin, as at ESS.
 
 | Step | What | Status |
 |---|---|---|
-| 1 | Build `kafka-to-nexus` from its sources (Linux only: C++, Conan 1 with the configuration of ECDC); image `ghcr.io/aglaenze/access-digital-twins-filewriter` (`Containerfile`, workflow `filewriter.yml`) | in progress |
+| 1 | Build `kafka-to-nexus` from its sources (Linux only: C++, Conan 1 with the configuration of ECDC); image `ghcr.io/aglaenze/access-digital-twins-filewriter` (`Containerfile`, workflow `filewriter.yml`) | done 2026-11-07 (kafka-to-nexus b6722d0d) |
 | 2 | The twin publishes what the file-writer reads, under the names of the real instrument: the neutrons of the detectors and of the monitors (`ev44`), the values of the devices (`f144`) | done 2026-11-06 |
-| 3 | NICOS starts and stops the jobs (`pl72`/`6s4t`); the structure of the file and the template come from the real ESS file | done 2026-11-06 (checked on Windows with a stand-in file-writer; with the real one: workflow) |
-| 4 | Compare the file of the file-writer with the files of the twin (`compare.py`); then the ESS reduction (essimaging, esssans) on it | comparison done; reduction to do |
+| 3 | NICOS starts and stops the jobs (`pl72`/`6s4t`); the structure of the file and the template come from the real ESS file | done 2026-11-07 (with the real file-writer, workflow `filewriter.yml`) |
+| 4 | Compare the file of the file-writer with the files of the twin (`compare.py`); then the ESS reduction (essimaging, esssans) on it | comparison done (same data, ODIN and LoKI); reduction to do |
 
 ## How it works
 
@@ -29,7 +29,9 @@ with essimaging / esssans), so everything is made from it (`twin_filewriter.py`)
   sent through Kafka;
 * **the start command** (`nexus_structure`): each stream of the real file as its writer module, same source and same
   topic (ODIN 367 streams, LoKI 154), plus the title, the proposal, the sample name and the start and end times
-  (`mdat`);
+  (`mdat`). It is sent as NICOS does at ESS (`nicos_ess/devices/datasinks/file_writer.py`): to the job pool
+  (`<instrument>_filewriter_pool`), naming `<instrument>_filewriter` as the control topic, where the file-writer
+  answers, takes the stop and reports the end of the file;
 * **the messages**: at the start of a job, the last value of every device (`snapshot_messages`, as the EPICS forwarder
   has published them); for each count of the twin, the neutrons of every detector bank and monitor, one message per
   source pulse, and the device values set for the count (`count_messages`), sent at the times of the pulses: a count
@@ -58,11 +60,28 @@ the instrument): the twin keeps writing its own files, which the exercises read.
   live.py`), not the full pixels published for the file-writer on the same topic.
 * **Comparison by hand**: `python filewriter/compare.py <file of the file-writer> <twin file> [...]`.
 
+## What the file-writer requires (found with the real one, 2026-11-07)
+
+* **Job and command ids** in the form of those of NICOS: a UUID with digits only up to position 14, `5` at
+  position 14 and `8` at position 19 (`isValidUUID`, `src/CommandSystem/Handler.cpp`); others: "job id was invalid".
+* **The template** in the HDF5 1.10 format (superblock 3: it opens its copy in SWMR mode), and without the root
+  attributes it writes into each file (`HDF5_Version`, `file_name`, `creator`, `file_time`, `dynamic_version`).
+* **Every topic** of the start command existing when the job starts (otherwise the job ends at once: "Unable to set up
+  consumer ... as this topic does not exist"); `FileWriterControl.start` creates them. Its command and pool topics
+  existing before it starts.
+* **The time zones** (`tzdata`) in its image (it writes the time of the file).
+* After its "finished writing" message (`wrdn`) it opens the file once more to add the metadata (start and end times):
+  read the file only once it is closed (`compare.open_fw` waits).
+* It logs only to **syslog** (no console output): `-v /dev/log:/dev/log` gives it the journal of the host
+  (`journalctl -t kafka-to-nexus`).
+
 ## Tests
 
 * `e2e_test.py`, run by the workflow `filewriter.yml` after the build: a Kafka broker and kafka-to-nexus on the runner;
   for ODIN and LoKI, a job with a measurement made from the real file (its pulses moved to now: no McStas needed),
-  then `compare.py`.
+  then `compare.py`. Passed on 2026-11-07: ODIN 1 000 000 events of `timepix3`, LoKI the 14 event streams (5 beam
+  monitors, 9 detector banks, 2 230 to 13 020 events each), identical to the twin's files; the device values set
+  during the measurement (3 of 3), the title, the sample name, the start and end times written.
 * On Windows (no file-writer): the twin server with a stand-in file-writer that answers the commands (2026-11-06, ODIN
   count of 5 s: 2 149 838 neutrons published in 70 messages, source `timepix3`, the count lasting its 5 s).
 
