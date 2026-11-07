@@ -53,6 +53,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      # kafka-to-nexus logs only to syslog: /dev/log of the runner (journald) is given to its container
       - name: The twin with the file-writer, end to end
         run: |
           pip install --quiet h5py numpy "confluent-kafka>=2.14,<3" "ess-streaming-data-types>=0.27,<0.28" pooch ipywidgets essimaging esssans
@@ -78,7 +79,7 @@ jobs:
             src=$ODIN_SRC; [ $instr = loki ] && src=$LOKI_SRC
             # its topics exist before it starts (it would not see a topic created after its subscription)
             python filewriter/e2e_test.py --create-topics ${instr}_filewriter ${instr}_filewriter_pool
-            docker run -d --name fw_$instr --network host -v /tmp/fw:/tmp/fw filewriter:test kafka-to-nexus \
+            docker run -d --name fw_$instr --network host -v /tmp/fw:/tmp/fw -v /dev/log:/dev/log filewriter:test kafka-to-nexus \
               --brokers 127.0.0.1:9092 --command-status-topic ${instr}_filewriter \
               --job-pool-topic ${instr}_filewriter_pool --hdf-output-prefix / --hdf-template-prefix /tmp/fw/templates \
               -v Debug
@@ -86,6 +87,7 @@ jobs:
             echo "::group::$instr"
             timeout 900 python filewriter/e2e_test.py --root /tmp/fw --instrument $instr --src "$src" || status=1
             echo "--- file-writer"; docker ps -a --filter name=fw_$instr; docker logs fw_$instr 2>&1 | tail -60
+            echo "--- its log (syslog only, no console output)"; sudo journalctl -t kafka-to-nexus --no-pager -o cat | grep -v -i 'debug' | tail -80
             echo "--- messages on the topics of the file-writer"
             python filewriter/e2e_test.py --show-topics ${instr}_filewriter ${instr}_filewriter_pool || true
             kafka_up || { echo "--- Kafka is down:"; docker ps -a; docker logs kafka 2>&1 | tail -60; }
