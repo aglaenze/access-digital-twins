@@ -35,8 +35,8 @@ with essimaging / esssans), so everything is made from it (`twin_filewriter.py`)
   start command at ESS. It is sent as NICOS does at ESS (`nicos_ess/devices/datasinks/file_writer.py`): to the job pool
   (`<instrument>_filewriter_pool`), naming `<instrument>_filewriter` as the control topic, where the file-writer
   answers, takes the stop and reports the end of the file;
-* **the messages**: at the start of a job, the value of every device (`snapshot_messages`, as the EPICS forwarder
-  has published them): the current settings of the twin (`nexus_logs()` of the instrument, the same values it writes
+* **the messages**: just before the start of a job, the value of every device (`snapshot_messages`, as the EPICS
+  forwarder has published them): the current settings of the twin (`nexus_logs()` of the instrument, the same values it writes
   in its own files), the other devices from the real file; for each count of the twin, the neutrons of every detector bank and monitor, one message per
   source pulse, and the device values set for the count (`count_messages`), sent at the times of the pulses: a count
   lasts its counting time, as on the instrument.
@@ -83,6 +83,11 @@ files (they are not data of the instrument): the twin keeps writing its own file
   not in the template) with only what the command gives. Without them a log that is a transformation loses its
   `depends_on`, `transformation_type` and `vector` (LoKI detector carriage: essreduce then cannot place the rear
   bank). `nexus_structure` copies them from the real file; `compare.py` checks them.
+* **The device values published before the job starts** (found 2026-11-09): at the start of a job it looks in each
+  topic for the messages from 10 s before the start; if there are none, it reads from the end of the topic, so a
+  message published just after the start command can be missed (it was: chopper setpoints missing). As the EPICS
+  forwarder at ESS, the twin publishes the value of every device before the start command, stamped 1 ms before the
+  start; the file-writer keeps the last value before the start of each device and writes it (`SourceFilter`).
 * **The time zones** (`tzdata`) in its image (it writes the time of the file).
 * After its "finished writing" message (`wrdn`) it opens the file once more to add the metadata (start and end times):
   read the file only once it is closed (`compare.open_fw` waits).
@@ -100,7 +105,7 @@ A file of the file-writer has, for each device, every value received during the 
 * **positions** (LoKI detector carriage): "Transform is time-dependent, but no filter is provided". essreduce has a
   parameter for it, `TransformationTimeFilter`; `loki_reduction.settled_transform` takes the last value, with a warning
   if they differ;
-* the values at the start of the job must be the **current settings** of the twin (before: those of its last file,
+* the values given before the job must be the **current settings** of the twin (before: those of its last file,
   wrong when a setting had just changed);
 * **ODIN, duration of a measurement**: the source pulses recorded (proton charge log) / 14 Hz instead of end - start:
   a job also lasts while the twin computes, without neutrons; the same value for a real file and a twin file; the

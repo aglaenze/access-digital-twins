@@ -12,7 +12,8 @@ What it does, as the twin and NICOS would:
   1. the template of the file-writer, from the real file (twin_filewriter.make_template);
   2. a "measurement" of the twin: the real file with its pulses moved to now (instead of a McStas simulation, so that
      the test needs neither McStas nor the beam files), with settings of the twin (entry/twin);
-  3. start of the job (pl72, as NICOS: nexusfile_open; with entry/twin), last values of all the devices (f144), the measurement
+  3. last values of all the devices (f144, before the start, as the EPICS forwarder), start of the job (pl72, as
+     NICOS: nexusfile_open; with entry/twin), the measurement
      (ev44 and f144, at the times of its pulses), stop of the job (6s4t), wait for the file (wrdn);
   4. compare.py: the file of the file-writer against the twin's file.
 """
@@ -134,12 +135,15 @@ def main():
     n_modules = sum(1 for _ in _modules(structure))
     print(f"start command: {n_modules} streams")
 
-    job_start = time.time_ns()
+    # the value of every device, published before the start of the job (as the EPICS forwarder): the file-writer
+    # writes the last value before the start
+    tf.ensure_topics(a.brokers, tf.structure_topics(structure))
+    job_start = time.time_ns() + 50_000_000
+    sent = tf.publish(producer, tf.snapshot_messages(a.src, job_start - 1_000_000))
+    print(f"device values before the start: {sent} messages")
     fw_file = os.path.join(root, "out", f"{instr}_job_000001.hdf")
     job = control.start(structure, fw_file, instr, start_ns=job_start, timeout=120)
     print(f"job {job} started: {fw_file}")
-    sent = tf.publish(producer, tf.snapshot_messages(a.src, job_start + 1_000_000))
-    print(f"device values at the start: {sent} messages")
 
     twin_file = fake_measurement(a.src, os.path.join(root, "out", f"{instr}_000001.nxs"), time.time_ns() + 2_000_000_000)
     msgs = tf.count_messages(twin_file)

@@ -31,8 +31,8 @@ ESS file-writer.
 The ESS file-writer (kafka-to-nexus, filewriter/README.md; optional, Linux):
     POST /filewriter/start {"title", "proposal", "folder"}  -> {"job", "file"}: makes the template of the file-writer
                  (from the real ESS file of the instrument, once), starts a job (pl72 on <instrument>_filewriter_pool,
-                 with the settings of the twin in entry/twin), publishes the value of every device (f144: the current
-                 settings of the twin); then each /count also publishes its neutrons and
+                 with the settings of the twin in entry/twin), the value of every device published just before (f144: the
+                 current settings of the twin, as the EPICS forwarder); then each /count also publishes its neutrons and
                  device values (ev44, f144: topics and sources of the real file), at the times of its pulses, and
                  lasts the counting time (as on the instrument)
     POST /filewriter/stop {}  -> {"file", "error", "twin_files", "differences", "report"}: stops the job, waits for
@@ -99,15 +99,18 @@ def _fw_start(args):
         sample = INSTR.samples()[sample].get("name", sample)
     except Exception:                               # noqa: BLE001
         pass
-    start_ns = time.time_ns()
-    # the settings of the twin in entry/twin (LoKI: the configuration its reduction needs), as NICOS at ESS writes
-    # the values of its devices into the start command
-    twin = INSTR.twin_settings() if hasattr(INSTR, "twin_settings") else None
-    job = FW["control"].start(tf.nexus_structure(src, args.get("title", ""), str(args.get("proposal", "")),
-                                                 str(sample), twin=twin), path, INSTR_NAME, start_ns=start_ns)
-    # the value of every device, as the EPICS forwarder: the current settings of the twin, the others from the real file
+    structure = tf.nexus_structure(src, args.get("title", ""), str(args.get("proposal", "")), str(sample),
+                                   # the settings of the twin in entry/twin (LoKI: the configuration its reduction
+                                   # needs), as NICOS at ESS writes the values of its devices into the start command
+                                   twin=INSTR.twin_settings() if hasattr(INSTR, "twin_settings") else None)
+    tf.ensure_topics(FW["control"].brokers, tf.structure_topics(structure))
+    # the value of every device, already published when the job starts, as by the EPICS forwarder at ESS (the
+    # file-writer writes the last value before the start of the job): the current settings of the twin, the other
+    # devices from the real file
+    start_ns = time.time_ns() + 50_000_000
     settings = INSTR.nexus_logs() if hasattr(INSTR, "nexus_logs") else None
-    tf.publish(FW["producer"], tf.snapshot_messages(src, start_ns + 1_000_000, settings))
+    tf.publish(FW["producer"], tf.snapshot_messages(src, start_ns - 1_000_000, settings))
+    job = FW["control"].start(structure, path, INSTR_NAME, start_ns=start_ns)
     FW.update(job=job, file=path, twin_files=[])
     return dict(job=job, file=path)
 
