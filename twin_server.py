@@ -28,6 +28,9 @@ Broker: variable TWIN_KAFKA (default 127.0.0.1:9092).
 Device values (Kafka, as the EPICS forwarder of ESS; optional, TWIN_FORWARD=1): the values of all the devices are
 published at start and after each /move to the topic <instrument>_devices (f144 messages, kafka/forwarder.py), for the
 ESS file-writer.
+ESS live data reduction (esslivedata, livedata/service.py; optional, TWIN_LIVEDATA=1): each /count also publishes its
+neutrons and device values as the instrument does (the same messages as for the file-writer, below), and lasts the
+counting time; esslivedata reduces them live (dashboard http://127.0.0.1:5009).
 The ESS file-writer (kafka-to-nexus, filewriter/README.md; optional, Linux):
     POST /filewriter/start {"title", "proposal", "folder"}  -> {"job", "file"}: makes the template of the file-writer
                  (from the real ESS file of the instrument, once), starts a job (pl72 on <instrument>_filewriter_pool,
@@ -135,10 +138,18 @@ def _fw_stop():
     return out
 
 
+def _livedata():
+    """ESS live data reduction (esslivedata, livedata/service.py) is on: TWIN_LIVEDATA=1 (start_nicos.py --livedata)."""
+    return os.environ.get("TWIN_LIVEDATA") == "1"
+
+
 def _fw_publish(f):
-    """The neutrons and device values of the measurement in file f, to the file-writer: at the times of its pulses,
-    in a thread (joined before /count answers: the count lasts its counting time, as on the instrument)."""
+    """The neutrons and device values of the measurement in file f, as the instrument sends them (real topics, sources
+    and pixel numbers), for the file-writer and for esslivedata: at the times of its pulses, in a thread (joined
+    before /count answers: the count lasts its counting time, as on the instrument)."""
     tf = _fw()
+    if "producer" not in FW:
+        FW["producer"] = tf.producer(os.environ.get("TWIN_KAFKA", "127.0.0.1:9092"))
     th = threading.Thread(target=tf.publish, args=(FW["producer"], tf.count_messages(f)), kwargs=dict(pace=True),
                           daemon=True)
     th.start()
@@ -257,13 +268,16 @@ class Handler(BaseHTTPRequestHandler):
                     INSTR.use_folder(args["folder"])
                 f = INSTR.count(float(args["t"]), title=args.get("title", ""), write=args.get("write", True))
                 out = dict(file=f, number=INSTR.number, n_counts=getattr(INSTR, "last_n_counts", None))
-                fw = _fw_publish(f) if f and FW.get("job") else None
+                fw = _fw_publish(f) if f and (FW.get("job") or _livedata()) else None
                 if args.get("stream") and f:
                     out["streamed"] = _stream(f, hold=args.get("hold", False))
                 if fw is not None:
                     fw.join()
-                    FW["twin_files"].append(f)
-                    out["filewriter"] = FW["file"]
+                    if FW.get("job"):
+                        FW["twin_files"].append(f)
+                        out["filewriter"] = FW["file"]
+                    if _livedata():
+                        out["livedata"] = True
                 if args.get("image"):                          # detector image for live displays (NICOS)
                     out["image"] = INSTR.last_image.tolist()
                 return self._reply(200, out)

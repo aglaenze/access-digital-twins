@@ -60,6 +60,8 @@ Live data as at ESS (Kafka broker + just-bin-it, ODIN): `-e TWIN_LIVE=1` with th
 The ESS file-writer (kafka-to-nexus, Intel/AMD image only): `-e TWIN_FILEWRITER=1` (entry point `nicos`, or the
 control room of the app): NICOS then has the files of each `nexusfile_open` block written by it, next to the twin's
 own (`../filewriter/README.md`).
+The live data reduction of ESS (esslivedata, both images): `-e TWIN_LIVEDATA=1`: its backend services and its
+dashboard (port 5009) next to NICOS (`../livedata/README.md`).
 The image contains the ODIN and LoKI twins (official models at fixed commits, `~/odin_model` and `~/loki_model`). A
 LoKI measurement needs about 6 GB of memory (downstream McStas part and its 440 MB of scattered neutrons, computed on
 the first measurement of each sample, ~2 min): give Docker enough memory.

@@ -213,8 +213,9 @@ if not ready:
     show_logs()
 
 
-def nicos_session(instrument, session, script, extra=()):
-    """Starts NICOS for `instrument` with the launcher (headless), runs `script`, stops it; returns (ready, output)."""
+def nicos_session(instrument, session, script, extra=(), before=None, after=None):
+    """Starts NICOS for `instrument` with the launcher (headless), runs `script`, stops it; returns (ready, output).
+    before(), after(): called once the services are ready, before and after the script (while they still run)."""
     import socket
     t0 = time.time()                                 # the services of the previous session are gone (their ports)
     while time.time() - t0 < 120:
@@ -240,10 +241,14 @@ def nicos_session(instrument, session, script, extra=()):
             ready = "ESS file-writer" in line if "--filewriter" in extra else True
             break
     if ready:
+        if before is not None:
+            before()
         r = subprocess.run([nicos_py, os.path.join(TWIN, "nicos", "run_nicos_script.py"), "-c", script],
                            capture_output=True, text=True, timeout=3600)
         out = r.stdout + r.stderr[-2000:]
         print("  " + out.replace("\n", "\n  "), flush=True)
+        if after is not None:
+            after()
     p.send_signal(signal.SIGINT)
     try:
         p.wait(60)
@@ -359,6 +364,68 @@ else:
             check(False, f"LoKI: reduction of the file-writer's files: {type(e).__name__}: {e}")
     else:
         check(False, f"LoKI: files of the jobs ({len(fw)} of the file-writer, {len(tw)} of the twin; 3 expected)")
+
+step("ESS live data reduction: esslivedata reduces a count of ODIN live, as at ESS (dashboard, NICOS devices)")
+import importlib.util                                  # noqa: E402
+_spec = importlib.util.spec_from_file_location("livedata_service", os.path.join(TWIN, "livedata", "service.py"))
+ld = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(ld)
+usable, what = ld.available()
+if "--no-livedata" in sys.argv or not usable:
+    print("skipped: " + ("--no-livedata" if usable else what))
+else:
+    print(what)
+    LD = {}
+
+    def ld_before():
+        import urllib.request
+        t0 = time.time()                             # the dashboard (a web page) answers
+        while time.time() - t0 < 180 and "dashboard" not in LD:
+            try:
+                urllib.request.urlopen(f"http://127.0.0.1:{ld.DASHBOARD_PORT}/", timeout=5)
+                LD["dashboard"] = time.time() - t0
+            except Exception:                        # noqa: BLE001
+                time.sleep(3)
+        time.sleep(20)                               # the backend services subscribe to their topics
+        # the image of the Timepix3 detector, started as from the dashboard (NICOS reads its total)
+        LD["job"] = ld.start_workflow("odin", "odin_detector_xy", "timepix3")
+        time.sleep(15)
+
+    def ld_after():
+        import glob
+        files = sorted(glob.glob(os.path.join(os.environ.get("TWIN_RUN_ROOT", ""), "**", "1237", "raw",
+                                              "odin_0*.nxs"), recursive=True))
+        n = 0
+        if files:
+            import h5py
+            with h5py.File(files[-1], "r") as f:
+                n = len(f["entry/instrument/timepix3/data/event_id"])
+        LD["events"] = n
+
+        def total(out):
+            v = out.get("timepix3_counts_total", {}).get("signal")
+            return None if v is None else float(np.asarray(v.data).sum())
+        dev = ld.nicos_devices("odin", timeout=180, until=lambda out: n and total(out) == n)
+        LD["total"] = total(dev)
+        LD["devices"] = sorted(dev)
+
+    ready, out = nicos_session("odin", "ci_livedata",
+                               "NewExperiment(1237, 'live reduction test')\n"
+                               "move(choppers, 'wfm', wfm_delta, 0.1); move(shutter, 'open', stage_x, 500)\n"
+                               "with nexusfile_open('open beam'):\n    count(t=10)\n",
+                               ["--livedata"], before=ld_before, after=ld_after)
+    check(ready, "NICOS started with esslivedata (ODIN)")
+    check("dashboard" in LD, "esslivedata dashboard answers on port "
+                             f"{ld.DASHBOARD_PORT}" + (f" (after {LD['dashboard']:.0f} s)" if "dashboard" in LD else ""))
+    print(f"NICOS devices of esslivedata: {LD.get('devices')}; total {LD.get('total')}, events in the file "
+          f"{LD.get('events')}")
+    check(LD.get("events", 0) > 0 and LD.get("total") == LD.get("events"),
+          "esslivedata: the live image of ODIN holds all the neutrons of the count")
+    if not (LD.get("total") == LD.get("events")):
+        for name in ("detector_data", "dashboard"):
+            path = os.path.join(os.environ.get("TWIN_RUN_ROOT", ""), "nicos", f"livedata_{name}.log")
+            if os.path.isfile(path):
+                print(f"--- {path} (end)\n" + open(path, errors="replace").read()[-4000:])
 
 print("\nALL PASSED" if ok else "\nSOME CHECKS FAILED")
 sys.exit(0 if ok else 1)

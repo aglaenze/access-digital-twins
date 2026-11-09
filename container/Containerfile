@@ -121,6 +121,18 @@ RUN if [ "$TARGETARCH" = "arm64" ]; then \
 COPY --from=filewriter /opt/kafka-to-nexus /opt/kafka-to-nexus
 RUN if [ -x /opt/kafka-to-nexus/bin/kafka-to-nexus ]; then       LD_LIBRARY_PATH=/opt/kafka-to-nexus/lib ldd /opt/kafka-to-nexus/bin/kafka-to-nexus | grep "not found" && exit 1;       LD_LIBRARY_PATH=/opt/kafka-to-nexus/lib /opt/kafka-to-nexus/bin/kafka-to-nexus --help > /dev/null       && cat /opt/kafka-to-nexus/K2N_VERSION;     else cat /opt/kafka-to-nexus/NOT_AVAILABLE; fi
 
+# The live data reduction of ESS (esslivedata, scipp; start_nicos.py --livedata, livedata/service.py): its own
+# environment (Python 3.13: its versions of essimaging and esssans differ from those of the twins), a fixed release
+# from GitHub (it is not on PyPI nor conda-forge); every service and the dashboard must build for ODIN and LoKI
+ARG LIVEDATA_VERSION=26.11.0
+RUN micromamba create -y -n livedata -c conda-forge "python=3.13" pip git && micromamba clean -a -y \
+ && micromamba run -n livedata pip install --no-cache-dir \
+      "esslivedata[odin,loki,dashboard] @ git+https://github.com/scipp/esslivedata@${LIVEDATA_VERSION}" \
+ && for i in odin loki; do for s in detector_data monitor_data data_reduction timeseries; do \
+      micromamba run -n livedata python -m ess.livedata.services.$s --instrument $i --check || exit 1; done; \
+      micromamba run -n livedata python -m ess.livedata.dashboard.reduction --instrument $i --transport none --check \
+      || exit 1; done
+
 # Real ODIN and LoKI files used as templates for the NeXus files (downloaded by essimaging / esssans; kept in the image)
 RUN python -c "import ess.odin.data as d; print(d.iron_simulation_ob_small())" \
  && python -c "import ess.loki.data as d; print(d.loki_coda_file())"
@@ -144,7 +156,7 @@ ENV TWIN_RUN_ROOT=/data/twin \
     OMPI_MCA_rmaps_base_oversubscribe=1 \
     OMPI_MCA_btl_vader_single_copy_mechanism=none
 VOLUME /data
-EXPOSE 8888 8866 8765 1301
+EXPOSE 8888 8866 8765 1301 5009
 
 ENTRYPOINT ["/usr/local/bin/_entrypoint.sh", "bash", "/home/mambauser/twin/container/start.sh"]
 CMD ["jupyter"]

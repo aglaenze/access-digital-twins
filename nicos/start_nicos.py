@@ -11,11 +11,13 @@ instrument computers): choosing the instrument here is like walking into its con
     python start_nicos.py --instrument odin --live   # live data as at ESS: Kafka broker + just-bin-it + setup "live"
     python start_nicos.py --instrument odin --filewriter   # files written by the ESS file-writer (kafka-to-nexus), as
                                                            # at ESS (Linux x86-64: the app container; TWIN_FILEWRITER=1)
+    python start_nicos.py --instrument loki --livedata     # live reduction of ESS (esslivedata; dashboard on port
+                                                           # 5009; the app container; TWIN_LIVEDATA=1)
 
 Two Python environments are used, on purpose: the twin (McStas, essimaging, numpy 2) in the Python running this launcher, NICOS
 (numpy < 2) in the conda env "nicos". They talk over HTTP on this computer only. Press Enter (or Ctrl+C) to stop all.
 Paths can be changed with the environment variables CONDA_ROOT, MCSTAS_PYTHON, NICOS_PYTHON, NICOS_ROOT,
-TWIN_RUN_ROOT; for --live and --filewriter: KAFKA_HOME, JAVA_HOME (see ../kafka/start_kafka.py) and JBI_HOME (sources of
+TWIN_RUN_ROOT; for --live, --filewriter and --livedata: KAFKA_HOME, JAVA_HOME (see ../kafka/start_kafka.py) and JBI_HOME (sources of
 just-bin-it, default ~/McStas_runs/just-bin-it).
 Logs: <TWIN_RUN_ROOT>/nicos/*.log.
 """
@@ -46,6 +48,7 @@ NICOS_ROOT = os.environ.get("NICOS_ROOT", os.path.join(HOME, "McStas_runs", "nic
 RUN_ROOT = os.environ.get("TWIN_RUN_ROOT", os.path.join(HOME, "McStas_runs", "twin")).replace(os.sep, "/")
 LOGS = os.path.join(RUN_ROOT, "nicos")
 PROCS = []
+AUX = []          # optional services (esslivedata): stopped with the rest, but their failure does not stop NICOS
 # instruments with a NICOS package nicos_twin/<name> (same names as in twin_server.INSTRUMENTS)
 INSTRUMENTS = {"odin": "ODIN — neutron imaging", "loki": "LoKI — small-angle neutron scattering (first version)"}
 LIVE = {"odin", "loki"}    # instruments with live data (setup nicos_twin/<instrument>/setups/live.py)
@@ -66,6 +69,15 @@ def choose_instrument():
             return a
         if a.isdigit() and 1 <= int(a) <= len(names):
             return names[int(a) - 1]
+
+
+def _livedata_service():
+    """livedata/service.py (imported under its own name: filewriter/ has a service.py too)."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("livedata_service", os.path.join(TWIN, "livedata", "service.py"))
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
 
 
 def start(name, cmd, env=None, cwd=None):
@@ -104,7 +116,7 @@ def port_open(port):
 
 
 def stop_all():
-    for name, p in reversed(PROCS):
+    for name, p in reversed(PROCS + AUX):
         if p.poll() is None:
             if os.name == "nt":       # whole process tree (the daemon has a child for its script thread)
                 subprocess.run(["taskkill", "/T", "/F", "/PID", str(p.pid)], capture_output=True)
@@ -124,6 +136,8 @@ def main():
     a.add_argument("--live", action="store_true", help="live data: Kafka broker, just-bin-it and setup 'live'")
     a.add_argument("--filewriter", action="store_true", default=os.environ.get("TWIN_FILEWRITER") == "1",
                    help="the ESS file-writer writes the files of nexusfile_open (default: TWIN_FILEWRITER=1)")
+    a.add_argument("--livedata", action="store_true", default=os.environ.get("TWIN_LIVEDATA") == "1",
+                   help="live data reduction of ESS (esslivedata, dashboard on port 5009; default: TWIN_LIVEDATA=1)")
     a.add_argument("--until-gui-closes", action="store_true",
                    help="stop everything when the NICOS window is closed (the control room of the app)")
     o = a.parse_args()
@@ -144,10 +158,18 @@ def main():
         if not usable:
             print(f"The ESS file-writer is not available here ({what}): the twin writes the files itself.")
             o.filewriter = False
+    if o.livedata:
+        ld_service = _livedata_service()
+        ld_usable, ld_what = ld_service.available()
+        if not ld_usable:
+            print(f"The live data reduction of ESS is not available here ({ld_what}).")
+            o.livedata = False
+    # read by the twin server: each count also publishes its neutrons as the instrument does, for esslivedata
+    os.environ["TWIN_LIVEDATA"] = "1" if o.livedata else "0"
     os.makedirs(LOGS, exist_ok=True)
     print(f"Starting the {instr.upper()} digital twin with NICOS:", flush=True)
     try:
-        if o.live or o.filewriter:     # data streaming as at ESS: the Kafka broker
+        if o.live or o.filewriter or o.livedata:     # data streaming as at ESS: the Kafka broker
             if not port_open(9092):
                 start("kafka", [MCSTAS_PY, os.path.join(TWIN, "kafka", "start_kafka.py")], cwd=TWIN)
                 wait_for(lambda: port_open(9092), "the Kafka broker", timeout=120)
@@ -156,6 +178,11 @@ def main():
             PROCS.append(("filewriter", p))
             print(f"  filewriter started (pid {p.pid}, {what}; it logs to syslog only)", flush=True)
             time.sleep(5)              # (it subscribes to its job pool)
+        if o.livedata:                 # esslivedata: its backend services and dashboard, its topics created first
+            for name, p in ld_service.start(instr, logdir=LOGS):
+                AUX.append((f"livedata_{name}", p))
+            print(f"  esslivedata started ({ld_what}; dashboard http://127.0.0.1:{ld_service.DASHBOARD_PORT}, "
+                  f"logs {LOGS}/livedata_*.log)", flush=True)
         if o.live:                 # just-bin-it (histograms for NICOS); its module
             # just_bin_it.cli defines main() without calling it (installed as a script), hence the -c
             subprocess.run([MCSTAS_PY, os.path.join(TWIN, "kafka", "start_kafka.py"), "--topics", instr],
@@ -181,7 +208,8 @@ def main():
                                capture_output=True, text=True, timeout=300, cwd=HERE)
             print("  setup 'live' loaded" if r.returncode == 0 else f"  setup 'live' NOT loaded: {r.stdout[-500:]}",
                   flush=True)
-        extras = [x for x, on in (("live data", o.live), ("ESS file-writer", o.filewriter)) if on]
+        extras = [x for x, on in (("live data", o.live), ("ESS file-writer", o.filewriter),
+                                  ("ESS live reduction", o.livedata)) if on]
         print(f"{instr.upper()} services ready{' (' + ', '.join(extras) + ')' if extras else ''}. NICOS daemon on localhost:1301 "
               "(user student, password student).", flush=True)
         if not o.no_gui:
