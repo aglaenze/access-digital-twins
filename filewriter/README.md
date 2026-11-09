@@ -92,6 +92,13 @@ files (they are not data of the instrument): the twin keeps writing its own file
   the first events after the start were then sometimes lost (22 of 46 in a dark job of ODIN). The twin therefore also
   publishes a marker on each topic of the job (`topic_markers`: source `twin_topic_marker`, in no job, so not written;
   on an event topic an ev44 message without events), and the file-writer reads each topic from it.
+* **The fixed logs** (found 2026-11-09): NXlogs of the real file that are not streams, written once with the file,
+  such as ODIN's `wfm1/transformations/wfmc_translation` and `wfm2/...` (the positions of the WFM discs, which the
+  reduction uses to compute the wavelengths). The twin sets them for each measurement (WFM disc separation); the
+  file-writer took them from its template (0 mm instead of 175 mm for δ = 0.10 m): its wavelengths were wrong by up to
+  2 Å, while the transmission was still right (sample and open beam equally wrong). The template now has no values
+  for them (`make_template`, kept in `<template>.fixed.json`); the start command gives them (`fixed_values`: the
+  twin's current setting, otherwise the template's), as dataset modules with their units; `compare.py` checks them.
 * **The time zones** (`tzdata`) in its image (it writes the time of the file).
 * After its "finished writing" message (`wrdn`) it opens the file once more to add the metadata (start and end times):
   read the file only once it is closed (`compare.open_fw` waits).

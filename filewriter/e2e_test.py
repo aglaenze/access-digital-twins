@@ -137,7 +137,8 @@ def main():
     control = tf.FileWriterControl(a.brokers, f"{instr}_filewriter")
     producer = tf.producer(a.brokers)
     structure = tf.nexus_structure(a.src, title="file-writer test", proposal="1000", sample_name="test sample",
-                                   twin=TWIN)
+                                   twin=TWIN, fixed=tf.fixed_values(template))
+    print(f"fixed logs given by the start command: {len(tf.fixed_values(template))}")
     n_modules = sum(1 for _ in _modules(structure))
     print(f"start command: {n_modules} streams")
 

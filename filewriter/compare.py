@@ -10,6 +10,7 @@ Checked:
     time;
   * every device has a value (the one at the start of the job at least);
   * the attributes of every stream group (a log can be a transformation: depends_on, vector...);
+  * the values of the fixed logs (NXlogs that are not streams, given by the start command: ODIN's WFM disc positions);
   * the run: title, sample name, start and end times present;
   * entry/twin, if the start command gave it (LoKI): the settings of the twin at the start of the job, as in its file.
 Expected differences (reported, not errors): the file-writer has no truths of the twin (not data of the instrument),
@@ -21,7 +22,7 @@ import sys
 import h5py
 import numpy as np
 
-from twin_filewriter import DTYPES, PER_PULSE, streams
+from twin_filewriter import DTYPES, PER_PULSE, fixed_logs, streams
 
 
 def _events(g):
@@ -147,6 +148,17 @@ def compare(fw_file, twin_files, log=print):
                         bad_attrs.append(f"{path}@{k}")
             say(not bad_attrs, f"attributes of the {len(st)} stream groups as in the twin's file" +
                 ("" if not bad_attrs else ": missing or different " + ", ".join(bad_attrs[:6])))
+            # the fixed logs (not streams, given by the start command; e.g. ODIN's WFM disc positions, which the
+            # reduction uses): the values of the twin's (last) file
+            fx = fixed_logs(twins[-1])
+            diff = []
+            for p in fx:
+                a = np.asarray(twins[-1][p]["value"][()], float)
+                b = np.asarray(fw[p]["value"][()], float) if p in fw and "value" in fw[p] else None
+                if b is None or a.shape != b.shape or not np.allclose(a, b, rtol=1e-9, atol=0):
+                    diff.append(f"{p} ({'none' if b is None else b.tolist()} instead of {a.tolist()})")
+            say(not diff, f"values of the {len(fx)} fixed logs as in the twin's file" +
+                ("" if not diff else ": " + "; ".join(diff[:4])))
             # the run
             e = fw["entry"]
             for k in ("title", "start_time", "end_time"):

@@ -59,11 +59,27 @@ def streams(f, modules=PUBLISHED):
     return out
 
 
+def fixed_logs(f):
+    """[path] of the NXlogs of an open h5py file that are not streams: written once, with the file (e.g. ODIN
+    wfm1/transformations/wfmc_translation, the position of a WFM disc). The twin changes some of them for each
+    measurement: the start command gives their values (the template has none)."""
+    out = []
+
+    def visit(name, o):
+        if (isinstance(o, h5py.Group) and _s(o.attrs.get("NX_class", "")) == "NXlog" and "writer_module" not in o.attrs
+                and isinstance(o.get("value"), h5py.Dataset) and o["value"].dtype.name in DTYPES
+                and (not isinstance(o.get("time"), h5py.Dataset) or o["time"].dtype.name in DTYPES)):
+            out.append(name)
+    f.visititems(visit)
+    return out
+
+
 # --------------------------------------------------------------------------- the template
 def make_template(src, out, patch=None):
     """Writes the template of the file-writer: the real file `src` without the streams the twin publishes and without
-    the values of a run (they come with the start command). patch(f): the static changes the twin makes to its own
-    files (e.g. the detector distance of the model), applied first. Returns out."""
+    the values of a run (they come with the start command), nor the values of the fixed logs (fixed_logs: they also
+    come with the start command, the twin changes some; kept in <out>.fixed.json). patch(f): the static changes the
+    twin makes to its own files (e.g. the detector distance of the model), applied first. Returns out."""
     os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
     tmp = out + ".tmp"
     shutil.copyfile(src, tmp)
@@ -72,6 +88,13 @@ def make_template(src, out, patch=None):
             patch(f)
         for path, *_ in streams(f):
             del f[path]
+        fixed = {}
+        for path in fixed_logs(f):
+            g = f[path]
+            fixed[path] = {k: {"values": g[k][()].tolist(), "dtype": DTYPES.get(g[k].dtype.name, "double"),
+                               "attributes": _attributes(g[k])} for k in ("value", "time") if k in g}
+            for k in fixed[path]:
+                del g[k]
         for p in PER_RUN:
             if p in f:
                 del f[p]
@@ -88,7 +111,25 @@ def make_template(src, out, patch=None):
             f.copy(f[name], g, name=name)
     os.remove(tmp)
     os.replace(out + ".new", out)
+    with open(out + FIXED_SUFFIX, "w") as fo:
+        json.dump(fixed, fo)
     return out
+
+
+FIXED_SUFFIX = ".fixed.json"     # next to the template: the fixed logs taken out of it, with their values
+
+
+def fixed_values(template, settings=None, t_ns=None):
+    """{path: {"value": ..., "time": ...}} of the fixed logs taken out of the template (make_template), for the start
+    command: the values of the template, or the current setting of the twin ({path: value}, stamped t_ns)."""
+    with open(template + FIXED_SUFFIX) as fi:
+        fixed = json.load(fi)
+    for path, v in (settings or {}).items():
+        if path in fixed:
+            fixed[path]["value"]["values"] = [float(v)] if fixed[path]["value"]["dtype"] in ("double", "float")                 else [int(v)]
+            if "time" in fixed[path] and t_ns is not None:
+                fixed[path]["time"]["values"] = [int(t_ns)]
+    return fixed
 
 
 def superblock_version(path):
@@ -151,11 +192,12 @@ def _value(name, value):
     return _string(name, value)
 
 
-def nexus_structure(src, title="", proposal="", sample_name="", twin=None):
+def nexus_structure(src, title="", proposal="", sample_name="", twin=None, fixed=None):
     """The nexus_structure (dict) of the start command: the groups down to every stream of `src`, each stream as its
     writer module (same source and topic as in the real file), and the values of the run. twin: {name: value}, the
     settings of the twin at the start of the job, written in entry/twin (NXcollection), as NICOS writes the values
-    of its devices into the start command at ESS (what the reduction of the twin needs, e.g. LoKI's configuration)."""
+    of its devices into the start command at ESS (what the reduction of the twin needs, e.g. LoKI's configuration).
+    fixed: fixed_values(template, ...), the values of the fixed logs (dataset modules, with their attributes)."""
     root = {"children": []}
     nodes = {"": root}
 
@@ -177,6 +219,10 @@ def nexus_structure(src, title="", proposal="", sample_name="", twin=None):
                 attrs = _attributes(f[path])
                 if attrs:
                     g["attributes"] = attrs
+    for path, data in (fixed or {}).items():
+        group(path)["children"] += [{"module": "dataset", "config": {"name": k, "values": d["values"],
+                                                                     "dtype": d["dtype"]},
+                                     "attributes": d["attributes"]} for k, d in data.items()]
     entry = group("entry")
     entry["children"] += [_string("title", title), _string("experiment_identifier", proposal),
                           {"module": "mdat", "config": {"items": ["start_time", "end_time"]}}]

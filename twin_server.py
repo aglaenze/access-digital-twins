@@ -86,7 +86,8 @@ def _fw_start(args):
     run_root = os.environ.get("TWIN_RUN_ROOT", os.path.join(os.path.expanduser("~"), "McStas_runs", "twin"))
     root = os.environ.get("TWIN_FW_TEMPLATES", os.path.join(run_root, "filewriter", "templates"))
     template = os.path.join(root, INSTR_NAME, f"{INSTR_NAME}.hdf")
-    if not os.path.isfile(template) or os.path.getmtime(template) < os.path.getmtime(src):
+    if (not os.path.isfile(template) or os.path.getmtime(template) < os.path.getmtime(src)
+            or not os.path.isfile(template + tf.FIXED_SUFFIX)):
         tf.make_template(src, template, getattr(INSTR, "nexus_static", None))
     if "control" not in FW:
         FW["control"] = tf.FileWriterControl(brokers, f"{INSTR_NAME}_filewriter")
@@ -99,16 +100,19 @@ def _fw_start(args):
         sample = INSTR.samples()[sample].get("name", sample)
     except Exception:                               # noqa: BLE001
         pass
+    start_ns = time.time_ns() + 50_000_000
+    settings = INSTR.nexus_logs() if hasattr(INSTR, "nexus_logs") else None
     structure = tf.nexus_structure(src, args.get("title", ""), str(args.get("proposal", "")), str(sample),
                                    # the settings of the twin in entry/twin (LoKI: the configuration its reduction
                                    # needs), as NICOS at ESS writes the values of its devices into the start command
-                                   twin=INSTR.twin_settings() if hasattr(INSTR, "twin_settings") else None)
+                                   twin=INSTR.twin_settings() if hasattr(INSTR, "twin_settings") else None,
+                                   # the fixed logs (not streams), with the current settings of the twin (ODIN: the
+                                   # positions of the WFM discs)
+                                   fixed=tf.fixed_values(template, settings, start_ns))
     tf.ensure_topics(FW["control"].brokers, tf.structure_topics(structure))
     # the value of every device, already published when the job starts, as by the EPICS forwarder at ESS (the
     # file-writer writes the last value before the start of the job): the current settings of the twin, the other
     # devices from the real file
-    start_ns = time.time_ns() + 50_000_000
-    settings = INSTR.nexus_logs() if hasattr(INSTR, "nexus_logs") else None
     tf.publish(FW["producer"], tf.snapshot_messages(src, start_ns - 1_000_000, settings)
                + tf.topic_markers(structure, start_ns - 1_000_000))
     job = FW["control"].start(structure, path, INSTR_NAME, start_ns=start_ns)
