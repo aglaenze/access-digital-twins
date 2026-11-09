@@ -38,7 +38,6 @@ on GitHub, 2026-11-09: 1.8 % of the neutrons of a 10 s count of ODIN missing).
 ## Limits, still to do
 
 * With the ESS file-writer on as well, its files get these 2 s of empty pulses (pulses without neutrons: same data).
-
 * Only the counts that write a file (inside `nexusfile_open`) are published: a count outside a file (`write=false`)
   is not seen by esslivedata yet.
 * The dashboard is not in the control room of the app yet (a browser page on port 5009 of the container).
