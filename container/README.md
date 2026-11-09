@@ -63,6 +63,8 @@ control room of the app): NICOS then has the files of each `nexusfile_open` bloc
 own (`../filewriter/README.md`).
 The live data reduction of ESS (esslivedata, both images): `-e TWIN_LIVEDATA=1`: its backend services and its
 dashboard (port 5009) next to NICOS (`../livedata/README.md`).
+The EPICS layer: `-e TWIN_EPICS=1`: every device as an EPICS PV (soft IOC) relayed to Kafka by the ESS forwarder, as
+at ESS (`../epics/README.md`).
 The image contains the ODIN and LoKI twins (official models at fixed commits, `~/odin_model` and `~/loki_model`). A
 LoKI measurement needs about 6 GB of memory (downstream McStas part and its 440 MB of scattered neutrons, computed on
 the first measurement of each sample, ~2 min): give Docker enough memory.

@@ -254,6 +254,14 @@ def snapshot_messages(src, t_ns, settings=None):
     NXpositioner: its logs value and target_value). At ESS the EPICS forwarder publishes each PV when it changes;
     the file-writer then has a value for every device of the file. Not the logs of PER_PULSE (the proton charge): those
     come with the neutrons of each measurement."""
+    return [(int(t_ns), topic, _f144(source, value, t_ns))
+            for path, source, topic, value in device_values(src, settings)]
+
+
+def device_values(src, settings=None):
+    """[(path, source, topic, value)] of every device of `src` (f144 streams, not PER_PULSE): its last value in `src`,
+    or the current setting of the twin given in `settings` (as snapshot_messages). The source is the name of the
+    EPICS PV of the device (epics/: the twin serves them as PVs, the ESS forwarder relays them to Kafka)."""
     settings = settings or {}
     over = {}
     for p, v in settings.items():
@@ -271,7 +279,7 @@ def snapshot_messages(src, t_ns, settings=None):
                 value = np.asarray(v[-1])
             else:
                 continue
-            out.append((int(t_ns), topic, _f144(source, value, t_ns)))
+            out.append((path, source, topic, value))
     return out
 
 
@@ -301,10 +309,12 @@ def topic_markers(structure, t_ns):
              if "ev44" in m else _f144(MARKER, np.float64(0.0), t_ns)) for t, m in sorted(kinds.items())]
 
 
-def count_messages(twin_file, message_id=0):
+def count_messages(twin_file, message_id=0, devices=True):
     """[(t_ns, topic, payload)] of one measurement of the twin (its NeXus file): one ev44 message per pulse with
     neutrons and per detector bank or monitor, and the device values recorded during the measurement (f144). The
-    times are those of the file. Pulses without neutrons are not sent (the file-writer would not write them)."""
+    times are those of the file. Pulses without neutrons are not sent (the file-writer would not write them).
+    devices=False: only the logs of PER_PULSE (proton charge) among the f144, the device values being relayed by the
+    ESS forwarder from the PVs of the twin (epics/, TWIN_EPICS=1)."""
     from streaming_data_types import serialise_ev44
     out = []
     with h5py.File(twin_file, "r") as f:
@@ -329,7 +339,7 @@ def count_messages(twin_file, message_id=0):
                                                               np.array([0], np.int32), eto[a:b], eid[a:b])))
         if t0 is not None:
             for path, module, source, topic in st:
-                if module != "f144":
+                if module != "f144" or (not devices and path not in PER_PULSE):
                     continue
                 g = f[path]
                 if "time" not in g or "value" not in g or g["value"].dtype.name not in DTYPES:

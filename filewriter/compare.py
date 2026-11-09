@@ -69,8 +69,11 @@ def open_fw(path, wait=120):
             time.sleep(2)
 
 
-def compare(fw_file, twin_files, log=print):
-    """Returns (number of differences, report lines)."""
+def compare(fw_file, twin_files, log=print, exact_times=True):
+    """Returns (number of differences, report lines). exact_times=False (device values relayed by the ESS forwarder
+    from the PVs of the twin, epics/): a device value of the twin's file must be the value in force in the
+    file-writer's file at its time (the last one written before it, 2 s of tolerance), not at the same time; the
+    logs of every pulse (PER_PULSE) keep their exact times."""
     lines, bad = [], 0
 
     def say(ok, text):
@@ -116,7 +119,10 @@ def compare(fw_file, twin_files, log=print):
                         ok = path in fw and "time" in fw[path]
                         if ok:
                             ft, fv = fw[path]["time"][()].astype(np.int64), fw[path]["value"][()]
-                            hit = np.nonzero(ft == times[k])[0]
+                            if exact_times or path in PER_PULSE:
+                                hit = np.nonzero(ft == times[k])[0]
+                            else:
+                                hit = np.nonzero(ft <= times[k] + 2_000_000_000)[0]
                             ok = len(hit) > 0 and np.allclose(np.asarray(fv[hit[-1]], float),
                                                               np.asarray(values[k], float), rtol=1e-6, atol=0)
                         if not ok:

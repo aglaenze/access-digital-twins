@@ -13,6 +13,8 @@ instrument computers): choosing the instrument here is like walking into its con
                                                            # at ESS (Linux x86-64: the app container; TWIN_FILEWRITER=1)
     python start_nicos.py --instrument loki --livedata     # live reduction of ESS (esslivedata; dashboard on port
                                                            # 5009; the app container; TWIN_LIVEDATA=1)
+    python start_nicos.py --instrument odin --epics --filewriter   # the devices as EPICS PVs (soft IOC), relayed to
+                                                           # Kafka by the ESS forwarder (the app container; TWIN_EPICS=1)
 
 Two Python environments are used, on purpose: the twin (McStas, essimaging, numpy 2) in the Python running this launcher, NICOS
 (numpy < 2) in the conda env "nicos". They talk over HTTP on this computer only. Press Enter (or Ctrl+C) to stop all.
@@ -71,10 +73,10 @@ def choose_instrument():
             return names[int(a) - 1]
 
 
-def _livedata_service():
-    """livedata/service.py (imported under its own name: filewriter/ has a service.py too)."""
+def _livedata_service(folder="livedata"):
+    """livedata/service.py, epics/service.py (imported under their own names: filewriter/ has a service.py too)."""
     import importlib.util
-    spec = importlib.util.spec_from_file_location("livedata_service", os.path.join(TWIN, "livedata", "service.py"))
+    spec = importlib.util.spec_from_file_location(f"{folder}_service", os.path.join(TWIN, folder, "service.py"))
     m = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(m)
     return m
@@ -138,6 +140,8 @@ def main():
                    help="the ESS file-writer writes the files of nexusfile_open (default: TWIN_FILEWRITER=1)")
     a.add_argument("--livedata", action="store_true", default=os.environ.get("TWIN_LIVEDATA") == "1",
                    help="live data reduction of ESS (esslivedata, dashboard on port 5009; default: TWIN_LIVEDATA=1)")
+    a.add_argument("--epics", action="store_true", default=os.environ.get("TWIN_EPICS") == "1",
+                   help="the devices as EPICS PVs, relayed to Kafka by the ESS forwarder (default: TWIN_EPICS=1)")
     a.add_argument("--until-gui-closes", action="store_true",
                    help="stop everything when the NICOS window is closed (the control room of the app)")
     o = a.parse_args()
@@ -164,12 +168,20 @@ def main():
         if not ld_usable:
             print(f"The live data reduction of ESS is not available here ({ld_what}).")
             o.livedata = False
-    # read by the twin server: each count also publishes its neutrons as the instrument does, for esslivedata
+    if o.epics:
+        ep_service = _livedata_service("epics")
+        ep_usable, ep_what = ep_service.available()
+        if not ep_usable:
+            print(f"The EPICS layer (soft IOC + ESS forwarder) is not available here ({ep_what}).")
+            o.epics = False
+    # read by the twin server: each count also publishes its neutrons as the instrument does, for esslivedata; with
+    # the EPICS layer, the device values are relayed by the forwarder instead of the twin
     os.environ["TWIN_LIVEDATA"] = "1" if o.livedata else "0"
+    os.environ["TWIN_EPICS"] = "1" if o.epics else "0"
     os.makedirs(LOGS, exist_ok=True)
     print(f"Starting the {instr.upper()} digital twin with NICOS:", flush=True)
     try:
-        if o.live or o.filewriter or o.livedata:     # data streaming as at ESS: the Kafka broker
+        if o.live or o.filewriter or o.livedata or o.epics:     # data streaming as at ESS: the Kafka broker
             if not port_open(9092):
                 start("kafka", [MCSTAS_PY, os.path.join(TWIN, "kafka", "start_kafka.py")], cwd=TWIN)
                 wait_for(lambda: port_open(9092), "the Kafka broker", timeout=120)
@@ -194,6 +206,10 @@ def main():
         start("twin_server", [MCSTAS_PY, os.path.join(TWIN, "twin_server.py"), "--instrument", instr,
                               "--session", o.session, "--mode", o.mode, "--port", str(o.port)], cwd=TWIN)
         wait_for(lambda: http_ok(f"http://127.0.0.1:{o.port}/status"), "the twin server")
+        if o.epics:                    # the PVs of the twin (soft IOC) and the ESS forwarder, configured with them
+            for name, p in ep_service.start(instr, twin=f"http://127.0.0.1:{o.port}", logdir=LOGS):
+                AUX.append((name, p))
+            print(f"  EPICS layer started ({ep_what}; logs {LOGS}/epics_ioc.log, forwarder.log)", flush=True)
         # TWIN_RUN_ROOT is read by the NICOS setups (cache database, data root)
         env = dict(os.environ, INSTRUMENT=f"nicos_twin.{instr}", TWIN_RUN_ROOT=RUN_ROOT,
                    TWIN_FILEWRITER="1" if o.filewriter else "0",       # read by nicos_twin/commands.py
@@ -209,7 +225,7 @@ def main():
             print("  setup 'live' loaded" if r.returncode == 0 else f"  setup 'live' NOT loaded: {r.stdout[-500:]}",
                   flush=True)
         extras = [x for x, on in (("live data", o.live), ("ESS file-writer", o.filewriter),
-                                  ("ESS live reduction", o.livedata)) if on]
+                                  ("ESS live reduction", o.livedata), ("EPICS + forwarder", o.epics)) if on]
         print(f"{instr.upper()} services ready{' (' + ', '.join(extras) + ')' if extras else ''}. NICOS daemon on localhost:1301 "
               "(user student, password student).", flush=True)
         if not o.no_gui:

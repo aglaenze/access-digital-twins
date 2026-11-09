@@ -427,5 +427,38 @@ else:
             if os.path.isfile(path):
                 print(f"--- {path} (end)\n" + open(path, errors="replace").read()[-4000:])
 
+step("EPICS layer: the devices of ODIN as EPICS PVs (soft IOC), relayed by the ESS forwarder to the file-writer")
+_spec = importlib.util.spec_from_file_location("epics_service", os.path.join(TWIN, "epics", "service.py"))
+ep = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(ep)
+ep_usable, ep_what = ep.available()
+if "--no-epics" in sys.argv or not ep_usable or not fw_service.available()[0]:
+    print("skipped: " + ("--no-epics" if "--no-epics" in sys.argv else ep_what if not ep_usable
+                         else "no ESS file-writer here"))
+else:
+    print(ep_what)
+    ready, out = nicos_session("odin", "ci_epics",
+                               "NewExperiment(1238, 'EPICS test')\n"
+                               "move(choppers, 'wfm', wfm_delta, 0.2); move(shutter, 'open', stage_x, 500)\n"
+                               "with nexusfile_open('open beam'):\n    count(t=10)\n", ["--filewriter", "--epics"])
+    check(ready, "NICOS started with the EPICS layer and the ESS file-writer (ODIN)")
+    check(out.count("same data") == 1, "EPICS: the job written by the file-writer has the same data as the twin's file, "
+                                       "device values relayed by the ESS forwarder")
+    fw, tw = job_files("odin", 1238)
+    if fw and tw:
+        import h5py
+        with h5py.File(fw[-1], "r") as a, h5py.File(tw[-1], "r") as b:
+            p = "entry/instrument/spst1_lin_x/value/value"          # the sample stage, moved to 500 mm
+            fa, fb = a[p][()], b[p][()]
+        print(f"sample stage x: file-writer {fa[-3:]}, twin {fb[-3:]}")
+        check(len(fa) > 0 and len(fb) > 0 and float(fa[-1]) == float(fb[-1]),
+              "EPICS: a setting of the twin (sample stage) reached the file-writer through its PV and the forwarder")
+    else:
+        check(False, f"EPICS: files of the job ({len(fw)} of the file-writer, {len(tw)} of the twin)")
+    for name in ("epics_ioc", "forwarder"):
+        path = os.path.join(os.environ.get("TWIN_RUN_ROOT", ""), "nicos", f"{name}.log")
+        if os.path.isfile(path):
+            print(f"--- {path} (end)\n" + open(path, errors="replace").read()[-2500:])
+
 print("\nALL PASSED" if ok else "\nSOME CHECKS FAILED")
 sys.exit(0 if ok else 1)

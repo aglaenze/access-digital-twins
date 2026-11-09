@@ -54,6 +54,8 @@ import time
 import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+import numpy as np
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 # instrument name -> (sub-folder of twin/, module, class)
 INSTRUMENTS = {"odin": ("odin", "odin_virtual", "VirtualOdin"),
@@ -116,8 +118,9 @@ def _fw_start(args):
     # the value of every device, already published when the job starts, as by the EPICS forwarder at ESS (the
     # file-writer writes the last value before the start of the job): the current settings of the twin, the other
     # devices from the real file
-    tf.publish(FW["producer"], tf.snapshot_messages(src, start_ns - 1_000_000, settings)
-               + tf.topic_markers(structure, start_ns - 1_000_000))
+    # (with the EPICS layer, the forwarder has already sent them: on each change, and again every 5 s)
+    snapshot = [] if _epics() else tf.snapshot_messages(src, start_ns - 1_000_000, settings)
+    tf.publish(FW["producer"], snapshot + tf.topic_markers(structure, start_ns - 1_000_000))
     job = FW["control"].start(structure, path, INSTR_NAME, start_ns=start_ns)
     FW.update(job=job, file=path, twin_files=[])
     return dict(job=job, file=path)
@@ -134,8 +137,15 @@ def _fw_stop():
     out = dict(file=path, error=error, twin_files=twins)
     if error is None and twins and os.path.isfile(path):
         import compare
-        out["differences"], out["report"] = compare.compare(path, twins, log=lambda *_: None)
+        out["differences"], out["report"] = compare.compare(path, twins, log=lambda *_: None,
+                                                            exact_times=not _epics())
     return out
+
+
+def _epics():
+    """The EPICS layer is on (epics/service.py, TWIN_EPICS=1): the ESS forwarder relays the device values to Kafka from
+    the PVs of the twin; the twin no longer publishes them itself."""
+    return os.environ.get("TWIN_EPICS") == "1"
 
 
 def _livedata():
@@ -150,12 +160,35 @@ def _fw_publish(f):
     tf = _fw()
     if "producer" not in FW:
         FW["producer"] = tf.producer(os.environ.get("TWIN_KAFKA", "127.0.0.1:9092"))
-    msgs = tf.count_messages(f)
+    msgs = tf.count_messages(f, devices=not _epics())
     if _livedata():          # the detectors keep sending after the count: esslivedata then reduces its last pulse
         msgs += tf.tail_messages(f)
     th = threading.Thread(target=tf.publish, args=(FW["producer"], msgs), kwargs=dict(pace=True), daemon=True)
     th.start()
     return th
+
+
+EPICS = {}
+
+
+def _epics_values():
+    """[{"pv", "topic", "type", "value"}] of every device of the real ESS file of the instrument (its f144 streams; the
+    source name is the EPICS PV name), with the current settings of the twin: the PVs the soft IOC serves
+    (epics/ioc.py) and the ESS forwarder relays to Kafka. type: "d" (float64), "l" (int64), "i" (int32)."""
+    tf = _fw()
+    if "table" not in EPICS:                      # the devices of the real file (read once; the values change)
+        EPICS["table"] = tf.device_values(INSTR.nexus_template())
+    settings = INSTR.nexus_logs() if hasattr(INSTR, "nexus_logs") else {}
+    over = {}
+    for p, v in settings.items():
+        for q in (p, f"{p}/value", f"{p}/target_value"):
+            over[q] = v
+    kind = {"float64": "d", "float32": "d", "int64": "l", "uint64": "l"}
+    out = []
+    for path, source, topic, value in EPICS["table"]:
+        v = np.asarray(over[path], dtype=value.dtype) if path in over else value
+        out.append(dict(pv=source, topic=topic, type=kind.get(value.dtype.name, "i"), value=v.item()))
+    return out
 
 
 def _forward(only_changes=True):
@@ -206,6 +239,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._reply(200, dict(devices=INSTR.status(), readings=_json(readings), busy=LOCK.locked(),
                                          running=RUNNING["action"], last_number=INSTR.number, folder=INSTR.folder,
                                          mode=INSTR.mode, ready=READY.is_set()))
+        if self.path == "/epics":                              # the PVs of the soft IOC (epics/ioc.py)
+            return self._reply(200, _epics_values())
         if self.path == "/devices":
             if hasattr(INSTR, "samples"):
                 INSTR.samples()            # the student's own samples appear in the list at once
