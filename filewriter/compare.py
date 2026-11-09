@@ -8,6 +8,7 @@ Checked:
     1 ns, pixel), all the measurements of the job together;
   * the devices: every value the twin recorded during its measurements is in the file-writer's file, at the same
     time;
+  * the attributes of every stream group (a log can be a transformation: depends_on, vector...);
   * the run: title, sample name, start and end times present;
   * entry/twin, if the start command gave it (LoKI): the settings of the twin at the start of the job, as in its file.
 Expected differences (reported, not errors): the file-writer has no truths of the twin (not data of the instrument),
@@ -33,6 +34,13 @@ def _events(g):
 def _sorted(t0, tof, pid):
     order = np.lexsort((pid, tof, t0))
     return t0[order], tof[order], pid[order]
+
+
+def _plain(v):
+    a = np.asarray(v)
+    if a.dtype.kind in "SOU":
+        return " ".join(x.decode() if isinstance(x, bytes) else str(x) for x in a.ravel())
+    return a
 
 
 def _same_value(a, b):
@@ -114,6 +122,17 @@ def compare(fw_file, twin_files, log=print):
             say(not missing, f"device values recorded during the measurements: {n_values - len(missing)} of "
                              f"{n_values} in the file-writer's file" + ("" if not missing else
                                                                        ": missing " + "; ".join(missing[:5])))
+            # the attributes of every stream group (e.g. depends_on, vector: a log that is a transformation)
+            bad_attrs = []
+            for path, module, source, topic in st:
+                if path not in fw:
+                    continue
+                a, b = twins[0][path].attrs, fw[path].attrs
+                for k in a:
+                    if k not in b or not _same_value(_plain(a[k]), _plain(b[k])):
+                        bad_attrs.append(f"{path}@{k}")
+            say(not bad_attrs, f"attributes of the {len(st)} stream groups as in the twin's file" +
+                ("" if not bad_attrs else ": missing or different " + ", ".join(bad_attrs[:6])))
             # the run
             e = fw["entry"]
             for k in ("title", "start_time", "end_time"):

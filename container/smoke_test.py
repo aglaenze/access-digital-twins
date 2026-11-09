@@ -215,6 +215,18 @@ if not ready:
 
 def nicos_session(instrument, session, script, extra=()):
     """Starts NICOS for `instrument` with the launcher (headless), runs `script`, stops it; returns (ready, output)."""
+    import socket
+    t0 = time.time()                                 # the services of the previous session are gone (their ports)
+    while time.time() - t0 < 120:
+        busy = []
+        for port in (8765, 14869, 1301):
+            with socket.socket() as so:
+                so.settimeout(1)
+                if so.connect_ex(("127.0.0.1", port)) == 0:
+                    busy.append(port)
+        if not busy:
+            break
+        time.sleep(2)
     p = subprocess.Popen([sys.executable, os.path.join(TWIN, "nicos", "start_nicos.py"), "--instrument", instrument,
                           "--no-gui", "--background", "--session", session, *extra],
                          stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)

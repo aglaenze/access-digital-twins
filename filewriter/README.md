@@ -79,6 +79,10 @@ files (they are not data of the instrument): the twin keeps writing its own file
 * **Every topic** of the start command existing when the job starts (otherwise the job ends at once: "Unable to set up
   consumer ... as this topic does not exist"); `FileWriterControl.start` creates them. Its command and pool topics
   existing before it starts.
+* **The attributes of every stream group** in the start command (found 2026-11-09): it creates these groups (they are
+  not in the template) with only what the command gives. Without them a log that is a transformation loses its
+  `depends_on`, `transformation_type` and `vector` (LoKI detector carriage: essreduce then cannot place the rear
+  bank). `nexus_structure` copies them from the real file; `compare.py` checks them.
 * **The time zones** (`tzdata`) in its image (it writes the time of the file).
 * After its "finished writing" message (`wrdn`) it opens the file once more to add the metadata (start and end times):
   read the file only once it is closed (`compare.open_fw` waits).

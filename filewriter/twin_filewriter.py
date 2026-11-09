@@ -113,6 +113,30 @@ def _module(f, path, module, source, topic):
     return {"module": "f144", "config": cfg}
 
 
+STREAM_ATTRS = ("writer_module", "source", "topic")      # given by the module itself
+
+
+def _attributes(obj):
+    """The attributes of an HDF5 object in the form of the start command ([{name, values[, dtype]}]). A stream group
+    is not in the template: the file-writer creates it from the start command, so its attributes must be there, e.g.
+    those that make a log a transformation (depends_on, transformation_type, vector, units)."""
+    out = []
+    for k, v in obj.attrs.items():
+        if k in STREAM_ATTRS:
+            continue
+        if isinstance(v, bytes):
+            v = v.decode()
+        if isinstance(v, str):
+            out.append({"name": k, "values": v})
+            continue
+        a = np.asarray(v)
+        if a.dtype.kind in "SO":
+            out.append({"name": k, "values": [_s(x) for x in a.ravel()] if a.ndim else _s(a.item())})
+        elif a.dtype.name in DTYPES:
+            out.append({"name": k, "values": a.tolist(), "dtype": DTYPES[a.dtype.name]})
+    return out
+
+
 def _string(name, value):
     return {"module": "dataset", "config": {"name": name, "values": str(value), "dtype": "string"}}
 
@@ -148,7 +172,11 @@ def nexus_structure(src, title="", proposal="", sample_name="", twin=None):
         for path, module, source, topic in streams(f):
             m = _module(f, path, module, source, topic)
             if m is not None:
-                group(path)["children"].append(m)
+                g = group(path)
+                g["children"].append(m)
+                attrs = _attributes(f[path])
+                if attrs:
+                    g["attributes"] = attrs
     entry = group("entry")
     entry["children"] += [_string("title", title), _string("experiment_identifier", proposal),
                           {"module": "mdat", "config": {"items": ["start_time", "end_time"]}}]
