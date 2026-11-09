@@ -56,7 +56,7 @@ jobs:
       # kafka-to-nexus logs only to syslog: /dev/log of the runner (journald) is given to its container
       - name: The twin with the file-writer, end to end
         run: |
-          pip install --quiet h5py numpy "confluent-kafka>=2.14,<3" "ess-streaming-data-types>=0.27,<0.28" pooch ipywidgets essimaging esssans
+          pip install --quiet h5py numpy "confluent-kafka>=2.14,<3" "ess-streaming-data-types>=0.27,<0.28" pooch ipywidgets essimaging esssans tof
           docker run -d --name kafka --network host \
             -e KAFKA_NODE_ID=1 -e KAFKA_PROCESS_ROLES=broker,controller \
             -e KAFKA_LISTENERS=PLAINTEXT://127.0.0.1:9092,CONTROLLER://127.0.0.1:9093 \

@@ -158,7 +158,30 @@ def main():
 
     bad, _ = compare.compare(fw_file, [twin_file])
     print("SAME DATA" if bad == 0 else f"{bad} DIFFERENCE(S)")
+    if instr == "odin":
+        bad += reduce_odin(fw_file, twin_file)
     sys.exit(1 if bad else 0)
+
+
+def reduce_odin(fw_file, twin_file):
+    """The ODIN reduction of the twin (essimaging) on both files: the same events with the same wavelengths."""
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "odin"))
+    import odin_reduction as red
+    out = []
+    for f in (fw_file, twin_file):
+        da = red.events(f)
+        ev = da.bins.concat().value
+        out.append((da.bins.size().values.ravel(), np.sort(np.nan_to_num(ev.coords["wavelength"].values, nan=-1)),
+                    red.lookup_table(f), red._chopper_fingerprint(f)))
+    (n_a, l_a, lut_a, k_a), (n_b, l_b, lut_b, k_b) = out
+    print(f"reduction: events per pixel {'same' if np.array_equal(n_a, n_b) else 'DIFFERENT'}; "
+          f"same lookup table: {lut_a is lut_b}; chopper fingerprints {'same' if k_a == k_b else f'{k_a} / {k_b}'}")
+    same = len(l_a) == len(l_b) and np.array_equal(l_a, l_b)
+    if not same and len(l_a) == len(l_b):
+        d = np.abs(l_a - l_b)
+        print(f"  wavelengths: {int((d > 0).sum())} of {len(d)} differ, by up to {d.max():.3g} A")
+    print("  wavelengths of the events:", "the same" if same else "DIFFERENT")
+    return 0 if same and np.array_equal(n_a, n_b) else 1
 
 
 def _modules(node):
