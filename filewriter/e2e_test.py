@@ -52,6 +52,12 @@ def fake_measurement(src, out, start_ns):
         for p in ev:
             d = f[p]["event_time_zero"]
             d[...] = (d[()].astype(np.int64) + delta).astype(d.dtype)
+            # as the twin (and ESS): whole nanoseconds after the pulse
+            g = f[p]
+            eto, attrs = np.round(g["event_time_offset"][()]).astype(np.int32), dict(g["event_time_offset"].attrs)
+            del g["event_time_offset"]
+            g.create_dataset("event_time_offset", data=eto)
+            g["event_time_offset"].attrs.update(attrs)
         moved = 0
         for p, m, *_ in st:
             if m == "f144" and "time" in f[p]:

@@ -110,7 +110,11 @@ A file of the file-writer has, for each device, every value received during the 
 * **ODIN, duration of a measurement**: the source pulses recorded (proton charge log) / 14 Hz instead of end - start:
   a job also lasts while the twin computes, without neutrons; the same value for a real file and a twin file; the
   proton charge is never in the snapshot (it would count one pulse more);
-* **LoKI** reads its configuration in `entry/twin`, which the start command now gives.
+* **LoKI** reads its configuration in `entry/twin`, which the start command now gives;
+* **arrival times in whole nanoseconds** (`event_time_offset`, int32, as ev44): the ODIN twin wrote them with
+  decimals (float64); the file-writer's were then up to 0.5 ns different, and the wavelengths by up to 7e-8 Å
+  (2026-11-09). The twin now writes whole nanoseconds after the pulse time (rounded to the ns too), as at ESS (LoKI
+  already did: uint32).
 
 Checked first on files made like those of the file-writer (every log of real twin files given a second value): ODIN
 (60 s, iron plate) image and spectrum identical, duration 60 s and proton charge identical; LoKI (silica spheres,

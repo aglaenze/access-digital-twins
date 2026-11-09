@@ -313,7 +313,9 @@ def write_nexus(counts, out_file, t_exp, start=None, det_dist=0.05, title="ODIN 
     k = np.floor(t_abs_ns / period_ns).astype(np.int64)
     order = np.argsort(t_abs_ns, kind="stable")
     k = k[order]
-    eto = t_abs_ns[order] - k * period_ns
+    # whole nanoseconds after the pulse time written in event_time_zero (rounded to the ns too), as at ESS (ev44:
+    # int32 ns): the files of the ESS file-writer then hold exactly the same numbers
+    eto = np.maximum(np.round(t_abs_ns[order]) - np.round(k * period_ns), 0).astype(np.int32)
     ids = num[ix[ok], iy[ok]][order].astype(np.int32)
     # One entry per pulse of the measurement (including pulses without neutrons, like the real system)
     n_pulses = int(round(t_exp * PULSE_HZ))
@@ -329,7 +331,7 @@ def write_nexus(counts, out_file, t_exp, start=None, det_dist=0.05, title="ODIN 
         _replace(d, "event_id", ids, compress=True)
         unit = d["event_time_offset"].attrs.get("units", b"ns")
         assert (unit.decode() if isinstance(unit, bytes) else unit) == "ns"
-        _replace(d, "event_time_offset", eto.astype(d["event_time_offset"].dtype), compress=True)
+        _replace(d, "event_time_offset", eto, compress=True)
         _replace(d, "event_index", index, compress=True)
         _replace(d, "event_time_zero", etz, compress=True)
         _replace(f[f"{DET}/transformations"], "translation", np.float64(det_dist))
