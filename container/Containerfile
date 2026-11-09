@@ -8,6 +8,8 @@
 # The ESS file-writer (kafka-to-nexus, filewriter/README.md), built from its sources by filewriter.yml: copied from its
 # image, fixed version (digest of the image; kafka-to-nexus b6722d0d). Linux x86-64 only: nothing on ARM (arm64).
 ARG FILEWRITER_IMAGE=ghcr.io/aglaenze/access-digital-twins-filewriter@sha256:ffd03d80600bc3c3306903cd8d4dc9fa5ee246a0871da1ce67cebd9f12cc9997
+# the EFU (below): its image, fixed version (declared here: an ARG used in FROM comes before the first FROM)
+ARG EFU_IMAGE=ghcr.io/aglaenze/access-digital-twins-efu@sha256:e96cf4dc3343cb7d5ab92c6ef8fc7bba7450102a43213d52f72881d61f506523
 FROM --platform=linux/amd64 ${FILEWRITER_IMAGE} AS filewriter-amd64
 FROM busybox:1.36 AS filewriter-arm64
 RUN mkdir -p /opt/kafka-to-nexus && echo "kafka-to-nexus is built for Linux x86-64 only" > /opt/kafka-to-nexus/NOT_AVAILABLE
@@ -16,7 +18,6 @@ FROM filewriter-${TARGETARCH} AS filewriter
 # The ESS Event Formation Unit (EFU: raw detector readout -> neutrons, efu/README.md), built from its sources by
 # efu.yml: copied from its image, fixed version (digest; event-formation-unit 8b399165 with one correction).
 # Linux x86-64 only, as the file-writer.
-ARG EFU_IMAGE=ghcr.io/aglaenze/access-digital-twins-efu@sha256:e96cf4dc3343cb7d5ab92c6ef8fc7bba7450102a43213d52f72881d61f506523
 FROM --platform=linux/amd64 ${EFU_IMAGE} AS efu-amd64
 FROM busybox:1.36 AS efu-arm64
 RUN mkdir -p /opt/efu && echo "the EFU is built for Linux x86-64 only" > /opt/efu/NOT_AVAILABLE
