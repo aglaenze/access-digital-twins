@@ -315,7 +315,10 @@ def write_nexus(counts, out_file, t_exp, start=None, det_dist=0.05, title="ODIN 
     k = k[order]
     # whole nanoseconds after the pulse time written in event_time_zero (rounded to the ns too), as at ESS (ev44:
     # int32 ns): the files of the ESS file-writer then hold exactly the same numbers
-    eto = np.maximum(np.round(t_abs_ns[order]) - np.round(k * period_ns), 0).astype(np.int32)
+    # and before the next pulse time: rounding both can give one ns past it (1 neutron in ~10^6), which no detector
+    # gives and the live reduction of ESS (esslivedata) does not count in the frame
+    eto = np.clip(np.round(t_abs_ns[order]) - np.round(k * period_ns),
+                  0, np.round((k + 1) * period_ns) - np.round(k * period_ns) - 1).astype(np.int32)
     ids = num[ix[ok], iy[ok]][order].astype(np.int32)
     # One entry per pulse of the measurement (including pulses without neutrons, like the real system)
     n_pulses = int(round(t_exp * PULSE_HZ))
