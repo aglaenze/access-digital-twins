@@ -38,6 +38,8 @@ def post(url, content):
         return json.loads(r.read())
 
 
+# (every PV starts with the time of the IOC start as its timestamp: the forwarder rejects updates stamped more than
+# a year ago, e.g. at 0 = 1970, the default)
 # fields of an EPICS motor record served for each motor, besides VAL, RBV and DMOV (type, value); those NICOS reads
 # (nicos_ess.devices.epics.pva.motor.EpicsMotor._record_fields). Constant: the twin's motors are ideal (no limit
 # switch, no error, always enabled, position reached exactly).
@@ -55,7 +57,7 @@ def motor_pvs(m, types, twin, pvs, last):
 
     def number(field, code, value, meta=False):
         nt = NTScalar(code, display=meta, control=meta)
-        v = nt.wrap(value)
+        v = nt.wrap(value, timestamp=time.time())
         if meta:
             v["display.units"] = m["unit"]
             v["display.description"] = m["desc"]
@@ -70,10 +72,11 @@ def motor_pvs(m, types, twin, pvs, last):
         v, nt = number(field, "d", value)
         pvs[f"{base}.{field}"] = SharedPV(nt=nt, initial=v)
     for field, text in (("EGU", m["unit"]), ("DESC", m["desc"])):
-        pvs[f"{base}.{field}"] = SharedPV(nt=NTScalar("s"), initial=text)
+        pvs[f"{base}.{field}"] = SharedPV(nt=NTScalar("s"), initial=NTScalar("s").wrap(text, timestamp=time.time()))
     v, nt = number("RBV", types.get(f"{base}.RBV", "d"), m["value"], meta=True)
     pvs[f"{base}.RBV"] = SharedPV(nt=nt, initial=v)
-    pvs[f"{base}.DMOV"] = SharedPV(nt=NTScalar(types.get(f"{base}.DMOV", "l")), initial=1)
+    pvs[f"{base}.DMOV"] = SharedPV(nt=NTScalar(types.get(f"{base}.DMOV", "l")),
+                                       initial=NTScalar(types.get(f"{base}.DMOV", "l")).wrap(1, timestamp=time.time()))
     last[f"{base}.RBV"], last[f"{base}.DMOV"] = m["value"], 1
 
     class Target:                                   # handler of VAL: a new target moves the twin's device
@@ -129,7 +132,8 @@ def main():
     for r in rows:
         if r["pv"] in pvs:                      # one PV can be written in several places of the file
             continue
-        pvs[r["pv"]] = SharedPV(nt=NTScalar(r["type"]), initial=r["value"])
+        pvs[r["pv"]] = SharedPV(nt=NTScalar(r["type"]),
+                                initial=NTScalar(r["type"]).wrap(r["value"], timestamp=time.time()))
         last[r["pv"]] = r["value"]
     conf = dict(LOCAL, **{k: os.environ[k] for k in LOCAL if k in os.environ})
     with Server(providers=[pvs], conf=conf, useenv=False):

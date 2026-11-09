@@ -399,7 +399,10 @@ else:
         if files:
             import h5py
             with h5py.File(files[-1], "r") as f:
-                n = len(f["entry/instrument/timepix3/data/event_id"])
+                LD["ids"] = f["entry/instrument/timepix3/data/event_id"][()]
+                LD["pulses"] = f["entry/instrument/timepix3/data/event_index"][()]
+                LD["eto"] = f["entry/instrument/timepix3/data/event_time_offset"][()]
+            n = len(LD["ids"])
         LD["events"] = n
 
         def total(out):
@@ -408,6 +411,8 @@ else:
         dev = ld.nicos_devices("odin", timeout=180, until=lambda out: n and total(out) == n)
         LD["total"] = total(dev)
         LD["devices"] = sorted(dev)
+        img = dev.get("timepix3_image", {}).get("signal")
+        LD["image"] = None if img is None else np.asarray(img.values if hasattr(img, "values") else img.data)
 
     ready, out = nicos_session("odin", "ci_livedata",
                                "NewExperiment(1237, 'live reduction test')\n"
@@ -422,6 +427,25 @@ else:
     check(LD.get("events", 0) > 0 and LD.get("total") == LD.get("events"),
           "esslivedata: the live image of ODIN holds all the neutrons of the count")
     if not (LD.get("total") == LD.get("events")):
+        # where the missing neutrons are: the live image (512 x 512) against the same image made from the file's
+        # events (ids laid out as x * 4096 + y from the first id, 8 x 8 pixels per cell), for a first id of 0 or 1
+        ids, img = LD.get("ids"), LD.get("image")
+        if ids is not None and img is not None and img.size == 512 * 512:
+            img = img.reshape(512, 512)
+            for first in (0, 1):
+                x, y = np.divmod(ids.astype(np.int64) - first, 4096)
+                keep = (x >= 0) & (x < 4096)
+                mine = np.zeros((512, 512))
+                np.add.at(mine, (x[keep] // 8, y[keep] // 8), 1)
+                for name, a in (("as is", img), ("transposed", img.T)):
+                    d = np.argwhere(mine != a)
+                    print(f"first id {first}, live image {name}: {len(d)} cells differ, {(~keep).sum()} ids outside; "
+                          f"cells {[(int(i), int(j), mine[i, j], a[i, j]) for i, j in d[:5]]}")
+        if ids is not None:
+            print(f"event ids: min {ids.min()} max {ids.max()}; arrival times: min {LD['eto'].min()} max "
+                  f"{LD['eto'].max()} ns; pulses {len(LD['pulses'])}, events in the first and last pulses: "
+                  f"{int(LD['pulses'][1] - LD['pulses'][0]) if len(LD['pulses']) > 1 else '?'}, "
+                  f"{int(len(ids) - LD['pulses'][-1])}")
         for name in ("detector_data", "dashboard"):
             path = os.path.join(os.environ.get("TWIN_RUN_ROOT", ""), "nicos", f"livedata_{name}.log")
             if os.path.isfile(path):
