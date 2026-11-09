@@ -8,7 +8,7 @@ reduction read them. With `--epics`, the twin does the same:
 | Piece | At ESS | In the twin |
 |---|---|---|
 | PVs | one IOC per piece of hardware | `ioc.py`: one soft IOC (p4p, pvAccess, on 127.0.0.1) serving every device written in the real ESS file of the instrument, with its real PV name (e.g. `ODIN-ChpSy1:Chop-WFMC-101:Spd_S`): 365 PVs for ODIN; their values are the current settings of the twin (twin server, `GET /epics`, every 0.5 s) |
-| Forwarder | ESS forwarder | the same program (release v2.1.0, own conda environment `forwarder`), configured with every PV (fc00 message: topic of the real file, f144, pvAccess) and a periodic update every 5 s |
+| Forwarder | ESS forwarder | the same program (release v2.1.0, run from its source tree with `forwarder_launch.py` as ESS does, own conda environment `forwarder`), configured with every PV (fc00 message: topic of the real file, f144, pvAccess) and a periodic update every 5 s |
 | Topics | `<instrument>_choppers`, `_motion`, ... | the same, from the real file |
 
 ```

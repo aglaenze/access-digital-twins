@@ -137,12 +137,19 @@ RUN micromamba create -y -n livedata -c conda-forge "python=3.13" pip git && mic
 # requirements) and p4p for the soft IOC of the twin, in their own environment. Optional: if it cannot be installed on
 # an architecture, the image is built without it (epics/service.py then says it is not available)
 ARG FORWARDER_VERSION=v2.1.0
+# (run from its source tree with forwarder_launch.py, as ESS does: the wheel of v2.1.0 lacks the subpackages of
+# "forwarder", its pyproject includes only the top package)
+ENV TWIN_FORWARDER_SRC=/opt/conda/envs/forwarder/src/forwarder
 RUN micromamba create -y -n forwarder -c conda-forge "python=3.11" pip git && micromamba clean -a -y \
  && if micromamba run -n forwarder pip install --no-cache-dir \
          -r "https://raw.githubusercontent.com/ess-dmsc/forwarder/${FORWARDER_VERSION}/requirements.txt" \
-      && micromamba run -n forwarder pip install --no-cache-dir --no-deps \
-         "forwarder @ git+https://github.com/ess-dmsc/forwarder@${FORWARDER_VERSION}" \
-      && micromamba run -n forwarder forwarder-launch --help > /dev/null \
+      && micromamba run -n forwarder git clone -q --depth 1 --branch "${FORWARDER_VERSION}" \
+         https://github.com/ess-dmsc/forwarder "$TWIN_FORWARDER_SRC" \
+      && echo "${FORWARDER_VERSION}" > "$TWIN_FORWARDER_SRC/TWIN_VERSION" \
+      && printf '#!/bin/sh\nexec /opt/conda/envs/forwarder/bin/python %s/forwarder_launch.py "$@"\n' \
+           "$TWIN_FORWARDER_SRC" > /opt/conda/envs/forwarder/bin/forwarder-launch \
+      && chmod +x /opt/conda/envs/forwarder/bin/forwarder-launch \
+      && /opt/conda/envs/forwarder/bin/forwarder-launch --help > /dev/null \
       && micromamba run -n forwarder python -c "import p4p.server"; \
     then echo "ESS forwarder ${FORWARDER_VERSION} installed"; \
     else micromamba env remove -y -n forwarder; echo "ESS forwarder NOT available on this architecture"; fi

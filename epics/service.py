@@ -43,12 +43,16 @@ def available():
     if not os.path.isfile(exe):
         return False, f"ESS forwarder not installed ({exe})"
     py = os.path.join(env_bin(), "python")
-    r = subprocess.run([py, "-c", "import importlib.metadata as m, p4p; print(m.version('forwarder'), p4p.__version__)"],
-                       capture_output=True, text=True, timeout=120)
+    r = subprocess.run([exe, "--help"], capture_output=True, text=True, timeout=120)
     if r.returncode != 0:
         return False, f"ESS forwarder does not run: {(r.stderr or r.stdout).strip()[-200:]}"
-    fw, p4p = r.stdout.split()
-    return True, f"ESS forwarder {fw}, p4p {p4p}"
+    r = subprocess.run([py, "-c", "import p4p; print(p4p.__version__)"], capture_output=True, text=True, timeout=120)
+    if r.returncode != 0:
+        return False, f"p4p does not run: {(r.stderr or r.stdout).strip()[-200:]}"
+    # the image runs the forwarder from its source tree (TWIN_FORWARDER_SRC, as ESS does); the release is written there
+    vf = os.path.join(os.environ.get("TWIN_FORWARDER_SRC", ""), "TWIN_VERSION")
+    fw = open(vf).read().strip() if os.path.isfile(vf) else "(release unknown)"
+    return True, f"ESS forwarder {fw}, p4p {r.stdout.strip()}"
 
 
 def topics(instrument):

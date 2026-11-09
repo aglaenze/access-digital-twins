@@ -432,6 +432,9 @@ _spec = importlib.util.spec_from_file_location("epics_service", os.path.join(TWI
 ep = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(ep)
 ep_usable, ep_what = ep.available()
+if fw_service.available()[0] and "--no-epics" not in sys.argv:
+    # where the file-writer is (Intel/AMD), the forwarder must be too: its absence is a failure, not a skip
+    check(ep_usable, f"ESS forwarder installed ({ep_what})")
 if "--no-epics" in sys.argv or not ep_usable or not fw_service.available()[0]:
     print("skipped: " + ("--no-epics" if "--no-epics" in sys.argv else ep_what if not ep_usable
                          else "no ESS file-writer here"))
