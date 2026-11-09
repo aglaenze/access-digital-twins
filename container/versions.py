@@ -54,6 +54,15 @@ def git_head(url, branch=None):
     return out[0] if out else "?"
 
 
+def git_latest_tag(url):
+    """The highest version tag of a git repository (tags with or without a leading v, e.g. v2.1.0 < 2.2.1)."""
+    out = subprocess.run(["git", "ls-remote", "--tags", "--refs", url], capture_output=True, text=True,
+                         timeout=60).stdout.split()
+    tags = [t.rsplit("/", 1)[1] for t in out if t.startswith("refs/tags/")]
+    tags = [t for t in tags if re.fullmatch(r"v?\d+(\.\d+)*", t)]
+    return max(tags, key=lambda t: tuple(int(x) for x in t.lstrip("v").split(".")), default="?")
+
+
 def fixed():
     """{name: (fixed version, where)} read from the files of this folder."""
     env, cf = open(ENV).read(), open(CONTAINERFILE).read()
@@ -64,7 +73,7 @@ def fixed():
     for n in PIP:
         m = re.search(rf"^\s+- {n}==([^\s#]+)", env, re.M)
         out[n] = (m.group(1) if m else "?", "environment-mcstas.yml (pip)")
-    for arg in ("LIVEDATA_VERSION", "NICOS_COMMIT", "JBI_COMMIT", "ODIN_COMMIT", "LOKI_COMMIT", "KAFKA_VERSION"):
+    for arg in ("LIVEDATA_VERSION", "FORWARDER_VERSION", "NICOS_COMMIT", "JBI_COMMIT", "ODIN_COMMIT", "LOKI_COMMIT", "KAFKA_VERSION"):
         m = re.search(rf"^ARG {arg}=(\S+)", cf, re.M)
         out[arg] = (m.group(1) if m else "?", "Containerfile")
     m = re.search(r"kafka-to-nexus (\w+)", cf)
@@ -76,6 +85,7 @@ LATEST = {
     **{n: (lambda n=n: conda_latest(n)) for n in CONDA + REPORT_CONDA},
     **{n: (lambda n=n: pypi_latest(n)) for n in PIP},
     "LIVEDATA_VERSION": lambda: github_release("scipp/esslivedata"),
+    "FORWARDER_VERSION": lambda: git_latest_tag("https://github.com/ess-dmsc/forwarder.git"),
     "NICOS_COMMIT": lambda: git_head("https://github.com/mlz-ictrl/nicos.git", "master"),
     "JBI_COMMIT": lambda: git_head("https://github.com/ess-dmsc/just-bin-it.git"),
     "ODIN_COMMIT": lambda: git_head("https://git.esss.dk/dmsc-instrumentmodels/odin.git"),
@@ -84,7 +94,7 @@ LATEST = {
     "kafka-to-nexus": lambda: git_head("https://github.com/ess-dmsc/kafka-to-nexus.git"),
     "KAFKA_VERSION": lambda: "(see kafka.apache.org)",
 }
-FOLLOWED = set(CONDA + PIP) | {"LIVEDATA_VERSION", "NICOS_COMMIT", "JBI_COMMIT"}
+FOLLOWED = set(CONDA + PIP) | {"LIVEDATA_VERSION", "FORWARDER_VERSION", "NICOS_COMMIT", "JBI_COMMIT"}
 
 
 def _unknown(v):
