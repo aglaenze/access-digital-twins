@@ -92,10 +92,40 @@ def start(instrument, twin="http://127.0.0.1:8765", logdir=None, brokers="127.0.
         time.sleep(10)
     run("forwarder", [os.path.join(b, "forwarder-launch"), "--config-topic", f"{brokers}/{config}",
                       "--status-topic", f"{brokers}/{status}", "--output-broker", brokers,
-                      "--pv-update-period", str(UPDATE_PERIOD_MS), "--service-id", f"twin-{instrument}"])
-    time.sleep(5)                                # (it subscribes to its configuration topic)
-    configure(rows, config, brokers)
+                      "--pv-update-period", str(UPDATE_PERIOD_MS), "--service-id", f"twin-{instrument}",
+                      "--verbosity", "Warning"])
+    n = configured(rows, config, status, brokers)
+    print(f"  forwarder configured: {n} PVs relayed", flush=True)
     return procs
+
+
+def configured(rows, config_topic, status_topic, brokers="127.0.0.1:9092", timeout=120):
+    """Sends the configuration until the forwarder reports the PVs it relays (status x5f2 messages, every few s).
+    The forwarder reads its configuration topic from its end once it has joined its consumer group: a configuration
+    sent before that is not seen. Returns the number of PVs it relays."""
+    from confluent_kafka import Consumer
+    from streaming_data_types.status_x5f2 import deserialise_x5f2
+    c = Consumer({"bootstrap.servers": brokers, "group.id": f"twin-epics-{os.getpid()}",
+                  "auto.offset.reset": "latest", "enable.auto.commit": False})
+    c.subscribe([status_topic])
+    t0, sent = time.time(), 0.0
+    try:
+        while time.time() - t0 < timeout:
+            if time.time() - sent > 10:
+                configure(rows, config_topic, brokers)
+                sent = time.time()
+            m = c.poll(1.0)
+            if m is None or m.error():
+                continue
+            try:
+                streams = json.loads(deserialise_x5f2(m.value()).status_json).get("streams", [])
+            except Exception:                    # noqa: BLE001  (another message on the status topic)
+                continue
+            if streams:
+                return len(streams)
+    finally:
+        c.close()
+    raise RuntimeError(f"the forwarder relays no PV after {timeout} s (see its log)")
 
 
 def configure(rows, config_topic, brokers="127.0.0.1:9092"):
