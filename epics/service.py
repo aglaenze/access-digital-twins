@@ -46,7 +46,7 @@ def available():
     r = subprocess.run([exe, "--help"], capture_output=True, text=True, timeout=120)
     if r.returncode != 0:
         return False, f"ESS forwarder does not run: {(r.stderr or r.stdout).strip()[-200:]}"
-    r = subprocess.run([py, "-c", "import p4p; print(p4p.__version__)"], capture_output=True, text=True, timeout=120)
+    r = subprocess.run([py, "-c", "import importlib.metadata as m, p4p.server; print(m.version('p4p'))"], capture_output=True, text=True, timeout=120)
     if r.returncode != 0:
         return False, f"p4p does not run: {(r.stderr or r.stdout).strip()[-200:]}"
     # the image runs the forwarder from its source tree (TWIN_FORWARDER_SRC, as ESS does); the release is written there
