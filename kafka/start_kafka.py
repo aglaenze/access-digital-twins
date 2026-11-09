@@ -62,7 +62,8 @@ def answers(port=PORT, host="127.0.0.1"):
 
 
 def cluster_id():
-    """Random cluster id in the Kafka format: 16 bytes, base64 (URL alphabet) without padding."""
+    """Random cluster id in the Kafka format: 16 bytes, base64 (URL alphabet) without padding. It can start with "-":
+    give it as --cluster-id=<id> (as "-t <id>", the storage tool took it for an option once in 64 starts)."""
     return base64.urlsafe_b64encode(uuid.uuid4().bytes).decode().rstrip("=")
 
 
@@ -137,7 +138,8 @@ def main():
     with open(props, "w", encoding="utf-8") as f:
         f.write(PROPERTIES)
     if not os.path.isfile(os.path.join(DATA, "logs", "meta.properties")):        # first start: format the storage
-        subprocess.run(java("kafka.tools.StorageTool", "format", "-t", cluster_id(), "-c", props, heap="-Xmx256M"),
+        subprocess.run(java("kafka.tools.StorageTool", "format", f"--cluster-id={cluster_id()}", "-c", props,
+                            heap="-Xmx256M"),
                        check=True)
     p = subprocess.Popen(java("kafka.Kafka", props))
     t0 = time.time()
