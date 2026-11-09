@@ -19,6 +19,17 @@ RUN git clone https://github.com/ess-dmsc/event-formation-unit.git /src && cd /s
     && git log -1 --format="event-formation-unit %H %cd" | tee /EFU_VERSION
 WORKDIR /src/build
 RUN conan install .. --build=missing --profile=linux_x86_64_gcc11
+# One correction (efu/README.md, "Correction"): at each new pulse the timepix3 module changes the reference time of the
+# event message without publishing the neutrons already in it (setReferenceTime), so the last neutrons of a pulse
+# leave with the time of the next pulse; checkAndSetReferenceTime publishes them first (the counter
+# produce.cause.pulse_change of the module counts this). EFU_PATCH=0 builds the sources as they are.
+ARG EFU_PATCH=1
+RUN f=/src/src/modules/timepix3/handlers/PixelEventHandler.cpp; \
+    if [ "$EFU_PATCH" = 1 ]; then \
+      grep -q 'serializer.setReferenceTime(lastEpochESSPulseTime->pulseTimeInEpochNs)' "$f" \
+        || { echo "EFU correction: the line is no longer in $f"; exit 1; }; \
+      sed -i 's/serializer.setReferenceTime(lastEpochESSPulseTime->pulseTimeInEpochNs)/serializer.checkAndSetReferenceTime(lastEpochESSPulseTime->pulseTimeInEpochNs)/' "$f" \
+      && echo "correction: flush at pulse change" >> /EFU_VERSION; fi
 RUN cmake -DCMAKE_BUILD_TYPE=Release .. && make -j"$(nproc)" timepix3 loki
 # libcrypt.so.2: may be needed by a prebuilt Conan package of ECDC (as for kafka-to-nexus, filewriter/Containerfile);
 # built from the sources of libxcrypt, used only if a library is missing below

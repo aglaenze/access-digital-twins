@@ -24,6 +24,21 @@ the readout is known exactly, and `timepix3_readout.expected()` predicts it:
 * **Merged neutrons.** Two neutrons in the same pixel at the same nanosecond are one flash for the camera, so the EFU
   publishes one neutron. Two neutrons within 1 ns whose pixels touch also make one cluster (pile-up).
 
+## Correction made to the EFU
+
+The test found a defect in the EFU's timepix3 module. At each new pulse, `handlers/PixelEventHandler.cpp` changes
+the reference time of the ev44 message with `serializer.setReferenceTime()`. That call does not first publish the
+neutrons already in the message, so the last neutrons of a pulse leave with the time of the next pulse.
+
+* In the test, these were 4007 neutrons of pulse 0 and 2462 of pulse 1, with their times of flight still counted from
+  their own pulse.
+* At ESS it should happen too: pulses come every 71 ms, and the EFU otherwise publishes only every second.
+* `EV44Serializer::checkAndSetReferenceTime()` publishes them first. The counter `produce.cause.pulse_change` of the
+  module counts that, so it was the intent.
+
+The image is built with this one-line change (`EFU_PATCH=1` in the `Containerfile`, written in `/opt/efu/EFU_VERSION`).
+The build stops if the line changes upstream. It is worth reporting to ECDC.
+
 ## Steps
 
 1. **Build.** `.github/workflows/efu.yml` builds the EFU as ECDC does: Ubuntu 22.04, Conan 1, profile
