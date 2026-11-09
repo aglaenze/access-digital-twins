@@ -1,0 +1,51 @@
+# The ESS Event Formation Unit (EFU, ECDC), built from its sources: step 1 of efu/README.md.
+# Built by GitHub Actions (.github/workflows/efu.yml); the image is ghcr.io/aglaenze/access-digital-twins-efu.
+#   docker build -f efu/Containerfile -t efu .
+#   docker run --rm efu timepix3 --help
+# The EFU reads the raw UDP readout of a detector and publishes the neutron events to Kafka (ev44). One program per
+# detector type: timepix3 (ODIN's camera) and loki (LoKI's CAEN readout). The version is the ref EFU_REF (a commit of
+# github.com/ess-dmsc/event-formation-unit, the mirror of gitlab.esss.lu.se/ecdc/ess-dmsc/event-formation-unit; its
+# tags stop in 2020). Built as ECDC builds it (.gitlab-ci.yml: ubuntu2204_gcc11_release): Conan 1, profile
+# linux_x86_64_gcc11, CMake.
+FROM ubuntu:22.04 AS build
+ARG EFU_REF=master
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential git python3-pip pkg-config curl ca-certificates perl autoconf automake libtool xz-utils \
+    && rm -rf /var/lib/apt/lists/* \
+    && pip3 install --no-cache-dir "conan<2" "cmake>=3.26,<4"
+RUN conan config install https://github.com/ess-dmsc/conan-configuration.git
+RUN git clone https://github.com/ess-dmsc/event-formation-unit.git /src && cd /src && git checkout "$EFU_REF" \
+    && git log -1 --format="event-formation-unit %H %cd" | tee /EFU_VERSION
+WORKDIR /src/build
+RUN conan install .. --build=missing --profile=linux_x86_64_gcc11
+RUN cmake -DCMAKE_BUILD_TYPE=Release .. && make -j"$(nproc)" timepix3 loki
+# libcrypt.so.2: may be needed by a prebuilt Conan package of ECDC (as for kafka-to-nexus, filewriter/Containerfile);
+# built from the sources of libxcrypt, used only if a library is missing below
+RUN curl -fsSL https://github.com/besser82/libxcrypt/releases/download/v4.4.36/libxcrypt-4.4.36.tar.xz \
+       | tar -xJ -C /tmp && cd /tmp/libxcrypt-4.4.36 \
+    && ./configure --prefix=/opt/xcrypt --disable-obsolete-api --disable-static --disable-werror > /dev/null \
+    && make -j"$(nproc)" > /dev/null && make install > /dev/null
+# the programs and the shared libraries they need, in one folder (as ECDC's .ci/docker/Dockerfile.deploy: bin, lib)
+RUN mkdir -p /dist/bin /dist/lib \
+    && for p in timepix3 loki; do cp "$(find /src/build -type f -name $p -perm -u+x | head -1)" /dist/bin/; done \
+    && cp -a /src/build/lib/. /dist/lib/ 2>/dev/null; \
+    find /root/.conan/data -path '*/package/*/lib/*.so*' \( -type f -o -type l \) -exec cp -a {} /dist/lib/ \; ; \
+    cp /EFU_VERSION /dist/ && ls /dist/bin
+RUN for pass in 1 2 3; do \
+      for n in $(LD_LIBRARY_PATH=/dist/lib ldd /dist/bin/* /dist/lib/*.so* 2>/dev/null \
+                 | awk '/not found/ {print $1}' | sort -u); do \
+        f="$(find / -xdev -name "$n" \( -type f -o -type l \) -not -path '/dist/*' 2>/dev/null | head -1)"; \
+        echo "missing $n: found at '$f'"; [ -n "$f" ] && cp -L "$f" /dist/lib/; \
+      done; \
+    done; true
+# every library found (otherwise the build stops here)
+RUN for p in /dist/bin/*; do if LD_LIBRARY_PATH=/dist/lib ldd "$p" | grep "not found"; then exit 1; fi; done
+
+FROM ubuntu:22.04
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=build /dist /opt/efu
+COPY efu/configs /opt/efu/configs
+ENV PATH="/opt/efu/bin:${PATH}" LD_LIBRARY_PATH="/opt/efu/lib"
+CMD ["timepix3", "--help"]

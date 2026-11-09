@@ -1,0 +1,79 @@
+# Step 1 of efu/README.md: build the ESS Event Formation Unit (EFU: timepix3 for ODIN, loki for LoKI) from its
+# sources, check that it runs, publish the image ghcr.io/aglaenze/access-digital-twins-efu; then step 2: the raw
+# readout of ODIN's camera made by the twin (efu/timepix3_readout.py), read by the EFU, compared with the neutrons sent.
+name: efu
+
+on:
+  push:
+    branches: [main]
+    paths: ["efu/**", ".github/workflows/efu.yml"]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "event-formation-unit ref (commit or branch)"
+        default: "master"
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 300
+    steps:
+      - name: Free disk space on the runner
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+          df -h /
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build the EFU
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: efu/Containerfile
+          load: true
+          tags: efu:test
+          build-args: EFU_REF=${{ github.event.inputs.ref || 'master' }}
+          cache-from: type=gha,scope=efu
+          cache-to: type=gha,mode=max,scope=efu
+      - name: It runs
+        run: |
+          docker run --rm efu:test cat /opt/efu/EFU_VERSION
+          docker run --rm efu:test timepix3 --help | head -60
+          docker run --rm efu:test loki --help > /dev/null
+      - name: Publish
+        if: github.event_name != 'pull_request'
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker tag efu:test "ghcr.io/${{ github.repository }}-efu:latest"
+          docker push "ghcr.io/${{ github.repository }}-efu:latest"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: ODIN's camera played by the twin, read by the EFU
+        run: |
+          pip install --quiet h5py numpy "confluent-kafka>=2.14,<3" "ess-streaming-data-types>=0.27,<0.28" pooch essimaging
+          python efu/timepix3_readout.py                    # the coding checked without the EFU
+          docker run -d --name kafka --network host \
+            -e KAFKA_NODE_ID=1 -e KAFKA_PROCESS_ROLES=broker,controller \
+            -e KAFKA_LISTENERS=PLAINTEXT://127.0.0.1:9092,CONTROLLER://127.0.0.1:9093 \
+            -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://127.0.0.1:9092 -e KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER \
+            -e KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT \
+            -e KAFKA_CONTROLLER_QUORUM_VOTERS=1@127.0.0.1:9093 -e KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1 \
+            -e KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1 -e KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1 \
+            -e KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS=0 -e KAFKA_NUM_PARTITIONS=1 \
+            -e KAFKA_MESSAGE_MAX_BYTES=16777216 -e KAFKA_REPLICA_FETCH_MAX_BYTES=16777216 apache/kafka:3.9.1
+          kafka_up() { python -c "from confluent_kafka.admin import AdminClient; AdminClient({'bootstrap.servers': '127.0.0.1:9092'}).list_topics(timeout=5)" 2>/dev/null; }
+          for i in $(seq 60); do kafka_up && break; sleep 3; done
+          kafka_up || { docker logs kafka 2>&1 | tail -60; exit 1; }
+          ODIN_SRC=$(python -c "import ess.odin.data as d; print(d.iron_simulation_ob_small())")
+          python efu/e2e_test.py --src "$ODIN_SRC" --create-topic
+          docker run -d --name efu --network host efu:test timepix3 -f /opt/efu/configs/odin_timepix3.json \
+            --nohwcheck -b 127.0.0.1:9092 -t odin_detector -p 9000
+          sleep 10
+          status=0
+          timeout 900 python -u efu/e2e_test.py --src "$ODIN_SRC" || status=1
+          echo "--- the EFU"; docker ps -a --filter name=efu; docker logs efu 2>&1 | tail -80
+          exit $status
