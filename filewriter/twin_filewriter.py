@@ -229,6 +229,32 @@ def snapshot_messages(src, t_ns, settings=None):
     return out
 
 
+MARKER = "twin_topic_marker"       # a source name no stream of a job uses: the file-writer reads, then drops it
+
+
+def topic_markers(structure, t_ns):
+    """[(t_ns, topic, payload)]: one message (source MARKER) on each topic of the nexus structure of a job, published
+    just before it. At the start of a job, kafka-to-nexus looks on each topic for the first message of the last 10 s (offsets for time,
+    BeforeStartTime); on a topic without one (empty, or quiet for 10 s: the detector of the twin between two
+    measurements) it reads from the end of the topic, wherever that is when it gets there: the first neutrons sent
+    after the start could be lost (2026-11-09: 22 of the 46 events of a dark job of ODIN). With a marker, it starts
+    from the marker. Its source is in no job: it is not written. On a topic of events: an ev44 message without events
+    (just-bin-it reads those topics too, and only ev44)."""
+    from streaming_data_types import serialise_ev44
+    kinds = {}
+    def walk(node):
+        if isinstance(node, dict):
+            c = node.get("config")
+            if node.get("module") in PUBLISHED and isinstance(c, dict) and c.get("topic"):
+                kinds.setdefault(c["topic"], set()).add(node["module"])
+            for ch in node.get("children", []):
+                walk(ch)
+    walk(structure)
+    empty = np.zeros(0, np.int32)
+    return [(int(t_ns), t, serialise_ev44(MARKER, 0, np.array([t_ns], np.int64), np.array([0], np.int32), empty, empty)
+             if "ev44" in m else _f144(MARKER, np.float64(0.0), t_ns)) for t, m in sorted(kinds.items())]
+
+
 def count_messages(twin_file, message_id=0):
     """[(t_ns, topic, payload)] of one measurement of the twin (its NeXus file): one ev44 message per pulse with
     neutrons and per detector bank or monitor, and the device values recorded during the measurement (f144). The

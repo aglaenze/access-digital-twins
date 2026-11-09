@@ -145,7 +145,8 @@ def main():
     # writes the last value before the start
     tf.ensure_topics(a.brokers, tf.structure_topics(structure))
     job_start = time.time_ns() + 50_000_000
-    sent = tf.publish(producer, tf.snapshot_messages(a.src, job_start - 1_000_000))
+    sent = tf.publish(producer, tf.snapshot_messages(a.src, job_start - 1_000_000)
+                      + tf.topic_markers(structure, job_start - 1_000_000))
     print(f"device values before the start: {sent} messages")
     fw_file = os.path.join(root, "out", f"{instr}_job_000001.hdf")
     job = control.start(structure, fw_file, instr, start_ns=job_start, timeout=120)

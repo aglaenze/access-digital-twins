@@ -88,6 +88,10 @@ files (they are not data of the instrument): the twin keeps writing its own file
   message published just after the start command can be missed (it was: chopper setpoints missing). As the EPICS
   forwarder at ESS, the twin publishes the value of every device before the start command, stamped 1 ms before the
   start; the file-writer keeps the last value before the start of each device and writes it (`SourceFilter`).
+  The same holds for the neutrons: the detector topic is empty before the first measurement and quiet between two;
+  the first events after the start were then sometimes lost (22 of 46 in a dark job of ODIN). The twin therefore also
+  publishes a marker on each topic of the job (`topic_markers`: source `twin_topic_marker`, in no job, so not written;
+  on an event topic an ev44 message without events), and the file-writer reads each topic from it.
 * **The time zones** (`tzdata`) in its image (it writes the time of the file).
 * After its "finished writing" message (`wrdn`) it opens the file once more to add the metadata (start and end times):
   read the file only once it is closed (`compare.open_fw` waits).

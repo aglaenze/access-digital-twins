@@ -109,7 +109,8 @@ def _fw_start(args):
     # devices from the real file
     start_ns = time.time_ns() + 50_000_000
     settings = INSTR.nexus_logs() if hasattr(INSTR, "nexus_logs") else None
-    tf.publish(FW["producer"], tf.snapshot_messages(src, start_ns - 1_000_000, settings))
+    tf.publish(FW["producer"], tf.snapshot_messages(src, start_ns - 1_000_000, settings)
+               + tf.topic_markers(structure, start_ns - 1_000_000))
     job = FW["control"].start(structure, path, INSTR_NAME, start_ns=start_ns)
     FW.update(job=job, file=path, twin_files=[])
     return dict(job=job, file=path)
