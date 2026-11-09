@@ -8,6 +8,7 @@ Checked:
     1 ns, pixel), all the measurements of the job together;
   * the devices: every value the twin recorded during its measurements is in the file-writer's file, at the same
     time;
+  * every device has a value (the one at the start of the job at least);
   * the attributes of every stream group (a log can be a transformation: depends_on, vector...);
   * the run: title, sample name, start and end times present;
   * entry/twin, if the start command gave it (LoKI): the settings of the twin at the start of the job, as in its file.
@@ -122,6 +123,17 @@ def compare(fw_file, twin_files, log=print):
             say(not missing, f"device values recorded during the measurements: {n_values - len(missing)} of "
                              f"{n_values} in the file-writer's file" + ("" if not missing else
                                                                        ": missing " + "; ".join(missing[:5])))
+            # every device has a value (at least the one given at the start of the job)
+            empty = []
+            n_dev = 0
+            for path, module, source, topic in st:
+                if module != "f144" or "value" not in twins[0][path] or twins[0][path]["value"].shape[:1] == (0,):
+                    continue
+                n_dev += 1
+                if path not in fw or "value" not in fw[path] or fw[path]["value"].shape[:1] == (0,):
+                    empty.append(f"{path} ({source} on {topic})")
+            say(not empty, f"devices with a value in the file-writer's file: {n_dev - len(empty)} of {n_dev}" +
+                ("" if not empty else "; none for " + "; ".join(empty[:8])))
             # the attributes of every stream group (e.g. depends_on, vector: a log that is a transformation)
             bad_attrs = []
             for path, module, source, topic in st:

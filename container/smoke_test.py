@@ -292,12 +292,18 @@ else:
                                        f"({out.count('same data')} of 3)")
     fw, tw = job_files("odin", 1235)
     if len(fw) == 3 and len(tw) == 3:
-        a = red.reduce(fw[2], fw[1], dark=fw[0])
-        b = red.reduce(tw[2], tw[1], dark=tw[0])
-        print(f"transmission 2.2-3.8 A from the file-writer's files: {np.nanmean(a['spectrum'].values[band]):.3f} "
-              f"(NCrystal {np.mean(T_nc):.3f}); normalization: file-writer {a['normalization']}, twin {b['normalization']}")
-        check(same(a["spectrum"], b["spectrum"]) and same(a["image"], b["image"]),
-              "ODIN: essimaging gives the same transmission (spectrum and image) from the file-writer's files")
+        try:
+            a = red.reduce(fw[2], fw[1], dark=fw[0])
+            b = red.reduce(tw[2], tw[1], dark=tw[0])
+            print(f"transmission 2.2-3.8 A from the file-writer's files: {np.nanmean(a['spectrum'].values[band]):.3f} "
+                  f"(NCrystal {np.mean(T_nc):.3f}); normalization: file-writer {a['normalization']}, "
+                  f"twin {b['normalization']}")
+            check(same(a["spectrum"], b["spectrum"]) and same(a["image"], b["image"]),
+                  "ODIN: essimaging gives the same transmission (spectrum and image) from the file-writer's files")
+        except Exception as e:                      # noqa: BLE001  (the LoKI part still runs)
+            import traceback
+            traceback.print_exc()
+            check(False, f"ODIN: reduction of the file-writer's files: {type(e).__name__}: {e}")
     else:
         check(False, f"ODIN: files of the jobs ({len(fw)} of the file-writer, {len(tw)} of the twin; 3 expected)")
     # LoKI: empty beam, solvent, sample, one job each, reduced with esssans
@@ -318,10 +324,15 @@ else:
     if len(fw) == 3 and len(tw) == 3:
         import loki_reduction as lred
         banks = ["loki_detector_0", "loki_detector_1", "loki_detector_5"]
-        a = lred.reduce(fw[2], background=fw[1], empty_beam=fw[0], banks=banks)
-        b = lred.reduce(tw[2], background=tw[1], empty_beam=tw[0], banks=banks)
-        check(all(same(a[k], b[k]) for k in banks),
-              "LoKI: esssans gives the same I(Q) (rear, middle and front banks) from the file-writer's files")
+        try:
+            a = lred.reduce(fw[2], background=fw[1], empty_beam=fw[0], banks=banks)
+            b = lred.reduce(tw[2], background=tw[1], empty_beam=tw[0], banks=banks)
+            check(all(same(a[k], b[k]) for k in banks),
+                  "LoKI: esssans gives the same I(Q) (rear, middle and front banks) from the file-writer's files")
+        except Exception as e:                      # noqa: BLE001
+            import traceback
+            traceback.print_exc()
+            check(False, f"LoKI: reduction of the file-writer's files: {type(e).__name__}: {e}")
     else:
         check(False, f"LoKI: files of the jobs ({len(fw)} of the file-writer, {len(tw)} of the twin; 3 expected)")
 
