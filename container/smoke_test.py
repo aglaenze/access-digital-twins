@@ -270,6 +270,28 @@ def same(a, b):
             and (a.variances is None or np.array_equal(a.variances, b.variances, equal_nan=True)))
 
 
+def odin_mismatch(fw, tw, a, b):
+    """Where the reductions of the file-writer's and the twin's ODIN files differ (printed when they do)."""
+    for what in ("spectrum", "image"):
+        x, y = a[what].values, b[what].values
+        d = np.abs(x - y)[np.isfinite(x) & np.isfinite(y)]
+        print(f"  {what}: {int((d > 0).sum())} of {x.size} bins differ, by up to {d.max() if d.size else 0:.3g}; "
+              f"non-finite bins {int((~np.isfinite(x)).sum())} / {int((~np.isfinite(y)).sum())}")
+    for f, t in zip(fw, tw):
+        kf, kt = red._chopper_fingerprint(f), red._chopper_fingerprint(t)
+        print(f"  {os.path.basename(f)} / {os.path.basename(t)}: chopper fingerprints "
+              + ("same" if kf == kt else f"DIFFER: {[(p, q) for p, q in zip(kf, kt) if p != q]}"))
+        ea, eb = red.events(f), red.events(t)
+        na, nb = ea.bins.size().values.ravel(), eb.bins.size().values.ravel()
+        la = np.sort(np.nan_to_num(ea.bins.concat().value.coords["wavelength"].values, nan=-1))
+        lb = np.sort(np.nan_to_num(eb.bins.concat().value.coords["wavelength"].values, nan=-1))
+        msg = "same" if len(la) == len(lb) and np.array_equal(la, lb) else (
+            f"{int((la != lb).sum())} of {len(la)} differ, by up to {np.abs(la - lb).max():.3g} A"
+            if len(la) == len(lb) else f"{len(la)} / {len(lb)} events")
+        print(f"    events per pixel {'same' if np.array_equal(na, nb) else 'DIFFERENT'}; wavelengths {msg}; "
+              f"duration {red.duration(f)} / {red.duration(t)}; charge {red.proton_charge(f)} / {red.proton_charge(t)}")
+
+
 step("ESS file-writer: NICOS jobs written by kafka-to-nexus, then reduced as the twin's own files (ODIN, LoKI)")
 sys.path.insert(0, os.path.join(TWIN, "filewriter"))
 import service as fw_service                          # noqa: E402
@@ -298,8 +320,10 @@ else:
             print(f"transmission 2.2-3.8 A from the file-writer's files: {np.nanmean(a['spectrum'].values[band]):.3f} "
                   f"(NCrystal {np.mean(T_nc):.3f}); normalization: file-writer {a['normalization']}, "
                   f"twin {b['normalization']}")
-            check(same(a["spectrum"], b["spectrum"]) and same(a["image"], b["image"]),
-                  "ODIN: essimaging gives the same transmission (spectrum and image) from the file-writer's files")
+            ok = same(a["spectrum"], b["spectrum"]) and same(a["image"], b["image"])
+            if not ok:
+                odin_mismatch(fw, tw, a, b)
+            check(ok, "ODIN: essimaging gives the same transmission (spectrum and image) from the file-writer's files")
         except Exception as e:                      # noqa: BLE001  (the LoKI part still runs)
             import traceback
             traceback.print_exc()
