@@ -60,6 +60,27 @@ def common(a, b):
     return int(np.minimum(ca[ia], cb[ib]).sum())
 
 
+def efu_stats(host="127.0.0.1", port=8888, show=("rx", "readouts", "handlers", "events", "produce", "receive")):
+    """The counters of the EFU (its command port: STAT_GET_COUNT, STAT_GET i), those whose name contains a word of
+    `show` and is not zero."""
+    import socket
+
+    def ask(s, cmd):
+        s.sendall((cmd + "\n").encode())
+        return s.recv(4096).decode(errors="replace").strip("\x00\n ")
+    try:
+        with socket.create_connection((host, port), timeout=5) as s:
+            n = int(ask(s, "STAT_GET_COUNT").split()[-1])
+            out = []
+            for i in range(1, n + 1):
+                _, name, value = (ask(s, f"STAT_GET {i}").split() + ["", "", ""])[:3]
+                if value not in ("0", "") and any(w in name for w in show):
+                    out.append(f"{name} {value}")
+            return out
+    except Exception as e:                      # noqa: BLE001  (diagnostic only)
+        return [f"(no counters: {e})"]
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--src", required=True)
@@ -68,6 +89,7 @@ def main():
     ap.add_argument("--port", type=int, default=9000)
     ap.add_argument("--topic", default="odin_detector")
     ap.add_argument("--max-events", type=int, default=0)
+    ap.add_argument("--pause-us", type=float, default=1000, help="pause between UDP packets")
     ap.add_argument("--create-topic", action="store_true", help="only create the topic, then exit")
     a = ap.parse_args()
 
@@ -99,7 +121,7 @@ def main():
     print(f"{len(payloads)} UDP packets ({sum(map(len, payloads)) / 1e6:.1f} MB) made in {time.time() - t:.1f} s",
           flush=True)
     t = time.time()
-    tr.send(payloads, a.host, a.port, pause_s=200e-6)
+    tr.send(payloads, a.host, a.port, pause_s=a.pause_us * 1e-6)
     print(f"sent in {time.time() - t:.1f} s", flush=True)
 
     got = {}                                    # reference time -> (ids, tofs)
@@ -119,6 +141,15 @@ def main():
     c.close()
     print(f"the EFU published {n_got} neutrons in {sum(1 for v in got.values() if sum(map(len, v[0])))} pulses",
           flush=True)
+    print("counters of the EFU:\n  " + "\n  ".join(efu_stats()), flush=True)
+    # the EFU computes the pulse time as seconds x 1e9 + ns in floating point (dto/TimepixDataTypes.h, EVRDataEvent):
+    # about 256 ns lost at today's epoch times; its reference time is matched to the nearest pulse (within 10 µs)
+    for ref in list(got):
+        k = int(np.argmin(np.abs(etz - ref)))
+        if abs(int(etz[k]) - ref) <= 10_000 and int(etz[k]) != ref:
+            v = got.pop(ref)
+            g = got.setdefault(int(etz[k]), ([], []))
+            g[0].extend(v[0]), g[1].extend(v[1])
 
     start, n_sent, n_exp, n_match, n_extra, n_dup, bad_pulse = 0, 0, 0, 0, 0, 0, []
     for k, (t0, n) in enumerate(zip(etz, counts)):

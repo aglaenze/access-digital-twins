@@ -70,8 +70,10 @@ jobs:
           kafka_up || { docker logs kafka 2>&1 | tail -60; exit 1; }
           ODIN_SRC=$(python -c "import ess.odin.data as d; print(d.iron_simulation_ob_small())")
           python efu/e2e_test.py --src "$ODIN_SRC" --create-topic
+          # a receive buffer of 32 MB (the EFU asks for it; the kernel caps it at rmem_max)
+          sudo sysctl -w net.core.rmem_max=33554432 net.core.rmem_default=33554432
           docker run -d --name efu --network host efu:test timepix3 -f /opt/efu/configs/odin_timepix3.json \
-            --nohwcheck -b 127.0.0.1:9092 -t odin_detector -p 9000
+            --nohwcheck -b 127.0.0.1:9092 -t odin_detector -p 9000 --rxbuffer 33554432
           sleep 10
           status=0
           timeout 900 python -u efu/e2e_test.py --src "$ODIN_SRC" || status=1
