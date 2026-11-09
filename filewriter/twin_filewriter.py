@@ -341,6 +341,31 @@ def count_messages(twin_file, message_id=0):
     return out
 
 
+PULSE_NS = 1_000_000_000 / 14                 # ESS source: 14 pulses per second
+
+
+def tail_messages(twin_file, seconds=2.0):
+    """[(t_ns, topic, payload)]: empty ev44 messages (no neutrons) on every detector and monitor source of the
+    measurement, one per source pulse for `seconds` after its last pulse. The real detectors keep sending at every
+    pulse; esslivedata closes a batch only when a later pulse arrives (its clock is the time of the data), so without
+    them the last pulse of a count would never be reduced (1.8 % of the neutrons of a 10 s count of ODIN). Sent only
+    for esslivedata (twin_server.py): the file-writer would write them as pulses without neutrons."""
+    from streaming_data_types import serialise_ev44
+    out, empty = [], np.zeros(0, np.int32)
+    with h5py.File(twin_file, "r") as f:
+        st = [(p, s, t) for p, m, s, t in streams(f) if m == "ev44"]
+        last = [int(f[p]["event_time_zero"][-1]) for p, s, t in st if len(f[p]["event_time_zero"])]
+        if not last:
+            return out
+        t_last = max(last)
+        for k in range(1, int(round(seconds * 1e9 / PULSE_NS)) + 1):
+            t = int(round(t_last + k * PULSE_NS))
+            for p, source, topic in st:
+                out.append((t, topic, serialise_ev44(source, 0, np.array([t], np.int64), np.array([0], np.int32),
+                                                     empty, empty)))
+    return out
+
+
 def publish(producer, messages, pace=False, stop=None):
     """Sends [(t_ns, topic, payload)]; pace: each message not before its time (wall clock), as the instrument
     produces them. Returns the number sent."""

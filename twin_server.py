@@ -150,8 +150,10 @@ def _fw_publish(f):
     tf = _fw()
     if "producer" not in FW:
         FW["producer"] = tf.producer(os.environ.get("TWIN_KAFKA", "127.0.0.1:9092"))
-    th = threading.Thread(target=tf.publish, args=(FW["producer"], tf.count_messages(f)), kwargs=dict(pace=True),
-                          daemon=True)
+    msgs = tf.count_messages(f)
+    if _livedata():          # the detectors keep sending after the count: esslivedata then reduces its last pulse
+        msgs += tf.tail_messages(f)
+    th = threading.Thread(target=tf.publish, args=(FW["producer"], msgs), kwargs=dict(pace=True), daemon=True)
     th.start()
     return th
 

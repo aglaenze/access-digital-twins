@@ -30,7 +30,14 @@ dashboard answers, the ODIN image is started as from the dashboard (`service.sta
 command on `odin_livedata_commands`), a count of 10 s through `nexusfile_open`; the total that esslivedata publishes
 for NICOS (`timepix3_counts_total`) must equal the number of neutrons in the twin's file.
 
+After each count the twin sends 2 s of empty pulses (no neutrons) on every detector and monitor source
+(`twin_filewriter.tail_messages`), as the real detectors keep sending: esslivedata closes a batch only when a later
+pulse arrives (its clock is the time of the data), so without them the last pulse of a count was never reduced (found
+on GitHub, 2026-11-09: 1.8 % of the neutrons of a 10 s count of ODIN missing).
+
 ## Limits, still to do
+
+* With the ESS file-writer on as well, its files get these 2 s of empty pulses (pulses without neutrons: same data).
 
 * Only the counts that write a file (inside `nexusfile_open`) are published: a count outside a file (`write=false`)
   is not seen by esslivedata yet.
