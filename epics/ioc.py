@@ -49,6 +49,13 @@ MOTOR_FIELDS = {"MOVN": ("i", 0), "MISS": ("i", 0), "HOMF": ("i", 0), "HOMR": ("
                 "RDBD": ("d", 0.001)}
 
 
+def stamped(nt, value, **kws):
+    """A SharedPV of type nt starting at value, stamped now. The initial value must be made by the same nt object as
+    the PV (p4p: post() requires the exact type of open())."""
+    from p4p.server.thread import SharedPV
+    return SharedPV(nt=nt, initial=nt.wrap(value, timestamp=time.time()), **kws)
+
+
 def motor_pvs(m, types, twin, pvs, last):
     """The PVs of one motor record m (from GET /epics/motors) into pvs; VAL is writable."""
     from p4p.nt import NTScalar
@@ -72,11 +79,10 @@ def motor_pvs(m, types, twin, pvs, last):
         v, nt = number(field, "d", value)
         pvs[f"{base}.{field}"] = SharedPV(nt=nt, initial=v)
     for field, text in (("EGU", m["unit"]), ("DESC", m["desc"])):
-        pvs[f"{base}.{field}"] = SharedPV(nt=NTScalar("s"), initial=NTScalar("s").wrap(text, timestamp=time.time()))
+        pvs[f"{base}.{field}"] = stamped(NTScalar("s"), text)
     v, nt = number("RBV", types.get(f"{base}.RBV", "d"), m["value"], meta=True)
     pvs[f"{base}.RBV"] = SharedPV(nt=nt, initial=v)
-    pvs[f"{base}.DMOV"] = SharedPV(nt=NTScalar(types.get(f"{base}.DMOV", "l")),
-                                       initial=NTScalar(types.get(f"{base}.DMOV", "l")).wrap(1, timestamp=time.time()))
+    pvs[f"{base}.DMOV"] = stamped(NTScalar(types.get(f"{base}.DMOV", "l")), 1)
     last[f"{base}.RBV"], last[f"{base}.DMOV"] = m["value"], 1
 
     class Target:                                   # handler of VAL: a new target moves the twin's device
@@ -132,8 +138,7 @@ def main():
     for r in rows:
         if r["pv"] in pvs:                      # one PV can be written in several places of the file
             continue
-        pvs[r["pv"]] = SharedPV(nt=NTScalar(r["type"]),
-                                initial=NTScalar(r["type"]).wrap(r["value"], timestamp=time.time()))
+        pvs[r["pv"]] = stamped(NTScalar(r["type"]), r["value"])
         last[r["pv"]] = r["value"]
     conf = dict(LOCAL, **{k: os.environ[k] for k in LOCAL if k in os.environ})
     with Server(providers=[pvs], conf=conf, useenv=False):
@@ -149,7 +154,10 @@ def main():
             for r in rows:
                 pv, v = r["pv"], r["value"]
                 if pv in pvs and last.get(pv) != v:
-                    pvs[pv].post(v, timestamp=now)
+                    try:
+                        pvs[pv].post(v, timestamp=now)
+                    except Exception as e:      # noqa: BLE001  (one PV must not stop the IOC)
+                        print(f"{pv}: update to {v!r} failed: {e}", file=sys.stderr, flush=True)
                     last[pv] = v
 
 
