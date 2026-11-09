@@ -20,8 +20,10 @@ of `count_messages`): the forwarder does. It keeps publishing the neutrons and t
 come with the detector data. `compare.py` then checks the device values by value in force at their time (the
 forwarder stamps them with the time of the PV update), not by identical times.
 
-With `--epics`, the NICOS setup of ODIN (`nicos/nicos_twin/odin/setups/odin.py`) replaces the twin's devices `stage_x`
-and `stage_rot` (HTTP) by `EpicsMotor` devices on these records: `move(stage_x, 500)` writes 500 to
+With `--epics`, the twin's devices `stage_x` and `stage_rot` (HTTP) are replaced by `EpicsMotor` devices on these
+records, in the NICOS setup `sample_stage` (`nicos/nicos_twin/odin/setups/sample_stage.py`), which the startup code loads
+once NICOS is in master mode, as a setup chosen in the Setup panel at ESS (an EPICS device of NICOS created in slave
+mode stays in slave mode: `EpicsDevice._setMode` does not pass the mode on): `move(stage_x, 500)` writes 500 to
 `ODIN-SpSt1:MC-LinY-01:Mtr.VAL`, the soft IOC moves the twin (`DMOV` 1 -> 0 -> 1, `RBV` = 500 mm), the forwarder relays
 the new value to Kafka and the file-writer writes it, as at ESS. The motors of the twin are ideal: always enabled, no
 limit switch, no error, the target reached at once.

@@ -46,13 +46,8 @@ devices = dict(
     ),
 )
 
-# With the EPICS layer (start_nicos.py --epics), the sample stage is driven as at ESS: through the EPICS motor records
-# of the real instrument (served by the soft IOC of the twin, epics/ioc.py), with the motor class of ESS
+# With the EPICS layer (start_nicos.py --epics), the sample stage is driven as at ESS, through the EPICS motor records
+# of the real instrument: its devices are then in the setup 'sample_stage' (loaded by the startup code once NICOS is
+# in master mode, as a setup chosen in the Setup panel at ESS)
 if os.environ.get('TWIN_EPICS') == '1':
-    for name, record in (('stage_x', 'ODIN-SpSt1:MC-LinY-01:Mtr'), ('stage_rot', 'ODIN-SpSt1:MC-RotZ-01:Mtr')):
-        devices[name] = device('nicos_ess.devices.epics.pva.motor.EpicsMotor',
-            description = devices[name][1]['description'] + ' (EPICS motor record %s)' % record,
-            motorpv = record, monitor = True, pva = True, has_powerauto = False, has_errormsg = False,
-            has_errorbit = False, has_reseterror = False,
-        )
-
+    del devices['stage_x'], devices['stage_rot']

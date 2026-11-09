@@ -11,6 +11,9 @@ if Exp._mode != SIMULATION:
     try:
         SetMode('master')
         SetDetectors(det)
+        import os
+        if os.environ.get('TWIN_EPICS') == '1':     # the sample stage through its EPICS motor records
+            AddSetup('sample_stage')
     except Exception as err:
         printwarning('could not prepare the session: %s' % err)
 printinfo("============================================================")
