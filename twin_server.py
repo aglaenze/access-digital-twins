@@ -30,8 +30,9 @@ published at start and after each /move to the topic <instrument>_devices (f144 
 ESS file-writer.
 The ESS file-writer (kafka-to-nexus, filewriter/README.md; optional, Linux):
     POST /filewriter/start {"title", "proposal", "folder"}  -> {"job", "file"}: makes the template of the file-writer
-                 (from the real ESS file of the instrument, once), starts a job (pl72 on <instrument>_filewriter),
-                 publishes the last value of every device (f144); then each /count also publishes its neutrons and
+                 (from the real ESS file of the instrument, once), starts a job (pl72 on <instrument>_filewriter_pool,
+                 with the settings of the twin in entry/twin), publishes the value of every device (f144: the current
+                 settings of the twin); then each /count also publishes its neutrons and
                  device values (ev44, f144: topics and sources of the real file), at the times of its pulses, and
                  lasts the counting time (as on the instrument)
     POST /filewriter/stop {}  -> {"file", "error", "twin_files", "differences", "report"}: stops the job, waits for
@@ -99,12 +100,14 @@ def _fw_start(args):
     except Exception:                               # noqa: BLE001
         pass
     start_ns = time.time_ns()
+    # the settings of the twin in entry/twin (LoKI: the configuration its reduction needs), as NICOS at ESS writes
+    # the values of its devices into the start command
+    twin = INSTR.twin_settings() if hasattr(INSTR, "twin_settings") else None
     job = FW["control"].start(tf.nexus_structure(src, args.get("title", ""), str(args.get("proposal", "")),
-                                                 str(sample)), path, INSTR_NAME, start_ns=start_ns)
-    # the last value of every device, as the EPICS forwarder: from the twin's last file (its settings), or the real one
-    files = sorted(f for f in os.listdir(folder) if f.startswith(f"{INSTR_NAME}_0") and f.endswith(".nxs"))
-    last = os.path.join(folder, files[-1]) if files else src
-    tf.publish(FW["producer"], tf.snapshot_messages(last, start_ns + 1_000_000))
+                                                 str(sample), twin=twin), path, INSTR_NAME, start_ns=start_ns)
+    # the value of every device, as the EPICS forwarder: the current settings of the twin, the others from the real file
+    settings = INSTR.nexus_logs() if hasattr(INSTR, "nexus_logs") else None
+    tf.publish(FW["producer"], tf.snapshot_messages(src, start_ns + 1_000_000, settings))
     FW.update(job=job, file=path, twin_files=[])
     return dict(job=job, file=path)
 

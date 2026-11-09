@@ -452,6 +452,13 @@ class VirtualOdin:
         nx._replace(f[f"{nx.DET}/transformations"], "translation", np.float64(tw.DET_DIST))
         nx._replace(f["entry"], "experiment_description", b"ACCESS digital twin (McStas simulation)")
 
+    def nexus_logs(self, state=None):
+        """{path of the device in the file: value} of the settings, as count() writes them in each file: the values the
+        twin publishes at the start of a job of the ESS file-writer (as the EPICS forwarder)."""
+        st = state or self.status()
+        settings = self._nexus_settings() | nx.chopper_settings(st["choppers"], st["wfm_delta"])
+        return {f"entry/instrument/{k}": v for k, v in settings.items()}
+
     def _nexus_settings(self):
         out = {}
         for d in self.devices.values():

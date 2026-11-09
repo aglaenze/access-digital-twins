@@ -27,12 +27,13 @@ built on its `nicos_ess` counterpart:
 |---|---|---|
 | GUI | `guiconfig.py`: tabs Experiment, Setup, Instrument interaction (command line, output, scan plot, detector image, script status, devices), Scripting, History, Logs | **the same file** (copied), with small changes in `nicos_twin/gui.py`: workaround for a NICOS bug, scrolling on small screens, Apply button of the Experiment tab under the form, detector-image color levels recomputed for each new image (ODIN), device list that can be enlarged (the detector-image panel no longer blocks the splitter handle) |
 | Experiment | `EssExperiment`: proposal number, title, users, samples; look-up in the ESS user office | `TwinExperiment` = `EssExperiment` without the user-office look-up (type any proposal number) |
-| Data files | written by the ESS file-writer (Kafka), started by NICOS; `<instrument>/<year>/<proposal>/raw/` | written by the twin, one per count, in `<TWIN_RUN_ROOT>/data/<instrument>/<year>/<proposal>/raw/` |
+| Data files | written by the ESS file-writer (Kafka), started by NICOS; `<instrument>/<year>/<proposal>/raw/` | written by the twin, one per count, in `<TWIN_RUN_ROOT>/data/<instrument>/<year>/<proposal>/raw/`; with `--filewriter` (Linux x86-64, the app image) also by the real ESS file-writer, one per job (`../filewriter/README.md`) |
 | Recording commands | `nexusfile_open`, `start_filewriting`, `stop_filewriting`, `list_filewriting_jobs` (`nicos_ess.commands`) | the same commands (`nicos_twin.commands`) |
 | Devices | EPICS (motors, choppers...), detector data through Kafka | HTTP orders to the twin server; names of `nicos_ess` where they exist (LoKI: `heavy_shutter`, `fast_shutter`) |
 | Which instrument | the computer you sit at | `start_nicos.py` asks (or `--instrument`): like walking into a control room |
 
-What is not reproduced: EPICS, Kafka and the file-writer themselves (§ 9), and ESS accounts (local accounts, § 2).
+What is not reproduced: EPICS (§ 9) and ESS accounts (local accounts, § 2). Kafka (`--live`) and the ESS file-writer
+(`--filewriter`, `../filewriter/README.md`) are there as options.
 At ESS, everything recorded inside one `nexusfile_open` block goes into **one** file; the twin writes one file per
 count. The device setups of the real instruments are still thin (ODIN and LoKI are in commissioning): most twin devices
 have no ESS name yet, and keep the twin names.
@@ -168,8 +169,13 @@ silica spheres (69 million neutrons) streams 998 647 of them; the live image sho
 the beam stop, the arrival-time spectrum the wrap-around after 71.4 ms (the slowest neutrons appear at 0–13 ms).
 Before the count the twin publishes one empty pulse, as a real detector streams all the time (just-bin-it fails on an
 empty topic). The container test (`container/smoke_test.py`) checks
-that the histograms of just-bin-it hold all the streamed neutrons. Not reproduced: the ESS file-writer (the twin writes the
-file itself, before streaming), the EPICS forwarder (device values are not streamed).
+that the histograms of just-bin-it hold all the streamed neutrons. The ESS file-writer: `--filewriter` (below and
+`../filewriter/README.md`); the EPICS forwarder is played by the twin server for it (device values as f144).
+
+**The ESS file-writer** (`python nicos/start_nicos.py --instrument odin --filewriter`, or `TWIN_FILEWRITER=1`; Linux
+x86-64, the app image): the launcher starts the Kafka broker and kafka-to-nexus too; then, as at ESS, everything
+recorded inside one `nexusfile_open` block goes into one file of the file-writer (`<instrument>_job_NNNNNN.hdf`, in
+the proposal folder), next to the twin's own files, and NICOS prints the comparison of the two ("same data").
 
 Installation (route B, Windows): Java (`conda create -n kafka -c conda-forge openjdk=21`), Apache Kafka 3.9.1
 (`kafka_2.13-3.9.1.tgz` from archive.apache.org, unpacked in `~/McStas_runs`), just-bin-it
@@ -282,8 +288,8 @@ The commands are those of `../container/Containerfile`.
 ## 9. Still to do
 - Done (2026-11-05): the NICOS GUI in the browser (desktop of the container, noVNC). For a NICOS client on another
   computer, the daemon would have to be opened to the network with real passwords (it listens on `localhost`).
-- Closer to ESS: the twin publishing its events to Kafka and the real ESS file-writer writing the NeXus files (one
-  file per `nexusfile_open` block), and devices as simulated EPICS process variables, so that the unmodified
+- Done (2026-11-09): the real ESS file-writer writing the NeXus files (one file per `nexusfile_open` block),
+  `--filewriter`. Closer to ESS still: devices as simulated EPICS process variables, so that the unmodified
   `nicos_ess` setups can be used. To discuss with ESS (ECDC), who built such test set-ups (simulated AMOR, NeXus
   streamer).
 - Done (2026-11-04): LoKI in the container image.

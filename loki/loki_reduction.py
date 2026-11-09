@@ -236,6 +236,19 @@ def masks(file, bank, wf):
     return {"beam stop and shadows": mask}
 
 
+def settled_transform(transform):
+    """A time-dependent position (e.g. the detector carriage) reduced to one value, for essreduce
+    (TransformationTimeFilter: it refuses time-dependent positions by default). A file of the twin has one value per
+    log; a file of the ESS file-writer has every value received during the job: the one at its start (as the EPICS
+    forwarder gives it), then those of each measurement. The last one is used; a warning if they differ (the
+    detector moved during the job: one job per configuration, as at ESS)."""
+    v = transform.values
+    if not np.allclose(v, v[-1], rtol=1e-9, atol=1e-12):
+        warnings.warn(f"position changed during the measurement ({np.unique(v)}); the last value is used",
+                      stacklevel=2)
+    return transform.data[transform.dims[0], -1]
+
+
 def workflow(file, bank="loki_detector_0", wavelength_bins=None, q_bins=None, direct=None, flat=True):
     """LokiWorkflow with the parameters of the ESS notebook, for the configuration of `file`; flat: with the flat field
     of the pixels (flat_field)."""
@@ -244,7 +257,9 @@ def workflow(file, bank="loki_detector_0", wavelength_bins=None, q_bins=None, di
                                 LookupTableFilename, NeXusDetectorName, QBins, ReturnEvents, SampleRun,
                                 UncertaintyBroadcastMode, WavelengthBins)
     info = lnx.read_twin(file)
+    from ess.reduce.nexus.types import TransformationTimeFilter
     wf = loki.LokiWorkflow()
+    wf[TransformationTimeFilter] = settled_transform
     wf[NeXusDetectorName] = bank
     wf[WavelengthBins] = wavelength_bins if wavelength_bins is not None else sc.geomspace(
         "wavelength", float(info["l_min"]), float(info["l_max"]), 81, unit="angstrom")

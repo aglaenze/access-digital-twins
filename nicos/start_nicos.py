@@ -9,11 +9,13 @@ instrument computers): choosing the instrument here is like walking into its con
     python start_nicos.py --instrument odin --mode mcstas
     python start_nicos.py --instrument odin --no-gui --background   # no console needed (stop the process to end)
     python start_nicos.py --instrument odin --live   # live data as at ESS: Kafka broker + just-bin-it + setup "live"
+    python start_nicos.py --instrument odin --filewriter   # files written by the ESS file-writer (kafka-to-nexus), as
+                                                           # at ESS (Linux x86-64: the app container; TWIN_FILEWRITER=1)
 
 Two Python environments are used, on purpose: the twin (McStas, essimaging, numpy 2) in the Python running this launcher, NICOS
 (numpy < 2) in the conda env "nicos". They talk over HTTP on this computer only. Press Enter (or Ctrl+C) to stop all.
 Paths can be changed with the environment variables CONDA_ROOT, MCSTAS_PYTHON, NICOS_PYTHON, NICOS_ROOT,
-TWIN_RUN_ROOT; for --live: KAFKA_HOME, JAVA_HOME (see ../kafka/start_kafka.py) and JBI_HOME (sources of
+TWIN_RUN_ROOT; for --live and --filewriter: KAFKA_HOME, JAVA_HOME (see ../kafka/start_kafka.py) and JBI_HOME (sources of
 just-bin-it, default ~/McStas_runs/just-bin-it).
 Logs: <TWIN_RUN_ROOT>/nicos/*.log.
 """
@@ -120,6 +122,8 @@ def main():
     a.add_argument("--no-gui", action="store_true")
     a.add_argument("--background", action="store_true", help="do not wait for Enter (run until stopped)")
     a.add_argument("--live", action="store_true", help="live data: Kafka broker, just-bin-it and setup 'live'")
+    a.add_argument("--filewriter", action="store_true", default=os.environ.get("TWIN_FILEWRITER") == "1",
+                   help="the ESS file-writer writes the files of nexusfile_open (default: TWIN_FILEWRITER=1)")
     a.add_argument("--until-gui-closes", action="store_true",
                    help="stop everything when the NICOS window is closed (the control room of the app)")
     o = a.parse_args()
@@ -133,14 +137,27 @@ def main():
     if o.live and instr not in LIVE:
         print(f"Live data not available yet for {instr.upper()}: starting without it.")
         o.live = False
+    if o.filewriter:
+        sys.path.insert(0, os.path.join(TWIN, "filewriter"))
+        import service as fw_service
+        usable, what = fw_service.available()
+        if not usable:
+            print(f"The ESS file-writer is not available here ({what}): the twin writes the files itself.")
+            o.filewriter = False
     os.makedirs(LOGS, exist_ok=True)
     print(f"Starting the {instr.upper()} digital twin with NICOS:", flush=True)
     try:
-        if o.live:                 # data streaming as at ESS: Kafka broker, then just-bin-it (histograms for NICOS); its module
-            # just_bin_it.cli defines main() without calling it (installed as a script), hence the -c
+        if o.live or o.filewriter:     # data streaming as at ESS: the Kafka broker
             if not port_open(9092):
                 start("kafka", [MCSTAS_PY, os.path.join(TWIN, "kafka", "start_kafka.py")], cwd=TWIN)
                 wait_for(lambda: port_open(9092), "the Kafka broker", timeout=120)
+        if o.filewriter:               # the ESS file-writer (kafka-to-nexus), its topics created first
+            p = fw_service.start(instr, log=os.path.join(LOGS, "filewriter.log"))
+            PROCS.append(("filewriter", p))
+            print(f"  filewriter started (pid {p.pid}, {what}; it logs to syslog only)", flush=True)
+            time.sleep(5)              # (it subscribes to its job pool)
+        if o.live:                 # just-bin-it (histograms for NICOS); its module
+            # just_bin_it.cli defines main() without calling it (installed as a script), hence the -c
             subprocess.run([MCSTAS_PY, os.path.join(TWIN, "kafka", "start_kafka.py"), "--topics", instr],
                            check=True, cwd=TWIN)
             start("just_bin_it", [MCSTAS_PY, "-c", "from just_bin_it.cli import main; main()", "-b", "127.0.0.1:9092",
@@ -152,6 +169,7 @@ def main():
         wait_for(lambda: http_ok(f"http://127.0.0.1:{o.port}/status"), "the twin server")
         # TWIN_RUN_ROOT is read by the NICOS setups (cache database, data root)
         env = dict(os.environ, INSTRUMENT=f"nicos_twin.{instr}", TWIN_RUN_ROOT=RUN_ROOT,
+                   TWIN_FILEWRITER="1" if o.filewriter else "0",       # read by nicos_twin/commands.py
                    PYTHONPATH=os.pathsep.join([HERE, os.environ.get("PYTHONPATH", "")]).rstrip(os.pathsep))
         start("nicos_cache", [NICOS_PY, os.path.join(NICOS_ROOT, "bin", "nicos-cache")], env=env, cwd=NICOS_ROOT)
         wait_for(lambda: port_open(14869), "the NICOS cache")
@@ -163,7 +181,8 @@ def main():
                                capture_output=True, text=True, timeout=300, cwd=HERE)
             print("  setup 'live' loaded" if r.returncode == 0 else f"  setup 'live' NOT loaded: {r.stdout[-500:]}",
                   flush=True)
-        print(f"{instr.upper()} services ready{' (live data)' if o.live else ''}. NICOS daemon on localhost:1301 "
+        extras = [x for x, on in (("live data", o.live), ("ESS file-writer", o.filewriter)) if on]
+        print(f"{instr.upper()} services ready{' (' + ', '.join(extras) + ')' if extras else ''}. NICOS daemon on localhost:1301 "
               "(user student, password student).", flush=True)
         if not o.no_gui:
             start("nicos_gui", [NICOS_PY, os.path.join(NICOS_ROOT, "bin", "nicos-gui"),

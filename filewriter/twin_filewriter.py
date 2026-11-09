@@ -117,9 +117,21 @@ def _string(name, value):
     return {"module": "dataset", "config": {"name": name, "values": str(value), "dtype": "string"}}
 
 
-def nexus_structure(src, title="", proposal="", sample_name=""):
+def _value(name, value):
+    if isinstance(value, (bool, np.bool_)):
+        value = int(value)
+    if isinstance(value, (int, np.integer)):
+        return {"module": "dataset", "config": {"name": name, "values": int(value), "dtype": "int64"}}
+    if isinstance(value, (float, np.floating)):
+        return {"module": "dataset", "config": {"name": name, "values": float(value), "dtype": "double"}}
+    return _string(name, value)
+
+
+def nexus_structure(src, title="", proposal="", sample_name="", twin=None):
     """The nexus_structure (dict) of the start command: the groups down to every stream of `src`, each stream as its
-    writer module (same source and topic as in the real file), and the values of the run."""
+    writer module (same source and topic as in the real file), and the values of the run. twin: {name: value}, the
+    settings of the twin at the start of the job, written in entry/twin (NXcollection), as NICOS writes the values
+    of its devices into the start command at ESS (what the reduction of the twin needs, e.g. LoKI's configuration)."""
     root = {"children": []}
     nodes = {"": root}
 
@@ -141,6 +153,12 @@ def nexus_structure(src, title="", proposal="", sample_name=""):
     entry["children"] += [_string("title", title), _string("experiment_identifier", proposal),
                           {"module": "mdat", "config": {"items": ["start_time", "end_time"]}}]
     group("entry/sample")["children"].append(_string("name", sample_name))
+    if twin:
+        g = group("entry/twin")
+        g["attributes"] = [{"name": "NX_class", "values": "NXcollection"},
+                           {"name": "description", "values": "Digital twin: its settings at the start of the job "
+                                                             "(given by the start command, as NICOS does at ESS)"}]
+        g["children"] += [_value(k, v) for k, v in twin.items()]
     return root
 
 
@@ -150,16 +168,36 @@ def _f144(source, value, t_ns):
     return serialise_f144(source, value, int(t_ns))
 
 
-def snapshot_messages(src, t_ns):
-    """[(t_ns, topic, payload)]: the last value of every device of `src` (f144), stamped t_ns. At ESS the EPICS
-    forwarder publishes each PV when it changes; the file-writer then has a value for every device of the file."""
+# logs with a value at every source pulse, which the twin writes in its files with the neutrons (ODIN: the proton
+# charge, used to normalize): published with each measurement, never in the snapshot (a value at the start of a job
+# would count as one more pulse)
+PER_PULSE = ("entry/instrument/source/pulse_charge",)
+
+
+def snapshot_messages(src, t_ns, settings=None):
+    """[(t_ns, topic, payload)]: the value of every device of `src` (f144), stamped t_ns: its last value in `src`, or
+    the current setting of the twin given in `settings` ({path of the device in the file: value}; a device that is an
+    NXpositioner: its logs value and target_value). At ESS the EPICS forwarder publishes each PV when it changes;
+    the file-writer then has a value for every device of the file. Not the logs of PER_PULSE (the proton charge): those
+    come with the neutrons of each measurement."""
+    settings = settings or {}
+    over = {}
+    for p, v in settings.items():
+        for q in (p, f"{p}/value", f"{p}/target_value"):
+            over[q] = v
     out = []
     with h5py.File(src, "r") as f:
         for path, module, source, topic in streams(f, ("f144",)):
             v = f[path].get("value")
-            if v is None or v.shape[0] == 0 or v.dtype.name not in DTYPES:
+            if v is None or v.dtype.name not in DTYPES or path in PER_PULSE:
                 continue
-            out.append((int(t_ns), topic, _f144(source, np.asarray(v[-1]), t_ns)))
+            if path in over:
+                value = np.asarray(over[path], dtype=v.dtype)
+            elif v.shape[0]:
+                value = np.asarray(v[-1])
+            else:
+                continue
+            out.append((int(t_ns), topic, _f144(source, value, t_ns)))
     return out
 
 

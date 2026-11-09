@@ -11,8 +11,8 @@ and see <root> at the same path.
 What it does, as the twin and NICOS would:
   1. the template of the file-writer, from the real file (twin_filewriter.make_template);
   2. a "measurement" of the twin: the real file with its pulses moved to now (instead of a McStas simulation, so that
-     the test needs neither McStas nor the beam files);
-  3. start of the job (pl72, as NICOS: nexusfile_open), last values of all the devices (f144), the measurement
+     the test needs neither McStas nor the beam files), with settings of the twin (entry/twin);
+  3. start of the job (pl72, as NICOS: nexusfile_open; with entry/twin), last values of all the devices (f144), the measurement
      (ev44 and f144, at the times of its pulses), stop of the job (6s4t), wait for the file (wrdn);
   4. compare.py: the file of the file-writer against the twin's file.
 """
@@ -30,10 +30,19 @@ import compare                                  # noqa: E402
 import twin_filewriter as tf                    # noqa: E402
 
 
+# settings of the twin given in the start command (entry/twin), as the twin server does (LoKI: its configuration)
+TWIN = {"collimation": "3m", "detector_distance": "5.0", "l_min": 3.0, "pulseskip": 0}
+
+
 def fake_measurement(src, out, start_ns):
-    """The real file `src` with its pulses (and the device values recorded during them) moved to start at start_ns."""
+    """The real file `src` with its pulses (and the device values recorded during them) moved to start at start_ns,
+    and the settings TWIN in entry/twin (as in a file of the twin)."""
     shutil.copyfile(src, out)
     with h5py.File(out, "r+") as f:
+        tw = f["entry"].require_group("twin")
+        tw.attrs["NX_class"] = "NXcollection"
+        for k, v in TWIN.items():
+            tw.create_dataset(k, data=v, dtype=h5py.string_dtype() if isinstance(v, str) else None)
         st = tf.streams(f)
         ev = [p for p, m, *_ in st if m == "ev44" and len(f[p]["event_time_zero"])]
         t_min = min(int(f[p]["event_time_zero"][0]) for p in ev)
@@ -120,7 +129,8 @@ def main():
     os.makedirs(os.path.join(root, "out"), exist_ok=True)
     control = tf.FileWriterControl(a.brokers, f"{instr}_filewriter")
     producer = tf.producer(a.brokers)
-    structure = tf.nexus_structure(a.src, title="file-writer test", proposal="1000", sample_name="test sample")
+    structure = tf.nexus_structure(a.src, title="file-writer test", proposal="1000", sample_name="test sample",
+                                   twin=TWIN)
     n_modules = sum(1 for _ in _modules(structure))
     print(f"start command: {n_modules} streams")
 

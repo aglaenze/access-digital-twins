@@ -8,9 +8,10 @@ Checked:
     1 ns, pixel), all the measurements of the job together;
   * the devices: every value the twin recorded during its measurements is in the file-writer's file, at the same
     time;
-  * the run: title, sample name, start and end times present.
-Expected differences (reported, not errors): the file-writer has no entry/twin (the truths and settings of the twin
-are not data of the instrument); pulses without neutrons are not written by the file-writer; it has one file per job,
+  * the run: title, sample name, start and end times present;
+  * entry/twin, if the start command gave it (LoKI): the settings of the twin at the start of the job, as in its file.
+Expected differences (reported, not errors): the file-writer has no truths of the twin (not data of the instrument),
+and for ODIN no entry/twin at all; pulses without neutrons are not written by the file-writer; it has one file per job,
 the twin one per count.
 """
 import sys
@@ -32,6 +33,14 @@ def _events(g):
 def _sorted(t0, tof, pid):
     order = np.lexsort((pid, tof, t0))
     return t0[order], tof[order], pid[order]
+
+
+def _same_value(a, b):
+    a = a.decode() if isinstance(a, bytes) else a
+    b = b.decode() if isinstance(b, bytes) else b
+    if isinstance(a, str) or isinstance(b, str):
+        return str(a) == str(b)
+    return bool(np.allclose(np.asarray(a, float), np.asarray(b, float), rtol=1e-9, atol=0))
 
 
 def open_fw(path, wait=120):
@@ -111,7 +120,16 @@ def compare(fw_file, twin_files, log=print):
                 say(k in e, f"entry/{k}: " + (repr(e[k][()]) if k in e else "missing"))
             say("sample/name" in e, "entry/sample/name: " + (repr(e["sample/name"][()]) if "sample/name" in e
                                                              else "missing"))
-            lines.append("  note entry/twin (truths and settings of the twin) is only in the twin's own files")
+            # the settings of the twin at the start of the job (entry/twin, given by the start command; LoKI)
+            if "twin" in e:
+                mine = twins[0]["entry"].get("twin")
+                diff = [k for k in e["twin"] if mine is None or k not in mine
+                        or not _same_value(e["twin"][k][()], mine[k][()])]
+                say(not diff, f"entry/twin: {len(e['twin'])} settings of the twin at the start of the job, as in "
+                              "the twin's first file" + ("" if not diff else ": different " + ", ".join(diff[:8])))
+                lines.append("  note the truths of the twin (true_*) and the event sampling are only in its own files")
+            else:
+                lines.append("  note entry/twin (truths and settings of the twin) is only in the twin's own files")
             log(lines[-1])
         finally:
             for t in twins:

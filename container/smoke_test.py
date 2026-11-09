@@ -8,7 +8,10 @@
    10 min; Guinier fit compared with the exact radius of gyration and I(0);
 4. live data (if Kafka is installed: KAFKA_HOME): Kafka broker and just-bin-it started, the iron-plate
    measurement streamed in real time (ev44), the histograms of just-bin-it must hold all its neutrons;
-5. NICOS services started headless with the launcher (twin server, cache, poller, daemon), then stopped.
+5. NICOS services started headless with the launcher (twin server, cache, poller, daemon), then stopped;
+6. the ESS file-writer (Linux x86-64; --no-filewriter to skip): NICOS with --filewriter, jobs of ODIN (dark, open
+   beam, iron plate) and LoKI (empty beam, solvent, silica spheres) written by kafka-to-nexus and compared with the
+   twin's own files, then reduced (essimaging, esssans) from both: the same results.
 Exit code 0 if everything works.
 """
 import os
@@ -197,10 +200,118 @@ try:
 except subprocess.TimeoutExpired:
     p.kill()
 logs = os.path.join(os.environ.get("TWIN_RUN_ROOT", ""), "nicos")
-if not ready and os.path.isdir(logs):
-    for f in sorted(os.listdir(logs)):
-        if f.endswith(".log"):
-            print(f"--- {f}\n" + open(os.path.join(logs, f), errors="replace").read()[-3000:])
+
+
+def show_logs():
+    if os.path.isdir(logs):
+        for f in sorted(os.listdir(logs)):
+            if f.endswith(".log"):
+                print(f"--- {f}\n" + open(os.path.join(logs, f), errors="replace").read()[-3000:])
+
+
+if not ready:
+    show_logs()
+
+
+def nicos_session(instrument, session, script, extra=()):
+    """Starts NICOS for `instrument` with the launcher (headless), runs `script`, stops it; returns (ready, output)."""
+    p = subprocess.Popen([sys.executable, os.path.join(TWIN, "nicos", "start_nicos.py"), "--instrument", instrument,
+                          "--no-gui", "--background", "--session", session, *extra],
+                         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    ready, t0, out = False, time.time(), ""
+    while time.time() - t0 < 300:
+        line = p.stdout.readline()
+        if not line:
+            break
+        print("  " + line.rstrip(), flush=True)
+        if "services ready" in line:
+            ready = "ESS file-writer" in line if "--filewriter" in extra else True
+            break
+    if ready:
+        r = subprocess.run([nicos_py, os.path.join(TWIN, "nicos", "run_nicos_script.py"), "-c", script],
+                           capture_output=True, text=True, timeout=3600)
+        out = r.stdout + r.stderr[-2000:]
+        print("  " + out.replace("\n", "\n  "), flush=True)
+    p.send_signal(signal.SIGINT)
+    try:
+        p.wait(60)
+    except subprocess.TimeoutExpired:
+        p.kill()
+    if not ready:
+        show_logs()
+    return ready, out
+
+
+def job_files(instrument, proposal):
+    """The files of the file-writer (one per job) and of the twin (one per count) of a proposal, in the order
+    written."""
+    import glob
+    raw = glob.glob(os.path.join(os.environ.get("TWIN_RUN_ROOT", ""), "**", str(proposal), "raw"), recursive=True)
+    if not raw:
+        return [], []
+    return (sorted(glob.glob(os.path.join(raw[0], f"{instrument}_job_*.hdf"))),
+            sorted(glob.glob(os.path.join(raw[0], f"{instrument}_0*.nxs"))))
+
+
+def same(a, b):
+    return (np.array_equal(a.values, b.values, equal_nan=True)
+            and (a.variances is None or np.array_equal(a.variances, b.variances, equal_nan=True)))
+
+
+step("ESS file-writer: NICOS jobs written by kafka-to-nexus, then reduced as the twin's own files (ODIN, LoKI)")
+sys.path.insert(0, os.path.join(TWIN, "filewriter"))
+import service as fw_service                          # noqa: E402
+usable, what = fw_service.available()
+if "--no-filewriter" in sys.argv or not usable:
+    print("skipped: " + ("--no-filewriter" if usable else what))
+else:
+    print(f"kafka-to-nexus: {what}")
+    # ODIN: dark, open beam, iron plate, one job each (as at ESS: one file per job)
+    ready, out = nicos_session("odin", "ci_fw_odin",
+                               "NewExperiment(1235, 'file-writer test')\n"
+                               "move(choppers, 'wfm', wfm_delta, 0.1); move(shutter, 'closed')\n"
+                               "with nexusfile_open('dark'):\n    count(t=5)\n"
+                               "move(shutter, 'open', stage_x, 500)\n"
+                               "with nexusfile_open('open beam'):\n    count(t=20)\n"
+                               "move(stage_x, 0)\n"
+                               "with nexusfile_open('iron plate'):\n    count(t=20)\n", ["--filewriter"])
+    check(ready, "NICOS started with the ESS file-writer (ODIN)")
+    check(out.count("same data") == 3, f"ODIN: 3 jobs written by the file-writer, same data as the twin's files "
+                                       f"({out.count('same data')} of 3)")
+    fw, tw = job_files("odin", 1235)
+    if len(fw) == 3 and len(tw) == 3:
+        a = red.reduce(fw[2], fw[1], dark=fw[0])
+        b = red.reduce(tw[2], tw[1], dark=tw[0])
+        print(f"transmission 2.2-3.8 A from the file-writer's files: {np.nanmean(a['spectrum'].values[band]):.3f} "
+              f"(NCrystal {np.mean(T_nc):.3f}); normalization: file-writer {a['normalization']}, twin {b['normalization']}")
+        check(same(a["spectrum"], b["spectrum"]) and same(a["image"], b["image"]),
+              "ODIN: essimaging gives the same transmission (spectrum and image) from the file-writer's files")
+    else:
+        check(False, f"ODIN: files of the jobs ({len(fw)} of the file-writer, {len(tw)} of the twin; 3 expected)")
+    # LoKI: empty beam, solvent, sample, one job each, reduced with esssans
+    ready, out = nicos_session("loki", "ci_fw_loki",
+                               "NewExperiment(1236, 'file-writer test')\n"
+                               "move(collimation, '3m', detector_distance, 5.0, heavy_shutter, 'Open', "
+                               "fast_shutter, 'Open')\n"
+                               "move(sample_holder, 'empty_beam')\n"
+                               "with nexusfile_open('empty beam'):\n    count(t=30)\n"
+                               "move(sample_holder, 'd2o')\n"
+                               "with nexusfile_open('solvent'):\n    count(t=60)\n"
+                               "move(sample_holder, 'silica_spheres')\n"
+                               "with nexusfile_open('silica spheres'):\n    count(t=60)\n", ["--filewriter"])
+    check(ready, "NICOS started with the ESS file-writer (LoKI)")
+    check(out.count("same data") == 3, f"LoKI: 3 jobs written by the file-writer, same data as the twin's files "
+                                       f"({out.count('same data')} of 3)")
+    fw, tw = job_files("loki", 1236)
+    if len(fw) == 3 and len(tw) == 3:
+        import loki_reduction as lred
+        banks = ["loki_detector_0", "loki_detector_1", "loki_detector_5"]
+        a = lred.reduce(fw[2], background=fw[1], empty_beam=fw[0], banks=banks)
+        b = lred.reduce(tw[2], background=tw[1], empty_beam=tw[0], banks=banks)
+        check(all(same(a[k], b[k]) for k in banks),
+              "LoKI: esssans gives the same I(Q) (rear, middle and front banks) from the file-writer's files")
+    else:
+        check(False, f"LoKI: files of the jobs ({len(fw)} of the file-writer, {len(tw)} of the twin; 3 expected)")
 
 print("\nALL PASSED" if ok else "\nSOME CHECKS FAILED")
 sys.exit(0 if ok else 1)

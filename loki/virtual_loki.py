@@ -289,7 +289,6 @@ class VirtualLoki:
     def _write_nexus(self, path, sim, t, start, title):
         """Events of the measurement (all banks, monitors m1 and m3) in a NeXus file of the real LoKI's format."""
         st = self.state
-        cfg = self.config(st)["front"]
         skip = self.pulseskip(st)
         reardet = float(st["detector_distance"])
         if reardet not in self._real_det:
@@ -312,19 +311,48 @@ class VirtualLoki:
             det_ev, n_pulses = lnx.detector_events(self.rng, sc_, self._real_det[reardet], t, sampling * rate,
                                                    1 + skip)
             mon_ev = lnx.monitor_events(self.rng, beam, transmission, t, sampling * rate, 1 + skip)
+        fn, kw, _, _, _ = self.samples()[st["sample"]]
+        truth = {} if fn is None else {k: v for k, v in fn(**kw)[2].items() if np.isscalar(v)}
+        info = self.twin_settings(st, settings=False)
+        info.update(event_sampling=sampling, **{f"true_{k}": float(v) for k, v in truth.items()})
+        lnx.write(path, det_ev, mon_ev, n_pulses, start, t, title or f"run {self.number}", st["sample"],
+                  {k: str(v) for k, v in st.items()}, self._nexus_choppers(st), reardet - lnx.REAR_Z0, info, lm.L1)
+        return dict(n_events=int(sum(len(v[0]) for v in det_ev.values())), sampling=sampling)
+
+    def _nexus_choppers(self, st):
+        """{NeXus chopper name: (speed [Hz], delay [ms])} of a device state."""
         choppers = {}
-        for c, (freq, a, b) in chopper_settings(*self.band(st), skip).items():
+        for c, (freq, a, b) in chopper_settings(*self.band(st), self.pulseskip(st)).items():
             n1, n2 = ("bw_chopper1", "bw_chopper2") if c == "ch1" else ("fo_chopper1", "fo_chopper2")
             choppers[n1], choppers[n2] = (freq, a), (freq, b)
-        fn, kw, thick, _, _ = self.samples()[st["sample"]]
-        truth = {} if fn is None else {k: v for k, v in fn(**kw)[2].items() if np.isscalar(v)}
+        return choppers
+
+    def twin_settings(self, state=None, settings=True):
+        """entry/twin without what belongs to one measurement (truths, event sampling): the configuration (what the
+        reduction needs to find its wavelength table and calibration), the sample's thickness and model, the proposal;
+        settings: also the device settings (as strings, as in the files). Given to the ESS file-writer at the start of
+        a job (filewriter/), as NICOS writes the values of its devices into the start command at ESS."""
+        st = state or self.state
+        cfg = self.config(st)["front"]
+        _, _, thick, _, _ = self.samples()[st["sample"]]
         info = {k: float(v) for k, v in cfg.items()}                  # configuration (finds the wavelength table)
-        info.update(pulseskip=int(skip), event_sampling=sampling, sample_thickness_m=float(thick),
-                    sample_model=st["sample"], proposal=os.path.basename(os.path.dirname(self.folder)),
-                    **{f"true_{k}": float(v) for k, v in truth.items()})
-        lnx.write(path, det_ev, mon_ev, n_pulses, start, t, title or f"run {self.number}", st["sample"],
-                  {k: str(v) for k, v in st.items()}, choppers, reardet - lnx.REAR_Z0, info, lm.L1)
-        return dict(n_events=int(sum(len(v[0]) for v in det_ev.values())), sampling=sampling)
+        info.update(pulseskip=int(self.pulseskip(st)), sample_thickness_m=float(thick), sample_model=st["sample"],
+                    proposal=os.path.basename(os.path.dirname(self.folder)))
+        return {**({k: str(v) for k, v in st.items()} if settings else {}), **info}
+
+    def nexus_logs(self, state=None):
+        """{path of the NXlog in the file: value} of the device settings, as lnx.write writes them in each file: the
+        values the twin publishes at the start of a job of the ESS file-writer (as the EPICS forwarder)."""
+        st = state or self.state
+        ins = "entry/instrument"
+        carriage_mm = (float(st["detector_distance"]) - lnx.REAR_Z0) * 1000.0
+        out = {f"{ins}/detector_carriage/value": carriage_mm, f"{ins}/detector_carriage/target_value": carriage_mm}
+        for c, (speed, delay) in self._nexus_choppers(st).items():
+            out.update({f"{ins}/{c}/rotation_speed": speed, f"{ins}/{c}/rotation_speed_setpoint": speed,
+                        f"{ins}/{c}/delay": delay * 1e6})
+        for k in ("heavy_shutter", "experiment_shutter"):
+            out[f"{ins}/{k}/value"] = 1.0
+        return out
 
     STREAM_MAX_RATE = 1e5          # neutrons per second in the live stream (Kafka), at most
     STREAM_MAX_EVENTS = 2e7        # and per measurement

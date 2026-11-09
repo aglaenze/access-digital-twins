@@ -33,7 +33,36 @@ def workflow(wavelength_from=None):
     from ess.imaging.types import NeXusDetectorName
     wf = odin.OdinBraggEdgeWorkflow(wavelength_from=wavelength_from or WAVELENGTH_FROM)
     wf[NeXusDetectorName] = "timepix3"
+    # the provider's generic types, set here: ess.reduce is imported only when a workflow is made
+    from ess.reduce.nexus.types import DiskChoppers, RawChoppers, RunType
+    _settled_choppers.__annotations__ = {"choppers": RawChoppers[RunType], "return": DiskChoppers[RunType]}
+    wf.insert(_settled_choppers)
     return wf
+
+
+CHOPPER_SETTINGS = ("rotation_speed_setpoint", "delay", "phase")
+
+
+def _settled_choppers(choppers):
+    """The DiskChoppers of essreduce (to_disk_choppers), each setting of a chopper (speed setpoint, delay, phase) first
+    reduced to one value. essreduce needs one value per setting (scippneutron, "processing NeXus choppers"). A file of
+    the twin has one; a file of the ESS file-writer has every value received during the job: the one already there
+    at its start (as the EPICS forwarder gives it), then those of each measurement. The last one is used (the one
+    of the measurement); a warning if they differ (choppers changed during the job: one job per setting, as at ESS)."""
+    from ess.reduce.nexus.workflow import to_disk_choppers
+    out = {}
+    for name, ch in choppers.items():
+        ch = ch.copy()
+        for key in CHOPPER_SETTINGS:
+            v = ch.get(key)
+            if isinstance(v, sc.DataArray) and v.ndim == 1 and v.sizes[v.dim] > 1:
+                last = v[v.dim, -1]
+                if not np.allclose(v.values, last.value, rtol=1e-6, atol=0):
+                    warnings.warn(f"chopper {name}: {key} changed during the measurement "
+                                  f"({np.unique(v.values)}); the last value is used", stacklevel=2)
+                ch[key] = last
+        out[name] = ch
+    return to_disk_choppers(type(choppers)(out))
 
 
 def _times_ns(f):
@@ -41,11 +70,23 @@ def _times_ns(f):
             for k in ("start_time", "end_time")]
 
 
+PULSE_RATE = 14.0          # Hz, ESS source
+
+
 def duration(file):
-    """Measurement duration [s] read in the file (end_time - start_time)."""
+    """Measurement duration [s]: the source pulses recorded during the measurement (pulse_charge log between start and
+    end) / 14 Hz; end_time - start_time if there is no such log. The same for a real file and for a file of the twin
+    (one charge per pulse, during the whole run). For a file of the ESS file-writer it is the time the twin was
+    really measuring: the job also lasts while the twin computes, with no neutrons and no pulses then."""
     import h5py
     with h5py.File(file, "r") as f:
         t0, t1 = _times_ns(f)
+        log = f.get("entry/instrument/source/pulse_charge")
+        if log is not None and "time" in log:
+            t = log["time"][()].astype(np.int64)
+            n = int(((t >= t0) & (t < t1)).sum())
+            if n:
+                return n / PULSE_RATE
     return (t1 - t0) * 1e-9
 
 
@@ -67,9 +108,10 @@ def _chopper_fingerprint(file):
     import h5py
     with h5py.File(file, "r") as f:
         ins = f["entry/instrument"]
-        key = [(c, float(ins[f"{c}/rotation_speed_setpoint/value"][0])) for c in ("wfm1", "wfm2", "foc1", "foc2", "foc3",
+        # (the last value: the one of the measurement, as _settled_choppers)
+        key = [(c, float(ins[f"{c}/rotation_speed_setpoint/value"][-1])) for c in ("wfm1", "wfm2", "foc1", "foc2", "foc3",
                                                                                  "foc4", "foc5", "bpc1", "bpc2", "t0")]
-        key.append(float(ins["wfm1/transformations/wfmc_translation/value"][0]))
+        key.append(float(ins["wfm1/transformations/wfmc_translation/value"][-1]))
     return tuple(key)
 
 
