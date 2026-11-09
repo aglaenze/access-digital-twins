@@ -50,6 +50,12 @@ The build stops if the line changes upstream. It is worth reporting to ECDC.
    readout over UDP. It reads back the EFU's ev44 messages and compares them pulse by pulse. It requires 99.5 % of
    the distinct neutrons found with the same pixel and the same time of flight.
 
+   Result (run of commit 5f68e52):
+   * 939,572 of the 939,580 distinct neutrons come back with the same pixel and time of flight (99.999 %).
+   * The 8 others were piled up, as predicted from the file: 9 pairs within 1 ns whose pixels touch.
+   * 195 neutrons come back twice. They are probably identical neutrons split between two UDP packets: the EFU
+     clusters each packet on its own. This explanation is not yet checked.
+
    `python efu/timepix3_readout.py` checks the coding without the EFU. It runs the EFU's computation, rewritten in
    Python, on 200 000 random neutrons.
 
