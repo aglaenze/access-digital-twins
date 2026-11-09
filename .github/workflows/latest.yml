@@ -1,0 +1,77 @@
+# Every week: builds the image with the LATEST versions of the ESS software the twins follow (scipp, essreduce,
+# essimaging, esssans, esslivedata, NICOS, just-bin-it...; container/versions.py) and runs the full container test.
+# Nothing is published and nothing in the repository changes: the summary of the run says which versions are newer
+# and whether the twins still work with them. To raise the fixed versions afterwards: container/UPDATES.md.
+name: latest versions
+
+on:
+  schedule:
+    - cron: "17 3 * * 1"      # Mondays, 03:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  latest:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    steps:
+      - name: Free disk space on the runner
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup \
+                      /opt/hostedtoolcache/CodeQL /usr/local/share/boost /usr/local/share/powershell
+          sudo docker image prune --all --force
+          df -h /
+
+      - uses: actions/checkout@v4
+
+      - name: Latest versions (written into this checkout only)
+        id: versions
+        run: |
+          {
+            echo "## Versions: fixed in the repository, latest published"
+            echo
+            python3 container/versions.py --markdown
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
+          python3 container/versions.py --apply build-args
+          {
+            echo "args<<EOF"
+            cat build-args
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+          git diff --stat
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build the image with the latest versions
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: container/Containerfile
+          load: true
+          tags: twin:latest-versions
+          build-args: ${{ steps.versions.outputs.args }}
+          cache-from: type=gha,scope=amd64          # reuse the layers of the usual build, never write to its cache
+
+      - name: Full container test with the latest versions
+        id: test
+        run: |
+          docker run --rm -e GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }} -e TWIN_MPI=4 twin:latest-versions test \
+            2>&1 | tee test.log
+          exit ${PIPESTATUS[0]}
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Container test with the latest versions: ${{ steps.test.outcome }}"
+            echo
+            echo '```'
+            grep -E "^(PASS|FAIL|SOME CHECKS|ALL PASSED)" test.log 2>/dev/null || echo "(no test: the build failed, see its log)"
+            echo '```'
+            echo
+            echo "Passed: the fixed versions can be raised (container/UPDATES.md). Failed: see the log; the twins keep"
+            echo "their fixed versions until it is solved."
+          } >> "$GITHUB_STEP_SUMMARY"

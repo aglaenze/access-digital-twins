@@ -28,6 +28,7 @@ and runs identically on a laptop, a DTU server, UCloud or ESS's VISA.
 | `control_room.sh`, `control_room.py`, `open_nicos.ipynb` | the "desktop" behind *Open NICOS*: NICOS of the instrument of the exercise (asked by the page `open_nicos.ipynb`; otherwise a choice of the instrument), the NICOS window alone, full screen and logged in |
 | `desktop_test.sh` | GitHub Actions: the control room (choice of the instrument, then the NICOS window; screenshots kept as an artifact of the run); the app itself is tested by `../app/ci_selftest.sh` |
 | `fetch_fronts.py` | downloads the precomputed McStas upstream parts (release `fronts-v1`) into `$TWIN_RUN_ROOT/odin/front/` |
+| `versions.py`, `UPDATES.md` | the fixed versions and the latest published; the weekly test with the latest (`../.github/workflows/latest.yml`) and how to raise them |
 | `smoke_test.py` | test run after each build: tools, a measurement with the virtual ODIN compared with NCrystal, NICOS services and a measurement recorded through NICOS (`nexusfile_open`, as at ESS) |
 | `../.github/workflows/container.yml` | GitHub Actions: build, test, publish to `ghcr.io/aglaenze/access-digital-twins` |
 
@@ -78,6 +79,12 @@ Windows and macOS) or Docker; it pulls this image the first time (several GB, on
 app is closed. Tested by GitHub Actions in container mode (`../app/ci_selftest.sh`). Limits of a laptop: the first
 measurement of a new sample or configuration runs McStas (minutes on 4 cores), and the work reaches the teacher only
 through *Submit* (a file to send).
+
+## Fixed versions and updates
+
+Every program has a fixed version (`environment-*.yml`, `ARG` lines of the `Containerfile`). `versions.py` lists them
+with the latest published; `.github/workflows/latest.yml` tests the image with the latest versions every week; how to
+raise them: `UPDATES.md`.
 
 ## Still to do
 
