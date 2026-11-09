@@ -12,7 +12,7 @@ The EFU must be started with  timepix3 -f odin_timepix3.json --nohwcheck -b <bro
   3. the ev44 messages of the EFU read back from Kafka; per pulse, its neutrons compared with the ones the EFU must
      find (timepix3_readout.expected: same pixel, same time of flight to the coding of the camera, eto or eto + 1 ns).
 Two neutrons in the same pixel at the same ns (repeated rays of the simulation: 6 % of this file) are one flash for
-the camera, one neutron for the EFU; two neutrons within 1 ns and 1 chip pixel of each other make one cluster (pile-up,
+the camera, one neutron for the EFU; two neutrons within 1 ns whose pixels touch make one cluster (pile-up,
 9 pairs in this file), published as one neutron at their center. The test requires 99.5 % of the distinct neutrons
 found exactly, in every pulse.
 """

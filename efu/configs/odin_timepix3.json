@@ -1,12 +1,12 @@
 {
   "Detector": "timepix3",
-  "comment": "ODIN's Timepix3 camera for the twin (efu/README.md). The configuration used at ESS is not public: 256 x 256 chip pixels scaled up 16 times give the 4096 x 4096 pixels of the real ODIN file; 14 Hz pulses. The twin sends each neutron as a cluster of 4 adjacent hits at the same time, so two neutrons make one cluster only if they come within 1 ns and 1 chip pixel of each other",
+  "comment": "ODIN's Timepix3 camera for the twin (efu/README.md). The configuration used at ESS is not public: 256 x 256 chip pixels scaled up 16 times give the 4096 x 4096 pixels of the real ODIN file; 14 Hz pulses. The twin sends each neutron as a cluster of 4 adjacent hits at the same time, so two neutrons make one cluster only if they come within 1 ns and their pixels touch (the EFU joins two hits when distance^2 < MaxCoordinateGap^2, strictly: 2 joins touching pixels, diagonals included)",
   "XResolution": 256,
   "YResolution": 256,
   "ScaleUpFactor": 16,
   "ParallelThreads": 1,
   "MaxTimeGapNS": 1,
-  "MaxCoordinateGap": 1,
+  "MaxCoordinateGap": 2,
   "MinEventSizeHits": 4,
   "MinimumToTSum": 20,
   "FrequencyHz": 14

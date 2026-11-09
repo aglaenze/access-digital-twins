@@ -11,7 +11,7 @@ publishes its neutrons to Kafka itself.
 |---|---|
 | The Timepix3 camera sees the flash of light that a neutron makes in the scintillator. It sends 64-bit **pixel words**: position on the 256 × 256 chip, time of arrival, time over threshold (ToT). For each proton pulse it also sends a **TDC word** when the pulse trigger arrives. | `timepix3_readout.py` turns each neutron of the twin's file into a cluster of 2 × 2 chip pixels, all hit at the neutron's time. The ToT weights put the ToT-weighted center in the right sub-pixel. It also sends one TDC word per pulse. |
 | The timing system (EVR) sends the time of each pulse in a 24-byte packet. | The same packet, with the time of the twin's pulse. |
-| The EFU (`timepix3` program):<br>• pairs each TDC word with its EVR packet;<br>• groups the hits into clusters;<br>• publishes one neutron per cluster: time of the first hit, position at the center scaled up 16 times (4096 × 4096 pixels, the pixels of the real ODIN file);<br>• uses the source `timepix3` and the topic `odin_detector`. | The same program, built from its sources (`Containerfile`). The configuration is `configs/odin_timepix3.json`, because the one used at ESS is not public. It sets 256 × 256 pixels scaled up 16 times and 14 Hz pulses. Its cluster gaps (1 ns, 1 chip pixel) match the twin's clusters. |
+| The EFU (`timepix3` program):<br>• pairs each TDC word with its EVR packet;<br>• groups the hits into clusters;<br>• publishes one neutron per cluster: time of the first hit, position at the center scaled up 16 times (4096 × 4096 pixels, the pixels of the real ODIN file);<br>• uses the source `timepix3` and the topic `odin_detector`. | The same program, built from its sources (`Containerfile`). The configuration is `configs/odin_timepix3.json`, because the one used at ESS is not public. It sets 256 × 256 pixels scaled up 16 times and 14 Hz pulses. Its cluster gaps match the twin's clusters: 1 ns, and a coordinate gap of 2, which joins only touching pixels (the EFU joins two hits when their distance squared is strictly below the gap squared). |
 
 The bit layout follows the EFU's sources: `src/modules/timepix3`, files `readout/DataParser.h`,
 `dto/TimepixDataTypes.h`, `handlers/PixelEventHandler.cpp` and `geometry/Timepix3Geometry.h`. What the EFU makes of
@@ -22,7 +22,7 @@ the readout is known exactly, and `timepix3_readout.expected()` predicts it:
 * **Time of flight.** The camera codes times in steps of 1.5625 ns, and the EFU rounds them down. The time of flight
   comes back as `eto` or `eto + 1` ns.
 * **Merged neutrons.** Two neutrons in the same pixel at the same nanosecond are one flash for the camera, so the EFU
-  publishes one neutron. Two neutrons within 1 ns and 1 chip pixel of each other also make one cluster (pile-up).
+  publishes one neutron. Two neutrons within 1 ns whose pixels touch also make one cluster (pile-up).
 
 ## Steps
 
