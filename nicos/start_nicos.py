@@ -214,6 +214,8 @@ def main():
         env = dict(os.environ, INSTRUMENT=f"nicos_twin.{instr}", TWIN_RUN_ROOT=RUN_ROOT,
                    TWIN_FILEWRITER="1" if o.filewriter else "0",       # read by nicos_twin/commands.py
                    PYTHONPATH=os.pathsep.join([HERE, os.environ.get("PYTHONPATH", "")]).rstrip(os.pathsep))
+        if o.epics:                    # NICOS finds the PVs (motor records of the sample stage) on this computer
+            env.update(ep_service.CLIENT)
         start("nicos_cache", [NICOS_PY, os.path.join(NICOS_ROOT, "bin", "nicos-cache")], env=env, cwd=NICOS_ROOT)
         wait_for(lambda: port_open(14869), "the NICOS cache")
         start("nicos_poller", [NICOS_PY, os.path.join(NICOS_ROOT, "bin", "nicos-poller")], env=env, cwd=NICOS_ROOT)

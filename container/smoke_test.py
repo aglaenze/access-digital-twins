@@ -442,9 +442,14 @@ else:
     print(ep_what)
     ready, out = nicos_session("odin", "ci_epics",
                                "NewExperiment(1238, 'EPICS test')\n"
-                               "move(choppers, 'wfm', wfm_delta, 0.2); move(shutter, 'open', stage_x, 500)\n"
+                               "print('stage_x class:', type(stage_x).__name__, stage_x.motorpv)\n"
+                               "move(choppers, 'wfm', wfm_delta, 0.1); move(shutter, 'open', stage_x, 500)\n"
+                               "print('stage_x read:', stage_x.read(0), stage_x.unit, stage_x.status(0))\n"
                                "with nexusfile_open('open beam'):\n    count(t=10)\n", ["--filewriter", "--epics"])
     check(ready, "NICOS started with the EPICS layer and the ESS file-writer (ODIN)")
+    check("stage_x class: EpicsMotor ODIN-SpSt1:MC-LinY-01:Mtr" in out,
+          "EPICS: NICOS drives the sample stage with the motor class of ESS (EpicsMotor, its real motor record)")
+    check("stage_x read: 500.0 mm" in out, "EPICS: the motor record reads back the position set in NICOS (500 mm)")
     check(out.count("same data") == 1, "EPICS: the job written by the file-writer has the same data as the twin's file, "
                                        "device values relayed by the ESS forwarder")
     fw, tw = job_files("odin", 1238)

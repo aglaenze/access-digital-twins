@@ -95,7 +95,9 @@ RUN micromamba create -y -n kafka -c conda-forge "openjdk=21" && micromamba clea
  && pip install --no-cache-dir "confluent-kafka>=2.14,<3" "ess-streaming-data-types>=0.27,<0.28" "graphyte>=1.7.1,<2" \
         "ConfigArgParse>=1.7.5,<2" \
  && micromamba run -n nicos pip install --no-cache-dir "confluent-kafka>=2.1" "ess-streaming-data-types>=0.21" \
-        "keyring>=10.6" "keyrings.alt>=4.0" "pycryptodomex>=3.4.7"
+        "keyring>=10.6" "keyrings.alt>=4.0" "pycryptodomex>=3.4.7" \
+ && (micromamba run -n nicos pip install --no-cache-dir "p4p>=4.0.0,<=4.2.0" \
+     || echo "p4p NOT installed in the nicos environment: no EPICS devices in NICOS")
 
 # NICOS window (GUI client, Qt 5) in the nicos environment, and the desktop in JupyterLab. On ARM (Apple Silicon,
 # arm64) PyPI has no PyQt5 wheels: Qt 5, QtWebEngine and QScintilla come from conda-forge, the rest from

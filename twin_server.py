@@ -191,6 +191,53 @@ def _epics_values():
     return out
 
 
+def _motor_map():
+    """{motor record (e.g. ODIN-SpSt1:MC-LinY-01:Mtr): twin device} for the twin's motors (devices with limits) whose
+    position is written in the real file as the readback of an EPICS motor record (<record>.RBV), as at ESS."""
+    if "motors" not in EPICS:
+        rbv = {path: pv[:-4] for path, pv, _t, _v in EPICS["table"] if pv.endswith(".RBV")}
+        out = {}
+        for d in INSTR.devices.values():
+            if getattr(d, "limits", None) is None or not isinstance(getattr(d, "nexus", None), str):
+                continue
+            base = rbv.get(f"entry/instrument/{d.nexus}/value")
+            if base:
+                out[base] = d
+        EPICS["motors"] = out
+    return EPICS["motors"]
+
+
+def _to_file(d, v):
+    return float(d.to_nexus(v) if d.to_nexus else v)
+
+
+def _epics_motors():
+    """[{record, device, unit, value, low, high, desc}] of the motors (GET /epics/motors): the soft IOC serves the
+    fields of an EPICS motor record for each (VAL, RBV, DMOV, HLM, LLM, EGU...), as the IOCs of ESS, so that NICOS drives
+    them with the class of ESS (nicos_ess.devices.epics.pva.motor.EpicsMotor). Values in the units of the file (mm)."""
+    _epics_values()
+    out = []
+    for base, d in _motor_map().items():
+        scale = _to_file(d, 1.0) - _to_file(d, 0.0)
+        unit = "mm" if d.unit == "m" and abs(scale - 1e3) < 1e-9 else d.unit
+        lo, hi = sorted((_to_file(d, d.limits[0]), _to_file(d, d.limits[1])))
+        out.append(dict(record=base, device=d.name, unit=unit, value=_to_file(d, d.value), low=lo, high=hi,
+                        desc=d.help[:40]))
+    return out
+
+
+def _epics_put(args):
+    """POST /epics/put {record, value}: a new target written to the VAL field of a motor record (by NICOS, through the
+    soft IOC): the twin's device moves there (value in the units of the file, converted back to the twin's)."""
+    d = _motor_map()[args["record"]]
+    y = float(args["value"])
+    a = _to_file(d, 0.0)
+    x = (y - a) / (_to_file(d, 1.0) - a)             # the conversions to the file are linear (mm = 1e3 m, deg)
+    INSTR.move(**{d.name: x})
+    _forward()
+    return dict(device=d.name, value=x, file_value=_to_file(d, d.value))
+
+
 def _forward(only_changes=True):
     """Publishes the values of the devices (f144) if TWIN_FORWARD=1; never stops the twin if Kafka is not there."""
     if os.environ.get("TWIN_FORWARD") != "1":
@@ -241,6 +288,8 @@ class Handler(BaseHTTPRequestHandler):
                                          mode=INSTR.mode, ready=READY.is_set()))
         if self.path == "/epics":                              # the PVs of the soft IOC (epics/ioc.py)
             return self._reply(200, _epics_values())
+        if self.path == "/epics/motors":                       # its motor records (NICOS drives them)
+            return self._reply(200, _epics_motors())
         if self.path == "/devices":
             if hasattr(INSTR, "samples"):
                 INSTR.samples()            # the student's own samples appear in the list at once
@@ -294,6 +343,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._reply(200, _fw_start(args))
             if self.path == "/filewriter/stop":
                 return self._reply(200, _fw_stop())
+            if self.path == "/epics/put":                  # NICOS moved a motor through its EPICS PV
+                return self._reply(200, _epics_put(args))
             if self.path == "/move":
                 INSTR.move(**args)
                 _forward()
