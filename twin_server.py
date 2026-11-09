@@ -138,7 +138,8 @@ def _fw_stop():
     if error is None and twins and os.path.isfile(path):
         import compare
         out["differences"], out["report"] = compare.compare(path, twins, log=lambda *_: None,
-                                                            exact_times=not _epics())
+                                                            exact_times=not _epics(),
+                                                            efu=tf_efu_sources() if _efu() else ())
     return out
 
 
@@ -146,6 +147,16 @@ def _epics():
     """The EPICS layer is on (epics/service.py, TWIN_EPICS=1): the ESS forwarder relays the device values to Kafka from
     the PVs of the twin; the twin no longer publishes them itself."""
     return os.environ.get("TWIN_EPICS") == "1"
+
+
+def _efu():
+    """The ESS Event Formation Unit is on (efu/service.py, TWIN_EFU=1): the twin sends the raw readout of its detector
+    (ODIN's Timepix3 camera) to the EFU, which publishes the neutrons; the twin no longer publishes them itself."""
+    return os.environ.get("TWIN_EFU") == "1"
+
+
+def tf_efu_sources():
+    return _fw().EFU_SOURCES
 
 
 def _livedata():
@@ -160,7 +171,8 @@ def _fw_publish(f):
     tf = _fw()
     if "producer" not in FW:
         FW["producer"] = tf.producer(os.environ.get("TWIN_KAFKA", "127.0.0.1:9092"))
-    msgs = tf.count_messages(f, devices=not _epics())
+    msgs = tf.count_messages(f, devices=not _epics(),
+                             efu=(os.environ.get("TWIN_EFU_HOST", "127.0.0.1"), 9000) if _efu() else None)
     if _livedata():          # the detectors keep sending after the count: esslivedata then reduces its last pulse
         msgs += tf.tail_messages(f)
     th = threading.Thread(target=tf.publish, args=(FW["producer"], msgs), kwargs=dict(pace=True), daemon=True)

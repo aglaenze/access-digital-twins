@@ -57,6 +57,34 @@ def expected(eto, ids):
     return 1 + x + NPIX * y, tof
 
 
+def match(t0, eto, ids, t0_efu, tof_efu, ids_efu, tolerance_ns=10_000):
+    """Compares neutrons sent (pulse time t0, eto, ids; one entry per neutron) with the neutrons the EFU published
+    (pulse time, time of flight, pixel id). The EFU's pulse time is computed in floating point (about 256 ns lost): it
+    is matched to the nearest pulse sent, within tolerance_ns. The neutrons sent become what the EFU must publish
+    (expected()), identical ones counted once (one flash). Returns (found exactly, expected, published, pulses of the
+    EFU matching no pulse sent)."""
+    t0, t0_efu = np.asarray(t0, np.int64), np.asarray(t0_efu, np.int64)
+    pulses = np.unique(t0)
+    j = np.clip(np.searchsorted(pulses, t0_efu), 1, max(len(pulses) - 1, 1)) if len(pulses) > 1 else \
+        np.zeros(len(t0_efu), np.int64)
+    if len(pulses) > 1:
+        j = np.where(np.abs(pulses[j - 1] - t0_efu) <= np.abs(pulses[j] - t0_efu), j - 1, j)
+    near = np.abs(pulses[j] - t0_efu) <= tolerance_ns if len(pulses) else np.zeros(len(t0_efu), bool)
+    xid, xtof = expected(eto, ids)
+    key_sent = (xid << 27) | xtof                       # pixel id (25 bits) and time of flight (< 2^27 ns)
+    key_got = (np.asarray(ids_efu, np.int64) << 27) | np.asarray(tof_efu, np.int64)
+    o_s, o_g = np.argsort(t0, kind="stable"), np.argsort(np.where(near, j, -1), kind="stable")
+    k_s, k_g = t0[o_s], np.where(near, j, -1)[o_g]
+    found = n_sent = 0
+    for k, p in enumerate(pulses):
+        a, b = np.searchsorted(k_s, p), np.searchsorted(k_s, p, side="right")
+        c, d = np.searchsorted(k_g, k), np.searchsorted(k_g, k, side="right")
+        s = np.unique(key_sent[o_s[a:b]])
+        n_sent += len(s)
+        found += int(np.isin(s, key_got[o_g[c:d]]).sum())
+    return found, n_sent, len(t0_efu), int(len(np.unique(t0_efu[~near])))
+
+
 def _time_code(t_ns):
     """Pixel clock time t (integer ns) -> (coarse 25 ns ticks c, fine 1.5625 ns ticks f): time = 25 c - 1.5625 f,
     the smallest such time >= t (the EFU then rounds it down: t or t + 1)."""
@@ -101,22 +129,39 @@ def cluster_words(eto, ids, t_tdc):
     return w.reshape(-1)
 
 
-def packets(etz, eto, ids, counts):
-    """UDP payloads of a measurement: for each pulse k (time etz[k], epoch ns; counts[k] neutrons, in eto and ids in
-    the order of the pulses), its EVR packet, its TDC word, then its neutrons in packets of whole clusters, by time.
-    The TDC of pulse k comes at pixel clock time 25 ns x round(k / 14 Hz / 25 ns), modulo the wrap of the clock."""
-    out, start = [], 0
-    period = 1e9 / PULSE_HZ
-    for k, (t0, n) in enumerate(zip(np.asarray(etz, np.int64), counts)):
-        prev = int(etz[k - 1]) if k else int(t0) - int(round(period))
-        out.append(evr_packet(k + 1, int(t0), prev))
-        t_tdc = (25 * int(round(k * period / 25))) % PIXEL_MAX_NS
-        out.append(np.array([tdc_word(k + 1, t_tdc)], np.uint64).tobytes())
-        e, d = np.asarray(eto[start:start + n], np.int64), np.asarray(ids[start:start + n], np.int64)
+class Camera:
+    """The camera and the timing system of the instrument, pulse after pulse: the pulse counter (EVR, TDC) and the
+    pixel clock go on from one measurement to the next, as on the instrument (the EFU drops a pulse whose counter
+    repeats the last one). The TDC of the k-th pulse comes at pixel clock time 25 ns x round(k / 14 Hz / 25 ns),
+    modulo the wrap of the clock."""
+
+    def __init__(self):
+        self.k, self.last = 0, None
+
+    def pulse(self, t0, eto, ids):
+        """UDP payloads of one pulse (time t0, epoch ns): its EVR packet, its TDC word, then its neutrons (eto ns after
+        the pulse, pixel ids) in packets of whole clusters, by time."""
+        t0 = int(t0)
+        prev = self.last if self.last is not None else t0 - int(round(1e9 / PULSE_HZ))
+        self.k += 1
+        t_tdc = (25 * int(round((self.k - 1) * 1e9 / PULSE_HZ / 25))) % PIXEL_MAX_NS
+        out = [evr_packet(self.k % 2**32, t0, prev), np.array([tdc_word(self.k, t_tdc)], np.uint64).tobytes()]
+        self.last = t0
+        e, d = np.asarray(eto, np.int64), np.asarray(ids, np.int64)
         o = np.argsort(e, kind="stable")
         e, d = e[o], d[o]
-        for j in range(0, n, EVENTS_PER_PACKET):
+        for j in range(0, len(e), EVENTS_PER_PACKET):
             out.append(cluster_words(e[j:j + EVENTS_PER_PACKET], d[j:j + EVENTS_PER_PACKET], t_tdc).tobytes())
+        return out
+
+
+def packets(etz, eto, ids, counts, camera=None):
+    """UDP payloads of a measurement: for each pulse k (time etz[k], epoch ns; counts[k] neutrons, in eto and ids in
+    the order of the pulses), Camera.pulse."""
+    camera = camera or Camera()
+    out, start = [], 0
+    for t0, n in zip(np.asarray(etz, np.int64), counts):
+        out += camera.pulse(t0, eto[start:start + n], ids[start:start + n])
         start += n
     return out
 
@@ -191,3 +236,10 @@ if __name__ == "__main__":
     print(f"{len(pk)} packets, {n} neutrons, {len(got)} pulses; mismatches: {bad}; "
           f"tof - eto in [{d.min()}, {d.max()}]; ids moved by the edge: {np.sum(expected(eto, ids)[0] != ids)}")
     assert bad == 0 and d.min() >= 0 and d.max() <= 1
+    # match(): the EFU's pulse times in floating point (seconds x 1e9 + ns, as dto/TimepixDataTypes.h)
+    t_efu = np.concatenate([[int(float(t // 10**9) * 1e9 + t % 10**9)] * len(g) for t, g, _ in got])
+    res = match(np.repeat(etz, counts), eto, ids, t_efu, np.concatenate([g[2] for g in got]),
+                np.concatenate([g[1] for g in got]))
+    print(f"match: {res[0]} of {res[1]} found, {res[2]} published, {res[3]} pulses unmatched; "
+          f"pulse times moved by up to {np.max(np.abs(t_efu - np.repeat(etz, counts)))} ns")
+    assert res[0] == res[1] == n and res[3] == 0

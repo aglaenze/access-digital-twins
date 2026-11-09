@@ -492,5 +492,37 @@ else:
         if os.path.isfile(path):
             print(f"--- {path} (end)\n" + open(path, errors="replace").read()[-2500:])
 
+step("Event Formation Unit: the twin sends the raw readout of ODIN's camera, the EFU of ESS makes the neutrons, the "
+     "file-writer writes them")
+_spec = importlib.util.spec_from_file_location("efu_service", os.path.join(TWIN, "efu", "service.py"))
+efu = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(efu)
+efu_usable, efu_what = efu.available("odin")
+if fw_service.available()[0] and "--no-efu" not in sys.argv:
+    check(efu_usable, f"ESS Event Formation Unit installed ({efu_what})")   # with the file-writer (Intel/AMD)
+if "--no-efu" in sys.argv or not efu_usable or not fw_service.available()[0]:
+    print("skipped: " + ("--no-efu" if "--no-efu" in sys.argv else efu_what if not efu_usable
+                         else "no ESS file-writer here"))
+else:
+    sys.path.insert(0, os.path.join(TWIN, "efu"))
+    import e2e_test as efu_e2e
+
+    def efu_counters():
+        print("  counters of the EFU:\n    " + "\n    ".join(efu_e2e.efu_stats(port=efu.CMD_PORT)), flush=True)
+    ready, out = nicos_session("odin", "ci_efu",
+                               "NewExperiment(1239, 'EFU test')\n"
+                               "move(choppers, 'wfm', wfm_delta, 0.1); move(shutter, 'open', stage_x, 500)\n"
+                               "with nexusfile_open('open beam'):\n    count(t=10)\n", ["--filewriter", "--efu"],
+                               after=efu_counters)
+    check(ready, "NICOS started with the ESS Event Formation Unit and the ESS file-writer (ODIN)")
+    line = next((x for x in out.splitlines() if "through the EFU" in x), "")
+    print("  " + (line.strip() or "(no comparison of the neutrons through the EFU)"))
+    check("through the EFU" in out and out.count("same data") == 1,
+          "EFU: the neutrons written by the file-writer are those the EFU makes of the twin's readout "
+          "(same pixel and time of flight), the other data the same as the twin's file")
+    path = os.path.join(os.environ.get("TWIN_RUN_ROOT", ""), "nicos", "efu.log")
+    if os.path.isfile(path):
+        print(f"--- {path} (end)\n" + open(path, errors="replace").read()[-2500:])
+
 print("\nALL PASSED" if ok else "\nSOME CHECKS FAILED")
 sys.exit(0 if ok else 1)

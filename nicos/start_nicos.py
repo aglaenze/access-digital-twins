@@ -15,6 +15,9 @@ instrument computers): choosing the instrument here is like walking into its con
                                                            # 5009; the app container; TWIN_LIVEDATA=1)
     python start_nicos.py --instrument odin --epics --filewriter   # the devices as EPICS PVs (soft IOC), relayed to
                                                            # Kafka by the ESS forwarder (the app container; TWIN_EPICS=1)
+    python start_nicos.py --instrument odin --efu --filewriter     # the neutrons made by the ESS Event Formation
+                                                           # Unit from the raw readout of the camera (ODIN; the app
+                                                           # container; TWIN_EFU=1)
 
 Two Python environments are used, on purpose: the twin (McStas, essimaging, numpy 2) in the Python running this launcher, NICOS
 (numpy < 2) in the conda env "nicos". They talk over HTTP on this computer only. Press Enter (or Ctrl+C) to stop all.
@@ -142,6 +145,9 @@ def main():
                    help="live data reduction of ESS (esslivedata, dashboard on port 5009; default: TWIN_LIVEDATA=1)")
     a.add_argument("--epics", action="store_true", default=os.environ.get("TWIN_EPICS") == "1",
                    help="the devices as EPICS PVs, relayed to Kafka by the ESS forwarder (default: TWIN_EPICS=1)")
+    a.add_argument("--efu", action="store_true", default=os.environ.get("TWIN_EFU") == "1",
+                   help="the ESS Event Formation Unit makes the neutrons from the raw readout of the detector (ODIN; "
+                        "default: TWIN_EFU=1)")
     a.add_argument("--until-gui-closes", action="store_true",
                    help="stop everything when the NICOS window is closed (the control room of the app)")
     o = a.parse_args()
@@ -174,14 +180,21 @@ def main():
         if not ep_usable:
             print(f"The EPICS layer (soft IOC + ESS forwarder) is not available here ({ep_what}).")
             o.epics = False
+    if o.efu:
+        efu_service = _livedata_service("efu")
+        efu_usable, efu_what = efu_service.available(instr)
+        if not efu_usable:
+            print(f"The Event Formation Unit of ESS is not available here ({efu_what}).")
+            o.efu = False
     # read by the twin server: each count also publishes its neutrons as the instrument does, for esslivedata; with
     # the EPICS layer, the device values are relayed by the forwarder instead of the twin
     os.environ["TWIN_LIVEDATA"] = "1" if o.livedata else "0"
     os.environ["TWIN_EPICS"] = "1" if o.epics else "0"
+    os.environ["TWIN_EFU"] = "1" if o.efu else "0"
     os.makedirs(LOGS, exist_ok=True)
     print(f"Starting the {instr.upper()} digital twin with NICOS:", flush=True)
     try:
-        if o.live or o.filewriter or o.livedata or o.epics:     # data streaming as at ESS: the Kafka broker
+        if o.live or o.filewriter or o.livedata or o.epics or o.efu:     # data streaming as at ESS: the Kafka broker
             if not port_open(9092):
                 start("kafka", [MCSTAS_PY, os.path.join(TWIN, "kafka", "start_kafka.py")], cwd=TWIN)
                 wait_for(lambda: port_open(9092), "the Kafka broker", timeout=120)
@@ -195,6 +208,10 @@ def main():
                 AUX.append((f"livedata_{name}", p))
             print(f"  esslivedata started ({ld_what}; dashboard http://127.0.0.1:{ld_service.DASHBOARD_PORT}, "
                   f"logs {LOGS}/livedata_*.log)", flush=True)
+        if o.efu:                      # the EFU: raw readout of the detector (UDP) -> neutrons (Kafka)
+            p = efu_service.start(instr, log=os.path.join(LOGS, "efu.log"))
+            AUX.append(("efu", p))
+            print(f"  EFU started ({efu_what}; log {LOGS}/efu.log)", flush=True)
         if o.live:                 # just-bin-it (histograms for NICOS); its module
             # just_bin_it.cli defines main() without calling it (installed as a script), hence the -c
             subprocess.run([MCSTAS_PY, os.path.join(TWIN, "kafka", "start_kafka.py"), "--topics", instr],
@@ -227,7 +244,8 @@ def main():
             print("  setup 'live' loaded" if r.returncode == 0 else f"  setup 'live' NOT loaded: {r.stdout[-500:]}",
                   flush=True)
         extras = [x for x, on in (("live data", o.live), ("ESS file-writer", o.filewriter),
-                                  ("ESS live reduction", o.livedata), ("EPICS + forwarder", o.epics)) if on]
+                                  ("ESS live reduction", o.livedata), ("EPICS + forwarder", o.epics),
+                                  ("ESS Event Formation Unit", o.efu)) if on]
         print(f"{instr.upper()} services ready{' (' + ', '.join(extras) + ')' if extras else ''}. NICOS daemon on localhost:1301 "
               "(user student, password student).", flush=True)
         if not o.no_gui:

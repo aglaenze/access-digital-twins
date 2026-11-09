@@ -69,11 +69,25 @@ def open_fw(path, wait=120):
             time.sleep(2)
 
 
-def compare(fw_file, twin_files, log=print, exact_times=True):
+def _efu_events(mine, theirs, source, topic, say):
+    """The neutrons of a detector read by the ESS Event Formation Unit (efu/): the twin sent their raw readout, the EFU
+    published them. They must be what the EFU makes of that readout (efu/timepix3_readout.match: same pixel and time
+    of flight to the coding of the camera, identical neutrons counted once, pulse times to 10 µs): 99.5 % of them."""
+    import os
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "efu"))
+    import timepix3_readout
+    found, n, published, stray = timepix3_readout.match(*mine, *theirs)
+    say(found >= 0.995 * n and stray == 0,
+        f"{source} on {topic}, through the EFU: {found} of {n} distinct neutrons found exactly "
+        f"({100 * found / max(n, 1):.3f} %), {published} published, {stray} pulses of the EFU matching no pulse")
+
+
+def compare(fw_file, twin_files, log=print, exact_times=True, efu=()):
     """Returns (number of differences, report lines). exact_times=False (device values relayed by the ESS forwarder
     from the PVs of the twin, epics/): a device value of the twin's file must be the value in force in the
     file-writer's file at its time (the last one written before it, 2 s of tolerance), not at the same time; the
-    logs of every pulse (PER_PULSE) keep their exact times."""
+    logs of every pulse (PER_PULSE) keep their exact times. efu: the detector sources read by the ESS Event Formation
+    Unit (TWIN_EFU=1), compared by _efu_events."""
     lines, bad = [], 0
 
     def say(ok, text):
@@ -97,6 +111,9 @@ def compare(fw_file, twin_files, log=print, exact_times=True):
                                            f"{len(mine[0])} events in the twin's")
                     continue
                 theirs = _sorted(*_events(fw[path]))
+                if source in efu:
+                    _efu_events(mine, theirs, source, topic, say)
+                    continue
                 same = len(mine[0]) == len(theirs[0]) and all(np.array_equal(a, b) for a, b in zip(mine, theirs))
                 say(same, f"{path} ({source} on {topic}): {len(theirs[0])} events written, {len(mine[0])} in the "
                           f"twin's files" + ("" if same else " -- not the same events"))

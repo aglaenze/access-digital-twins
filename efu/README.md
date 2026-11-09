@@ -59,8 +59,30 @@ The build stops if the line changes upstream. It is worth reporting to ECDC.
    `python efu/timepix3_readout.py` checks the coding without the EFU. It runs the EFU's computation, rewritten in
    Python, on 200 000 random neutrons.
 
+## In the app
+
+The app's image holds the EFU (Linux x86-64 only, as the file-writer). It is copied from the image above, fixed by
+its digest.
+
+```
+python nicos/start_nicos.py --instrument odin --efu --filewriter     # or TWIN_EFU=1
+```
+
+With `--efu`:
+
+* **The EFU.** `service.py` starts it for ODIN, before the twin server. It takes UDP on port 9000 and publishes to
+  `odin_detector`.
+* **The twin.** At each pulse of a count, the twin server sends the readout of its camera instead of publishing the
+  neutrons (`filewriter/twin_filewriter.py`: `count_messages(efu=...)`, `Camera`). The pulse counter goes on from
+  count to count, as on the instrument. The packets of a pulse are spread over at most 60 ms.
+* **The comparison.** At the end of a job, the file-writer's file is compared with the twin's file. For the neutrons,
+  the comparison is `timepix3_readout.match()` instead of identity: 99.5 % of the distinct neutrons, pulse times
+  within 10 µs. NICOS prints the line "through the EFU: … found exactly".
+
+The container test (`../container/smoke_test.py`, last step, GitHub only) runs one job of ODIN this way.
+
 ## Still to do
 
-* Put the EFU into the app's image, with `start_nicos.py --efu` or `TWIN_EFU=1`. The twin would then send the readout
-  instead of the neutrons. The file-writer and esslivedata would read the EFU's neutrons.
 * LoKI: CAEN readout, which uses the ESS readout header and a calibration file (`loki` program).
+* esslivedata with the EFU: in a container, the kernel limits the receive buffer to about 200 kB. The twin's pacing
+  should cover that, but it is not yet tested with dense counts.

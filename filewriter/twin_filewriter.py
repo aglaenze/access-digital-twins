@@ -26,12 +26,14 @@ import datetime
 import json
 import os
 import shutil
+import sys
 import time
 import uuid
 
 import h5py
 import numpy as np
 
+HERE = os.path.dirname(os.path.abspath(__file__))
 PUBLISHED = ("f144", "ev44")          # the streams the twin publishes; the others (tdct) stay static, in the template
 PER_RUN = ("entry/title", "entry/experiment_identifier", "entry/start_time", "entry/end_time", "entry/sample/name",
            "entry/twin")             # values of a run: given by the start command (mdat: start and end times)
@@ -309,12 +311,15 @@ def topic_markers(structure, t_ns):
              if "ev44" in m else _f144(MARKER, np.float64(0.0), t_ns)) for t, m in sorted(kinds.items())]
 
 
-def count_messages(twin_file, message_id=0, devices=True):
+def count_messages(twin_file, message_id=0, devices=True, efu=None):
     """[(t_ns, topic, payload)] of one measurement of the twin (its NeXus file): one ev44 message per pulse with
     neutrons and per detector bank or monitor, and the device values recorded during the measurement (f144). The
     times are those of the file. Pulses without neutrons are not sent (the file-writer would not write them).
     devices=False: only the logs of PER_PULSE (proton charge) among the f144, the device values being relayed by the
-    ESS forwarder from the PVs of the twin (epics/, TWIN_EPICS=1)."""
+    ESS forwarder from the PVs of the twin (epics/, TWIN_EPICS=1).
+    efu=(host, port): the neutrons of the detectors that have an EFU in the twin (EFU_SOURCES: ODIN's camera) are
+    sent as their raw readout to the ESS Event Formation Unit (efu/, TWIN_EFU=1), one message per pulse
+    (t_ns, "udp://host:port", [UDP payloads]); the EFU publishes them to Kafka."""
     from streaming_data_types import serialise_ev44
     out = []
     with h5py.File(twin_file, "r") as f:
@@ -333,6 +338,10 @@ def count_messages(twin_file, message_id=0, devices=True):
             for k in range(len(etz)):
                 a, b = bounds[k], bounds[k + 1]
                 if b <= a:
+                    continue
+                if efu is not None and source in EFU_SOURCES:
+                    out.append((int(etz[k]), "udp://%s:%d" % tuple(efu),
+                                efu_camera().pulse(etz[k], eto[a:b], eid[a:b])))
                     continue
                 message_id += 1
                 out.append((int(etz[k]), topic, serialise_ev44(source, message_id, np.array([etz[k]], np.int64),
@@ -387,11 +396,37 @@ def publish(producer, messages, pace=False, stop=None):
                 time.sleep(wait)
         if stop is not None and stop.is_set():
             break
+        if topic.startswith("udp://"):            # raw readout of a detector, to its EFU (count_messages(efu=...))
+            host, port = topic[6:].rsplit(":", 1)
+            _send_udp(payload, host, int(port))
+            n += 1
+            continue
         producer.produce(topic, payload, timestamp=t_ns // 1_000_000)
         producer.poll(0)
         n += 1
     producer.flush(30)
     return n
+
+
+EFU_SOURCES = {"timepix3"}             # detectors whose raw readout the twin can send to an EFU (efu/README.md)
+_CAMERA = {}
+
+
+def efu_camera():
+    """The twin's Timepix3 camera and timing system (efu/timepix3_readout.Camera): one per twin server, its pulse
+    counter going on from count to count, as on the instrument."""
+    if "camera" not in _CAMERA:
+        sys.path.insert(0, os.path.join(os.path.dirname(HERE), "efu"))
+        import timepix3_readout
+        _CAMERA["module"], _CAMERA["camera"] = timepix3_readout, timepix3_readout.Camera()
+    return _CAMERA["camera"]
+
+
+def _send_udp(payloads, host, port):
+    """The packets of one pulse, spread over at most 60 ms (a pulse every 71 ms): the EFU reads them one by one and
+    its receive buffer may be small (the kernel's limit in a container)."""
+    efu_camera()
+    _CAMERA["module"].send(payloads, host, port, pause_s=min(1e-3, 0.06 / max(len(payloads), 1)))
 
 
 def producer(brokers):
