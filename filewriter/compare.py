@@ -21,7 +21,7 @@ import sys
 import h5py
 import numpy as np
 
-from twin_filewriter import DTYPES, streams
+from twin_filewriter import DTYPES, PER_PULSE, streams
 
 
 def _events(g):
@@ -123,11 +123,13 @@ def compare(fw_file, twin_files, log=print):
             say(not missing, f"device values recorded during the measurements: {n_values - len(missing)} of "
                              f"{n_values} in the file-writer's file" + ("" if not missing else
                                                                        ": missing " + "; ".join(missing[:5])))
-            # every device has a value (at least the one given at the start of the job)
+            # every device has a value (at least the one given before the start of the job); not the logs of every
+            # pulse (proton charge), which come with the measurements (checked above, as device values recorded)
             empty = []
             n_dev = 0
             for path, module, source, topic in st:
-                if module != "f144" or "value" not in twins[0][path] or twins[0][path]["value"].shape[:1] == (0,):
+                if (module != "f144" or path in PER_PULSE or "value" not in twins[0][path]
+                        or twins[0][path]["value"].shape[:1] == (0,)):
                     continue
                 n_dev += 1
                 if path not in fw or "value" not in fw[path] or fw[path]["value"].shape[:1] == (0,):
