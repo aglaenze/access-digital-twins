@@ -1,0 +1,11 @@
+# Teaching proposals of ODIN: what the ESS user office would hold for the course (nicos/user_office.py).
+# id: the proposal number (digits); samples: names of odin/samples/*.yml. Users: the teaching accounts of NICOS.
+- id: "100001"
+  title: Bragg edges of alpha-iron
+  samples: [iron_plate]
+- id: "100002"
+  title: Iron and copper in one image
+  samples: [iron_copper]
+- id: "100003"
+  title: Thickness of a steel step wedge
+  samples: [steel_steps]

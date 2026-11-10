@@ -310,17 +310,21 @@ if _EssJustBinItDetector is not None:
 
 class TwinExperiment(EssExperiment):
     """ESS experiment (proposal number, title, users, samples; data in <dataroot>/<instrument>/<year>/<proposal>/raw),
-    without the "current" symlinks (not allowed for ordinary users on Windows). The look-up of real ESS proposals
-    (user office) is not available: any number can be used."""
+    without the "current" symlinks (not allowed for ordinary users on Windows).
+    Proposals: with the twin's user office (start_nicos.py --proposals, TWIN_PROPOSALS=1), as at ESS: the teaching
+    proposals of nicos/proposals/ are read from the proposal cache (cache_filepath, written by nicos/user_office.py),
+    and "Query" in the Experiment tab fills in the number, title, users and samples. Without it, any number can be
+    typed in (Experiment tab, or NewExperiment), as when the proposal system is unreachable at ESS."""
 
     def doInit(self, mode):
-        # no connection to the ESS user office: the proposal number and title are typed in (Experiment panel, or
-        # NewExperiment), as when the proposal system is unreachable at ESS
+        if os.environ.get("TWIN_PROPOSALS") == "1" and os.path.isfile(self.cache_filepath):
+            EssExperiment.doInit(self, mode)
+            return
         Experiment.doInit(self, mode)
         self._client = None
 
     def _canQueryProposals(self):
-        return False
+        return self._client is not None
 
     @property
     def scriptpath(self):

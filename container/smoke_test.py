@@ -545,5 +545,27 @@ else:
     if os.path.isfile(path):
         print(f"--- {path} (end)\n" + open(path, errors="replace").read()[-1500:])
 
+step("User office: the Experiment tab queries the teaching proposals (proposal cache of yuos_query, as at ESS)")
+ready, out = nicos_session("odin", "ci_proposals",
+                           "import time\n"
+                           "for _ in range(30):\n"
+                           "    if session.experiment._canQueryProposals() and "
+                           "session.experiment._client.all_proposals(): break\n"
+                           "    time.sleep(1)\n"
+                           "r = session.experiment._queryProposals(kwds={'fed_id': 'student', 'admin': False})\n"
+                           "for p in r: printinfo('proposal %s | %s | %s | %s' % (p['proposal'], p['title'], "
+                           "[s['name'] for s in p['samples']], [u['facility_user_id'] for u in p['users']]))\n"
+                           "p = r[0]\n"
+                           "NewExperiment(p['proposal'], p['title'], users=p['users'])\n"
+                           "session.experiment.sample.set_samples({i: s for i, s in enumerate(p['samples'])})\n"
+                           "printinfo('experiment %s: %s' % (session.experiment.proposal, session.experiment.title))\n",
+                           ["--proposals"])
+check(ready, "NICOS started with the twin's user office (ODIN)")
+props = [x.split("proposal ", 1)[1] for x in out.splitlines() if "proposal 1000" in x]
+print("  " + "\n  ".join(props))
+check(len(props) == 3 and "Iron plate, 5 mm" in out and "experiment 100001: Bragg edges of alpha-iron" in out,
+      "user office: the 3 proposals of ODIN for the account student, with their samples; the first one becomes the "
+      "experiment, as with Query and Apply in the Experiment tab")
+
 print("\nALL PASSED" if ok else "\nSOME CHECKS FAILED")
 sys.exit(0 if ok else 1)

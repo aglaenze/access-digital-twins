@@ -1,0 +1,5 @@
+# Teaching proposals of LoKI: what the ESS user office would hold for the course (nicos/user_office.py).
+# id: the proposal number (digits); samples: names of loki/samples/*.yml. Users: the teaching accounts of NICOS.
+- id: "200001"
+  title: Size of silica nanoparticles in D2O
+  samples: [silica_spheres, d2o, empty_beam]

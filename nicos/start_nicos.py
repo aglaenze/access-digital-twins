@@ -148,6 +148,9 @@ def main():
     a.add_argument("--efu", action="store_true", default=os.environ.get("TWIN_EFU") == "1",
                    help="the ESS Event Formation Unit makes the neutrons from the raw readout of the detector (ODIN; "
                         "default: TWIN_EFU=1)")
+    a.add_argument("--proposals", action="store_true", default=os.environ.get("TWIN_PROPOSALS") == "1",
+                   help="the twin's user office: the Experiment tab queries the teaching proposals (nicos/proposals/), "
+                        "as at ESS, instead of any number typed in (default: TWIN_PROPOSALS=1)")
     a.add_argument("--until-gui-closes", action="store_true",
                    help="stop everything when the NICOS window is closed (the control room of the app)")
     o = a.parse_args()
@@ -192,6 +195,13 @@ def main():
     os.environ["TWIN_EPICS"] = "1" if o.epics else "0"
     os.environ["TWIN_EFU"] = "1" if o.efu else "0"
     os.makedirs(LOGS, exist_ok=True)
+    if o.proposals:            # the twin's user office: the proposal cache that EssExperiment reads (nicos/user_office.py)
+        r = subprocess.run([MCSTAS_PY, os.path.join(HERE, "user_office.py"), instr,
+                            os.path.join(LOGS, "cached_proposals.json")], capture_output=True, text=True, timeout=120)
+        if r.returncode != 0:
+            print(f"The twin's user office is not available: {(r.stderr or r.stdout).strip()[-300:]}")
+            o.proposals = False
+    os.environ["TWIN_PROPOSALS"] = "1" if o.proposals else "0"
     print(f"Starting the {instr.upper()} digital twin with NICOS:", flush=True)
     try:
         if o.live or o.filewriter or o.livedata or o.epics or o.efu:     # data streaming as at ESS: the Kafka broker
@@ -245,7 +255,7 @@ def main():
                   flush=True)
         extras = [x for x, on in (("live data", o.live), ("ESS file-writer", o.filewriter),
                                   ("ESS live reduction", o.livedata), ("EPICS + forwarder", o.epics),
-                                  ("ESS Event Formation Unit", o.efu)) if on]
+                                  ("ESS Event Formation Unit", o.efu), ("user office", o.proposals)) if on]
         print(f"{instr.upper()} services ready{' (' + ', '.join(extras) + ')' if extras else ''}. NICOS daemon on localhost:1301 "
               "(user student, password student).", flush=True)
         if not o.no_gui:
