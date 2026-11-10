@@ -60,6 +60,24 @@ def random_neutrons(n, pulses=30, seed=2):
     return etz, eto, rng.integers(1, cr.N_PIXELS + 1, n), counts
 
 
+def diagnose(t0, eto, ids, t0_efu, ids_efu, tof_efu):
+    """What differs, on the first pulse: the pixel ids alone, the times of flight alone, and the first neutrons."""
+    p = np.unique(t0)[0]
+    q = t0_efu[np.argmin(np.abs(t0_efu - p))]
+    s, g = t0 == p, t0_efu == q
+    xt, xtof = cr.expected(t0[s], eto[s])
+    print(f"    first pulse: sent {s.sum()}, published {g.sum()}, pulse time {p} -> expected {xt[0]}, EFU {q}")
+    print(f"    same pixel ids (as sets of the pulse): {np.array_equal(np.sort(ids[s]), np.sort(ids_efu[g]))}; "
+          f"same times of flight: {np.array_equal(np.sort(xtof), np.sort(tof_efu[g]))}")
+    d = np.sort(tof_efu[g]) - np.sort(xtof)
+    print(f"    time of flight EFU - expected (sorted): min {d.min()}, median {np.median(d)}, max {d.max()}")
+    o, r = np.argsort(xtof, kind="stable")[:6], np.argsort(tof_efu[g], kind="stable")[:6]
+    print(f"    first sent (id, expected tof): {list(zip(ids[s][o].tolist(), xtof[o].tolist()))}")
+    print(f"    first published (id, tof):     {list(zip(ids_efu[g][r].tolist(), tof_efu[g][r].tolist()))}")
+    print(f"    their readouts: {[tuple(int(v[i]) for v in cr.readouts(ids[s][o][:3])) for i in range(3)]}",
+          flush=True)
+
+
 def run(name, etz, eto, ids, counts, a, consumer):
     from streaming_data_types import deserialise_ev44
     from timepix3_readout import send
@@ -96,7 +114,7 @@ def run(name, etz, eto, ids, counts, a, consumer):
     for b in range(cr.N_BANKS):
         sel = bank == b
         g = [np.concatenate(v) if v else np.zeros(0, np.int64) for v in got[b]]
-        found, sent, published, stray = cr.match(t0[sel], eto[sel], ids[sel], *g)
+        found, sent, published, stray = cr.match(t0[sel], eto[sel], ids[sel], g[0], g[2], g[1])   # pulse times, tofs, ids
         wrong_bank = int(np.sum(cr.bank_of(g[1]) != b)) if len(g[1]) else 0
         total = [total[0] + found, total[1] + sent, total[2] + published]
         good = found == sent == published and stray == 0 and wrong_bank == 0
@@ -104,6 +122,8 @@ def run(name, etz, eto, ids, counts, a, consumer):
         print(f"  bank {b} ({TOPICS[b]}): {found} of {sent} neutrons found exactly, {published} published, "
               f"{stray} pulses matching no pulse sent, {wrong_bank} pixels of another bank "
               f"{'ok' if good else 'DIFFERENT'}", flush=True)
+        if not good and len(g[1]) and b == 0:
+            diagnose(t0[sel], eto[sel], ids[sel], *g)
     print(f"  {name}: {total[0]} of {total[1]} neutrons found exactly, {total[2]} published", flush=True)
     if not ok:
         for b in range(cr.N_BANKS):
