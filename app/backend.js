@@ -134,7 +134,7 @@ class Backend {
     }
     this.onStatus("Starting the instruments…", 0.4);
     await run(eng, ["rm", "-f", CONTAINER]);
-    const r = await run(eng, ["run", "-d", "--rm", "--name", CONTAINER, "-p", `127.0.0.1:${this.port}:8888`,
+    const r = await run(eng, ["run", "-d", "--name", CONTAINER, "-p", `127.0.0.1:${this.port}:8888`,
                               "-v", "twin-data:/data", ...(process.env.GITHUB_TOKEN ? ["-e", "GITHUB_TOKEN"] : []), image, "jupyter", `--IdentityProvider.token=${this.token}`]);
     if (r.code !== 0) throw new Error("The container did not start: " + r.stderr.slice(-300));
   }
@@ -171,6 +171,14 @@ class Backend {
       } catch {
         if (this.proc && this.proc.exitCode !== null) {
           throw new Error("The server stopped: see " + path.join(this.dataDir, "server.log"));
+        }
+        if (this.mode === "container" && this.engine && Date.now() - (this._checked || 0) > 10000) {
+          this._checked = Date.now();                  // the container stopped: say so now, with the end of its log
+          const st = await run(this.engine, ["inspect", "-f", "{{.State.Running}}", CONTAINER]);
+          if (st.code !== 0 || st.stdout.trim() !== "true") {
+            const lg = await run(this.engine, ["logs", "--tail", "15", CONTAINER]);
+            throw new Error("The instruments stopped: " + (lg.stdout + lg.stderr).trim().slice(-600));
+          }
         }
         // the first start of the container downloads the recorded beams (MCPL files): up to ~15 min
         const limit = this.mode === "container" ? 45 * 60000 : 4 * 60000;
