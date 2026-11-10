@@ -111,7 +111,9 @@ The container test (`../container/smoke_test.py`, last step, GitHub only) runs o
   of flight (99.974 %), and the rest of the file is the same as the twin's. The cause of the 463 others is not yet
   checked: pile-up, or clusters cut (the EFU counted 180 clusters too small). In the container the kernel gave the
   EFU a receive buffer of 2 MB instead of the 32 MB asked.
-* LoKI: under test.
+* LoKI (run of commit b509968): a count of 30 s on D2O, 4,818,037 neutrons in the 9 banks. Every one comes back
+  once, with the same pixel and the predicted time of flight (100 %), and the rest of the file is the same as the
+  twin's.
 
 ## Still to do
 
