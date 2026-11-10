@@ -82,7 +82,7 @@ jobs:
           exit $status
       - name: LoKI's readout played by the twin, read by one EFU per bank
         run: |
-          pip install --quiet esssans
+          pip install --quiet esssans ipywidgets
           python efu/caen_readout.py                        # the coding checked without the EFU (every pixel)
           mkdir -p /tmp/efu && python efu/caen_readout.py --calibration /tmp/efu/loki_calibration.json
           python efu/e2e_loki.py --create-topics
