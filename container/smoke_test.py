@@ -15,6 +15,7 @@
 Exit code 0 if everything works.
 """
 import os
+import re
 import shutil
 import signal
 import subprocess
@@ -581,7 +582,8 @@ ready, out = nicos_session("odin", "ci_proposals",
                            "printinfo('experiment %s, mounted %s' % (Exp.proposal, sample_holder.read(0)))\n",
                            (), timeout=600)
 check(ready, "NICOS started with the twin's user office (ODIN, by default)")
-props = [x.split("proposal ", 1)[1].strip() for x in out.splitlines() if "proposal " in x and " | " in x]
+props = [x.strip()[len("proposal "):] for x in out.splitlines()         # (not the echo of the script)
+         if re.match(r"\s*proposal \d+ \| ", x)]
 print("  " + "\n  ".join(props))
 check(any(x.startswith("1234 | Lattice spacing") and "['iron_plate']" in x for x in props)
       and any(x.startswith(free["id"] + " | Does a weld") and "[]" in x for x in props)
