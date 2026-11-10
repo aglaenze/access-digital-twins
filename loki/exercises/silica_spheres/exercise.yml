@@ -42,3 +42,6 @@ modes:
     file: loki/exercises/silica_spheres/beamtime.md
     nicos: loki
     analysis: loki/exercises/silica_spheres/LoKI_silica_beamtime.ipynb
+    # the proposal of this beamtime, in the user office of the twin (user_office.py): Query in the Experiment tab
+    # of NICOS; its samples are those of the exercise, the first one mounted by default
+    proposal: {id: "3001", title: "Size of silica nanoparticles for a new polishing slurry"}

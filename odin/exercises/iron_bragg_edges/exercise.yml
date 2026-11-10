@@ -39,3 +39,6 @@ modes:
     file: odin/exercises/iron_bragg_edges/beamtime.md
     nicos: odin
     analysis: odin/exercises/iron_bragg_edges/ODIN_iron_beamtime.ipynb
+    # the proposal of this beamtime, in the user office of the twin (user_office.py): Query in the Experiment tab
+    # of NICOS; its samples are those of the exercise, the first one mounted by default
+    proposal: {id: "1234", title: "Lattice spacing of a ferritic steel component by Bragg-edge imaging"}

@@ -75,7 +75,10 @@ ODIN BSc page (answers a question), the MSc notebook, and saves screenshots:
   (`PROPOSAL`); without files the notebook stops there with a message (`nb_tools.need_measurements`), no hidden
   simulation.
 - **Beamtime and free beamtime**: the proposal (folded), *Open NICOS* and *Sample builder* are at the top of the starter
-  notebook; the catalogue only opens the notebook.
+  notebook; the catalogue only opens the notebook. The card of the free beamtime makes proposals in the twin's user
+  office (`../user_office.py`, `POST /twin/proposal`): *New free beamtime* (a new number each time, the question as
+  title), *Import a proposal* (a real one: number, title, samples); the student's proposals are listed, each with its
+  own copy of the starter notebook (`work/<user>/<instr>_free_beamtime_<proposal>/`). In NICOS: Experiment, Query.
 - A notebook opens **already run**: the app runs all its cells once the kernel is ready (Notebook 7 exposes its
   commands: `exposeAppInBrowser` in `../container/app_config/labconfig/page_config.json`), then shows where it stopped.
 - The code of the questions and of the solutions (the answers are in it) is hidden; only their widgets show.

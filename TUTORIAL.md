@@ -242,9 +242,11 @@ python nicos\start_nicos.py
 Answer `1` (ODIN). After ~30 s the NICOS window of ESS opens. Log in with user **student**, password **student**
 (server `localhost:1301`).
 
-1. Tab **Experiment**: type a *Proposal ID* (any number, e.g. `1234`: at ESS it is the number of your accepted
-   proposal), a title, your name in *Users*, then **Apply**. Without a proposal NICOS refuses to record data, as at
-   ESS.
+1. Tab **Experiment**: **Query**, choose your proposal, then **Apply**. As at ESS, NICOS asks the user office for
+   your proposals (here the twin's: the proposals of the exercises, e.g. `1234` for the iron plate, and your free
+   beamtimes), and fills in the number, title, users and samples; the first sample is mounted on the sample changer
+   (mount another one with `move(sample_holder, 'its_name')`). Without a proposal NICOS refuses to record data, as at
+   ESS. (`start_nicos.py --no-proposals`: any number can be typed in instead, as when the proposal system is down.)
 2. Tab **Instrument interaction**: type in the command line (one line, then Enter; or several lines in the tab
    **Scripting**, then Run):
    ```
@@ -289,7 +291,7 @@ python nicos/start_nicos.py --instrument odin --no-gui --background
 Wait for `ODIN services ready`. Terminal 2: write your commands in a file, e.g. `my_session.py`
 (JupyterLab: *File → New → Text File*):
 ```
-NewExperiment(1234, 'Bragg edges of iron')
+NewExperiment(1234, 'Bragg edges of iron')     # in a script any number is accepted, as at ESS
 move(shutter, 'open', stage_x, 500)
 with nexusfile_open('open beam'):
     count(t=10)

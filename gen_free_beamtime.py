@@ -23,8 +23,10 @@ references does your analysis need? how long? in which configuration?), measure 
 analyze your files here. Your own samples can be designed with the *Sample builder*: they appear on the sample changer
 of NICOS.
 
-**Your proposal**: choose a proposal number (e.g. your group number, 1000-9999) and enter it in the *Experiment* panel
-of NICOS; write it below in `PROPOSAL`. Your files are then in `data/{instr}/<year>/<proposal>/raw`.
+**Your proposal**: each free beamtime is a new proposal of the user office of the twin, made by the app (button *New
+free beamtime*, or *Import a proposal* for a real one): its number is in `PROPOSAL` below. In NICOS, tab *Experiment*:
+**Query**, choose it, **Apply**. No sample is imposed: mount any sample of the library, or your own. Your files are in
+`data/{instr}/<year>/<proposal>/raw`.
 
 """
 
@@ -42,21 +44,23 @@ def main():
         cells.insert(1, nbf.v4.new_markdown_cell(
             "## My question\n\n(what, on which sample, why; what result would answer it)\n\n## My plan\n\n"
             "(measurements, references, configuration, counting times, and why)"))
-        # no proposal sheet here: the question is the student's own; the proposal number is 1000 (PROPOSAL)
+        # no proposal sheet here: the question is the student's own; the proposal number "1000" is replaced by the
+        # number of the free beamtime in the student's copy (container/twin_app.py, Open with a proposal)
         cells = nb.cells = [c for c in cells if not (c.cell_type == "markdown" and c.source.startswith("**Your proposal**"))]
         for c in cells:
             if c.cell_type == "code" and "nb_tools.proposal(" in c.source:
                 c.source = c.source.split("nb_tools.proposal(")[0].rstrip()
                 c.metadata["jupyter"] = {"source_hidden": True}
             if c.cell_type == "code" and "nb_tools.sample_builder(" in c.source:
-                c.source = f'nb_tools.sample_builder("{instr}", "1000")'
+                c.source = (f'nb_tools.sample_builder("{instr}", "1000")\n'
+                            f'nb_tools.imported_samples("{instr}", "1000")   # a real proposal: its samples to build')
             if c.cell_type == "markdown" and c.source.startswith("## 2. Your measurements, in NICOS"):
-                c.source = c.source.replace("the *Proposal ID* of your proposal", "your *Proposal ID* (the number of "
+                c.source = c.source.replace("choose your proposal", "choose your free beamtime (its number is "
                                             "PROPOSAL below)").replace(" your budget is in your proposal.", " no budget.").replace(" (e.g. `iron_plate`)", "").replace(" (e.g. `silica_spheres`, `d2o`, `empty_beam`)", "").replace(
                                             "(e.g. `iron_plate`)", "(`sample_info()`)")
             if c.cell_type == "code" and "FOLDER = " in c.source and f"/{number}/raw" in c.source:
                 c.source = (f"from {instr}_paths import TWIN_RUN_ROOT\nimport datetime\n"
-                            f"PROPOSAL = \"1000\"          # your proposal number (the one entered in NICOS)\n"
+                            f"PROPOSAL = \"1000\"          # the number of this free beamtime (set by the app)\n"
                             f"FOLDER = f\"{{TWIN_RUN_ROOT}}/data/{instr}/{{datetime.date.today().year}}/{{PROPOSAL}}/raw\"")
             if c.cell_type == "markdown" and c.source.startswith("## Results for the committee"):
                 c.source = "## My answer\n\n(the answer to your question, with uncertainties; what you would do next)"

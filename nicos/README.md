@@ -78,7 +78,7 @@ interaction**, or in any NICOS client:
 
 ```python
 NewExperiment(1234, 'Bragg edges of iron')     # 1. your experiment: proposal number and title
-                                               #    (or the Experiment tab: Proposal ID, title, users, Apply)
+                                               #    (or the Experiment tab: Query, your proposal, Apply)
 read()                                         # state of all devices
 move(shutter, 'closed')
 with nexusfile_open('dark'):                   # 2. record: everything in the block is written to file
@@ -184,6 +184,27 @@ Installation (route B, Windows): Java (`conda create -n kafka -c conda-forge ope
 `pip install confluent-kafka ess-streaming-data-types keyring keyrings.alt pycryptodomex` in the `nicos` environment
 (the Kafka devices of the ESS NICOS need the last three). In the container everything is
 installed: `docker run ... -e TWIN_LIVE=1 ... nicos`.
+
+### Proposals: the twin's user office
+
+As at ESS, a beamtime has a **proposal** (number, title, team, samples) accepted beforehand by the user office, and
+NICOS reads the proposals from a cache that a service writes for the instrument (`yuos_query`): in the **Experiment**
+tab, **Query** lists the proposals of the logged-in user and **Apply** fills in the number, title, users and samples
+(they can then no longer be typed in). The data of a proposal go to `<instrument>/<year>/<proposal>/raw`.
+
+The twin has its own user office (`twin/user_office.py`), written to the cache by `start_nicos.py`
+(`<run root>/nicos/cached_proposals_<instrument>.json`, read again every ~1 min):
+
+| Proposals | Number | Samples |
+|---|---|---|
+| beamtime of an exercise | from its `exercise.yml` (`modes.beamtime.proposal`): ODIN 1234, LoKI 3001 | those of the exercise; the first one is **mounted on Apply**, the student may mount another |
+| free beamtime | a **new number each time** (from 900001), made by the app (*New free beamtime*) | none imposed: any sample of the library, or the student's own |
+| imported proposal | its own (e.g. a real ESS proposal), typed in the app (*Import a proposal*) | names and formulas; each one built with the sample builder under the short name given |
+
+The free and imported proposals belong to the student who made them (the account of the app): Query shows the
+proposals of the exercises and those of the student signed in. `NewExperiment(<number>, 'title')` in a script still
+accepts any number, as at ESS. `start_nicos.py --no-proposals` (or `TWIN_PROPOSALS=0`): no user office, any number is
+typed in the Experiment tab, as when the proposal system is unreachable.
 
 ### Samples
 

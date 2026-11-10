@@ -9,6 +9,11 @@ All requests need the token of the server (header "Authorization: token ...").
                                    (TWIN_USER, sessions of the pages, logbooks of the questions); open kernels stop
     POST /twin/open {dir,mode,what} the address to show for one way into an exercise (a page, or the student's own
                                    copy of a notebook, made on first opening) and records that it was opened
+                                   ({file, proposal}: the starter notebook of a free beamtime, one copy per proposal)
+    POST /twin/proposal {instrument, kind, title, proposal, samples}
+                                   the user office of the twin (user_office.py): a new free beamtime (kind "free", a
+                                   new number each time) or an imported proposal (kind "imported": its number, title,
+                                   samples [{name, formula}]); NICOS finds it in Query within a minute
     POST /twin/reset {dir,mode}    starts one way into an exercise again: the student's copy of its notebook, the
                                    answers to its questions and its state (started, submitted) are put aside (folder
                                    _old/ of the student, nothing is deleted); the measurements stay
@@ -109,7 +114,13 @@ class Catalogue(Base):
                 ex += [dict(e, status="planned") for e in yaml.safe_load(fh) or []]
         free = {k: f"{k}/exercises/free_beamtime/{v['name']}_free_beamtime.ipynb" for k, v in INSTRUMENTS.items()}
         free = {k: f for k, f in free.items() if os.path.isfile(os.path.join(self.root, f))}
-        self.finish(json.dumps(dict(instruments=INSTRUMENTS, exercises=ex, free=free, user=user(),
+        mine = {}                                  # the student's free beamtimes and imported proposals
+        if user():
+            import user_office
+            for p in user_office.proposals(owner=user()):
+                if p["kind"] != "exercise":
+                    mine.setdefault(p["instrument"], []).append(p)
+        self.finish(json.dumps(dict(instruments=INSTRUMENTS, exercises=ex, free=free, proposals=mine, user=user(),
                                     local=bool(os.environ.get("TWIN_APP_LOCAL")))))
 
     def mode_progress(self, d, mode):
@@ -155,6 +166,8 @@ class User(Base):
         for v in SESSION_VARS:                       # the pages measure in the session of the student
             os.environ[v] = uid
         os.makedirs(os.path.join(run_root(), "progress", uid), exist_ok=True)
+        import user_office
+        user_office.set_signed_in(uid)               # NICOS lists the proposals of this student (start_nicos.py)
         with open(os.path.join(run_root(), "progress", uid, "account.json"), "w", encoding="utf-8") as f:
             json.dump(dict(id=uid, name=b.get("name", ""), email=b.get("email", "")), f)
         if changed:                                  # kernels of the previous student (not the kept ones of
@@ -230,10 +243,13 @@ class Open(Base):
             kind = b.get("kind", "notebook")
         if not os.path.isfile(os.path.join(self.root, rel)) or ".." in rel.split("/"):
             raise web.HTTPError(404, rel)
+        proposal = str(b.get("proposal") or "")
+        if proposal and not proposal.isdigit():
+            raise web.HTTPError(400, "proposal: digits")
         if kind == "page":
             url = "/voila/render/" + rel
         else:
-            url = "/notebooks/" + self.personal_copy(rel)
+            url = "/notebooks/" + self.personal_copy(rel, proposal)
         if d and mode and self.progress():
             o = self.opened()
             o.setdefault(f"{d}:{mode}", datetime.datetime.now().isoformat(timespec="minutes"))
@@ -242,14 +258,16 @@ class Open(Base):
                 json.dump(o, f)
         self.finish(json.dumps(dict(url=url, kind=kind)))
 
-    def personal_copy(self, rel):
-        """The student's own copy of a notebook (made once, then kept), its relative paths made absolute."""
+    def personal_copy(self, rel, proposal=""):
+        """The student's own copy of a notebook (made once, then kept), its relative paths made absolute. With a
+        proposal (free beamtime, imported proposal): one copy per proposal, its number in place of "1000"."""
         import nbformat
         src = os.path.join(self.root, rel)
         ex_dir = os.path.dirname(src)
         instr_dir = os.path.dirname(os.path.dirname(ex_dir))
         who = user() or "guest"
-        dst_rel = f"work/{who}/{os.path.basename(instr_dir)}_{os.path.basename(ex_dir)}/{os.path.basename(rel)}"
+        folder = f"{os.path.basename(instr_dir)}_{os.path.basename(ex_dir)}" + (f"_{proposal}" if proposal else "")
+        dst_rel = f"work/{who}/{folder}/{os.path.basename(rel)}"
         dst = os.path.join(self.root, dst_rel)
         if not os.path.isfile(dst):
             nb = nbformat.read(src, as_version=4)
@@ -262,9 +280,40 @@ class Open(Base):
                 c.source = (c.source.replace('os.path.abspath("../../..")', root)
                             .replace('os.path.abspath("../..")', f'os.path.join({root}, "{instr}")')
                             .replace('"exercise.yml"', f'os.path.join({root}, "{yml}")'))
+                if proposal and c.cell_type == "code":
+                    c.source = c.source.replace('"1000"', f'"{proposal}"')
             os.makedirs(os.path.dirname(dst), exist_ok=True)
             nbformat.write(nb, dst)
         return dst_rel
+
+
+class Proposal(Base):
+    @web.authenticated
+    def post(self):
+        import user_office
+        who = user()
+        if not who:
+            raise web.HTTPError(400, "sign in first")
+        b = self.body()
+        name = ""
+        try:
+            with open(os.path.join(run_root(), "progress", who, "account.json"), encoding="utf-8") as f:
+                name = json.load(f).get("name", "")
+        except (OSError, ValueError):
+            pass
+        try:
+            p = user_office.create(b.get("instrument", ""), b.get("title", ""), who, kind=b.get("kind", "free"),
+                                   proposal_id=b.get("proposal"), samples=b.get("samples") or [], owner_name=name)
+        except ValueError as e:
+            self.set_status(400)
+            self.finish(json.dumps(dict(error=str(e))))
+            return
+        try:                                       # NICOS (if open) reads its proposal cache again within a minute
+            user_office.write_cache(p["instrument"], os.path.join(run_root(), "nicos",
+                                                                  f"cached_proposals_{p['instrument']}.json"), who)
+        except Exception:                          # noqa: BLE001 (written again when NICOS starts)
+            pass
+        self.finish(json.dumps(p))
 
 
 class Nicos(Base):
@@ -321,7 +370,8 @@ def _jupyter_server_extension_points():
 def _load_jupyter_server_extension(serverapp):
     base = serverapp.web_app.settings["base_url"]
     serverapp.web_app.add_handlers(".*$", [(url_path_join(base, "twin", p), h) for p, h in [
-        ("catalogue", Catalogue), ("user", User), ("open", Open), ("reset", Reset), ("nicos", Nicos), ("handin", Handin)]])
+        ("catalogue", Catalogue), ("user", User), ("open", Open), ("reset", Reset), ("proposal", Proposal),
+        ("nicos", Nicos), ("handin", Handin)]])
     # the twin root on the path of the server (quiz.py: the progress shown in the catalogue)
     root = os.path.abspath(os.path.expanduser(serverapp.root_dir))
     os.environ["TWIN_ROOT"] = root            # the kernels find the twin from the students' copies (work/<user>/...)

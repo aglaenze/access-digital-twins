@@ -311,17 +311,41 @@ if _EssJustBinItDetector is not None:
 class TwinExperiment(EssExperiment):
     """ESS experiment (proposal number, title, users, samples; data in <dataroot>/<instrument>/<year>/<proposal>/raw),
     without the "current" symlinks (not allowed for ordinary users on Windows).
-    Proposals: with the twin's user office (start_nicos.py --proposals, TWIN_PROPOSALS=1), as at ESS: the teaching
-    proposals of nicos/proposals/ are read from the proposal cache (cache_filepath, written by nicos/user_office.py),
-    and "Query" in the Experiment tab fills in the number, title, users and samples. Without it, any number can be
-    typed in (Experiment tab, or NewExperiment), as when the proposal system is unreachable at ESS."""
+    Proposals: as at ESS, from the twin's user office (user_office.py, written to the proposal cache cache_filepath
+    by start_nicos.py): "Query" in the Experiment tab lists the proposals of the exercises and the student's own (free
+    beamtimes, imported proposals) and fills in the number, title, users and samples. On a new proposal, its first
+    sample is mounted on the sample changer (the student may mount another one). With start_nicos.py --no-proposals,
+    any number can be typed in, as when the proposal system is unreachable at ESS. NewExperiment in a script accepts
+    any number in both cases, as at ESS."""
 
     def doInit(self, mode):
-        if os.environ.get("TWIN_PROPOSALS") == "1" and os.path.isfile(self.cache_filepath):
+        if os.environ.get("TWIN_PROPOSALS", "1") != "0" and os.path.isfile(self.cache_filepath):
             EssExperiment.doInit(self, mode)
             return
         Experiment.doInit(self, mode)
         self._client = None
+
+    def new(self, proposal, title=None, localcontact=None, user=None, **kwds):
+        EssExperiment.new(self, proposal, title, localcontact, user, **kwds)
+        if self._client is None:
+            return
+        try:                               # the first sample of the proposal, mounted by default
+            found = [p for p in self._client.all_proposals() if str(p.id) == str(proposal)]
+            names = [s.name for s in found[0].samples] if found else []
+            changer = session.getDevice("sample_holder") if names else None
+        except Exception:                  # noqa: BLE001 (no proposal, or no sample changer in this setup)
+            return
+        if changer is not None:
+            try:
+                if changer.isAllowed(names[0])[0]:
+                    changer.maw(names[0])
+                    self.log.info("sample %r of proposal %s mounted (sample_holder); mount another one with "
+                                  "move(sample_holder, '<name>')", names[0], proposal)
+                else:
+                    self.log.info("the samples of proposal %s are not on the sample changer yet: build them with "
+                                  "the sample builder (same short names: %s)", proposal, ", ".join(names))
+            except Exception as e:         # noqa: BLE001
+                self.log.warning("sample %r not mounted: %s", names[0], e)
 
     def _canQueryProposals(self):
         return self._client is not None

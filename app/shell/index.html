@@ -104,6 +104,17 @@
   password?</i> on the sign-in screen. It is shown only now.</p>
   <p id="recovery-code" class="code"></p></div><form method="dialog"><button class="primary">I have written it down</button></form></dialog>
 <dialog id="sheet"><div class="sheet-body"></div><form method="dialog"><button class="primary">Close</button></form></dialog>
+<dialog id="proposal"><form id="p-form" class="prop-form"><div class="sheet-body"><h2>New free beamtime</h2>
+  <p class="only-import">A real proposal (for example your ESS proposal), to try it on the twin: same number, same data
+  folder. Its samples are then built with the sample builder (your starter notebook has a button for each one).</p>
+  <div class="field only-import"><label for="p-id">Proposal number</label>
+    <input id="p-id" type="text" inputmode="numeric" autocomplete="off" placeholder="e.g. 2025123"></div>
+  <div class="field"><label for="p-title" id="p-title-label">Your question</label>
+    <input id="p-title" type="text" autocomplete="off" required placeholder="What do you want to learn, on which sample?"></div>
+  <div class="field only-import"><label for="p-samples">Samples: one per line, name; formula</label>
+    <textarea id="p-samples" rows="4" placeholder="Turbine blade, nickel alloy; Ni&#10;Reference plate; Fe"></textarea></div>
+  <p id="p-error" class="error"></p></div>
+  <div class="prop-acts"><button type="button" class="btn" id="p-cancel">Cancel</button><button class="primary">Create the proposal</button></div></form></dialog>
 <div id="toast" role="status"></div>
 <script src="app.js"></script>
 </body>

@@ -27,7 +27,9 @@ Rules for every exercise: the student has a **role and a mission** that say why 
 question is **interactive** (`quiz.py`: multiple choice or a value checked with a tolerance, a wrong answer is
 explained, the answer can be shown, MSc tasks have their solution behind a button), so that the exercises work
 without a teacher. Each instrument also has a **free beamtime** (no exercise: NICOS, sample builder, a starter
-notebook asking for the question and the plan first; `gen_free_beamtime.py`). The answers are kept in
+notebook asking for the question and the plan first; `gen_free_beamtime.py`), a new proposal each time. As at ESS,
+NICOS finds the proposals in the user office (`user_office.py`: those of the exercises, the free beamtimes and the
+proposals a student imports), with Query in the Experiment tab. The answers are kept in
 `TWIN_RUN_ROOT/progress/`; `progress_summary.py` gives the teacher a table for a class.
 
 ## Instruments
@@ -54,6 +56,7 @@ twin/
 ├── odin/                everything specific to ODIN — read odin/README.md
 ├── loki/                everything specific to LoKI — read loki/README.md
 ├── sample_library.py    the samples (one YAML file each: odin/samples, loki/samples, <proposal>/samples)
+├── user_office.py       the proposals (exercises, free beamtimes, imported), the proposal cache of NICOS
 ├── quiz.py              interactive questions (explanations, answers on request, report, progress files)
 ├── gen_free_beamtime.py starter notebooks of the free beamtime (<instrument>/exercises/free_beamtime/)
 ├── progress_summary.py  teachers: the answers of a class, from the students' progress files

@@ -175,6 +175,17 @@ header .right { display: flex; align-items: center; gap: 10px; position: relativ
 .free .acts .btn { background: transparent; color: #fff; border-color: var(--line-dark); height: 42px; }
 .free .acts .btn:hover { background: var(--ink3); }
 .free .acts .btn.go { background: var(--beam); color: var(--ink); border-color: var(--beam); font-weight: 700; }
+.free .acts { display: flex; flex-direction: column; gap: 8px; }
+.free .props { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.free .props li { display: flex; align-items: center; gap: 12px; background: var(--ink3); border-radius: 10px; padding: 6px 8px 6px 12px; }
+.free .props .pid { font-weight: 700; color: var(--beam); font-variant-numeric: tabular-nums; }
+.free .props .pt { flex: 1; color: #fff; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.free .props .pk { color: #B8C6D8; font-size: 12.5px; }
+.free .props .btn { height: 32px; background: transparent; color: #fff; border-color: var(--line-dark); }
+dialog form.prop-form { display: block; padding: 0; }
+.prop-form .field { margin-bottom: 14px; }
+.prop-form textarea { border: 1px solid var(--line2); border-radius: 9px; padding: 8px 12px; font: inherit; font-size: 15px; resize: vertical; }
+.prop-acts { padding: 12px 32px 24px; display: flex; justify-content: flex-end; gap: 10px; }
 dialog { border: 0; border-radius: 16px; padding: 0; max-width: 760px; width: 90vw; box-shadow: 0 24px 64px rgba(11, 22, 38, .3); }
 dialog::backdrop { background: rgba(11, 22, 38, .45); }
 .sheet-body { padding: 28px 32px 8px; max-height: 70vh; overflow-y: auto; line-height: 1.55; }

@@ -38,14 +38,15 @@ sys.path.insert(0, os.path.abspath("loki"))
 import sample_library as sl
 
 ROOT = os.environ.get("TWIN_RUN_ROOT", os.path.join(os.path.expanduser("~"), "McStas_runs", "twin")).replace(os.sep, "/")
-QS = parse_qs(os.environ.get("QUERY_STRING", ""))         # ?instrument=odin&proposal=1234 (from the notebook)
+QS = parse_qs(os.environ.get("QUERY_STRING", ""))         # ?instrument=odin&proposal=1234 (from the notebook;
+#                                                          an imported proposal also gives &name=...&title=...)
 GIVEN = QS.get("instrument", [""])[0].lower()
 NAMES = {"odin": "ODIN (imaging)", "loki": "LoKI (small-angle scattering)"}
 instr = w.ToggleButtons(options=[(v, k) for k, v in NAMES.items()], value=GIVEN if GIVEN in NAMES else "odin",
                         description="Instrument")
 proposal = w.Text(value=QS.get("proposal", [""])[0], placeholder="e.g. 1234", description="Proposal")
-name = w.Text(value="", placeholder="e.g. my_steel_wedge", description="Short name")
-title = w.Text(value="", placeholder="e.g. Steel wedge with a copper insert", description="Title",
+name = w.Text(value=QS.get("name", [""])[0], placeholder="e.g. my_steel_wedge", description="Short name")
+title = w.Text(value=QS.get("title", [""])[0], placeholder="e.g. Steel wedge with a copper insert", description="Title",
                layout=w.Layout(width="520px"))
 description = w.Textarea(value="", placeholder="what it is, why you made it", description="Description",
                          layout=w.Layout(width="520px", height="60px"))

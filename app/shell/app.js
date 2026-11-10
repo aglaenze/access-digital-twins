@@ -166,10 +166,19 @@ function renderCatalogue() {
        <div class="levels">${Object.entries(e.modes || {}).map(([k, m]) => level(e, k, m, i)).join("")}</div></article>`).join("");
   $("#exercises").querySelectorAll("[data-act]").forEach((b) => b.onclick = () => act(b.dataset));
   const free = c.free[instr];
+  // each free beamtime is a new proposal of the twin's user office (user_office.py); a real proposal can be imported
+  const mine = (c.proposals || {})[instr] || [];
+  const rows = mine.map((p) => `<li><span class="pid">${esc(p.id)}</span><span class="pt">${esc(p.title)}</span>
+      <span class="pk">${p.kind === "imported" ? "imported" : "free"} · ${esc((p.created || "").slice(0, 10))}</span>
+      <button class="btn" data-act="file" data-file="${esc(free)}" data-kind="notebook" data-proposal="${esc(p.id)}"
+        data-label="${esc(I.name)} · ${esc(p.id)}">Continue</button></li>`).join("");
   $("#free").innerHTML = free ? `<article class="free"><div class="txt"><span class="tech">No exercise · MSc and beyond</span>
       <h3>Free beamtime on ${esc(I.name)}</h3><p>Your own question, your own samples, your own measurements: as in a real beamtime at ESS.
-      The starter notebook asks for your question and your plan first.</p></div>
-      <div class="acts"><button class="btn go" data-act="file" data-file="${esc(free)}" data-kind="notebook" data-label="${esc(I.name)} · Free beamtime">Starter notebook</button></div></article>` : "";
+      Each free beamtime is a new proposal (its own number and data folder), found in NICOS with <i>Query</i>; no sample
+      is imposed. Preparing a real beamtime? Import your proposal and try it on the twin.</p>
+      ${rows ? `<ul class="props">${rows}</ul>` : ""}</div>
+      <div class="acts"><button class="btn go" data-act="newfree">New free beamtime</button>
+        <button class="btn" data-act="import">Import a proposal</button></div></article>` : "";
   $("#free").querySelectorAll("[data-act]").forEach((b) => b.onclick = () => act(b.dataset));
 }
 
@@ -205,8 +214,16 @@ async function act(d) {
       const r = await T.api("POST", "/twin/open", { dir: d.dir, mode: d.mode, what: d.what || "file" });
       openTab(r.url, r.kind, d.what === "analysis" ? d.label.replace(/Beamtime$/, "Beamtime notebook") : d.label);
     } else if (d.act === "file") {
-      const r = await T.api("POST", "/twin/open", { file: d.file, kind: d.kind });
+      const r = await T.api("POST", "/twin/open", { file: d.file, kind: d.kind, proposal: d.proposal || "" });
       openTab(r.url, r.kind, d.label);
+    } else if (d.act === "newfree" || d.act === "import") {
+      const p = await askProposal(d.act === "import");
+      if (!p) return;
+      const I = catalogue.instruments[instr];
+      toast(`Proposal ${p.id} is in the user office: in NICOS, tab Experiment, Query, choose it, Apply.`, 9000);
+      const r = await T.api("POST", "/twin/open", { file: catalogue.free[instr], kind: "notebook", proposal: p.id });
+      openTab(r.url, r.kind, `${I.name} · ${p.id}`);
+      loadCatalogue();
     } else if (d.act === "nicos") {
       const r = await T.api("POST", "/twin/nicos", { instrument: d.instr });
       const name = catalogue.instruments[d.instr].name;
@@ -233,6 +250,32 @@ async function act(d) {
   } catch (e) {
     toast("Could not open: " + (e.message || e), 8000);
   }
+}
+
+// a new free beamtime (its question) or an imported proposal (number, title, samples): the twin's user office
+function askProposal(imported) {
+  const dlg = $("#proposal");
+  dlg.querySelector("h2").textContent = imported ? "Import a proposal" : "New free beamtime";
+  dlg.querySelectorAll(".only-import").forEach((e) => e.classList.toggle("hidden", !imported));
+  $("#p-title-label").textContent = imported ? "Title of the proposal" : "Your question";
+  $("#p-title").value = ""; $("#p-id").value = ""; $("#p-samples").value = ""; $("#p-error").textContent = "";
+  dlg.showModal();
+  return new Promise((resolve) => {
+    $("#p-cancel").onclick = () => { dlg.close(); resolve(null); };
+    $("#p-form").onsubmit = async (ev) => {
+      ev.preventDefault();
+      const samples = $("#p-samples").value.split("\n").map((l) => l.trim()).filter(Boolean)
+        .map((l) => { const [name, formula] = l.split(";"); return { name: name.trim(), formula: (formula || "").trim() }; });
+      try {
+        const p = await T.api("POST", "/twin/proposal", { instrument: instr, kind: imported ? "imported" : "free",
+          title: $("#p-title").value, proposal: $("#p-id").value, samples });
+        dlg.close(); resolve(p);
+      } catch (e) {
+        const m = /"error": "([^"]*)"/.exec(String(e.message || e));
+        $("#p-error").textContent = m ? m[1] : String(e.message || e);
+      }
+    };
+  });
 }
 
 // ------------------------------------------------------------------ tabs

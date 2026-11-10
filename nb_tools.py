@@ -4,6 +4,7 @@
     nb_tools.nicos("odin")                         # the button Open NICOS (MSc: part 0, measure yourself)
     nb_tools.proposal("odin/exercises/iron_bragg_edges/beamtime.md")   # the proposal sheet, folded
     nb_tools.sample_builder("odin", "1234")           # the sample builder of this instrument and proposal
+    nb_tools.imported_samples("odin", "2025123")    # an imported proposal: a button per sample still to build
     nb_tools.need_measurements(FOLDER, "odin")     # stops the notebook, clearly, while there is nothing to analyze
 
 The buttons are links: in the app they open a tab (NICOS: on the desktop of this computer, or the control room of the
@@ -45,6 +46,37 @@ def sample_builder(instr, proposal=""):
                       main=True),
               "Design your sample (as many blocks, cylinders, spheres or kinds of particles as you want), then save it "
               "with your proposal: it appears on the sample changer of NICOS.")
+
+
+def imported_samples(instr, proposal):
+    """An imported proposal (a real one, typed in the app): its samples, each with a button that opens the sample
+    builder with its short name and title filled in, until it is built. Nothing for the other proposals."""
+    import sys
+    from urllib.parse import quote
+    if ROOT not in sys.path:
+        sys.path.insert(0, ROOT)
+    import user_office
+    import sample_library
+    p = user_office.get(proposal)
+    if not p or p.get("kind") != "imported" or not p.get("samples"):
+        return
+    import datetime
+    folder = os.path.join(user_office.run_root(), "data", instr, str(datetime.date.today().year), str(proposal), "raw")
+    built = sample_library.load(instr, folder)
+    rows = []
+    for s in p["samples"]:
+        label = html.escape(f"{s.get('title') or s['name']}" + (f" ({s['formula']})" if s.get("formula") else ""))
+        if s["name"] in built:
+            rows.append(f"<li>{label}: built, <code>move(sample_holder, '{s['name']}')</code></li>")
+        else:
+            href = (f"/voila/render/Sample_builder.ipynb?instrument={instr}&proposal={proposal}"
+                    f"&name={quote(s['name'])}&title={quote(s.get('title') or '')}")
+            rows.append(f"<li>{label}: {_button('Build it', href)}</li>")
+    display(HTML(f'<div style="margin:0 0 24px"><b>The samples of your proposal {html.escape(str(proposal))}</b> '
+                 f'(the twin needs a model of each one: what it is made of, its shape):<ul>{"".join(rows)}</ul>'
+                 f'<span style="color:#5B6779; font-size:13px">Save each one under the short name given: NICOS then '
+                 f'mounts the first one when you apply the proposal. Run this cell again to see what is built.</span>'
+                 f'</div>'))
 
 
 def beamtime_tools(instr, proposal=None):

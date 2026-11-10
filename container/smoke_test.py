@@ -556,26 +556,44 @@ else:
     if os.path.isfile(path):
         print(f"--- {path} (end)\n" + open(path, errors="replace").read()[-1500:])
 
-step("User office: the Experiment tab queries the teaching proposals (proposal cache of yuos_query, as at ESS)")
+step("User office: Query in the Experiment tab lists the proposals of the exercises and the student's own (as at ESS)")
+sys.path.insert(0, TWIN)
+import user_office                                     # noqa: E402
+user_office.set_signed_in("ci_student")                # as the app does when a student signs in
+free = user_office.create("odin", "Does a weld change the texture of steel?", "ci_student", owner_name="Casey Tester")
+imported = user_office.create("odin", "Residual strain in a turbine blade", "ci_student", kind="imported",
+                              proposal_id="2025123", samples=[{"name": "Turbine blade, nickel alloy", "formula": "Ni"}],
+                              owner_name="Casey Tester")
+print(f"  free beamtime {free['id']}, imported proposal {imported['id']} {imported['samples']}")
 ready, out = nicos_session("odin", "ci_proposals",
                            "for _ in range(30):\n"
-                           "    if Exp._canQueryProposals() and "
-                           "Exp._client.all_proposals(): break\n"
+                           "    if Exp._canQueryProposals() and Exp._client.all_proposals(): break\n"
                            "    sleep(1)\n"
-                           "r = Exp._queryProposals(kwds={'fed_id': 'student', 'admin': False})\n"
-                           "for p in r: printinfo('proposal %s | %s | %s | %s' % (p['proposal'], p['title'], "
+                           "for p in Exp._queryProposals(kwds={'fed_id': 'student', 'admin': False}): "
+                           "printinfo('proposal %s | %s | %s | %s' % (p['proposal'], p['title'], "
                            "[s['name'] for s in p['samples']], [u['facility_user_id'] for u in p['users']]))\n"
-                           "NewExperiment(r[0]['proposal'], r[0]['title'], users=r[0]['users'])\n"
+                           "move(sample_holder, 'steel_steps')\n"
+                           # Apply of the Experiment tab: Exp.new, then the samples of the proposal
+                           "Exp.new(proposal='1234', title='Lattice spacing of a ferritic steel component by Bragg-edge imaging')\n"
                            "Exp.sample.set_samples({i: s for i, s in enumerate(Exp._queryProposals(kwds={'fed_id': 'student', 'admin': False})[0]['samples'])})\n"
-                           "printinfo('experiment %s: %s' % (Exp.proposal, Exp.title))\n",
-                           ["--proposals"], timeout=600)
-check(ready, "NICOS started with the twin's user office (ODIN)")
-props = [x.split("proposal ", 1)[1] for x in out.splitlines() if "proposal 1000" in x]
+                           "printinfo('experiment %s, mounted %s' % (Exp.proposal, sample_holder.read(0)))\n"
+                           f"Exp.new(proposal='{free['id']}', title='free')\n"
+                           "printinfo('experiment %s, mounted %s' % (Exp.proposal, sample_holder.read(0)))\n",
+                           (), timeout=600)
+check(ready, "NICOS started with the twin's user office (ODIN, by default)")
+props = [x.split("proposal ", 1)[1].strip() for x in out.splitlines() if "proposal " in x and " | " in x]
 print("  " + "\n  ".join(props))
-check(len(props) == 3 and "Iron plate, 5 mm" in out and "experiment 100001: Bragg edges of alpha-iron" in out,
-      "user office: the 3 proposals of ODIN for the account student, with their samples; the first one becomes the "
-      "experiment, as with Query and Apply in the Experiment tab")
-if "experiment 100001" not in out:
+check(any(x.startswith("1234 | Lattice spacing") and "['iron_plate']" in x for x in props)
+      and any(x.startswith(free["id"] + " | Does a weld") and "[]" in x for x in props)
+      and any(x.startswith("2025123 | Residual strain") and "turbine_blade_nickel_alloy" in x for x in props)
+      and len(props) == 3,
+      f"user office: Query lists the proposal of the exercise (1234, its sample), the student's free beamtime "
+      f"({free['id']}, no sample) and imported proposal (2025123, its sample to build)")
+check("experiment 1234, mounted iron_plate" in out,
+      "user office: applying the proposal of the exercise mounts its sample (the student may mount another)")
+check(f"experiment {free['id']}, mounted iron_plate" in out,
+      "user office: a free beamtime imposes no sample (the one mounted stays)")
+if f"experiment {free['id']}" not in out:
     show_logs()
 
 print("\nALL PASSED" if ok else "\nSOME CHECKS FAILED")
