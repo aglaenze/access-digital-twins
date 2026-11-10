@@ -555,16 +555,16 @@ else:
 step("User office: the Experiment tab queries the teaching proposals (proposal cache of yuos_query, as at ESS)")
 ready, out = nicos_session("odin", "ci_proposals",
                            "for _ in range(30):\n"
-                           "    if session.experiment._canQueryProposals() and "
-                           "session.experiment._client.all_proposals(): break\n"
+                           "    if Exp._canQueryProposals() and "
+                           "Exp._client.all_proposals(): break\n"
                            "    sleep(1)\n"
-                           "r = session.experiment._queryProposals(kwds={'fed_id': 'student', 'admin': False})\n"
+                           "r = Exp._queryProposals(kwds={'fed_id': 'student', 'admin': False})\n"
                            "for p in r: printinfo('proposal %s | %s | %s | %s' % (p['proposal'], p['title'], "
                            "[s['name'] for s in p['samples']], [u['facility_user_id'] for u in p['users']]))\n"
                            "p = r[0]\n"
                            "NewExperiment(p['proposal'], p['title'], users=p['users'])\n"
-                           "session.experiment.sample.set_samples({i: s for i, s in enumerate(p['samples'])})\n"
-                           "printinfo('experiment %s: %s' % (session.experiment.proposal, session.experiment.title))\n",
+                           "Exp.sample.set_samples({i: s for i, s in enumerate(p['samples'])})\n"
+                           "printinfo('experiment %s: %s' % (Exp.proposal, Exp.title))\n",
                            ["--proposals"], timeout=600)
 check(ready, "NICOS started with the twin's user office (ODIN)")
 props = [x.split("proposal ", 1)[1] for x in out.splitlines() if "proposal 1000" in x]
