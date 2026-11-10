@@ -113,6 +113,7 @@ def need_measurements(folder, instr):
     if not files:
         raise MeasureFirst(
             f"No measurement yet in {folder}.\n"
-            f"Measure in NICOS first (part 0), with the proposal number of PROPOSAL; then run this notebook again: "
+            f"Measure in NICOS first (button Open NICOS of this notebook), with the proposal of PROPOSAL applied in the "
+            f"Experiment tab; then run this notebook again: "
             f"menu Run > Run All Cells.")
     return files
