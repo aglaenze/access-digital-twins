@@ -67,12 +67,22 @@ def main():
         return 1
     time.sleep(1)
     c.run(code)
-    t_end = time.time() + o.timeout
+    t_start = time.time()
+    t_end = t_start + o.timeout
     while True:
-        if not c.done.wait(max(t_end - time.time(), 0)):
-            print("timeout")
-            c.failed = True
-            break
+        if not c.done.wait(min(5, max(t_end - time.time(), 0))):
+            if time.time() >= t_end:
+                print("timeout")
+                c.failed = True
+                break
+            if not c.started and time.time() - t_start > 15:
+                # never started: the daemon refused the script (e.g. ScriptError) and is idle with nothing queued
+                st = c.ask("getstatus", quiet=True) or {}
+                if st.get("status", (-1,))[0] < 0 and not st.get("requests"):
+                    print("the NICOS daemon did not run the script")
+                    c.failed = True
+                    break
+            continue
         # the daemon may report "idle" for a moment between the blocks of a script (e.g. inside a with block):
         # finished only if it is still idle with nothing queued a moment later
         time.sleep(1.5)

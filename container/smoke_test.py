@@ -554,11 +554,10 @@ else:
 
 step("User office: the Experiment tab queries the teaching proposals (proposal cache of yuos_query, as at ESS)")
 ready, out = nicos_session("odin", "ci_proposals",
-                           "import time\n"
                            "for _ in range(30):\n"
                            "    if session.experiment._canQueryProposals() and "
                            "session.experiment._client.all_proposals(): break\n"
-                           "    time.sleep(1)\n"
+                           "    sleep(1)\n"
                            "r = session.experiment._queryProposals(kwds={'fed_id': 'student', 'admin': False})\n"
                            "for p in r: printinfo('proposal %s | %s | %s | %s' % (p['proposal'], p['title'], "
                            "[s['name'] for s in p['samples']], [u['facility_user_id'] for u in p['users']]))\n"
