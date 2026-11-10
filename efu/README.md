@@ -53,7 +53,7 @@ neutrons already in the message, so the last neutrons of a pulse leave with the 
   module counts that, so it was the intent.
 
 The image is built with this one-line change (`EFU_PATCH=1` in the `Containerfile`, written in `/opt/efu/EFU_VERSION`).
-The build stops if the line changes upstream. It is worth reporting to ECDC.
+The build stops if the line changes upstream. Reported to ECDC (2026-11-10): https://github.com/ess-dmsc/event-formation-unit/issues/852
 
 ## Steps
 

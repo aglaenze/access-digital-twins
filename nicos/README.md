@@ -26,14 +26,16 @@ built on its `nicos_ess` counterpart:
 | | ESS (`nicos_ess/<instrument>/`) | Twin (`nicos_twin/<instrument>/`) |
 |---|---|---|
 | GUI | `guiconfig.py`: tabs Experiment, Setup, Instrument interaction (command line, output, scan plot, detector image, script status, devices), Scripting, History, Logs | **the same file** (copied), with small changes in `nicos_twin/gui.py`: workaround for a NICOS bug, scrolling on small screens, Apply button of the Experiment tab under the form, detector-image color levels recomputed for each new image (ODIN), device list that can be enlarged (the detector-image panel no longer blocks the splitter handle) |
-| Experiment | `EssExperiment`: proposal number, title, users, samples; look-up in the ESS user office | `TwinExperiment` = `EssExperiment` without the user-office look-up (type any proposal number) |
+| Experiment | `EssExperiment`: proposal number, title, users, samples; look-up in the ESS user office | `TwinExperiment` = `EssExperiment` with the twin's user office (Query: the proposals of the exercises and the student's own, § 3 "Proposals"); the first sample of a proposal mounted on Apply |
 | Data files | written by the ESS file-writer (Kafka), started by NICOS; `<instrument>/<year>/<proposal>/raw/` | written by the twin, one per count, in `<TWIN_RUN_ROOT>/data/<instrument>/<year>/<proposal>/raw/`; with `--filewriter` (Linux x86-64, the app image) also by the real ESS file-writer, one per job (`../filewriter/README.md`) |
 | Recording commands | `nexusfile_open`, `start_filewriting`, `stop_filewriting`, `list_filewriting_jobs` (`nicos_ess.commands`) | the same commands (`nicos_twin.commands`) |
-| Devices | EPICS (motors, choppers...), detector data through Kafka | HTTP orders to the twin server; names of `nicos_ess` where they exist (LoKI: `heavy_shutter`, `fast_shutter`) |
+| Devices | EPICS (motors, choppers...), detector data through Kafka | HTTP orders to the twin server; names of `nicos_ess` where they exist (LoKI: `heavy_shutter`, `fast_shutter`); with `--epics`, every device of the real file as an EPICS PV and the sample stage driven through its EPICS motor records (`../epics/README.md`) |
 | Which instrument | the computer you sit at | `start_nicos.py` asks (or `--instrument`): like walking into a control room |
 
-What is not reproduced: EPICS (§ 9) and ESS accounts (local accounts, § 2). Kafka (`--live`) and the ESS file-writer
-(`--filewriter`, `../filewriter/README.md`) are there as options.
+What is not reproduced: ESS accounts (local accounts, § 2) and the data catalogue (SciCat). Kafka (`--live`), the ESS
+file-writer (`--filewriter`, `../filewriter/README.md`), EPICS and the forwarder (`--epics`, `../epics/README.md`),
+the live reduction (`--livedata`, `../livedata/README.md`) and the Event Formation Unit (`--efu`, `../efu/README.md`)
+are there as options.
 At ESS, everything recorded inside one `nexusfile_open` block goes into **one** file; the twin writes one file per
 count. The device setups of the real instruments are still thin (ODIN and LoKI are in commissioning): most twin devices
 have no ESS name yet, and keep the twin names.
