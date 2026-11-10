@@ -209,9 +209,9 @@ def main():
             print(f"  esslivedata started ({ld_what}; dashboard http://127.0.0.1:{ld_service.DASHBOARD_PORT}, "
                   f"logs {LOGS}/livedata_*.log)", flush=True)
         if o.efu:                      # the EFU: raw readout of the detector (UDP) -> neutrons (Kafka)
-            p = efu_service.start(instr, log=os.path.join(LOGS, "efu.log"))
-            AUX.append(("efu", p))
-            print(f"  EFU started ({efu_what}; log {LOGS}/efu.log)", flush=True)
+            procs = efu_service.start(instr, log=os.path.join(LOGS, "efu.log"))
+            AUX.extend((f"efu{i or ''}", p) for i, p in enumerate(procs))
+            print(f"  {len(procs)} EFU started ({efu_what}; log {LOGS}/efu.log)", flush=True)
         if o.live:                 # just-bin-it (histograms for NICOS); its module
             # just_bin_it.cli defines main() without calling it (installed as a script), hence the -c
             subprocess.run([MCSTAS_PY, os.path.join(TWIN, "kafka", "start_kafka.py"), "--topics", instr],

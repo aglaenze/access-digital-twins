@@ -524,5 +524,26 @@ else:
     if os.path.isfile(path):
         print(f"--- {path} (end)\n" + open(path, errors="replace").read()[-2500:])
 
+    # LoKI: one EFU per bank (CAEN readout, charge division); every neutron must come back, once
+    def loki_counters():
+        for b, (_, _, topic, _, cmd) in enumerate(efu.INSTANCES["loki"]):
+            print(f"  counters of the EFU of {topic}: " + "; ".join(efu_e2e.efu_stats(
+                port=cmd, show=("events.count", "readouts", "errors", "parser", "geometry", "tof"))), flush=True)
+    ready, out = nicos_session("loki", "ci_efu_loki",
+                               "NewExperiment(1240, 'EFU test')\n"
+                               "move(collimation, '3m', detector_distance, 5.0, heavy_shutter, 'Open', "
+                               "fast_shutter, 'Open')\n"
+                               "move(sample_holder, 'd2o')\n"
+                               "with nexusfile_open('D2O'):\n    count(t=30)\n", ["--filewriter", "--efu"],
+                               after=loki_counters)
+    check(ready, "NICOS started with 9 Event Formation Units (one per bank) and the ESS file-writer (LoKI)")
+    lines = [x.strip() for x in out.splitlines() if "through the EFU" in x]
+    print("  " + ("\n  ".join(lines) or "(no comparison of the neutrons through the EFU)"))
+    check(sum(x.startswith("ok  caen on loki_detector_bank") for x in lines) == 9 and out.count("same data") == 1,
+          "EFU: the 9 banks of LoKI in the file-writer's file hold every neutron of the twin's readout, once, "
+          "same pixel and time of flight to a tick of the ESS clock; the other data the same as the twin's file")
+    if os.path.isfile(path):
+        print(f"--- {path} (end)\n" + open(path, errors="replace").read()[-1500:])
+
 print("\nALL PASSED" if ok else "\nSOME CHECKS FAILED")
 sys.exit(0 if ok else 1)

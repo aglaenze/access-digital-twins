@@ -71,15 +71,22 @@ def open_fw(path, wait=120):
 
 def _efu_events(mine, theirs, source, topic, say):
     """The neutrons of a detector read by the ESS Event Formation Unit (efu/): the twin sent their raw readout, the EFU
-    published them. They must be what the EFU makes of that readout (efu/timepix3_readout.match: same pixel and time
-    of flight to the coding of the camera, identical neutrons counted once, pulse times to 10 µs): 99.5 % of them."""
+    published them. They must be what the EFU makes of that readout (pulse times to 10 µs):
+    * ODIN's camera (efu/timepix3_readout.match): same pixel and time of flight to the coding of the camera, identical
+      neutrons counted once (one flash), some piled up: 99.5 % of the distinct neutrons;
+    * LoKI (efu/caen_readout.match): one readout per neutron, no clustering: every neutron, once, same pixel, time of
+      flight to a tick of the ESS clock."""
+    import importlib
     import os
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "efu"))
-    import timepix3_readout
-    found, n, published, stray = timepix3_readout.match(*mine, *theirs)
-    say(found >= 0.995 * n and stray == 0,
-        f"{source} on {topic}, through the EFU: {found} of {n} distinct neutrons found exactly "
-        f"({100 * found / max(n, 1):.3f} %), {published} published, {stray} pulses of the EFU matching no pulse")
+    if source == "caen":
+        found, n, published, stray = importlib.import_module("caen_readout").match(*mine, *theirs)
+        ok, what = found == n == published and stray == 0, "neutrons"
+    else:
+        found, n, published, stray = importlib.import_module("timepix3_readout").match(*mine, *theirs)
+        ok, what = found >= 0.995 * n and stray == 0, "distinct neutrons"
+    say(ok, f"{source} on {topic}, through the EFU: {found} of {n} {what} found exactly "
+            f"({100 * found / max(n, 1):.3f} %), {published} published, {stray} pulses of the EFU matching no pulse")
 
 
 def compare(fw_file, twin_files, log=print, exact_times=True, efu=()):

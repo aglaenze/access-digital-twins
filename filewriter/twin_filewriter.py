@@ -317,9 +317,10 @@ def count_messages(twin_file, message_id=0, devices=True, efu=None):
     times are those of the file. Pulses without neutrons are not sent (the file-writer would not write them).
     devices=False: only the logs of PER_PULSE (proton charge) among the f144, the device values being relayed by the
     ESS forwarder from the PVs of the twin (epics/, TWIN_EPICS=1).
-    efu=(host, port): the neutrons of the detectors that have an EFU in the twin (EFU_SOURCES: ODIN's camera) are
-    sent as their raw readout to the ESS Event Formation Unit (efu/, TWIN_EFU=1), one message per pulse
-    (t_ns, "udp://host:port", [UDP payloads]); the EFU publishes them to Kafka."""
+    efu={topic: (host, port)} (efu/service.targets()): the neutrons of the detectors that have an EFU in the twin
+    (EFU_SOURCES: ODIN's camera, LoKI's banks) are sent as their raw readout to the ESS Event Formation Unit of their
+    topic (efu/, TWIN_EFU=1), one message per pulse (t_ns, "udp://host:port", [UDP payloads]); the EFU publishes
+    them to Kafka."""
     from streaming_data_types import serialise_ev44
     out = []
     with h5py.File(twin_file, "r") as f:
@@ -339,9 +340,11 @@ def count_messages(twin_file, message_id=0, devices=True, efu=None):
                 a, b = bounds[k], bounds[k + 1]
                 if b <= a:
                     continue
-                if efu is not None and source in EFU_SOURCES:
-                    out.append((int(etz[k]), "udp://%s:%d" % tuple(efu),
-                                efu_camera().pulse(etz[k], eto[a:b], eid[a:b])))
+                if efu and source in EFU_SOURCES and topic in efu:
+                    payloads = efu_readout(source).pulse(etz[k], eto[a:b], eid[a:b])
+                    if isinstance(payloads, dict):        # LoKI: {bank: payloads}, one bank per topic
+                        payloads = [x for v in payloads.values() for x in v]
+                    out.append((int(etz[k]), "udp://%s:%d" % tuple(efu[topic]), payloads))
                     continue
                 message_id += 1
                 out.append((int(etz[k]), topic, serialise_ev44(source, message_id, np.array([etz[k]], np.int64),
@@ -408,25 +411,31 @@ def publish(producer, messages, pace=False, stop=None):
     return n
 
 
-EFU_SOURCES = {"timepix3"}             # detectors whose raw readout the twin can send to an EFU (efu/README.md)
-_CAMERA = {}
+# detectors whose raw readout the twin can send to an EFU (efu/README.md): source -> (module of efu/, its class)
+EFU_SOURCES = {"timepix3": ("timepix3_readout", "Camera"),     # ODIN's Timepix3 camera
+               "caen": ("caen_readout", "Readout")}            # LoKI's banks (CAEN electronics)
+_EFU = {}
 
 
-def efu_camera():
-    """The twin's Timepix3 camera and timing system (efu/timepix3_readout.Camera): one per twin server, its pulse
-    counter going on from count to count, as on the instrument."""
-    if "camera" not in _CAMERA:
-        sys.path.insert(0, os.path.join(os.path.dirname(HERE), "efu"))
-        import timepix3_readout
-        _CAMERA["module"], _CAMERA["camera"] = timepix3_readout, timepix3_readout.Camera()
-    return _CAMERA["camera"]
+def _efu_module(name):
+    sys.path.insert(0, os.path.join(os.path.dirname(HERE), "efu"))
+    import importlib
+    return importlib.import_module(name)
+
+
+def efu_readout(source):
+    """The twin's readout system of a detector source (efu/timepix3_readout.Camera, efu/caen_readout.Readout): one
+    per twin server, its pulse and packet counters going on from count to count, as on the instrument."""
+    if source not in _EFU:
+        module, cls = EFU_SOURCES[source]
+        _EFU[source] = getattr(_efu_module(module), cls)()
+    return _EFU[source]
 
 
 def _send_udp(payloads, host, port):
     """The packets of one pulse, spread over at most 60 ms (a pulse every 71 ms): the EFU reads them one by one and
     its receive buffer may be small (the kernel's limit in a container)."""
-    efu_camera()
-    _CAMERA["module"].send(payloads, host, port, pause_s=min(1e-3, 0.06 / max(len(payloads), 1)))
+    _efu_module("timepix3_readout").send(payloads, host, port, pause_s=min(1e-3, 0.06 / max(len(payloads), 1)))
 
 
 def producer(brokers):
