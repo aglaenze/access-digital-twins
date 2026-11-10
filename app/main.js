@@ -290,7 +290,12 @@ async function selftest(out) {
     await newProposal("import", "Again", "1234", "");
     const refused = await js(`document.querySelector("#p-error").textContent`);
     check("the number of an exercise cannot be imported (" + refused + ")", /proposal of an exercise/.test(refused), t5);
+    await new Promise((r) => setTimeout(r, 500));
+    await shot("9b_import_refused");
     await js(`document.querySelector("#p-cancel").click(); true`);
+    await new Promise((r) => setTimeout(r, 500));
+    await js(`document.querySelector("#free").scrollIntoView({ block: "center" }); true`);
+    await new Promise((r) => setTimeout(r, 7000));      // (after the toasts)
     await shot("9_proposals");
   } catch (e) {
     if (e && e.resume) log(e.stack);
