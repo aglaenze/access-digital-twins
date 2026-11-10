@@ -17,11 +17,8 @@ svg { flex-shrink: 0; }
 
 /* ---------------------------------------------------------------- sign in */
 #login { display: flex; }
-/* the fade between the sign-in screen and the app */
-#login { position: fixed; inset: 0; z-index: 5; transition: opacity .45s ease, transform .45s ease; }
-#login.leaving { opacity: 0; transform: scale(1.02); pointer-events: none; }
-#app { transition: opacity .5s ease .1s, transform .5s ease .1s; }
-#app.entering { opacity: 0; transform: translateY(8px); }
+/* the sign-in screen, over the app until signed in */
+#login { position: fixed; inset: 0; z-index: 5; }
 .intro { width: 44%; max-width: 600px; min-width: 420px; background: var(--ink); color: #E8EEF6; padding: 52px 56px 36px;
   display: flex; flex-direction: column; gap: 26px; overflow: auto; }
 .brand { display: flex; align-items: center; gap: 14px; }

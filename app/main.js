@@ -41,7 +41,9 @@ function createWindow() {
   win = new BrowserWindow({
     width: 1400, height: 900, minWidth: 960, minHeight: 640, backgroundColor: "#0B1626", show: false,
     title: "ESS digital twins", icon: path.join(__dirname, "icon.png"), autoHideMenuBar: true,
-    webPreferences: { preload: path.join(__dirname, "preload.js"), webviewTag: true, contextIsolation: true },
+    webPreferences: { preload: path.join(__dirname, "preload.js"), webviewTag: true, contextIsolation: true,
+                      // the self-test window is out of the screen: no slowed timers there
+                      backgroundThrottling: !process.env.TWIN_APP_SELFTEST },
   });
   win.removeMenu();
   win.once("ready-to-show", () => win.show());
@@ -252,6 +254,44 @@ async function selftest(out) {
     const after = await js(`[...document.querySelectorAll(".prog .row span")].slice(0, 2).map(s => s.textContent).join(" | ")`);
     check("started again (" + after + ")", after === "Not started | Not started", Date.now());
     await shot("7_started_again");
+    // the free beamtime: a new proposal each time (user office of the twin), then an imported proposal
+    const t5 = Date.now();
+    const newProposal = async (act, title, id, samples) => {
+      await js(`document.querySelector('#free [data-act="${act}"]').click(); true`);
+      await new Promise((r) => setTimeout(r, 800));
+      await js(`document.querySelector("#p-title").value = ${JSON.stringify(title)};
+        document.querySelector("#p-id").value = ${JSON.stringify(id)};
+        document.querySelector("#p-samples").value = ${JSON.stringify(samples)};
+        document.querySelector("#p-form").requestSubmit(); true`);
+      return wait(`!document.querySelector("#proposal").open || document.querySelector("#p-error").textContent !== ""`, 60);
+    };
+    await newProposal("newfree", "Does a weld change the texture of steel?", "", "");
+    const tabsAfter = await js(`[...document.querySelectorAll(".tab span:nth-child(2)")].map(s => s.textContent).join(" | ")`);
+    check("free beamtime: a new proposal, its notebook opened (" + tabsAfter + ")", /ODIN · 9\d{5}/.test(tabsAfter), t5);
+    await wait(`document.querySelectorAll(".pane .loading").length === 0`, 300);
+    await new Promise((r) => setTimeout(r, 4000));
+    const nbFree = await js(`document.querySelector(".pane.on webview").executeJavaScript("(() => { const w = window.jupyterapp && window.jupyterapp.shell.currentWidget; return w && w.content ? w.content.widgets.map(c => c.model.sharedModel.source).filter(s => s.includes('PROPOSAL = ')).join('') : 'none'; })()")`).catch(() => "?");
+    check("free beamtime: the notebook has its number (" + nbFree.split("\n").filter((l) => l.startsWith("PROPOSAL")).join("") + ")",
+          /PROPOSAL = "9\d{5}"/.test(nbFree), t5);
+    await shot("8_free_beamtime");
+    await js(`document.querySelector("#tab-cat").click(); true`);
+    await new Promise((r) => setTimeout(r, 2000));
+    await newProposal("newfree", "A second free beamtime", "", "");
+    await js(`document.querySelector("#tab-cat").click(); true`);
+    await new Promise((r) => setTimeout(r, 2000));
+    const ids = await js(`[...document.querySelectorAll("#free .props .pid")].map(s => s.textContent).join(" ")`);
+    check("free beamtime: each one is a new proposal, listed (" + ids + ")", ids.split(" ").filter(Boolean).length === 2
+          && new Set(ids.split(" ")).size === 2, t5);
+    await newProposal("import", "Residual strain in a turbine blade", "2025123", "Turbine blade, nickel alloy; Ni");
+    await js(`document.querySelector("#tab-cat").click(); true`);
+    await new Promise((r) => setTimeout(r, 2000));
+    const listed = await js(`[...document.querySelectorAll("#free .props li")].map(li => [...li.querySelectorAll("span")].map(x => x.textContent.trim()).join(" ")).join(" / ")`);
+    check("imported proposal listed (" + listed + ")", /2025123 Residual strain in a turbine blade imported/.test(listed), t5);
+    await newProposal("import", "Again", "1234", "");
+    const refused = await js(`document.querySelector("#p-error").textContent`);
+    check("the number of an exercise cannot be imported (" + refused + ")", /proposal of an exercise/.test(refused), t5);
+    await js(`document.querySelector("#p-cancel").click(); true`);
+    await shot("9_proposals");
   } catch (e) {
     if (e && e.resume) log(e.stack);
     else { log("ERROR " + e.stack); failed = true; }

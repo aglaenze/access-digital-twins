@@ -92,13 +92,9 @@ $("#auth").onsubmit = async (e) => {
 
 // ------------------------------------------------------------------ the app
 function enterApp() {
-  // a fade: the sign-in screen dissolves while the app comes up
-  const login = $("#login"), appv = $("#app");
-  login.classList.add("leaving");
-  setTimeout(() => { login.classList.add("hidden"); login.classList.remove("leaving"); }, 450);
-  appv.classList.add("entering");
-  appv.classList.remove("hidden");
-  requestAnimationFrame(() => requestAnimationFrame(() => appv.classList.remove("entering")));
+  // straight into the app (no fade: its timers and animation frames could hold the sign-in screen, 2026-11-10)
+  $("#login").classList.add("hidden");
+  $("#app").classList.remove("hidden");
   const initials = user.name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join("");
   $("#avatar").textContent = initials;
   $("#me-name").textContent = user.name;
