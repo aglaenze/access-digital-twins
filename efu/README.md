@@ -79,7 +79,11 @@ With `--efu`:
   the comparison is `timepix3_readout.match()` instead of identity: 99.5 % of the distinct neutrons, pulse times
   within 10 µs. NICOS prints the line "through the EFU: … found exactly".
 
-The container test (`../container/smoke_test.py`, last step, GitHub only) runs one job of ODIN this way.
+The container test (`../container/smoke_test.py`, last step, GitHub only) runs one job of ODIN this way. Result (run of commit 65e5663):
+1,784,932 of the 1,785,395 distinct neutrons come back with the same pixel and time of flight (99.974 %), and the rest
+of the file is the same as the twin's. The cause of the 463 others is not yet checked: pile-up, or clusters cut
+(the EFU counted 180 clusters too small). In the container the kernel gave the EFU a receive buffer of 2 MB instead of
+32 MB.
 
 ## Still to do
 
