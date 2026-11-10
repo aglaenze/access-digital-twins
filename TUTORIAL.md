@@ -4,6 +4,10 @@ This guide takes you, step by step, from nothing to your first measurement with 
 the European Spallation Source (ESS). No prior knowledge of McStas or NICOS is needed. Commands to type are in gray
 boxes; copy them exactly.
 
+This guide shows **how to use the tools** (install, operate the instrument, find your files). **What to measure and
+why** is in the exercises: each one tells you, step by step, what to do and checks your answers. The examples below
+are only first counts, to see that everything works.
+
 **Which instruments?** The twins do not all offer the same things yet:
 
 | Instrument | Technique | Web page | Console | NICOS | Python script |
@@ -14,13 +18,13 @@ boxes; copy them exactly.
 
 The installation (part 1) is common to all twins. **You choose the instrument when you start it** (console:
 `--instrument odin` or `loki`; NICOS: the launcher asks), as you would walk into the control room of that instrument
-at ESS. The examples of parts 2–4 use **ODIN** (iron plate); part 6 gives the same steps for LoKI.
+at ESS. The examples of parts 2–4 use **ODIN**; part 6 gives what is different for LoKI.
 
 **What you will do**: install the twins (part 1), then measure with one of the three ways to use a twin (parts 2–4):
 a web page, a console, or NICOS, the control software of the real ESS instruments. Part 5 tells you where your data are
 and how to analyze them; part 6 covers the other instruments.
 
-**In a course** you will rather use the **app** (first section above): its catalogue of exercises: choose the
+**In a course** you will rather use the **app** (next section): its catalogue of exercises: choose the
 instrument, then an exercise, then the way in: a guided web page (BSc), a notebook with tasks
 and automatic checks (MSc), or a beamtime with NICOS (a proposal, a budget, your own decisions).
 
@@ -48,7 +52,7 @@ its questions are interactive (a wrong answer is explained, with a hint; you can
 exercise, **Submit my work** makes a file: save it and send it to your teacher (email, or the course page).
 
 What you see depends on your level. **BSc**: guided pages, no code, no NICOS. **MSc**: a notebook; you measure first
-in NICOS (button *Open NICOS* in the notebook, step by step), then you analyze. **Beamtime** and **free beamtime**: your
+in NICOS (button *Open NICOS* in the notebook), then you analyze. **Beamtime** and **free beamtime**: your
 proposal, your sample (the sample builder), NICOS and your analysis, all from the starter notebook.
 
 The rest of this guide is for teachers and for students who want to go further (console, scripts, local installation).
@@ -170,22 +174,11 @@ A page with buttons: you set the instrument, measure, and see your transmission 
   ```
   Your browser opens the page.
 
-Then follow the page from top to bottom. In section **1. Operate the instrument**, for each of the three
-measurements below, set the controls, give a title, choose the time and click **Count**:
-1. **Dark run**: *Shutter* closed, title `dark`, 10 s (measures the background of the detector).
-2. **Open beam**: *Shutter* open, *Stage x* = 500 mm (sample out of the beam), title `open beam`, 30 s (measures
-   the beam without sample).
-3. **Sample**: *Stage x* = 0 mm (sample in the beam), title `iron plate`, 30 s.
-
-Section **2. Your measurements** lists your files (the button *Review my logbook* checks your experimental practice).
-In section **3. Reduce**, choose the sample, open-beam and dark files and click **Compute transmission**: the page
-divides sample by open beam (after removing the dark). You see the image of the plate and its transmission spectrum,
-with sharp jumps: the **Bragg edges** of iron (the last one at 4.05 Å). Section 4 asks you questions about it.
+Then follow the page from top to bottom: it gives the controls of the instrument, the button **Count**, the list of
+your files and the analysis. In an exercise, the page tells you what to measure.
 
 The very first measurement in a new configuration takes 1–2 minutes (the twin runs McStas once and keeps the
 result); the following ones take a few seconds.
-
-For a game: `odin/ODIN_mission.ipynb` (same way): identify three unknown metals with a limited beam time.
 
 ---
 
@@ -209,20 +202,17 @@ python -i twin_console.py
 You get a `>>>` prompt. Type, one line at a time:
 ```
 status()
-count(10, title="dark")
-move(shutter, "open", stage_x, 0.5)
-count(10, title="open beam")
-move(stage_x, 0.0)
-count(10, title="iron plate")
+move(shutter, "open")
+count(10, title="my first count")
 log()
 ```
 - `status()` shows the devices (choppers, shutter, pinhole, diffuser, sample stage);
 - `move(device, value, ...)` changes them: `stage_x` is the sample position in meters (0.5 m = out of the beam);
-- `count(t)` measures for `t` seconds and writes a NeXus file (the ESS data format);
+- `count(t)` measures for `t` seconds and writes a NeXus file (the ESS data format); `log()` lists your files;
 - try a forbidden value, e.g. `move(pinhole, 0.025)`: the instrument refuses, as a real one would;
 - `help_twin()` lists all commands. Quit with `exit()`.
 
-Then analyze the three files: part 5.
+Your files: part 5.
 
 ---
 
@@ -243,29 +233,22 @@ Answer `1` (ODIN). After ~30 s the NICOS window of ESS opens. Log in with user *
 (server `localhost:1301`).
 
 1. Tab **Experiment**: **Query**, choose your proposal, then **Apply**. As at ESS, NICOS asks the user office for
-   your proposals (here the twin's: the proposals of the exercises, e.g. `1234` for the iron plate, and your free
-   beamtimes), and fills in the number, title, users and samples; the first sample is mounted on the sample changer
+   your proposals (here the twin's: the proposals of the exercises and your free beamtimes), and fills in the number, title, users and samples; the first sample is mounted on the sample changer
    (mount another one with `move(sample_holder, 'its_name')`). Without a proposal NICOS refuses to record data, as at
    ESS. (`start_nicos.py --no-proposals`: any number can be typed in instead, as when the proposal system is down.)
 2. Tab **Instrument interaction**: type in the command line (one line, then Enter; or several lines in the tab
    **Scripting**, then Run):
    ```
    read()
-   move(shutter, 'closed')
-   with nexusfile_open('dark'):
-       count(t=10)
-   move(shutter, 'open', stage_x, 500)
-   with nexusfile_open('open beam'):
-       count(t=10)
-   move(stage_x, 0)
-   with nexusfile_open('iron plate'):
+   move(shutter, 'open')
+   with nexusfile_open('my first count'):
        count(t=10)
    ```
    In **Scripting**, *Save* proposes the scripts folder of your proposal
    (`McStas_runs\twin\data\odin\<year>\<proposal>\scripts\`); a saved script can be run again later with
    `run('my_script.py')`.
    `with nexusfile_open('title'):` is the ESS way of recording: what is measured in the indented block is written to
-   a data file with this title. (In NICOS, the stage position is in **millimeters**: 500 mm = out of the beam.)
+   a data file with this title. (In NICOS, positions are in **millimeters**.)
 3. The devices and their values are on the right; the image of the last count is in **Detector image**;
    `list_filewriting_jobs()` lists the files written.
 
@@ -291,9 +274,9 @@ python nicos/start_nicos.py --instrument odin --no-gui --background
 Wait for `ODIN services ready`. Terminal 2: write your commands in a file, e.g. `my_session.py`
 (JupyterLab: *File → New → Text File*):
 ```
-NewExperiment(1234, 'Bragg edges of iron')     # in a script any number is accepted, as at ESS
-move(shutter, 'open', stage_x, 500)
-with nexusfile_open('open beam'):
+NewExperiment(1000, 'my test')     # in a script any number is accepted, as at ESS
+move(shutter, 'open')
+with nexusfile_open('my first count'):
     count(t=10)
 ```
 and run it:
@@ -316,31 +299,17 @@ Each measurement is a NeXus file `odin_000001.nxs`, `odin_000002.nxs`, ... (the 
 detected neutron with its pixel and arrival time, plus the state of the instrument), and `log.jsonl` is the logbook
 of the session.
 
-**Analyze them** with the notebook `odin/ODIN_analysis.ipynb` (open it in JupyterLab; route B: `jupyter lab` in the
-folder `twin`). Write your folder in its first cell and run the cells one after the other: it reads the logbook,
-finds your dark, open beam and sample, shows what is inside a NeXus file, reduces the data with the official ESS
-software (transmission spectrum and image) and fits the Bragg edges of iron to give the distance between its atomic
-planes. Leave `FOLDER = None` to try it first on a small demonstration session (about 1 min).
+**Analyze them**: the notebooks of the exercises read your files and guide the analysis. Outside an exercise, the
+notebook `odin/ODIN_analysis.ipynb` (open it in JupyterLab; route B: `jupyter lab` in the folder `twin`) reads the
+folder written in its first cell (a session or a proposal) and reduces it with the official ESS software.
 
-The heart of it fits in a few lines, if you prefer your own notebook (*File → New → Notebook*, in the folder `odin`):
-```python
-import odin_reduction as red
-folder = "/data/twin/odin/my_first_session"        # route B: r"C:\Users\<you>\McStas_runs\twin\odin\my_first_session"
-r = red.reduce(f"{folder}/odin_000003.nxs", f"{folder}/odin_000002.nxs", dark=f"{folder}/odin_000001.nxs")
-r["spectrum"].plot()       # transmission T(λ) of the plate: look for the Bragg edges
-r["image"].plot()          # transmission image
-```
-(files 1, 2, 3 = dark, open beam, sample, in the order you measured them).
-
-**Other samples**: the page and NICOS offer several samples (`steel_steps`, `iron_copper`, ...;
-`move(sample_holder, 'steel_steps')`, `sample_info()` describes it). For a free beamtime you can design your own with
+**Other samples**: the page and NICOS offer several samples (`move(sample_holder, '<name>')`; `sample_info()`
+describes them). For a free beamtime you can design your own with
 the sample builder, `Sample_builder.ipynb` (see README.md, "Samples").
 
-**Going further**: other chopper modes (`move(choppers, "natural")`, `"white"`; in NICOS, the devices `wfm1_speed`,
-`bpc1_delay`, ... show the speed and delay of each chopper, which follow the mode: compare them in the three modes),
-tomography (rotate the sample with
-`scan(stage_rot, 0, 3, 60, t=10)`), the games of `ODIN_mission.ipynb`, the 3D view of the neutrons in the beamline
-(`python odin/show_3d.py`, route B). Everything is explained in `odin/README.md`.
+**Going further**: other chopper modes (`move(choppers, "natural")`, `"white"`), tomography (`scan(stage_rot, ...)`),
+the game `ODIN_mission.ipynb`, the 3D view of the neutrons in the beamline (`python odin/show_3d.py`, route B).
+Everything is explained in `odin/README.md`.
 
 ---
 
@@ -351,66 +320,35 @@ tomography (rotate the sample with
 The LoKI twin can be used from a web page, from Python, from the console and from NICOS, with both routes: route A
 (the container contains it) and route B (step 9 of the installation). It needs about 6 GB of free memory during a
 measurement (route A: memory given to Docker). As on the real LoKI, each measurement is a **NeXus event file** (every
-detected neutron with its pixel of the real detector and its arrival time) and the reduction to I(Q) is done by the
-official ESS software (`esssans`). A SANS experiment needs **three measurements** in the same configuration: the
-sample (`silica_spheres`), the solvent alone (`d2o`, subtracted) and the empty beam (`empty_beam`, reference of the
-transmission). Its test case measures the three for dilute silica spheres (radius 50 Å) and fits their size (route
-A: in a JupyterLab terminal):
+detected neutron with its pixel of the real detector and its arrival time), reduced by the official ESS software
+(`esssans`). The first measurement of a sample in a configuration takes a few minutes (McStas), the next ones less.
+
+**Check that it works** (route A: in a JupyterLab terminal; ~10 min the first time):
 ```
 cd loki
 python easy_case.py
 ```
-The first run takes ~10 min (McStas simulations of the samples and the calibration of the configuration, then kept
-in the results folder `twin/loki`), the next ones a few minutes. It prints the radius of gyration (expected ≈ 39 Å),
-the radius and the volume fraction from the sphere model of sasmodels, and saves the figure `figures/easy_case.png`.
-To measure yourself, in Python (started in the folder `loki`):
-```python
-from virtual_loki import VirtualLoki
-import loki_reduction as red
-loki = VirtualLoki(session="my_first_sans")
-loki.move(collimation="3m", heavy_shutter="open", shutter="open")
-files = {}
-for s in ("empty_beam", "d2o", "silica_spheres"):
-    loki.move(sample=s)
-    files[s] = loki.count(600)          # 600 s; returns the NeXus file written
-iq = red.reduce(files["silica_spheres"], background=files["d2o"], empty_beam=files["empty_beam"])
-iq["loki_detector_0"].plot()            # I(Q) of the rear bank (esssans), divide by the thickness (0.1 cm) for cm⁻¹
-```
+It measures a test sample, reduces it and saves the figure `figures/easy_case.png`.
+
 **Web page**: as in part 2, with `loki/LoKI_virtual.ipynb` (route A: open it in JupyterLab, then "Render with
-Voilà"; route B: `voila LoKI_virtual.ipynb` in the folder `loki`). It gives the settings of the measurements (empty
-beam, solvent, sample, in two configurations), shows the image of the rear detector after each count, and analyzes
-the curve (esssans, Guinier and the sphere model of sasmodels).
+Voilà"; route B: `voila LoKI_virtual.ipynb` in the folder `loki`).
 
 **Console**: as in part 3, with `python twin_server.py --instrument loki --session my_first_sans` in terminal 1;
-devices `heavy_shutter`, `shutter`, `collimation` (`3m`, `5m`, `8m`), `pulse_skipping` (`off`, `on`: choppers at
-7 Hz, wavelength band 3–21.4 Å, with `3m` only), `detector_distance` (5 or 10 m; 10 m only with `8m`: with a wider wavelength band the neutrons of one pulse
-would overlap with those of the next one, "frame overlap", and the twin refuses it with the explanation), `sample`. `status()` also shows the
-chopper speeds and delays, which follow the configuration.
+devices `heavy_shutter`, `shutter`, `collimation`, `pulse_skipping`, `detector_distance`, `sample`; `status()`
+shows their values (a forbidden combination is refused, with the explanation).
 
 **NICOS**: `python nicos\start_nicos.py`, answer `2` (LoKI). The window is the one of the real LoKI. In the
-Experiment tab give a proposal number, then:
+Experiment tab: **Query**, choose your proposal, **Apply** (as in part 4). Then, for a first count:
 ```
 move(heavy_shutter, 'Open', fast_shutter, 'Open')
-move(sample_holder, 'empty_beam')
-with nexusfile_open('empty beam'):
+with nexusfile_open('my first count'):
     count(t=60)
-move(sample_holder, 'd2o')
-with nexusfile_open('D2O'):
-    count(t=600)
-move(sample_holder, 'silica_spheres')
-with nexusfile_open('silica spheres, 10 min'):
-    count(t=600)
 ```
 (`heavy_shutter` and `fast_shutter` are the names used by the NICOS of the real LoKI.) Each file holds the events of
-the 9 detector banks and of the monitors; the Detector image tab shows the rear detector. To reach lower Q, change the configuration, e.g.
-`move(collimation, '8m', detector_distance, 10)`, then count again: compare the Q range of the rear bank and the
-counting time needed for the same error bars. Details: `loki/README.md`.
+the 9 detector banks and of the monitors; the Detector image tab shows the rear detector. Details: `loki/README.md`.
 
-**Analyze** with the notebook `loki/LoKI_analysis.ipynb` (`jupyter lab` in the folder `twin`): write your folder
-(session or proposal) in its first cell, then run the cells. It finds your sample, solvent and empty beam in the
-logbook, shows what is inside a NeXus file, reduces them with esssans (9 banks, solvent subtracted, absolute units),
-finds the radius of gyration with a Guinier fit, and fits the sphere model of sasmodels (the engine of SasView) to
-the whole curve: radius and volume fraction. Leave `FOLDER = None` to measure first.
+**Analyze**: the notebooks of the exercises; outside an exercise, `loki/LoKI_analysis.ipynb` (`jupyter lab` in the
+folder `twin`): write your folder (session or proposal) in its first cell, then run the cells.
 
 ### DREAM, BIFROST
 

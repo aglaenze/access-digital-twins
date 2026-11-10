@@ -71,7 +71,7 @@ ODIN BSc page (answers a question), the MSc notebook, and saves screenshots:
 ## The notebooks of the exercises
 
 - **MSc**: the student measures first, in NICOS, as at ESS: part 0 of the notebook gives the button *Open NICOS*
-  (`../nb_tools.py`) and the steps (proposal, dark, open beam, sample...). Part 1 reads the files of the proposal
+  (`../nb_tools.py`) and the steps of the measurement. Part 1 reads the files of the proposal
   (`PROPOSAL`); without files the notebook stops there with a message (`nb_tools.need_measurements`), no hidden
   simulation.
 - **Beamtime and free beamtime**: the proposal (folded), *Open NICOS* and *Sample builder* are at the top of the starter
