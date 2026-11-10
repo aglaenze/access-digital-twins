@@ -213,9 +213,10 @@ if not ready:
     show_logs()
 
 
-def nicos_session(instrument, session, script, extra=(), before=None, after=None):
+def nicos_session(instrument, session, script, extra=(), before=None, after=None, timeout=3600):
     """Starts NICOS for `instrument` with the launcher (headless), runs `script`, stops it; returns (ready, output).
-    before(), after(): called once the services are ready, before and after the script (while they still run)."""
+    before(), after(): called once the services are ready, before and after the script (while they still run).
+    timeout [s]: the script is stopped after it (its output is still shown)."""
     import socket
     t0 = time.time()                                 # the services of the previous session are gone (their ports)
     while time.time() - t0 < 120:
@@ -243,8 +244,8 @@ def nicos_session(instrument, session, script, extra=(), before=None, after=None
     if ready:
         if before is not None:
             before()
-        r = subprocess.run([nicos_py, os.path.join(TWIN, "nicos", "run_nicos_script.py"), "-c", script],
-                           capture_output=True, text=True, timeout=3600)
+        r = subprocess.run([nicos_py, os.path.join(TWIN, "nicos", "run_nicos_script.py"), "-c", script,
+                            "--timeout", str(timeout)], capture_output=True, text=True, timeout=timeout + 300)
         out = r.stdout + r.stderr[-2000:]
         print("  " + out.replace("\n", "\n  "), flush=True)
         if after is not None:
@@ -565,13 +566,15 @@ ready, out = nicos_session("odin", "ci_proposals",
                            "NewExperiment(p['proposal'], p['title'], users=p['users'])\n"
                            "session.experiment.sample.set_samples({i: s for i, s in enumerate(p['samples'])})\n"
                            "printinfo('experiment %s: %s' % (session.experiment.proposal, session.experiment.title))\n",
-                           ["--proposals"])
+                           ["--proposals"], timeout=600)
 check(ready, "NICOS started with the twin's user office (ODIN)")
 props = [x.split("proposal ", 1)[1] for x in out.splitlines() if "proposal 1000" in x]
 print("  " + "\n  ".join(props))
 check(len(props) == 3 and "Iron plate, 5 mm" in out and "experiment 100001: Bragg edges of alpha-iron" in out,
       "user office: the 3 proposals of ODIN for the account student, with their samples; the first one becomes the "
       "experiment, as with Query and Apply in the Experiment tab")
+if "experiment 100001" not in out:
+    show_logs()
 
 print("\nALL PASSED" if ok else "\nSOME CHECKS FAILED")
 sys.exit(0 if ok else 1)
