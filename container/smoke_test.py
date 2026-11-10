@@ -426,6 +426,12 @@ else:
           f"{LD.get('events')}")
     check(LD.get("events", 0) > 0 and LD.get("total") == LD.get("events"),
           "esslivedata: the live image of ODIN holds all the neutrons of the count")
+    if LD.get("total") != LD.get("events") and "eto" in LD:     # where the missing neutrons may be (diagnosis)
+        e, idx = np.asarray(LD["eto"]), np.asarray(LD["pulses"])
+        per = np.diff(np.r_[idx, len(e)])
+        print(f"  time of flight {e.min()}..{e.max()} ns ({np.sum(e <= 0)} at 0 or below, "
+              f"{np.sum(e >= 71_430_000)} at 71.43 ms or above); {len(per)} pulses, neutrons in the first "
+              f"{per[:2].tolist()} and the last {per[-3:].tolist()}")
     if not (LD.get("total") == LD.get("events")):
         # where the missing neutrons are: the live image (512 x 512) against the same image made from the file's
         # events (ids laid out as x * 4096 + y from the first id, 8 x 8 pixels per cell), for a first id of 0 or 1
