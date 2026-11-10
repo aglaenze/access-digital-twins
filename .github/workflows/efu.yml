@@ -1,6 +1,7 @@
 # Step 1 of efu/README.md: build the ESS Event Formation Unit (EFU: timepix3 for ODIN, loki for LoKI) from its
 # sources, check that it runs, publish the image ghcr.io/aglaenze/access-digital-twins-efu; then step 2: the raw
-# readout of ODIN's camera made by the twin (efu/timepix3_readout.py), read by the EFU, compared with the neutrons sent.
+# readout of ODIN's camera made by the twin (efu/timepix3_readout.py), read by the EFU, compared with the neutrons sent;
+# the same for LoKI (efu/caen_readout.py, one EFU per bank).
 name: efu
 
 on:
@@ -78,4 +79,21 @@ jobs:
           status=0
           timeout 900 python -u efu/e2e_test.py --src "$ODIN_SRC" || status=1
           echo "--- the EFU"; docker ps -a --filter name=efu; docker logs efu 2>&1 | tail -80
+          exit $status
+      - name: LoKI's readout played by the twin, read by one EFU per bank
+        run: |
+          pip install --quiet esssans
+          python efu/caen_readout.py                        # the coding checked without the EFU (every pixel)
+          mkdir -p /tmp/efu && python efu/caen_readout.py --calibration /tmp/efu/loki_calibration.json
+          python efu/e2e_loki.py --create-topics
+          for b in 0 1 2 3 4 5 6 7 8; do
+            docker run -d --name efu_loki$b --network host -v /tmp/efu:/cal:ro efu:test loki \
+              -f /opt/efu/configs/loki.json --calibration /cal/loki_calibration.json --nohwcheck \
+              -b 127.0.0.1:9092 -t loki_detector_bank$b -p $((9100 + b)) -m $((8900 + b)) --rxbuffer 33554432
+          done
+          sleep 10
+          status=0
+          timeout 900 python -u efu/e2e_loki.py || status=1
+          echo "--- the EFUs"; docker ps -a --filter name=efu_loki
+          docker logs efu_loki0 2>&1 | grep -v -E "Registering command|Adding stat|Graphite|2003" | tail -60
           exit $status
