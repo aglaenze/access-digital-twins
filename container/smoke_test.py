@@ -561,9 +561,8 @@ ready, out = nicos_session("odin", "ci_proposals",
                            "r = Exp._queryProposals(kwds={'fed_id': 'student', 'admin': False})\n"
                            "for p in r: printinfo('proposal %s | %s | %s | %s' % (p['proposal'], p['title'], "
                            "[s['name'] for s in p['samples']], [u['facility_user_id'] for u in p['users']]))\n"
-                           "p = r[0]\n"
-                           "NewExperiment(p['proposal'], p['title'], users=p['users'])\n"
-                           "Exp.sample.set_samples({i: s for i, s in enumerate(p['samples'])})\n"
+                           "NewExperiment(r[0]['proposal'], r[0]['title'], users=r[0]['users'])\n"
+                           "Exp.sample.set_samples({i: s for i, s in enumerate(r[0]['samples'])})\n"
                            "printinfo('experiment %s: %s' % (Exp.proposal, Exp.title))\n",
                            ["--proposals"], timeout=600)
 check(ready, "NICOS started with the twin's user office (ODIN)")
