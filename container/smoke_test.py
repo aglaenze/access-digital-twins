@@ -88,7 +88,11 @@ sys.path.insert(0, os.path.join(TWIN, "loki"))
 import easy_case                                      # noqa: E402
 res = easy_case.main(plot=False, session="ci_loki", mpi=int(os.environ.get("TWIN_MPI", "4")))
 print(f"LoKI measurement in {time.time() - t0:.0f} s (including the McStas compilation and the downstream part)")
-check(abs(res["rg"] / res["rg_true"] - 1) < 0.05, f"radius of gyration {res['rg']:.1f} Å within 5 % of {res['rg_true']:.1f} Å")
+# the Guinier fit has a statistical uncertainty (drg, about 1.2 Å for this count): 5 % or 3 standard deviations
+tol = max(0.05 * res["rg_true"], 3 * res["drg"])
+check(abs(res["rg"] - res["rg_true"]) < tol,
+      f"radius of gyration {res['rg']:.1f} ± {res['drg']:.1f} Å within {tol:.1f} Å of {res['rg_true']:.1f} Å "
+      f"(5 % or 3 standard deviations of the fit)")
 check(abs(res["radius"] / 50.0 - 1) < 0.03, f"sphere radius (sasmodels) {res['radius']:.1f} Å within 3 % of 50 Å")
 check(abs(res["phi"] / 0.01 - 1) < 0.08, f"volume fraction (absolute units) {100 * res['phi']:.2f} % within 8 % of 1 %")
 
@@ -326,10 +330,10 @@ else:
             print(f"transmission 2.2-3.8 A from the file-writer's files: {np.nanmean(a['spectrum'].values[band]):.3f} "
                   f"(NCrystal {np.mean(T_nc):.3f}); normalization: file-writer {a['normalization']}, "
                   f"twin {b['normalization']}")
-            ok = same(a["spectrum"], b["spectrum"]) and same(a["image"], b["image"])
-            if not ok:
+            identical = same(a["spectrum"], b["spectrum"]) and same(a["image"], b["image"])
+            if not identical:
                 odin_mismatch(fw, tw, a, b)
-            check(ok, "ODIN: essimaging gives the same transmission (spectrum and image) from the file-writer's files")
+            check(identical, "ODIN: essimaging gives the same transmission (spectrum and image) from the file-writer's files")
         except Exception as e:                      # noqa: BLE001  (the LoKI part still runs)
             import traceback
             traceback.print_exc()
