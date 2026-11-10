@@ -24,6 +24,22 @@ the readout is known exactly, and `timepix3_readout.expected()` predicts it:
 * **Merged neutrons.** Two neutrons in the same pixel at the same nanosecond are one flash for the camera, so the EFU
   publishes one neutron. Two neutrons within 1 ns whose pixels touch also make one cluster (pile-up).
 
+## LoKI: CAEN readout of the tubes
+
+| At ESS | In the twin |
+|---|---|
+| A neutron absorbed in a straw of a tube makes a charge, read at both ends of the tube. The CAEN digitizers send one 24-byte **readout** per neutron: fiber, front-end board (FEN), group, time on the ESS clock (88.0525 MHz), and four amplitudes A, B, C, D. Each UDP packet starts with the ESS readout header (time of the pulse and of the previous one). | `caen_readout.py` turns each neutron of the twin's file into the readout of its pixel. Its amplitudes give the right straw and position by charge division, and its time is the nearest tick of the ESS clock. |
+| The EFU (`loki` program) finds the straw from (B + D) / (A + B + C + D) and the position along it from (A + B) / (A + B + C + D), corrected by the calibration of that straw. It publishes one neutron per readout (no clustering), with source `caen`. Each bank has its own EFU and topic (`loki_detector_bank0` ... `bank8`), as in the real file. | The same program, one per bank (`service.py`). The configuration is `configs/loki.json`, the 9 banks and 10 rings of `LokiFull.json` of the EFU's sources: its pixel numbers are exactly those of the real LoKI file (3,211,264 pixels). The calibration is null (no correction), written by `caen_readout.null_calibration()`: the twin's charge division is ideal. ESS's real calibration is not public. |
+
+The bit layout follows the EFU's sources: `src/common/readout/ess/Parser.h`, `src/modules/caen/readout/DataParser.h`,
+`src/modules/caen/geometry/CDCalibration.cpp`, `src/modules/loki/geometry/LokiGeometry.cpp` and `LokiConfig.h`,
+`src/common/time/ESSTime.h`. What the EFU makes of the readout is known exactly (`caen_readout.expected()`):
+
+* **Pixel.** The same pixel.
+* **Time of flight.** The readout time and the pulse time are each rounded to a tick of the ESS clock (11.4 ns), so the
+  time of flight comes back within 10 ns of `eto`.
+* **Every neutron.** No clustering: each neutron of the twin comes back once, identical neutrons included.
+
 ## Correction made to the EFU
 
 The test found a defect in the EFU's timepix3 module. At each new pulse, `handlers/PixelEventHandler.cpp` changes
@@ -56,8 +72,15 @@ The build stops if the line changes upstream. It is worth reporting to ECDC.
    * 195 neutrons come back twice. They are probably identical neutrons split between two UDP packets: the EFU
      clusters each packet on its own. This explanation is not yet checked.
 
+   **LoKI end to end** (`e2e_loki.py`, nine EFUs, one per bank). The neutrons of the real LoKI file
+   (`ess.loki.data.loki_coda_file()`), then 2 million random neutrons on all the pixels, are sent as CAEN readout.
+   Every neutron must come back once, with the same pixel and the time of flight of `caen_readout.expected()`.
+   Result (run of commit b509968): 103,431 of 103,431 neutrons of the real file and 2,000,000 of 2,000,000 random ones,
+   in all 9 banks.
+
    `python efu/timepix3_readout.py` checks the coding without the EFU. It runs the EFU's computation, rewritten in
-   Python, on 200 000 random neutrons.
+   Python, on 200 000 random neutrons. `python efu/caen_readout.py` does the same for LoKI, on every pixel and on
+   300 000 random neutrons.
 
 ## In the app
 
@@ -66,27 +89,30 @@ its digest.
 
 ```
 python nicos/start_nicos.py --instrument odin --efu --filewriter     # or TWIN_EFU=1
+python nicos/start_nicos.py --instrument loki --efu --filewriter
 ```
 
 With `--efu`:
 
-* **The EFU.** `service.py` starts it for ODIN, before the twin server. It takes UDP on port 9000 and publishes to
-  `odin_detector`.
-* **The twin.** At each pulse of a count, the twin server sends the readout of its camera instead of publishing the
-  neutrons (`filewriter/twin_filewriter.py`: `count_messages(efu=...)`, `Camera`). The pulse counter goes on from
-  count to count, as on the instrument. The packets of a pulse are spread over at most 60 ms.
+* **The EFUs.** `service.py` starts them before the twin server, one per detector topic of the real file. ODIN: one
+  EFU, UDP port 9000, topic `odin_detector`. LoKI: nine EFUs, UDP ports 9100 to 9108, topics `loki_detector_bank0`
+  to `bank8`.
+* **The twin.** At each pulse of a count, the twin server sends the readout of its detectors instead of publishing
+  the neutrons (`filewriter/twin_filewriter.py`: `count_messages(efu=service.targets())`, `EFU_SOURCES`). The pulse
+  and packet counters go on from count to count, as on the instrument. The packets of a pulse are spread over at
+  most 60 ms.
 * **The comparison.** At the end of a job, the file-writer's file is compared with the twin's file. For the neutrons,
-  the comparison is `timepix3_readout.match()` instead of identity: 99.5 % of the distinct neutrons, pulse times
-  within 10 µs. NICOS prints the line "through the EFU: … found exactly".
+  the comparison is the `match()` of the readout module instead of identity, pulse times within 10 µs. ODIN: 99.5 %
+  of the distinct neutrons. LoKI: every neutron. NICOS prints the lines "through the EFU: … found exactly".
 
-The container test (`../container/smoke_test.py`, last step, GitHub only) runs one job of ODIN this way. Result (run of commit 65e5663):
-1,784,932 of the 1,785,395 distinct neutrons come back with the same pixel and time of flight (99.974 %), and the rest
-of the file is the same as the twin's. The cause of the 463 others is not yet checked: pile-up, or clusters cut
-(the EFU counted 180 clusters too small). In the container the kernel gave the EFU a receive buffer of 2 MB instead of
-32 MB.
+The container test (`../container/smoke_test.py`, last step, GitHub only) runs one job of each instrument this way.
+
+* ODIN (run of commit 65e5663): 1,784,932 of the 1,785,395 distinct neutrons come back with the same pixel and time
+  of flight (99.974 %), and the rest of the file is the same as the twin's. The cause of the 463 others is not yet
+  checked: pile-up, or clusters cut (the EFU counted 180 clusters too small). In the container the kernel gave the
+  EFU a receive buffer of 2 MB instead of the 32 MB asked.
+* LoKI: under test.
 
 ## Still to do
 
-* LoKI: CAEN readout, which uses the ESS readout header and a calibration file (`loki` program).
-* esslivedata with the EFU: in a container, the kernel limits the receive buffer to about 200 kB. The twin's pacing
-  should cover that, but it is not yet tested with dense counts.
+* esslivedata with the EFU: not yet tested together.
