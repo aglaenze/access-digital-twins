@@ -30,7 +30,7 @@ modes:
       You measure in NICOS (the commands are given); the reduction with the ESS software (esssans) is given; you develop
       the Guinier analysis and choose a shape with sasmodels (the engine of SasView) in model builders (no code to
       write), checked automatically.
-    duration: half a day
+    duration: 3 hours
     open: lab
     file: loki/exercises/silica_spheres/LoKI_silica_msc.ipynb
   beamtime:

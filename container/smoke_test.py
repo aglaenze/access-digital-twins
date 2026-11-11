@@ -531,10 +531,13 @@ else:
                              f"{ld.DASHBOARD_PORT}" + (f" (after {LD['dashboard']:.0f} s)" if "dashboard" in LD else ""))
     print(f"NICOS devices of esslivedata: {LD.get('devices')}; total {LD.get('total')}, events in the file "
           f"{LD.get('events')}")
-    # The live image of esslivedata counts the pixels of the camera from 0 (id = x * 4096 + y); the real ODIN file (and
-    # so the twin) numbers them from 1 to 4096 x 4096 (detector_number). The image is therefore shifted by one pixel
-    # and leaves out the last pixel (id 16777216): found on 2026-11-11 (one neutron of 1.77 million), to tell the
-    # scipp team. The neutrons of that pixel are not expected in the image.
+    # Pixel numbering (checked on 2026-11-11). esslivedata takes the first pixel number from the ODIN geometry file it
+    # downloads (geometry-odin-2026-09-04.nxs: entry/instrument/event_mode_detectors/timepix3, detector_number 0 to
+    # 4096 x 4096 - 1). The twin's files are made from an older ODIN file (entry/instrument/timepix3, detector_number
+    # 1 to 4096 x 4096), and the ESS EFU tested here also publishes 1 + x + 4096 y. So esslivedata is right for the
+    # current ODIN file, and for the twin's events its image is shifted by one pixel and leaves out the last pixel
+    # (id 16777216; one neutron of 1.77 million on 2026-11-11). Not a bug of esslivedata. Open: move the twin to the
+    # current ODIN file structure, and ask ESS which numbering the EFU of ODIN uses in production.
     n_last = int(np.sum(np.asarray(LD["ids"]) == 4096 * 4096)) if LD.get("ids") is not None else 0
     if n_last:
         print(f"  {n_last} neutron(s) in the last pixel of the camera (id 16777216), which the live image leaves out")

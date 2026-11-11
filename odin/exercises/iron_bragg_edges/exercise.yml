@@ -26,7 +26,7 @@ modes:
     what: >-
       You measure in NICOS (the commands are given); the reduction with the ESS software is given; you develop the model of
       a Bragg edge with a model builder (shape, range, start values, fit: no code to write), checked automatically.
-    duration: half a day
+    duration: 3 hours
     open: lab
     file: odin/exercises/iron_bragg_edges/ODIN_iron_msc.ipynb
   beamtime:
