@@ -133,8 +133,9 @@ def tomo_frames(sino, angles_deg, xs_mm, steps=None, order="sequential"):
 
 
 # --------------------------------------------------------------------------- players (pages)
-def show_live(nexus_file, n_frames=24):
-    """Animated replay of a measurement in a notebook / Voilà page (Play button + slider)."""
+def show_live(nexus_file, n_frames=24, autoplay=True):
+    """Animated replay of a measurement in a notebook / Voilà page (Play button + slider); autoplay: it starts by
+    itself, as the detector image of a real instrument fills up during the count."""
     import ipywidgets as w
     import matplotlib.pyplot as plt
     from IPython.display import display
@@ -163,3 +164,5 @@ def show_live(nexus_file, n_frames=24):
     slider.observe(lambda ch: draw(ch["new"]), names="value")
     draw(0)
     display(w.VBox([w.HBox([play, slider]), out]))
+    if autoplay and hasattr(play, "playing"):        # ipywidgets 8: the replay starts at once
+        play.playing = True

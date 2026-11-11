@@ -19,13 +19,17 @@ from IPython.display import display
 from scipy.optimize import curve_fit, least_squares
 from scipy.special import erfc
 
-LAYOUT = w.Layout(width="520px")
 STYLE = {"description_width": "170px"}
+
+
+def _layout():
+    """A new layout for each widget: a layout shared by several widgets would hide them all when one is hidden."""
+    return w.Layout(width="520px")
 
 
 def _slider(desc, value, lo, hi, step, fmt=".3f"):
     return w.FloatSlider(value=value, min=lo, max=hi, step=step, description=desc, readout_format=fmt,
-                         continuous_update=False, layout=LAYOUT, style=STYLE)
+                         continuous_update=False, layout=_layout(), style=STYLE)
 
 
 def _pre(code):
@@ -104,14 +108,15 @@ class EdgeBuilder(_Builder):
         self.model = w.ToggleButtons(options=list(EDGE_MODELS), value="sharp step",
                                      style={"button_width": "250px"})
         self.model_help = w.HTML()
-        self.window = w.FloatRangeSlider(value=(round(e - 0.35, 2), round(e + 0.35, 2)), min=round(e - 1.0, 2),
+        self.window = w.FloatRangeSlider(value=(round(e - 1.0, 2), round(e + 1.0, 2)), min=round(e - 1.0, 2),
                                          max=round(e + 1.0, 2), step=0.01, description="range of λ [Å]",
-                                         continuous_update=False, readout_format=".2f", layout=LAYOUT, style=STYLE)
-        self.p_edge = _slider("λ_edge (start) [Å]", e, e - 0.3, e + 0.3, 0.001)
-        self.p_width = _slider("width w (start) [Å]", 0.03, 0.005, 0.2, 0.001)
-        self.p_base = _slider("baseline (start)", round(t_lo, 3), 0.0, 1.2, 0.005)
+                                         continuous_update=False, readout_format=".2f", layout=_layout(), style=STYLE)
+        # start values: nothing chosen for the student (round values, not those of the data)
+        self.p_edge = _slider("λ_edge (start) [Å]", round(e - 0.25, 1), e - 0.3, e + 0.3, 0.001)
+        self.p_width = _slider("width w (start) [Å]", 0.1, 0.005, 0.2, 0.001)
+        self.p_base = _slider("baseline (start)", 0.8, 0.0, 1.2, 0.005)
         self.p_slope = _slider("slope (start) [1/Å]", 0.0, -2.0, 2.0, 0.01)
-        self.p_jump = _slider("jump (start)", round(max(t_hi - t_lo, 0.01), 3), 0.0, 1.0, 0.005)
+        self.p_jump = _slider("jump (start)", 0.05, 0.0, 1.0, 0.005)
         self._ui("1 · Choose the shape of the edge", self.model,
                  [self.model_help, w.HTML("<b>2 · Choose the range of the data</b> (the edge, and a little on each "
                                           "side)"), self.window,
@@ -194,7 +199,13 @@ class EdgeBuilder(_Builder):
                 print(f"The fit did not converge ({err}). Move the start values closer to the data, or change the "
                       "range.")
                 return
-            err = np.sqrt(np.diag(cov))
+            err = np.sqrt(np.abs(np.diag(cov)))
+            if not np.all(np.isfinite(err)) or err[0] > 0.05:
+                print(f"The fit gives λ_edge = {x[0]:.4f} Å with an uncertainty of {err[0]:.3g} Å: it has not found a "
+                      "well-defined edge (some parameters are not fixed by the data, e.g. a jump of almost zero, or "
+                      "an edge at the border of the range). Look at the dashed curve: move the start values closer to "
+                      "the data, narrow the range around one edge, then Fit again.")
+                return
             p = list(full)
             for n, v in zip(names, x):
                 p[idx[n]] = v
@@ -257,9 +268,9 @@ class GuinierBuilder(_Builder):
         self.rg = self.drg = self.i0 = None
         qmin = float(self.q.min())
         self.plot = w.ToggleButtons(options=list(PLOTS), value="I against Q", style={"button_width": "170px"})
-        self.window = w.FloatRangeSlider(value=(round(qmin, 4), 0.06), min=round(qmin, 4), max=0.15, step=0.001,
+        self.window = w.FloatRangeSlider(value=(round(qmin, 4), 0.15), min=round(qmin, 4), max=0.15, step=0.001,
                                          description="range of Q [Å⁻¹]", continuous_update=False,
-                                         readout_format=".3f", layout=LAYOUT, style=STYLE)
+                                         readout_format=".3f", layout=_layout(), style=STYLE)
         self._ui("1 · Which plot turns the Guinier law I = I(0)·exp(−Q²Rg²/3) into a straight line?", self.plot,
                  [w.HTML("<b>2 · Choose the range of Q</b> (the law holds for Q·Rg ≲ 1.3), then Fit a straight line"),
                   self.window])
@@ -372,7 +383,7 @@ class ShapeBuilder(_Builder):
         self.window = w.FloatRangeSlider(value=(float(self.q.min()), float(self.q.max())),
                                          min=float(self.q.min()), max=float(self.q.max()), step=0.001,
                                          description="range of Q [Å⁻¹]", continuous_update=False,
-                                         readout_format=".3f", layout=LAYOUT, style=STYLE)
+                                         readout_format=".3f", layout=_layout(), style=STYLE)
         self.p_scale = _slider("volume fraction φ (start)", 0.01, 0.0005, 0.05, 0.0005, ".4f")
         self.p_bg = _slider("background (start) [cm⁻¹]", 0.0, -0.05, 0.2, 0.001)
         self.use_bg = w.Checkbox(value=True, description="fit a flat background too", style=STYLE)

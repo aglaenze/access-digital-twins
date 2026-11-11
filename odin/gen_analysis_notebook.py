@@ -86,8 +86,7 @@ md(r"""
 ## 2. The logbook: which file is what?
 
 As at ESS, each `nexusfile_open` block in NICOS wrote **one file**, written by the ESS file writer
-(`odin_job_000001.hdf`, `odin_job_000002.hdf`, ...; on a computer without the file writer, the twin writes them
-itself, one per count: `odin_000001.nxs`, ...). Everything is in the file: its title, and the state of the instrument
+(`odin_job_000001.hdf`, `odin_job_000002.hdf`, ...). Everything is in the file: its title, and the state of the instrument
 during the measurement (shutter, sample stage, pinhole, choppers). The table below is read from the files themselves.
 
 To compute a transmission you need three kinds of measurement:
@@ -198,8 +197,8 @@ with h5py.File(path(OPEN), "r") as f:
     unit = det["event_time_offset"].attrs.get("units", b"ns")
     unit = unit.decode() if isinstance(unit, bytes) else unit
     print("neutrons    :", len(toa), "events,", len(det["event_time_zero"]), "source pulses")
-    q = e["instrument/source/pulse_charge/value"][()]
-    print(f"proton charge: {q.sum():.0f} µC in total ({q.mean():.1f} µC per pulse on average)")
+    charge = e["instrument/source/pulse_charge/value"][()]
+    print(f"proton charge: {charge.sum():.0f} µC in total ({charge.mean():.1f} µC per pulse on average)")
 
 scale = {"ns": 1e-6, "us": 1e-3, "ms": 1.0, "s": 1e3}.get(unit, 1e-6)
 fig, ax = plt.subplots(figsize=(8, 3.5))

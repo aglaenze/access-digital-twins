@@ -20,3 +20,6 @@ COMPONENTS = os.path.join(HERE, "components")
 
 if HERE not in sys.path:
     sys.path.insert(0, HERE)
+if os.path.dirname(HERE) not in sys.path:      # twin/: mcstas_env
+    sys.path.insert(0, os.path.dirname(HERE))
+import mcstas_env  # noqa: E402,F401  (MCSTAS and mcrun, also without an activated environment)

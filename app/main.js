@@ -205,17 +205,23 @@ async function selftest(out) {
     await js(`document.querySelector('[data-act="open"][data-mode="msc"]').click(); true`);
     check("notebook loaded", await wait(`document.querySelectorAll(".pane .loading").length === 0 && document.querySelectorAll(".pane webview").length === 2`, 300), t2);
     const t3 = Date.now();
-    const nbState = `document.querySelectorAll(".pane.on webview")[0].executeJavaScript("(() => { const w = window.jupyterapp && window.jupyterapp.shell.currentWidget; if (!w || !w.content) return 'none'; const cs = w.content.widgets.filter(c => c.model.type === 'code' && c.model.sharedModel.source.trim()); const done = cs.filter(c => c.model.executionCount).length; const errs = cs.filter(c => c.model.outputs.toJSON().some(o => o.output_type === 'error' && o.ename !== 'MeasureFirst')).length; const stop = cs.some(c => c.model.outputs.toJSON().some(o => o.ename === 'MeasureFirst')); return done + '/' + cs.length + ' errors ' + errs + (stop ? ' stop' : ''); })()")`;
+    // at opening: the cells before the measurements run (up to the cell marked run_at_open: stop), none after;
+    // every code cell read-only (MSc: nothing to write); the notebook shown from its top
+    const nbState = `document.querySelectorAll(".pane.on webview")[0].executeJavaScript("(() => { const w = window.jupyterapp && window.jupyterapp.shell.currentWidget; if (!w || !w.content) return 'none'; const all = w.content.widgets; const k = all.findIndex(c => { const m = c.model.getMetadata ? c.model.getMetadata('twin') : null; return m && m.run_at_open === 'stop'; }); const stop = k < 0 ? all.length : k; const code = (a) => a.filter(c => c.model.type === 'code' && c.model.sharedModel.source.trim()); const before = code(all.slice(0, stop)), after = code(all.slice(stop)); const done = before.filter(c => c.model.executionCount).length; const late = after.filter(c => c.model.executionCount).length; const errs = before.filter(c => c.model.outputs.toJSON().some(o => o.output_type === 'error')).length; const ro = code(all).filter(c => c.readOnly).length; return done + '/' + before.length + ' errors ' + errs + ' after ' + late + ' readonly ' + ro + '/' + code(all).length + ' active ' + w.content.activeCellIndex; })()")`;
     let st = "";
     for (let i = 0; i < 300; i++) {
       st = await js(nbState).catch(() => "?");
       const m = /^(\d+)\/(\d+)/.exec(st);
-      if ((m && +m[1] === +m[2] && +m[2] > 0) || / stop$/.test(st)) break;
+      if (m && +m[1] === +m[2] && +m[2] > 0) break;
       await new Promise((r) => setTimeout(r, 1000));
     }
-    const m = /^(\d+)\/(\d+) errors (\d+)/.exec(st);
-    log("locked cells: " + await js(`document.querySelectorAll(".pane.on webview")[0].executeJavaScript("(() => { const w = window.jupyterapp.shell.currentWidget; const cs = w.content.widgets; return cs.filter(c => c.readOnly).length + ' read-only of ' + cs.length; })()")`).catch((e) => "?"));
-    check(`notebook run at opening (${st})`, !!m && m[3] === "0" && (m[1] === m[2] || / stop$/.test(st)), t3);
+    await new Promise((r) => setTimeout(r, 2000));
+    st = await js(nbState).catch(() => "?");
+    const m = /^(\d+)\/(\d+) errors (\d+) after (\d+) readonly (\d+)\/(\d+) active (\d+)/.exec(st);
+    check(`notebook at opening: the cells before the measurements run, none after (${st})`,
+      !!m && m[1] === m[2] && m[3] === "0" && m[4] === "0", t3);
+    check(`MSc notebook: every code cell locked (${m ? m[5] + "/" + m[6] : "?"})`, !!m && m[5] === m[6], t3);
+    check(`notebook shown from its top (active cell ${m ? m[7] : "?"})`, !!m && m[7] === "0", t3);
     await new Promise((r) => setTimeout(r, 2000));
     await shot("5_notebook");
     // the sample builder, opened for ODIN and a proposal (as from a beamtime notebook): a block, + a sphere, + a cylinder

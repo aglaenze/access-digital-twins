@@ -35,8 +35,9 @@ FREE_CODE = ("# your", "= None", "PROPOSAL =", "FOLDER =", "DARK, OPEN, SAMPLE =
 FREE_TEXT = ("## Results for the committee", "## My question", "## My answer", "## Your analysis")
 
 
-def lock(c):
-    free = (c.cell_type == "code" and (not c.source.strip() or any(k in c.source for k in FREE_CODE))) or \
+def lock(c, all_code=False):
+    """all_code (MSc): every code cell locked, the student writes no code; beamtime: the cells to fill stay free."""
+    free = (c.cell_type == "code" and not all_code and (not c.source.strip() or any(k in c.source for k in FREE_CODE))) or \
            (c.cell_type == "markdown" and c.source.startswith(FREE_TEXT))
     if not free:
         c.metadata["editable"] = False
@@ -46,7 +47,7 @@ def lock(c):
 HIDDEN_START = ("q.", "q_.", "import submit", "nb_tools.", "import nb_tools" + chr(10) + "nb_tools.nicos(")
 
 
-def write(cells, name):
+def write(cells, name, all_code_locked=False):
     """The code of the questions and of the solutions (the answers are in it), of Submit and of the NICOS button is
     hidden: only their widgets show. A solution (q.solution) after a check gets its own hidden cell."""
     nb = nbf.v4.new_notebook()
@@ -65,7 +66,7 @@ def write(cells, name):
                 c.metadata["jupyter"] = {"source_hidden": True}
         out.append(c)
     for c in out:
-        lock(c)
+        lock(c, all_code_locked)
     cells = out
     nb["cells"] = cells
     nb["metadata"] = {"kernelspec": {"display_name": "Python 3", "language": "python", "name": "python3"},
@@ -112,7 +113,7 @@ for c in src[i1:i6]:
     msc.append(FOLDER_CELL if c.cell_type == "code" and c.source.lstrip().startswith("from odin_paths import TWIN_RUN_ROOT")
                and "FOLDER" in c.source else clean(c))
 msc += [md(r"""
-## 6. Your turn: model the (110) Bragg edge (nothing to type)
+## 6. Your turn: model the (110) Bragg edge
 
 α-iron is body-centered cubic, $a = 2.8665$ Å. The planes that can diffract are (110), (200), (211)... with spacings
 $d_{hkl} = a/\sqrt{h^2+k^2+l^2}$, and each family gives an edge at $\lambda = 2d_{hkl}$: by Bragg's law,
@@ -134,8 +135,6 @@ import model_builder as mb
 expected = 2 * 2.8665 / np.sqrt(2)          # (110) edge: λ = 2 d_110 = a √2
 edge_builder = mb.EdgeBuilder(lam, T, dT, expected=expected, name="(110)")
 """), code(r"""
-import odin_exercises as ex, quiz
-q = quiz.Quiz("odin_iron_msc")
 q.choice("Which shape describes the (110) edge best, and why?",
          ["The smoothed step on a sloping baseline: reduced χ² close to 1 and residuals without a pattern.",
           "The sharp step: it is the ideal edge of a perfect crystal.",
@@ -235,26 +234,251 @@ q.report()
 msc += [md("## Submit your work\n\nWhen you are done: save this notebook (*Save*), then submit. The file for your teacher is made from your answers, your measurements and your notebook."),
         code("import submit\n_ = submit.Submit(\"odin/exercises/iron_bragg_edges\", \"msc\", quiz=q)")]
 # --- part 0: the student measures in NICOS (step by step), as at ESS; no demonstration session
-PART0 = [md("\n## 0. Your measurements, in NICOS\n\nAs at ESS, you measure with **NICOS**, the control software of the instrument: you type the commands, NICOS moves\nthe devices, counts and writes the data files. Nobody measures for you: if a file is wrong (shutter forgotten, sample\nin the wrong place), you will see it in part 2 and measure again.\n\n1. **Open NICOS** with the button below. After about a minute the NICOS window of ODIN is there, logged in.\n2. **Your proposal.** Tab *Experiment*: **Find my proposal**, choose proposal `1234` (the proposal of this exercise, in the\n   user office of the twin), then **Apply**: its number, title, users and sample are filled in, as at ESS, and the\n   iron plate is mounted on the sample changer (`sample_info()` describes it). Without a proposal NICOS refuses to\n   record data, as at ESS.\n3. **The dark.** Tab *Instrument interaction*, in the command line (one line, then Enter):\n   `move(shutter, 'closed')`, then `with nexusfile_open('dark'): count(t=30)`.\n   The *Detector image* stays almost empty: a few counts of background.\n4. **The open beam.** `move(shutter, 'open', stage_x, 500)`: the stage goes 500 mm aside, so the plate is out of the\n   14 mm field of view. Then `with nexusfile_open('open beam'): count(t=60)`.\n5. **The iron plate.** `move(stage_x, 0)`, then `with nexusfile_open('iron plate'): count(t=60)`. The image now shows\n   the plate: a darker square.\n6. **Check.** `list_filewriting_jobs()` lists your three files. Come back here and run the notebook:\n   menu *Run > Run All Cells*.\n\nSeveral lines at once: tab *Scripting*, then *Run*. Why these settings: the choppers (WFM, δ = 0.30 m) and the pinhole\nstay the same for the three runs, so that the open beam can divide the sample run.\n"), code('import nb_tools\nnb_tools.nicos("odin")')]
+# --- before measuring, and part 0: the student measures in NICOS, one command at a time, each explained
+QUIZ_CELL = code('import quiz, odin_exercises as ex\nq = quiz.Quiz("odin_iron_msc")       # the questions of this notebook')
+PREP = [md(r"""
+## Before you measure: three measurements, and why
+
+A transmission is a ratio: what crosses the sample divided by what arrives without it. ODIN only counts neutrons, so you
+need **three measurements**, with the same chopper settings and the same pinhole:
+
+1. **the dark**: shutter closed, no beam at all. The camera still records a few counts (gamma rays, electronic noise):
+   this background is in every measurement and has to be subtracted from the two others;
+2. **the open beam**: shutter open, sample moved out of the beam. It tells how many neutrons of each wavelength arrive
+   *without* the sample. The camera sees only 14 mm × 14 mm, so moving the plate 500 mm aside is more than enough;
+3. **the sample**: shutter open, the iron plate in the beam.
+
+The transmission is then $T(\lambda) = \dfrac{\text{sample} - \text{dark}}{\text{open beam} - \text{dark}}$, wavelength by
+wavelength (part 5 adds the corrections).
+"""), code(r"""
+q.choice("Why is the open beam measured with exactly the same chopper settings and pinhole as the sample?",
+         ["Because the transmission divides the two: they must see the same beam, so that only the sample makes the "
+          "difference.",
+          "To save time: the instrument does not have to move.",
+          "Because NICOS refuses other settings.",
+          "It does not matter: the reduction corrects any change of settings."],
+         answer=0, why={1: "Moving the choppers takes a few seconds; the reason is the physics of the ratio.",
+                        2: "NICOS would accept them; the ratio would then mix two different beams.",
+                        3: "The reduction cannot correct a different beam: it only divides."},
+         explanation="The ratio sample / open beam removes everything that is the same in both (the shape of the beam, "
+                     "the efficiency of the camera). A different setting changes the beam itself, and the ratio would "
+                     "no longer be the transmission of the sample.",
+         hints=["What does a ratio cancel?"], title="Q1. Same settings")
+""")]
+
+PART0 = [md(r"""
+## 0. Your measurements, in NICOS
+
+As at ESS, you measure with **NICOS**, the control software of the instrument: you type a command, NICOS moves the
+devices, counts and writes the data files. Nobody measures for you: if a file is wrong (shutter forgotten, sample in the
+wrong place), you will see it in part 2 and measure again.
+
+**Open NICOS** with the button below: it opens in its own window, logged in, in about a minute.
+"""), code('import nb_tools\nnb_tools.nicos("odin")'), md(r"""
+### Step 1. Your proposal
+
+At ESS nothing is recorded without an accepted **proposal**: it gives the number of the experiment, the team and the
+samples, and the files go to its folder. The proposal of this exercise is **1234**.
+
+In NICOS, tab **Experiment**, click **Find my proposal**. NICOS asks the user office for your proposals. If you have
+only one, NICOS fills in the form at once (number 1234, title, users, sample); if you have several, it lets you choose.
+Check that the number is 1234, then click **Apply**: the proposal becomes the current experiment, and its sample, the
+iron plate, is mounted on the sample changer.
+
+Then go to the tab **Instrument interaction**. Type each command below in the command line at the top, then press
+*Enter*, one at a time; the *Output* tab shows what NICOS does.
+"""), md(r"""
+### Step 2. The instrument
+
+```
+sample_info()
+```
+describes the sample mounted on the instrument: an iron plate of 10 mm × 10 mm, 5 mm thick. Check it before measuring.
+
+```
+move(choppers, 'wfm')
+```
+sets the choppers to **WFM** mode (*wavelength frame multiplication*): the wavelength of each neutron is then known
+to better than 1 %, which is needed to see the sharp jumps of a Bragg edge.
+
+```
+move(wfm_delta, 0.3)
+```
+sets the distance between the two WFM discs to 0.3 m: a good resolution with enough neutrons (a smaller distance gives
+a finer resolution, but fewer neutrons).
+
+```
+move(pinhole, 0.03)
+```
+chooses the pinhole of 3 cm: a sharp enough image of the plate, with many neutrons.
+"""), md(r"""
+### Step 3. The dark
+
+```
+move(shutter, 'closed')
+```
+closes the shutter just before the sample: no neutron reaches the camera.
+
+```
+with nexusfile_open('dark'): count(t=30)
+```
+counts for 30 s and writes **one file**, titled *dark*. `nexusfile_open` is the ESS command that records everything
+measured inside it in one NeXus file, in the folder of your proposal. The *Detector image* stays almost empty: only the
+background.
+"""), md(r"""
+### Step 4. The open beam
+
+```
+move(shutter, 'open')
+```
+opens the shutter: the beam reaches the sample position.
+
+```
+move(stage_x, 500)
+```
+moves the sample stage 500 mm to the side: the plate is out of the beam, the camera sees the beam alone.
+
+```
+with nexusfile_open('open beam'): count(t=60)
+```
+counts for 60 s: a file titled *open beam*. The *Detector image* fills up evenly.
+"""), md(r"""
+### Step 5. The iron plate
+
+```
+move(stage_x, 0)
+```
+brings the plate back in the beam, at the center of the camera.
+
+```
+with nexusfile_open('iron plate'): count(t=60)
+```
+counts for 60 s, as long as the open beam, so that both have the same statistics. The *Detector image* now shows the
+plate: a darker square, because the iron stops some of the neutrons.
+
+```
+list_filewriting_jobs()
+```
+lists your three files: dark, open beam, iron plate.
+"""), code(r"""
+q.choice("In step 4, why is the plate moved 500 mm away rather than taken off the instrument?",
+         ["The camera sees only 14 mm × 14 mm: 500 mm aside, the plate is far out of the beam, and the stage brings it "
+          "back exactly to the same place for step 5.",
+          "Because 500 mm is the length of the plate.",
+          "To protect the plate from the neutrons.",
+          "Because the open beam must be measured through the plate."],
+         answer=0, why={1: "The plate is 10 mm wide; 500 mm is the travel of the stage.",
+                        2: "The plate is not damaged by the beam; the open beam is a measurement without it.",
+                        3: "The open beam is measured without the sample: it is the reference."},
+         explanation="Moving the stage is what an instrument scientist does: the sample leaves the 14 mm field of view, "
+                     "and the motor brings it back to the same position to the micrometer.",
+         hints=["How large is the field of view of the camera?"], title="Q2. The open beam")
+q.choice("You forgot `move(shutter, 'open')` before the open beam. What will your open-beam file look like?",
+         ["Like a second dark: almost no neutrons, so the transmission cannot be computed.",
+          "Like the sample: the plate is still in the beam.",
+          "Normal: the shutter only protects the camera.",
+          "NICOS refuses to count."],
+         answer=0, why={1: "The plate was moved away; with the shutter closed no neutron arrives at all.",
+                        2: "A closed shutter stops the beam before the sample: nothing reaches the camera.",
+                        3: "NICOS counts: it does not know what you meant to measure. You will see it in the logbook."},
+         explanation="Part 2 reads the logbook from your files: a file with almost no neutrons and the shutter closed is "
+                     "a dark, whatever its title. Measure the open beam again.",
+         hints=["What does a closed shutter stop?"], title="Q3. A forgotten shutter")
+"""), md(r"""
+**When the three files are written**, come back here and run the whole notebook: menu *Run > Run All Cells*. The
+notebook reads your files from part 1 on.
+""")]
+
+PART1_TEXT = (
+    "## 1. Your files\n\n"
+    "As at ESS, NICOS has written your files in the folder of your proposal, `data/<instrument>/<year>/<proposal>/raw`. "
+    "The cell below goes to the folder of proposal 1234, this year, and lists the files it finds there. If there is no "
+    "file yet, it stops with a message: measure first (part 0).")
+PART1_CODE = ('from odin_paths import TWIN_RUN_ROOT          # root of the results of the twins\n'
+              'import datetime\n'
+              'PROPOSAL = "1234"                              # the proposal of this exercise (part 0)\n'
+              'FOLDER = f"{TWIN_RUN_ROOT}/data/odin/{datetime.date.today().year}/{PROPOSAL}/raw"')
+# part 2: the three kinds of measurement are explained before part 0; here only how the logbook is read
+PART2_TEXT = (
+    "## 2. The logbook: which file is what?\n\n"
+    "Each `nexusfile_open` block wrote **one file**, as at ESS (`odin_job_000001.hdf`, `odin_job_000002.hdf`, ...). "
+    "Everything is in the file: its title, and the state of the instrument during the measurement (shutter, sample stage, "
+    "pinhole, choppers). The table below is read from the files themselves.\n\n"
+    "The column `kind` is deduced from the state of the instrument, not from the title: shutter closed = dark; shutter "
+    "open and stage far from 0 = open beam; shutter open and stage at 0 = sample. Check it against what you did.")
+Q_PART = {
+    "## 3.": r"""
+q.choice("What does the camera record for each neutron?",
+         ["Which pixel it hit and when it arrived after the source pulse.",
+          "Its wavelength, measured directly.",
+          "An image, one per second.",
+          "Its energy, measured by the pixel."],
+         answer=0, why={1: "The wavelength is computed later, from the arrival time (part 4).",
+                        2: "The file holds events, one per neutron; images are made from them.",
+                        3: "A pixel only says that a neutron arrived, and when."},
+         explanation="Two numbers per neutron: event_id (the pixel) and event_time_offset (the arrival time). Images, "
+                     "spectra and transmissions are all computed from these lists.",
+         hints=["Look at the two columns printed by the cell above."], title="Q4. What is in the file?")
+""",
+    "## 4.": r"""
+q.choice("The sample spectrum is lower than the open-beam spectrum. Why can the transmission not simply be the ratio "
+         "of these two raw spectra?",
+         ["Both contain the background of the dark, and the source may not have sent the same number of protons "
+          "during the two counts.",
+          "Because the two spectra have different wavelengths.",
+          "It can: the raw ratio is the transmission.",
+          "Because the plate is not in the ROI."],
+         answer=0, why={1: "Both are computed on the same wavelength bins.",
+                        2: "The background and the power of the source would bias it (part 5 corrects both).",
+                        3: "The ROI (white square) is on the plate."},
+         explanation="The dark is subtracted from both, and each count is divided by its proton charge (the number of "
+                     "neutrons produced is proportional to it): this is the reduction of part 5.",
+         hints=["What else than the plate is in both measurements?"], title="Q5. Raw counts")
+""",
+    "## 5.": r"""
+q.choice("On the plate, T ≈ 0.6 at many wavelengths. What does it mean?",
+         ["60 % of the neutrons of that wavelength cross the 5 mm of iron without being stopped or deflected.",
+          "60 % of the neutrons are absorbed.",
+          "The plate is 60 % iron.",
+          "The camera detects 60 % of the neutrons."],
+         answer=0, why={1: "T is the fraction that comes through; 40 % are stopped or deflected.",
+                        2: "The plate is pure iron; T depends on its thickness and on λ.",
+                        3: "The efficiency of the camera cancels in the ratio sample / open beam."},
+         explanation="T = 1 means nothing in the beam, T = 0 an opaque sample. The jumps of T with λ are the Bragg "
+                     "edges: part 6 models them.", hints=["T is a ratio: of what to what?"], title="Q6. Transmission")
+""",
+}
+
 _k0 = next(k for k, c in enumerate(msc) if c.cell_type == "code" and "exercise_hidden" in c.source) + 1
-msc[_k0:_k0] = PART0
+msc[_k0:_k0] = [QUIZ_CELL] + PREP + PART0
+out = []
 for c in msc:
     if c.cell_type == "markdown" and c.source.startswith("## 1."):
-        c.source = '## 1. Your files\n\nYour files are in the folder of your proposal, `data/<instrument>/<year>/<proposal>/raw`, as at ESS. Write in\n`PROPOSAL` the number of the proposal applied in NICOS (part 0). If there is no file yet, the notebook stops here and tells you.'
+        c.source = PART1_TEXT
+        c.metadata["twin"] = {"run_at_open": "stop"}      # the app runs the cells above this one at opening
+    if c.cell_type == "markdown" and c.source.startswith("## 2."):
+        c.source = PART2_TEXT
+    if c.cell_type == "markdown" and c.source.startswith("The cell below picks the **last** dark"):
+        c.source = ("The cell below takes the **last** dark, open beam and sample of the logbook: those you have just "
+                    "measured. It also checks that the three were measured with the same chopper mode and pinhole: "
+                    "otherwise the ratio would mix two different beams and mean nothing (question Q1).")
     if c.cell_type == "code" and c.source.lstrip().startswith("from odin_paths import TWIN_RUN_ROOT") and "FOLDER" in c.source:
-        c.source = ('from odin_paths import TWIN_RUN_ROOT          # root of the results of the twins\n'
-                    'import datetime\n'
-                    'PROPOSAL = "1234"                              # the proposal applied in NICOS (part 0)\n'
-                    'FOLDER = f"{TWIN_RUN_ROOT}/data/odin/{datetime.date.today().year}/{PROPOSAL}/raw"')
+        c.source = PART1_CODE
     if c.cell_type == "code" and "if FOLDER is None:" in c.source:
         _a, _b = c.source.index("if FOLDER is None:"), c.source.index('print("folder:"')
         c.source = (c.source[:_a] + 'import nb_tools\nnb_tools.need_measurements(FOLDER, "odin")   '
                     '# stops here, with a message, while there is no file\n' + c.source[_b:])
+    for head, qsrc in Q_PART.items():          # a question at the end of parts 3, 4 and 5 (before the next part)
+        nxt = {"## 3.": "## 4.", "## 4.": "## 5.", "## 5.": "## 6."}[head]
+        if c.cell_type == "markdown" and c.source.startswith(nxt):
+            out.append(code(qsrc))
+    out.append(c)
+msc = out
 import sys as _sys
 _sys.path.insert(0, os.path.abspath(os.path.join(HERE, '..', '..', '..')))
 from nbfig import figure_cell, insert_after_mission
 insert_after_mission(msc, figure_cell('iron_structures.png', 'What you have to decide: α-iron (left) or γ-iron (middle)? Each structure has its own atomic planes, hence its own Bragg edges (right).'))
-write(msc, "ODIN_iron_msc.ipynb")
+write(msc, "ODIN_iron_msc.ipynb", all_code_locked=True)
 
 # --------------------------------------------------------------------------- beamtime starter
 i2, i3 = section(src, "## 2."), section(src, "## 3.")

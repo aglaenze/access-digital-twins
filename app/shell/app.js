@@ -330,13 +330,25 @@ function openTab(url, kind, label) {
           const a = window.jupyterapp, w = a && a.shell && a.shell.currentWidget;
           if (w && w.sessionContext && w.content && w.content.widgets && w.content.widgets.length) {
             await w.sessionContext.ready;
-            await a.commands.execute("notebook:run-all-cells");
-            // back to where the notebook stopped (a message such as "measure in NICOS first"), or to the top
+            // only the cells before the measurements run at opening: they stop at the cell marked
+            // {"twin": {"run_at_open": "stop"}} (the generators of the MSc notebooks); without a mark, all of them
             const cells = w.content.widgets;
-            let k = cells.findIndex((c) => c.model.type === "code" &&
-              c.model.outputs.toJSON().some((o) => o.output_type === "error"));
-            if (k < 0) k = 0;
-            try { w.content.activeCellIndex = k; await w.content.scrollToCell(cells[k], "start"); } catch (e) { /* older API */ }
+            const stop = cells.findIndex((c) => {
+              const m = c.model.getMetadata ? c.model.getMetadata("twin") : (c.model.metadata || {}).twin;
+              return m && m.run_at_open === "stop";
+            });
+            if (stop > 0) {
+              w.content.activeCellIndex = stop;
+              await a.commands.execute("notebook:run-all-above");
+            } else {
+              await a.commands.execute("notebook:run-all-cells");
+            }
+            // always back to the top of the notebook
+            try {
+              w.content.activeCellIndex = 0;
+              await w.content.scrollToCell(cells[0], "start");
+            } catch (e) { /* older API */ }
+            try { w.content.node.scrollTop = 0; } catch (e) { /* */ }
             return "done";
           }
           await new Promise((r) => setTimeout(r, 500));
@@ -388,6 +400,12 @@ T.on("open-url", (url) => {
   const p = u.pathname + (u.search ? u.search.replace(/([?&])token=[^&]*&?/, "$1").replace(/[?&]$/, "") : "");
   const instr = u.searchParams.get("instrument");
   const file = decodeURIComponent(u.pathname.split("/").pop() || "Page").replace(/\.ipynb$/, "");
+  // the button Open NICOS of a notebook: the same as the button of the catalogue. On this computer (local app) NICOS
+  // opens as its own window: a short message, no tab. In the container: the tab of the control room.
+  if (file === "open_nicos" && instr) {
+    act({ act: "nicos", instr });
+    return;
+  }
   const name = file === "open_nicos" ? `NICOS · ${({ odin: "ODIN", loki: "LoKI" })[instr] || ""}`
     : file === "Sample_builder" ? "Sample builder" : file;
   openTab(p, u.pathname.startsWith("/notebooks/") ? "notebook" : "page", name);

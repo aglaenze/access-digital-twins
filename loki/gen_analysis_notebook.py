@@ -82,8 +82,7 @@ md(r"""
 ## 2. The logbook: which file is what?
 
 As at ESS, each `nexusfile_open` block in NICOS wrote **one file**, written by the ESS file writer
-(`loki_job_000001.hdf`, ...; on a computer without the file writer, the twin writes them itself, one per count:
-`loki_000001.nxs`, ...). Everything is in the file: its title, the sample, and the configuration of the instrument;
+(`loki_job_000001.hdf`, ...). Everything is in the file: its title, the sample, and the configuration of the instrument;
 the table below is read from the files themselves. A SANS experiment needs three kinds of measurement,
 **in the same configuration** (collimation, pulse skipping, detector distance):
 - **sample**: the particles in their solvent, in a cell;
