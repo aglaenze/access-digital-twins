@@ -40,7 +40,7 @@ echo "MEASURE the control room with the data chain of ESS: NICOS window after $(
      "$MEM0 MB before, $MEM1 MB with NICOS and the chain (+$((MEM1 - MEM0)) MB)"
 if [ $rc -eq 0 ]; then              # a count of the iron plate, as a student would do it (the live image fills up)
   /opt/conda/envs/nicos/bin/python nicos/run_nicos_script.py --timeout 600 -c "NewExperiment(1234, 'iron plate')
-move(choppers, 'wfm', wfm_delta, 0.30); move(shutter, 'open', stage_x, 0)
+move(choppers, 'wfm', wfm_delta, 0.1); move(shutter, 'open', stage_x, 0)
 with nexusfile_open('iron plate'):
     count(t=30)" > "$OUT/count.log" 2>&1 || { echo "FAIL the count in NICOS"; tail -30 "$OUT/count.log"; rc=1; }
   tail -8 "$OUT/count.log"
