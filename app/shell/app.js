@@ -126,7 +126,7 @@ $("#handin").onclick = async () => {
 
 // ------------------------------------------------------------------ catalogue
 const ICON_TARGET = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="5"></circle><circle cx="12" cy="12" r="1"></circle></svg>';
-const LEVEL = { bsc: "BSc", msc: "MSc", beamtime: "Beamtime" };
+const LEVEL = { bsc: "BSc", msc: "MSc", beamtime: "Beamtime", all: "All levels" };
 
 async function loadCatalogue() {
   try {
@@ -140,7 +140,8 @@ async function loadCatalogue() {
 
 function renderCatalogue() {
   const c = catalogue;
-  const count = (k) => c.exercises.filter((e) => e.instrument === k && e.status !== "planned").length;
+  // the introduction of an instrument (kind: introduction) is shown first and is not counted as an exercise
+  const count = (k) => c.exercises.filter((e) => e.instrument === k && e.status !== "planned" && e.kind !== "introduction").length;
   if (!count(instr)) instr = Object.keys(c.instruments).find((k) => count(k)) || "odin";
   $("#instruments").innerHTML = Object.entries(c.instruments).map(([k, i]) => {
     const n = count(k);
@@ -154,10 +155,11 @@ function renderCatalogue() {
   const I = c.instruments[instr];
   $("#ex-title").textContent = `Exercises on ${I.name}`;
   const ex = c.exercises.filter((e) => e.instrument === instr);
-  ex.sort((a, b) => (a.status === "planned") - (b.status === "planned"));
+  ex.sort((a, b) => ((b.kind === "introduction") - (a.kind === "introduction")) || ((a.status === "planned") - (b.status === "planned")));
   $("#exercises").innerHTML = ex.map((e, i) => e.status === "planned"
     ? `<article class="ex planned"><div><span class="tech">${esc(e.technique)} · planned</span><h3>${esc(e.title)}</h3></div><p class="q">${esc(e.question)}</p></article>`
-    : `<article class="ex"><div><span class="tech">${esc(e.technique)}</span><h3>${esc(e.title)}</h3></div>
+    : `<article class="ex${e.kind === "introduction" ? " intro-card" : ""}"><div><span class="tech">${esc(e.technique)}</span><h3>${esc(e.title)}</h3></div>
+       ${e.kind === "introduction" ? `<p class="q">${esc(e.question)} Start here: it takes about ${esc((e.modes.all || {}).duration || "40 min")}.</p>` : ""}
        ${e.mission ? `<div class="mission">${ICON_TARGET}<span><b>Your mission.</b> ${esc(e.mission)}</span></div>` : ""}
        <div class="levels">${Object.entries(e.modes || {}).map(([k, m]) => level(e, k, m, i)).join("")}</div></article>`).join("");
   $("#exercises").querySelectorAll("[data-act]").forEach((b) => b.onclick = () => act(b.dataset));
@@ -179,7 +181,7 @@ function renderCatalogue() {
 }
 
 function short(title) {
-  const t = title.replace(/\?$/, "").replace(/^How (far apart are|big are) /, "").replace(/ \(game\)$/, "");
+  const t = title.replace(/\?$/, "").replace(/^How (far apart are|big are) /, "").replace(/ \(game\)$/, "").replace(/^Introduction to .*/, "Introduction");
   return t.length > 28 ? t.slice(0, 27) + "…" : t;
 }
 
@@ -189,7 +191,7 @@ function level(e, k, m, i) {
   const d = `data-dir="${esc(e.dir)}" data-mode="${k}" data-label="${esc(label)}"`;
   const go = p.status === "new" ? "Start" : (p.status === "done" ? "Open again" : "Continue");
   let acts;
-  if (k === "bsc") acts = `<button class="btn go" data-act="open" ${d}>${go}</button>`;
+  if (k === "bsc" || k === "all") acts = `<button class="btn go" data-act="open" ${d}>${go}</button>`;
   // (NICOS and the sample builder are opened from the notebook itself: measuring is part of the exercise)
   else if (k === "msc") acts = `<button class="btn go" data-act="open" ${d}>${go === "Start" ? "Open the notebook" : go}</button>`;
   else acts = `<button class="btn" data-act="sheet" data-i="${i}" data-k="${k}">Your proposal</button>

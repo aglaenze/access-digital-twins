@@ -174,6 +174,9 @@ async function selftest(out) {
     check("signed in", await js(`!document.querySelector("#app").classList.contains("hidden")`), t0);
     await new Promise((r) => setTimeout(r, 1500));
     await shot("2_catalogue");
+    check("the introduction of the instrument is the first card of the catalogue",
+      await js(`(() => { const c = document.querySelector(".ex"); return !!c && c.classList.contains("intro-card")
+        && !!c.querySelector('[data-act="open"][data-mode="all"]'); })()`), Date.now());
     const t1 = Date.now();
     await js(`document.querySelector('[data-act="open"][data-mode="bsc"]').click(); true`);
     check("page loaded", await wait(`document.querySelectorAll(".pane .loading").length === 0 && document.querySelectorAll(".pane webview").length === 1`, 300), t1);

@@ -22,6 +22,7 @@ NICOS, all from the starter notebook). NICOS is for the MSc level
 and the free beamtime only: BSc students use the web pages and never see NICOS. Each exercise is one folder
 `<instrument>/exercises/<name>/` with an `exercise.yml`; its MSc and beamtime notebooks are generated from the guided
 analysis notebook of the instrument (`gen_notebooks.py`). Exercises planned: `catalogue_planned.yml`.
+Each instrument starts with an **introduction** (first card of the catalogue, all levels, about 40 min, no code): how the instrument works and what it is used for, with interactive pictures and questions (`<instrument>/gen_intro_page.py`, `exercises/introduction/exercise.yml`, `kind: introduction`).
 Rules for every exercise: the student has a **role and a mission** that say why the measurement matters (field
 `mission` of `exercise.yml`, shown on the card, in the page and in the notebooks, with a final verdict); every
 question is **interactive** (`quiz.py`: multiple choice or a value checked with a tolerance, a wrong answer is
@@ -59,6 +60,8 @@ twin/
 ├── sample_library.py    the samples (one YAML file each: odin/samples, loki/samples, <proposal>/samples)
 ├── user_office.py       the proposals (exercises, free beamtimes, imported), the proposal cache of NICOS
 ├── quiz.py              interactive questions (explanations, answers on request, report, progress files)
+├── intro_widgets.py     interactive pictures of the introductions to the instruments (ODIN_intro, LoKI_intro)
+├── gen_intro_figures.py figures of the introductions (figures/odin_*.png, loki_*.png)
 ├── model_builder.py     model builders of the MSc notebooks: choose a model, a range, start values, fit (no code to write)
 ├── gen_free_beamtime.py starter notebooks of the free beamtime (<instrument>/exercises/free_beamtime/)
 ├── progress_summary.py  teachers: the answers of a class, from the students' progress files

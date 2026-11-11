@@ -192,3 +192,7 @@ dialog form { padding: 12px 32px 24px; display: flex; justify-content: flex-end;
   padding: 12px 18px; border-radius: 10px; font-size: 14px; opacity: 0; pointer-events: none; transition: all .25s; max-width: 640px;
   box-shadow: 0 12px 32px rgba(11, 22, 38, .3); }
 #toast.on { opacity: 1; transform: translateX(-50%); }
+
+/* the introduction of an instrument: first card of the catalogue */
+.ex.intro-card { border: 2px solid var(--teal); background: var(--teal-l); }
+.chip.all { background: var(--ink3); } .fill.all { background: var(--ink3); }

@@ -712,5 +712,25 @@ check(f"experiment {free['id']}, mounted iron_plate" in out,
 if f"experiment {free['id']}" not in out:
     show_logs()
 
+step("The introductions to the instruments (ODIN_intro, LoKI_intro): every cell runs, the pictures to try are drawn")
+for page in ("odin/ODIN_intro.ipynb", "loki/LoKI_intro.ipynb"):
+    try:
+        import nbformat
+        from nbclient import NotebookClient
+        nbp = os.path.join(TWIN, page)
+        nb = nbformat.read(nbp, as_version=4)
+        NotebookClient(nb, timeout=600, kernel_name="python3", allow_errors=True,
+                       resources={"metadata": {"path": os.path.dirname(nbp)}}).execute()
+        errs = [(k, o["ename"], o["evalue"][:200]) for k, c in enumerate(nb.cells) for o in c.get("outputs", [])
+                if o.get("output_type") == "error"]
+        widgets = sum(1 for c in nb.cells for o in c.get("outputs", [])
+                      if "application/vnd.jupyter.widget-view+json" in o.get("data", {}))
+        for e in errs:
+            print("  error:", e)
+        check(not errs and widgets >= 10, f"{page}: runs without error, {widgets} interactive outputs (pictures and "
+                                          "questions)")
+    except Exception as e:                           # noqa: BLE001
+        check(False, f"{page}: {type(e).__name__}: {e}")
+
 print("\nALL PASSED" if ok else "\nSOME CHECKS FAILED")
 sys.exit(0 if ok else 1)

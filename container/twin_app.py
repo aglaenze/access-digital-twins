@@ -46,6 +46,8 @@ INSTRUMENTS = {
     "bifrost": dict(name="BIFROST", kind="Spectroscopy", text="Not available yet: no official McStas model"),
 }
 QUIZ = {  # the quiz (quiz.Quiz name) of each way into an exercise, for the progress shown in the catalogue
+    ("odin/exercises/introduction", "all"): "odin_intro",
+    ("loki/exercises/introduction", "all"): "loki_intro",
     ("odin/exercises/iron_bragg_edges", "bsc"): "odin_iron_bsc",
     ("odin/exercises/iron_bragg_edges", "msc"): "odin_iron_msc",
     ("loki/exercises/silica_spheres", "bsc"): "loki_silica_bsc",
