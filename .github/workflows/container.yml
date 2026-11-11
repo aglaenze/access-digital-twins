@@ -63,7 +63,7 @@ jobs:
       - name: NICOS window on the desktop of the container (screenshot)
         run: |
           mkdir -p shots && chmod 777 shots
-          docker run --rm -v "$PWD/shots:/data/shots" -e TWIN_MPI=4 twin:test bash container/desktop_test.sh /data/shots
+          docker run --rm -v "$PWD/shots:/data/shots" -e GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }} -e TWIN_MPI=4 twin:test bash container/desktop_test.sh /data/shots
 
 
       - uses: actions/setup-node@v4

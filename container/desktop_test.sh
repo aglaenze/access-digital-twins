@@ -10,6 +10,8 @@ set -u
 OUT="${1:-/data/shots}"
 mkdir -p "$OUT"
 cd "$HOME/twin"
+# the recorded beam of the count below (a new container has none; the app downloads them at its first start)
+/opt/conda/envs/mcstas/bin/python container/fetch_fronts.py wfm_delta0.10_N2e+08 || echo "WARNING: upstream part not downloaded"
 mem() { awk '/MemTotal/ {t=$2} /MemAvailable/ {a=$2} END {printf "%.0f", (t-a)/1024}' /proc/meminfo; }
 MEM0=$(mem); T0=$(date +%s)
 echo "${2:-odin}" > "$HOME/.control_room_test"
@@ -44,6 +46,8 @@ move(choppers, 'wfm', wfm_delta, 0.1); move(shutter, 'open', stage_x, 0)
 with nexusfile_open('iron plate'):
     count(t=30)" > "$OUT/count.log" 2>&1 || { echo "FAIL the count in NICOS"; tail -30 "$OUT/count.log"; rc=1; }
   tail -8 "$OUT/count.log"
+  if grep -q "Error" "$OUT/count.log"; then echo "FAIL the count in NICOS reported an error"; grep "Error" "$OUT/count.log" | head -5; rc=1
+  else echo "PASS a count of the iron plate in the NICOS of the control room, written by the data chain"; fi
   sleep 5
   scrot "$OUT/nicos_detector.png" && echo "screenshot: $OUT/nicos_detector.png"
   echo "MEASURE memory in use after the count: $(mem) MB"

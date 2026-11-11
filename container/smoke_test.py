@@ -427,7 +427,7 @@ print(f"  start-up of the chain (launcher -> NICOS ready): {ESS.get('ready_s', f
       f"(+{ESS.get('mem_ready', float('nan')) - ESS['mem0']:.0f} MB), {ESS.get('mem_after', float('nan')):.0f} MB after "
       "the three jobs", flush=True)
 raw = f"{os.environ.get('TWIN_RUN_ROOT', '')}/data/odin/{datetime.date.today().year}/1241/raw"
-kinds = []
+kinds, rows = [], []
 if os.path.isdir(raw):
     print("  " + raw + ": " + ", ".join(sorted(os.listdir(raw))))
     import odin_reduction as ored
