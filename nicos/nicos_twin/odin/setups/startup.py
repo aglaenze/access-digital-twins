@@ -19,7 +19,7 @@ if Exp._mode != SIMULATION:
 printinfo("============================================================")
 printinfo("ODIN digital twin (ESS neutron imaging).")
 printinfo("Devices: choppers, wfm_delta, shutter, pinhole, diffuser, stage_x, stage_rot, sample_holder, det.")
-printinfo("1. Your proposal:    tab Experiment, Query, choose it, Apply   (script: NewExperiment(1234, 'title'))")
+printinfo("1. Your proposal:    tab Experiment, Find my proposal, choose it, Apply   (script: NewExperiment(1234, 'title'))")
 printinfo("2. Measure:          move(shutter, 'open', stage_x, 500)")
 printinfo("                     with nexusfile_open('open beam'):")
 printinfo("                         count(t=10)")

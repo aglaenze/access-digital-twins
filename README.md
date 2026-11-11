@@ -29,7 +29,7 @@ explained, the answer can be shown, MSc tasks have their solution behind a butto
 without a teacher. Each instrument also has a **free beamtime** (no exercise: NICOS, sample builder, a starter
 notebook asking for the question and the plan first; `gen_free_beamtime.py`), a new proposal each time. As at ESS,
 NICOS finds the proposals in the user office (`user_office.py`: those of the exercises, the free beamtimes and the
-proposals a student imports), with Query in the Experiment tab. The answers are kept in
+proposals a student imports), with Find my proposal in the Experiment tab. The answers are kept in
 `TWIN_RUN_ROOT/progress/`; `progress_summary.py` gives the teacher a table for a class.
 
 ## Instruments

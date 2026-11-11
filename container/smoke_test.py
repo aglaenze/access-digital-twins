@@ -557,7 +557,7 @@ else:
     if os.path.isfile(path):
         print(f"--- {path} (end)\n" + open(path, errors="replace").read()[-1500:])
 
-step("User office: Query in the Experiment tab lists the proposals of the exercises and the student's own (as at ESS)")
+step("User office: Find my proposal in the Experiment tab lists the proposals of the exercises and the student's own (as at ESS)")
 sys.path.insert(0, TWIN)
 import user_office                                     # noqa: E402
 user_office.set_signed_in("ci_student")                # as the app does when a student signs in
@@ -589,7 +589,7 @@ check(any(x.startswith("1234 | Lattice spacing") and "['iron_plate']" in x for x
       and any(x.startswith(free["id"] + " | Does a weld") and "[]" in x for x in props)
       and any(x.startswith("2025123 | Residual strain") and "turbine_blade_nickel_alloy" in x for x in props)
       and len(props) == 3,
-      f"user office: Query lists the proposal of the exercise (1234, its sample), the student's free beamtime "
+      f"user office: Find my proposal lists the proposal of the exercise (1234, its sample), the student's free beamtime "
       f"({free['id']}, no sample) and imported proposal (2025123, its sample to build)")
 check("experiment 1234, mounted iron_plate" in out,
       "user office: applying the proposal of the exercise mounts its sample (the student may mount another)")

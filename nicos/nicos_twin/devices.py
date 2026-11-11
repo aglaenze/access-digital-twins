@@ -312,7 +312,7 @@ class TwinExperiment(EssExperiment):
     """ESS experiment (proposal number, title, users, samples; data in <dataroot>/<instrument>/<year>/<proposal>/raw),
     without the "current" symlinks (not allowed for ordinary users on Windows).
     Proposals: as at ESS, from the twin's user office (user_office.py, written to the proposal cache cache_filepath
-    by start_nicos.py): "Query" in the Experiment tab lists the proposals of the exercises and the student's own (free
+    by start_nicos.py): "Find my proposal" in the Experiment tab lists the proposals of the exercises and the student's own (free
     beamtimes, imported proposals) and fills in the number, title, users and samples. On a new proposal, its first
     sample is mounted on the sample changer (the student may mount another one). With start_nicos.py --no-proposals,
     any number can be typed in, as when the proposal system is unreachable at ESS. NewExperiment in a script accepts

@@ -232,7 +232,7 @@ python nicos\start_nicos.py
 Answer `1` (ODIN). After ~30 s the NICOS window of ESS opens. Log in with user **student**, password **student**
 (server `localhost:1301`).
 
-1. Tab **Experiment**: **Query**, choose your proposal, then **Apply**. As at ESS, NICOS asks the user office for
+1. Tab **Experiment**: **Find my proposal**, choose your proposal, then **Apply**. As at ESS, NICOS asks the user office for
    your proposals (here the twin's: the proposals of the exercises and your free beamtimes), and fills in the number, title, users and samples; the first sample is mounted on the sample changer
    (mount another one with `move(sample_holder, 'its_name')`). Without a proposal NICOS refuses to record data, as at
    ESS. (`start_nicos.py --no-proposals`: any number can be typed in instead, as when the proposal system is down.)
@@ -338,7 +338,7 @@ devices `heavy_shutter`, `shutter`, `collimation`, `pulse_skipping`, `detector_d
 shows their values (a forbidden combination is refused, with the explanation).
 
 **NICOS**: `python nicos\start_nicos.py`, answer `2` (LoKI). The window is the one of the real LoKI. In the
-Experiment tab: **Query**, choose your proposal, **Apply** (as in part 4). Then, for a first count:
+Experiment tab: **Find my proposal**, choose your proposal, **Apply** (as in part 4). Then, for a first count:
 ```
 move(heavy_shutter, 'Open', fast_shutter, 'Open')
 with nexusfile_open('my first count'):

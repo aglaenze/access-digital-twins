@@ -151,7 +151,7 @@ def main():
     a.add_argument("--no-proposals", dest="proposals", action="store_false",
                    default=os.environ.get("TWIN_PROPOSALS", "1") != "0",
                    help="without the twin's user office: any proposal number is typed in the Experiment tab, as when "
-                        "the proposal system is unreachable at ESS (default: the user office, as at ESS: Query lists "
+                        "the proposal system is unreachable at ESS (default: the user office, as at ESS: Find my proposal lists "
                         "the proposals of the exercises and the student's own; TWIN_PROPOSALS=0 to switch it off)")
     a.add_argument("--until-gui-closes", action="store_true",
                    help="stop everything when the NICOS window is closed (the control room of the app)")

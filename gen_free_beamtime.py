@@ -25,7 +25,7 @@ of NICOS.
 
 **Your proposal**: each free beamtime is a new proposal of the user office of the twin, made by the app (button *New
 free beamtime*, or *Import a proposal* for a real one): its number is in `PROPOSAL` below. In NICOS, tab *Experiment*:
-**Query**, choose it, **Apply**. No sample is imposed: mount any sample of the library, or your own. Your files are in
+**Find my proposal**, choose it, **Apply**. No sample is imposed: mount any sample of the library, or your own. Your files are in
 `data/{instr}/<year>/<proposal>/raw`.
 
 """

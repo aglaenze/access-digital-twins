@@ -170,7 +170,7 @@ function renderCatalogue() {
         data-label="${esc(I.name)} · ${esc(p.id)}">Continue</button></li>`).join("");
   $("#free").innerHTML = free ? `<article class="free"><div class="txt"><span class="tech">No exercise · MSc and beyond</span>
       <h3>Free beamtime on ${esc(I.name)}</h3><p>Your own question, your own samples, your own measurements: as in a real beamtime at ESS.
-      Each free beamtime is a new proposal (its own number and data folder), found in NICOS with <i>Query</i>; no sample
+      Each free beamtime is a new proposal (its own number and data folder), found in NICOS with <i>Find my proposal</i>; no sample
       is imposed. Preparing a real beamtime? Import your proposal and try it on the twin.</p>
       ${rows ? `<ul class="props">${rows}</ul>` : ""}</div>
       <div class="acts"><button class="btn go" data-act="newfree">New free beamtime</button>
@@ -216,7 +216,7 @@ async function act(d) {
       const p = await askProposal(d.act === "import");
       if (!p) return;
       const I = catalogue.instruments[instr];
-      toast(`Proposal ${p.id} is in the user office: in NICOS, tab Experiment, Query, choose it, Apply.`, 9000);
+      toast(`Proposal ${p.id} is in the user office: in NICOS, tab Experiment, Find my proposal, choose it, Apply.`, 9000);
       const r = await T.api("POST", "/twin/open", { file: catalogue.free[instr], kind: "notebook", proposal: p.id });
       openTab(r.url, r.kind, `${I.name} · ${p.id}`);
       loadCatalogue();

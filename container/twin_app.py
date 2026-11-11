@@ -13,7 +13,7 @@ All requests need the token of the server (header "Authorization: token ...").
     POST /twin/proposal {instrument, kind, title, proposal, samples}
                                    the user office of the twin (user_office.py): a new free beamtime (kind "free", a
                                    new number each time) or an imported proposal (kind "imported": its number, title,
-                                   samples [{name, formula}]); NICOS finds it in Query within a minute
+                                   samples [{name, formula}]); NICOS finds it in Find my proposal within a minute
     POST /twin/reset {dir,mode}    starts one way into an exercise again: the student's copy of its notebook, the
                                    answers to its questions and its state (started, submitted) are put aside (folder
                                    _old/ of the student, nothing is deleted); the measurements stay

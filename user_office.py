@@ -2,7 +2,7 @@
 
 At ESS a proposal (number, title, team, samples) is written and accepted in the user office system before the
 beamtime. NICOS does not ask the user office itself: a service writes the proposals of the instrument to a cache file
-(yuos_query), and EssExperiment reads it. In the Experiment tab, "Query" lists the proposals of the logged-in user and
+(yuos_query), and EssExperiment reads it. In the Experiment tab, "Find my proposal" lists the proposals of the logged-in user and
 "Apply" fills in the number, title, users and samples; the files then go to <instrument>/<year>/<proposal>/raw.
 
 The twin holds three kinds of proposals:

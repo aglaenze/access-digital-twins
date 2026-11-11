@@ -16,7 +16,7 @@ if Exp._mode != SIMULATION:
 printinfo("============================================================")
 printinfo("LoKI digital twin (ESS small-angle neutron scattering), first version.")
 printinfo("Devices: heavy_shutter, fast_shutter, collimation, sample_holder, det.")
-printinfo("1. Your proposal:    tab Experiment, Query, choose it, Apply   (script: NewExperiment(3001, 'title'))")
+printinfo("1. Your proposal:    tab Experiment, Find my proposal, choose it, Apply   (script: NewExperiment(3001, 'title'))")
 printinfo("2. Measure:          move(heavy_shutter, 'Open', fast_shutter, 'Open')")
 printinfo("                     with nexusfile_open('silica spheres, 10 min'):")
 printinfo("                         count(t=600)")

@@ -36,7 +36,7 @@ devices = dict(
         dataroot=RUN_ROOT + '/data',
         sample='Sample',
         cache_filepath=RUN_ROOT + '/nicos/cached_proposals_odin.json',   # the twin's user office (user_office.py)
-        update_interval=0.02,    # hours: a new free beamtime or imported proposal is in Query within ~1 min
+        update_interval=0.02,    # hours: a new free beamtime or imported proposal is in Find my proposal within ~1 min
     ),
     conssink=device(
         'nicos_ess.devices.datasinks.console_scan_sink.ConsoleScanSink'),
