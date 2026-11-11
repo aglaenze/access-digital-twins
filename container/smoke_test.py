@@ -531,13 +531,15 @@ else:
                              f"{ld.DASHBOARD_PORT}" + (f" (after {LD['dashboard']:.0f} s)" if "dashboard" in LD else ""))
     print(f"NICOS devices of esslivedata: {LD.get('devices')}; total {LD.get('total')}, events in the file "
           f"{LD.get('events')}")
-    # Pixel numbering (checked on 2026-11-11). esslivedata takes the first pixel number from the ODIN geometry file it
-    # downloads (geometry-odin-2026-09-04.nxs: entry/instrument/event_mode_detectors/timepix3, detector_number 0 to
-    # 4096 x 4096 - 1). The twin's files are made from an older ODIN file (entry/instrument/timepix3, detector_number
-    # 1 to 4096 x 4096), and the ESS EFU tested here also publishes 1 + x + 4096 y. So esslivedata is right for the
-    # current ODIN file, and for the twin's events its image is shifted by one pixel and leaves out the last pixel
-    # (id 16777216; one neutron of 1.77 million on 2026-11-11). Not a bug of esslivedata. Open: move the twin to the
-    # current ODIN file structure, and ask ESS which numbering the EFU of ODIN uses in production.
+    # Pixel numbering (checked on 2026-11-11, by reading both files). The twin's files are made from the ODIN file
+    # shipped with essimaging, written from the ESS NeXus template of 2026-10-19 (entry/template_information):
+    # entry/instrument/timepix3, detector_number 1 to 4096 x 4096; the ESS EFU tested here publishes the same numbers
+    # (1 + x + 4096 y). esslivedata (26.11.0, and its main branch on 2026-11-11) takes the first pixel number from its
+    # own geometry file of ODIN, geometry-odin-2026-09-04.nxs, an older structure (file written 2026-09-02:
+    # entry/instrument/event_mode_detectors/timepix3, detector_number 0 to 4096 x 4096 - 1). So its image is shifted
+    # by one pixel and leaves out the last pixel (id 16777216; one neutron of 1.77 million on 2026-11-11), until
+    # esslivedata adopts the newer ODIN file (as it did for LoKI and BIFROST on 2026-11-03). Nothing to change in the
+    # twin.
     n_last = int(np.sum(np.asarray(LD["ids"]) == 4096 * 4096)) if LD.get("ids") is not None else 0
     if n_last:
         print(f"  {n_last} neutron(s) in the last pixel of the camera (id 16777216), which the live image leaves out")
