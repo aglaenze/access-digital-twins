@@ -190,3 +190,68 @@ def reduce(sample, open_beam, dark=None, lam=None, roi=(-3, 3, -3, 3), n_pixels=
         out[what] = res["E"] / res["O"]
     out["normalization"] = {k: dict(duration=v["duration"], charge_uC=v["charge"]) for k, v in H.items()}
     return out
+
+
+# --------------------------------------------------------------------------- the logbook, read from the files
+def data_files(folder):
+    """The data files of a folder, in the order written: those of the ESS file-writer (odin_job_NNNNNN.hdf, one per
+    nexusfile_open block, as at ESS) and those the twin writes itself (odin_NNNNNN.nxs, one per count: the pages of the
+    BSc level, and NICOS where the file-writer does not exist)."""
+    import glob
+    import os
+    files = glob.glob(os.path.join(folder, "odin_job_*.hdf")) + glob.glob(os.path.join(folder, "odin_[0-9]*.nxs"))
+    return sorted((f.replace(os.sep, "/") for f in files), key=lambda f: (os.path.getmtime(f), f))
+
+
+def _last(group, path, default=None):
+    """Last value of the NXlog `path` (relative to entry/instrument): the value during the measurement. A positioner
+    (e.g. spst1_lin_x) holds its NXlog in `value`."""
+    import h5py
+    d = group.get(f"{path}/value")
+    if isinstance(d, h5py.Group):
+        d = d.get("value")
+    if d is None or d.shape == (0,):
+        return default
+    v = d[()]
+    return v[-1] if np.ndim(v) else v
+
+
+def _chopper_mode(ins):
+    """Chopper mode (wfm, natural, white) and WFM disc separation [m], from the chopper speeds in the file."""
+    import odin_nexus as nx
+    turning = {c for c in nx.NEXUS_CHOPPERS if (_last(ins, f"{c}/rotation_speed_setpoint", 0.0) or 0.0) != 0.0}
+    mode = next((m for m, active in nx.ACTIVE_CHOPPERS.items() if set(active) == turning), "other")
+    delta = None
+    if mode == "wfm":
+        tr = _last(ins, "wfm1/transformations/wfmc_translation", 0.0)
+        delta = round(nx.DELTA_TEMPLATE - 2 * float(tr) / 1e3, 4)
+    return mode, delta
+
+
+def measurements(folder):
+    """The logbook of a folder, read from the data files themselves (as a user of ESS does: everything is in the
+    file): one row per file, with its kind (dark: shutter closed; open beam: shutter open, sample stage far from 0;
+    sample), title, duration, number of neutrons and the settings of the instrument during the measurement."""
+    import os
+    import h5py
+    rows = []
+    for path in data_files(folder):
+        try:
+            with h5py.File(path, "r") as f:
+                e, ins = f["entry"], f["entry/instrument"]
+                title = e["title"][()]
+                title = title.decode() if isinstance(title, bytes) else str(title)
+                shutter = _last(ins, "experiment_shutter/status", 3)
+                x_mm = float(_last(ins, "spst1_lin_x", 0.0))
+                rot = float(_last(ins, "spst1_rot_y", 0.0))
+                pin = float(_last(ins, "pinhole_2/horizontal_gap", 0.0))
+                n = len(ins["timepix3/data/event_id"]) if "timepix3/data/event_id" in ins else 0
+                mode, delta = _chopper_mode(ins)
+        except (OSError, KeyError) as err:           # a file still being written, or not a measurement
+            rows.append(dict(file=os.path.basename(path), kind="?", title=f"(not readable: {err})"))
+            continue
+        kind = "dark" if int(shutter) != 3 else ("open beam" if abs(x_mm) > 20 else "sample")
+        rows.append(dict(file=os.path.basename(path), kind=kind, title=title, t_s=round(duration(path), 1), counts=n,
+                         choppers=mode, wfm_delta_m=delta, pinhole_m=round(pin / 1e3, 4), stage_x_m=round(x_mm / 1e3, 4),
+                         stage_rot_deg=round(rot, 2)))
+    return rows

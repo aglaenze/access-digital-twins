@@ -16,11 +16,13 @@ import datetime
 import hashlib
 import json
 import os
+import sys
 
 import h5py
 import numpy as np
 
 import loki_paths as paths
+HERE = os.path.dirname(os.path.abspath(__file__))
 import loki_mcstas as lm
 import loki_samples as ls
 import loki_nexus as lnx
@@ -314,7 +316,14 @@ class VirtualLoki:
         fn, kw, _, _, _ = self.samples()[st["sample"]]
         truth = {} if fn is None else {k: v for k, v in fn(**kw)[2].items() if np.isscalar(v)}
         info = self.twin_settings(st, settings=False)
-        info.update(event_sampling=sampling, **{f"true_{k}": float(v) for k, v in truth.items()})
+        info.update(event_sampling=sampling)
+        # the truths about the sample: not in the file (a real file does not have them), but apart (sample_library)
+        sys.path.insert(0, os.path.dirname(HERE))
+        import sample_library as sl
+        tdir = sl.truth_folder(os.path.dirname(path))
+        os.makedirs(tdir, exist_ok=True)
+        with open(os.path.join(tdir, os.path.basename(path) + ".json"), "w", encoding="utf-8") as f:
+            json.dump(dict(sample=st["sample"], **{k: float(v) for k, v in truth.items()}), f, indent=1)
         lnx.write(path, det_ev, mon_ev, n_pulses, start, t, title or f"run {self.number}", st["sample"],
                   {k: str(v) for k, v in st.items()}, self._nexus_choppers(st), reardet - lnx.REAR_Z0, info, lm.L1)
         return dict(n_events=int(sum(len(v[0]) for v in det_ev.values())), sampling=sampling)

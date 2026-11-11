@@ -99,8 +99,23 @@ def user_folder(data_folder):
     if not data_folder:
         return None
     data_folder = data_folder.rstrip("/\\")
-    base = os.path.dirname(data_folder) if os.path.basename(data_folder) == "raw" else data_folder
+    base = os.path.dirname(data_folder) if os.path.basename(data_folder) in ("raw", TRUTH) else data_folder
     return os.path.join(base, "samples").replace(os.sep, "/")
+
+
+TRUTH = ".twin"
+
+
+def truth_folder(data_folder):
+    """Where the twin keeps what is not data of the instrument, apart from the files the student reads (as at ESS, a
+    data folder holds only what the instrument wrote): the truths about the samples measured (<file>.json) and, when
+    the ESS file-writer writes the data, the twin's own files of each count (to check the file-writer's).
+    <proposal>/raw -> <proposal>/.twin ; any other folder -> <folder>/.twin."""
+    data_folder = data_folder.rstrip("/\\")
+    if os.path.basename(data_folder) == TRUTH:
+        return data_folder.replace(os.sep, "/")
+    base = os.path.dirname(data_folder) if os.path.basename(data_folder) == "raw" else data_folder
+    return os.path.join(base, TRUTH).replace(os.sep, "/")
 
 
 def load(instrument, data_folder=None):

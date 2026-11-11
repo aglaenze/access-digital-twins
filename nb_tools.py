@@ -109,7 +109,7 @@ class MeasureFirst(Exception):
 
 
 def need_measurements(folder, instr):
-    files = sorted(glob.glob(os.path.join(folder, f"{instr}_*.nxs")))
+    files = sorted(glob.glob(os.path.join(folder, f"{instr}_*.nxs")) + glob.glob(os.path.join(folder, f"{instr}_job_*.hdf")))
     if not files:
         raise MeasureFirst(
             f"No measurement yet in {folder}.\n"

@@ -25,10 +25,11 @@ modes:
     open: voila
     file: loki/LoKI_virtual.ipynb
   msc:
-    label: Notebook with tasks
+    label: Notebook with a model builder
     what: >-
-      You measure in NICOS (the commands are given); the reduction with the ESS software (esssans) is given; you write the
-      Guinier analysis, then fit a sphere model with sasmodels (the engine of SasView), checked automatically.
+      You measure in NICOS (the commands are given); the reduction with the ESS software (esssans) is given; you develop
+      the Guinier analysis and choose a shape with sasmodels (the engine of SasView) in model builders (no code to
+      write), checked automatically.
     duration: half a day
     open: lab
     file: loki/exercises/silica_spheres/LoKI_silica_msc.ipynb

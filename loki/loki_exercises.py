@@ -24,7 +24,7 @@ def _no(msg):
 
 def _given(x, dx, name):
     if x is None:
-        _no(f"{name} is still None")
+        _no(f"no {name} yet: fit first (button Fit of the builder; for the radius: the sphere)")
         return False
     if dx is None or not np.isfinite(dx) or dx <= 0:
         _no(f"give the uncertainty of {name} as well (square root of the diagonal of the covariance matrix)")

@@ -70,7 +70,7 @@ import odin_reduction as red
 
 if FOLDER is None:                                     # demonstration session
     FOLDER = f"{TWIN_RUN_ROOT}/odin/analysis_demo"
-    if not glob.glob(f"{FOLDER}/odin_*.nxs"):
+    if not red.data_files(FOLDER):
         from odin_virtual import VirtualOdin
         odin = VirtualOdin(session="analysis_demo", seed=1)
         odin.count(10, title="dark")                    # shutter closed at start-up
@@ -79,14 +79,16 @@ if FOLDER is None:                                     # demonstration session
         odin.move(stage_x=0.0)                          # sample back in the beam
         odin.count(10, title="iron plate")
 print("folder:", FOLDER)
-print("files :", sorted(os.path.basename(f) for f in glob.glob(f"{FOLDER}/odin_*.nxs")))
+print("files :", [os.path.basename(f) for f in red.data_files(FOLDER)])
 """)
 
 md(r"""
 ## 2. The logbook: which file is what?
 
-Each measurement (*count*) wrote one file `odin_000001.nxs`, `odin_000002.nxs`, ... and one line in the logbook
-`log.jsonl`, with the state of the instrument during the count. The table below lists them.
+As at ESS, each `nexusfile_open` block in NICOS wrote **one file**, written by the ESS file writer
+(`odin_job_000001.hdf`, `odin_job_000002.hdf`, ...; on a computer without the file writer, the twin writes them
+itself, one per count: `odin_000001.nxs`, ...). Everything is in the file: its title, and the state of the instrument
+during the measurement (shutter, sample stage, pinhole, choppers). The table below is read from the files themselves.
 
 To compute a transmission you need three kinds of measurement:
 - **dark**: shutter closed. The detector still records a few counts (gamma rays, electronic noise): the background,
@@ -99,17 +101,7 @@ The column `kind` is guessed from the shutter and the stage position. Check it a
 """)
 
 code(r"""
-rows = []
-with open(f"{FOLDER}/log.jsonl", encoding="utf-8") as f:
-    for line in f:
-        entry = json.loads(line)
-        if entry["action"] != "count" or not entry["details"].get("file"):
-            continue
-        d, s = entry["details"], entry["details"]["state"]
-        kind = "dark" if s["shutter"] == "closed" else ("open beam" if abs(s["stage_x"]) > 0.02 else "sample")
-        rows.append(dict(file=os.path.basename(d["file"]), kind=kind, title=d["title"], t_s=d["t"],
-                         counts=d["n_counts"], choppers=s["choppers"], wfm_delta_m=s["wfm_delta"],
-                         pinhole_m=s["pinhole"], stage_x_m=s["stage_x"], stage_rot_deg=s["stage_rot"]))
+rows = red.measurements(FOLDER)                         # the logbook, read from the files
 def show_table(rows):                                  # a list of dicts, printed as a table
     if not rows:
         print("no measurement in the logbook"); return
@@ -124,7 +116,7 @@ show_table(rows)
 
 md(r"""
 The cell below picks the **last** dark, open beam and sample of the logbook. To choose other files (for example an
-older set, or another chopper mode), write their names instead, e.g. `SAMPLE = "odin_000003.nxs"`.
+older set, or another chopper mode), write their names instead, e.g. `SAMPLE = "odin_job_000003.hdf"`.
 Dark, open beam and sample must be measured with the **same chopper mode and pinhole**: otherwise the ratio mixes two
 different beams and means nothing.
 """)

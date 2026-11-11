@@ -14,7 +14,7 @@ writes one file per count.
 With the ESS file-writer (TWIN_FILEWRITER=1 for NICOS; Linux, filewriter/README.md): as at ESS, start_filewriting
 starts a job of the file-writer (through the twin server, POST /filewriter/start) and everything recorded until
 stop_filewriting goes into ONE file of the file-writer (<instrument>_job_NNNNNN.hdf in the proposal folder); the twin
-still writes its own files, one per count, and stop_filewriting compares them with the file-writer's.
+writes its own files of the counts apart (<proposal>/.twin), and stop_filewriting compares them with the file-writer's.
 """
 import os
 import time

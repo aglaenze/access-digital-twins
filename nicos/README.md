@@ -27,7 +27,7 @@ built on its `nicos_ess` counterpart:
 |---|---|---|
 | GUI | `guiconfig.py`: tabs Experiment, Setup, Instrument interaction (command line, output, scan plot, detector image, script status, devices), Scripting, History, Logs | **the same file** (copied), with small changes in `nicos_twin/gui.py`: workaround for a NICOS bug, scrolling on small screens, Apply button of the Experiment tab under the form, detector-image color levels recomputed for each new image (ODIN), device list that can be enlarged (the detector-image panel no longer blocks the splitter handle) |
 | Experiment | `EssExperiment`: proposal number, title, users, samples; look-up in the ESS user office | `TwinExperiment` = `EssExperiment` with the twin's user office (Find my proposal: the proposals of the exercises and the student's own, § 3 "Proposals"); the first sample of a proposal mounted on Apply |
-| Data files | written by the ESS file-writer (Kafka), started by NICOS; `<instrument>/<year>/<proposal>/raw/` | written by the twin, one per count, in `<TWIN_RUN_ROOT>/data/<instrument>/<year>/<proposal>/raw/`; with `--filewriter` (Linux x86-64, the app image) also by the real ESS file-writer, one per job (`../filewriter/README.md`) |
+| Data files | written by the ESS file-writer (Kafka), started by NICOS; `<instrument>/<year>/<proposal>/raw/` | with `--filewriter` or `--ess` (the control room of the app; Linux x86-64): written by the real ESS file-writer, one per `nexusfile_open` block, in `<TWIN_RUN_ROOT>/data/<instrument>/<year>/<proposal>/raw/`, the twin's own files apart in `<proposal>/.twin`; without it, written by the twin, one per count, in `raw/` (`../filewriter/README.md`) |
 | Recording commands | `nexusfile_open`, `start_filewriting`, `stop_filewriting`, `list_filewriting_jobs` (`nicos_ess.commands`) | the same commands (`nicos_twin.commands`) |
 | Devices | EPICS (motors, choppers...), detector data through Kafka | HTTP orders to the twin server; names of `nicos_ess` where they exist (LoKI: `heavy_shutter`, `fast_shutter`); with `--epics`, every device of the real file as an EPICS PV and the sample stage driven through its EPICS motor records (`../epics/README.md`) |
 | Which instrument | the computer you sit at | `start_nicos.py` asks (or `--instrument`): like walking into a control room |
@@ -35,7 +35,8 @@ built on its `nicos_ess` counterpart:
 What is not reproduced: ESS accounts (local accounts, § 2) and the data catalogue (SciCat). Kafka (`--live`), the ESS
 file-writer (`--filewriter`, `../filewriter/README.md`), EPICS and the forwarder (`--epics`, `../epics/README.md`),
 the live reduction (`--livedata`, `../livedata/README.md`) and the Event Formation Unit (`--efu`, `../efu/README.md`)
-are there as options.
+are there; `--ess` starts them all but the live reduction, each where it exists: the control room of the app does so
+(decision of 2026-11-11), as on the instrument.
 At ESS, everything recorded inside one `nexusfile_open` block goes into **one** file; the twin writes one file per
 count. The device setups of the real instruments are still thin (ODIN and LoKI are in commissioning): most twin devices
 have no ESS name yet, and keep the twin names.
@@ -177,7 +178,8 @@ that the histograms of just-bin-it hold all the streamed neutrons. The ESS file-
 **The ESS file-writer** (`python nicos/start_nicos.py --instrument odin --filewriter`, or `TWIN_FILEWRITER=1`; Linux
 x86-64, the app image): the launcher starts the Kafka broker and kafka-to-nexus too; then, as at ESS, everything
 recorded inside one `nexusfile_open` block goes into one file of the file-writer (`<instrument>_job_NNNNNN.hdf`, in
-the proposal folder), next to the twin's own files, and NICOS prints the comparison of the two ("same data").
+the proposal folder); the twin's own files of the counts go apart (`<proposal>/.twin`), and NICOS prints the
+comparison of the two ("same data").
 
 Installation (route B, Windows): Java (`conda create -n kafka -c conda-forge openjdk=21`), Apache Kafka 3.9.1
 (`kafka_2.13-3.9.1.tgz` from archive.apache.org, unpacked in `~/McStas_runs`), just-bin-it

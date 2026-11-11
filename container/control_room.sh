@@ -8,6 +8,7 @@ xsetroot -solid "#1D2433" 2>/dev/null
 xfwm4 --compositor=off >/dev/null 2>&1 &                      # window manager (title bars, moving, closing)
 # test mode (GitHub Actions, desktop_test.sh): the instrument chosen by itself, from this file
 [ -f "$HOME/.control_room_test" ] && { export CONTROL_ROOM_INSTRUMENT=$(cat "$HOME/.control_room_test"); export CONTROL_ROOM_DELAY=10; rm -f "$HOME/.control_room_test"; }
+[ -f "$HOME/.nicos_gui_test" ] && { export NICOS_TWIN_SHOW_TAB=$(cat "$HOME/.nicos_gui_test"); rm -f "$HOME/.nicos_gui_test"; }   # tabs shown (gui.py)
 NICOS_PY=/opt/conda/envs/nicos/bin/python
 TWIN_PY=/opt/conda/envs/mcstas/bin/python
 while true; do
@@ -17,7 +18,8 @@ while true; do
     instr=$($NICOS_PY container/control_room.py 2>/tmp/control_room.log)
   fi
   [ -z "$instr" ] && { sleep 1; continue; }
-  $TWIN_PY nicos/start_nicos.py --instrument "$instr" --until-gui-closes --session nicos \
+  # --ess: the data chain of ESS (Kafka, EPICS + forwarder, EFU, file-writer, just-bin-it), as on the instrument
+  $TWIN_PY nicos/start_nicos.py --instrument "$instr" --ess --until-gui-closes --session nicos \
     > "/tmp/nicos_$instr.log" 2>&1 &
   pid=$!
   for i in $(seq 1 180); do                                   # the NICOS window, full screen as soon as it appears

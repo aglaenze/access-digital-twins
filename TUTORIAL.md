@@ -51,7 +51,7 @@ when you want: your work is kept (answers, measurements, notebooks). Each exerci
 its questions are interactive (a wrong answer is explained, with a hint; you can show the answer). At the end of an
 exercise, **Submit my work** makes a file: save it and send it to your teacher (email, or the course page).
 
-What you see depends on your level. **BSc**: guided pages, no code, no NICOS. **MSc**: a notebook; you measure first
+What you see depends on your level. **BSc**: guided pages, no code, no NICOS. **MSc**: a notebook, no code to write either; you measure first
 in NICOS (button *Open NICOS* in the notebook), then you analyze. **Beamtime** and **free beamtime**: your
 proposal, your sample (the sample builder), NICOS and your analysis, all from the starter notebook.
 

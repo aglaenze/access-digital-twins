@@ -17,6 +17,7 @@ What the twin provides, as the instrument team does at ESS:
     import loki_reduction as red
     iq = red.reduce(sample="loki_000003.nxs", background="loki_000002.nxs", empty_beam="loki_000001.nxs")
 """
+import glob
 import os
 import warnings
 
@@ -337,3 +338,35 @@ def kind(state):
     if state.get("heavy_shutter", "open") != "open" or state.get("shutter") != "open":
         return "shutter closed"
     return {"empty_beam": "empty beam", "d2o": "solvent"}.get(state.get("sample"), "sample")
+
+
+# --------------------------------------------------------------------------- the logbook, read from the files
+def data_files(folder):
+    """The data files of a folder, in the order written: those of the ESS file-writer (loki_job_NNNNNN.hdf, one per
+    nexusfile_open block, as at ESS) and those the twin writes itself (loki_NNNNNN.nxs, one per count)."""
+    files = glob.glob(os.path.join(folder, "loki_job_*.hdf")) + glob.glob(os.path.join(folder, "loki_[0-9]*.nxs"))
+    return sorted((f.replace(os.sep, "/") for f in files), key=lambda f: (os.path.getmtime(f), f))
+
+
+def measurements(folder):
+    """The logbook of a folder, read from the data files themselves (as a user of ESS does): one row per file, with
+    its kind (empty beam, solvent, sample, shutter closed), title, duration and the configuration of the instrument
+    (entry/twin: the settings of the twin at the start of the measurement)."""
+    import h5py
+    rows = []
+    for path in data_files(folder):
+        try:
+            s = lnx.read_twin(path)
+            with h5py.File(path, "r") as f:
+                e = f["entry"]
+                txt = lambda x: x.decode() if isinstance(x, bytes) else str(x)
+                title = txt(e["title"][()])
+                t0, t1 = (np.datetime64(txt(e[k][()]).rstrip("Z"), "ns") for k in ("start_time", "end_time"))
+        except (OSError, KeyError) as err:           # a file still being written, or not a measurement
+            rows.append(dict(file=os.path.basename(path), kind="?", title=f"(not readable: {err})"))
+            continue
+        rows.append(dict(file=os.path.basename(path), kind=kind(s), title=title,
+                         t_s=round(float((t1 - t0) / np.timedelta64(1, "s")), 1), collimation=s.get("collimation"),
+                         pulse_skipping=s.get("pulse_skipping", "off"),
+                         detector_m=float(s.get("detector_distance", "nan")), sample=s.get("sample")))
+    return rows

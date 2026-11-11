@@ -12,10 +12,16 @@
 5. Instrument interaction tab: the device list can be enlarged. The tab is a splitter (command line and output /
    detector image above, devices below); the detector-image panel needs ~810 pixels, so on a laptop the splitter had
    no room left and its handle did not move. The upper part is put in a scroll area (its minimum height no longer
-   blocks the handle) and the device list gets a third of the height at start.
+   blocks the handle) and the device list gets the height the detector image does not need (~810 pixels), at
+   least a sixth of it: on a large screen the detector image and its previews (image, spectrum of arrival times)
+   are seen whole at start.
+6. Test mode (GitHub Actions, container/desktop_test.sh): NICOS_TWIN_SHOW_TAB="Instrument interaction,Detector Image"
+   opens these tabs once connected (for the screenshot of the detector image).
 """
+import os
+
 from nicos.clients.flowui.mainwindow import MainWindow as FlowuiMainWindow
-from nicos.guisupport.qt import QAction, QApplication, QFrame, QScrollArea, QSplitter, QTimer
+from nicos.guisupport.qt import QAction, QApplication, QFrame, QScrollArea, QSplitter, QTabWidget, QTimer
 from nicos_ess.gui.panels.exp_panel import ExpPanel as EssExpPanel
 from nicos_ess.odin.gui.panels.live import MultiLiveDataPanel as OdinMultiLiveDataPanel
 
@@ -97,15 +103,18 @@ class MainWindow(FlowuiMainWindow):
                 self.move(avail.x() + (avail.width() - w) // 2, avail.y())
             QTimer.singleShot(500, self._give_room_to_devices)     # after NICOS has restored its saved layout
 
+    DETECTOR_IMAGE_HEIGHT = 810         # pixels the detector-image panel needs (image, level bar, two previews)
+
     def _give_room_to_devices(self):
-        """The device list gets a third of the height of its splitter at start (then the handle moves freely)."""
+        """The device list gets what the detector image does not need, at least a sixth of the height of its splitter
+        (then the handle moves freely)."""
         for sp in self._device_splitters:
             total = sum(sp.sizes())
             if total <= 0:
                 continue
             dev = [i for i in range(sp.count()) if "DevicesPanel" in type(sp.widget(i)).__name__][0]
             sizes = [0] * sp.count()
-            sizes[dev] = total // 3
+            sizes[dev] = max(total // 6, total - self.DETECTOR_IMAGE_HEIGHT)
             others = [i for i in range(sp.count()) if i != dev]
             for i in others:
                 sizes[i] = (total - sizes[dev]) // len(others)
@@ -119,6 +128,16 @@ class MainWindow(FlowuiMainWindow):
     def on_client_connected(self):
         self._ensure_website_action()
         FlowuiMainWindow.on_client_connected(self)
+        if os.environ.get("NICOS_TWIN_SHOW_TAB"):
+            QTimer.singleShot(3000, self._show_tabs)
+
+    def _show_tabs(self):
+        wanted = [t.strip() for t in os.environ["NICOS_TWIN_SHOW_TAB"].split(",") if t.strip()]
+        for name in wanted:                  # outer tabs first (the order given)
+            for tw in self.findChildren(QTabWidget):
+                for i in range(tw.count()):
+                    if tw.tabText(i).strip() == name:
+                        tw.setCurrentIndex(i)
 
     def on_client_disconnected(self):
         self._ensure_website_action()

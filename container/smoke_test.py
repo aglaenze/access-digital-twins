@@ -14,6 +14,8 @@
    twin's own files, then reduced (essimaging, esssans) from both: the same results.
 Exit code 0 if everything works.
 """
+import datetime
+import glob
 import os
 import re
 import shutil
@@ -272,8 +274,11 @@ def job_files(instrument, proposal):
     raw = glob.glob(os.path.join(os.environ.get("TWIN_RUN_ROOT", ""), "**", str(proposal), "raw"), recursive=True)
     if not raw:
         return [], []
+    # with the file-writer, the twin's own files are apart: <proposal>/.twin (sample_library.truth_folder)
+    twin = os.path.join(os.path.dirname(raw[0]), ".twin")
     return (sorted(glob.glob(os.path.join(raw[0], f"{instrument}_job_*.hdf"))),
-            sorted(glob.glob(os.path.join(raw[0], f"{instrument}_0*.nxs"))))
+            sorted(glob.glob(os.path.join(twin, f"{instrument}_0*.nxs")) or
+                   glob.glob(os.path.join(raw[0], f"{instrument}_0*.nxs"))))
 
 
 def same(a, b):
@@ -370,6 +375,100 @@ else:
             check(False, f"LoKI: reduction of the file-writer's files: {type(e).__name__}: {e}")
     else:
         check(False, f"LoKI: files of the jobs ({len(fw)} of the file-writer, {len(tw)} of the twin; 3 expected)")
+    if fw:                                         # the logbook of the notebooks, read from the files (as at ESS)
+        import loki_reduction as lred
+        rows = lred.measurements(os.path.dirname(fw[0]))
+        print("  logbook:", [(r["file"], r["kind"], r["title"]) for r in rows])
+        check([r["kind"] for r in rows] == ["empty beam", "solvent", "sample"],
+              "LoKI: the logbook read from the file-writer's files gives empty beam, solvent, sample")
+        truths = glob.glob(os.path.join(os.path.dirname(os.path.dirname(fw[0])), ".twin", "loki_*.nxs.json"))
+        check(len(truths) == 3, f"LoKI: the truths about the samples are apart, not in the files ({len(truths)} of 3)")
+
+step("The data chain of the app (start_nicos.py --ess, as the control room): ESS file-writer, Kafka, EPICS, EFU and "
+     "just-bin-it together; memory and start-up time; the MSc notebook on the files written")
+
+
+def mem_used_mb():
+    """Memory in use on this machine [MB] (/proc/meminfo: MemTotal - MemAvailable)."""
+    try:
+        info = {l.split(":")[0]: int(l.split()[1]) for l in open("/proc/meminfo")}
+        return (info["MemTotal"] - info["MemAvailable"]) / 1024
+    except (OSError, KeyError, ValueError):
+        return float("nan")
+
+
+ESS = {}
+
+
+def ess_ready():
+    ESS["ready_s"], ESS["mem_ready"] = time.time() - ESS["t0"], mem_used_mb()
+
+
+def ess_done():
+    ESS["mem_after"] = mem_used_mb()
+    import resource
+    ESS["peak_self"] = resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss / 1024
+
+
+fw_here = fw_service.available()[0]
+ESS["t0"], ESS["mem0"] = time.time(), mem_used_mb()
+ready, out = nicos_session("odin", "ci_ess",
+                           "NewExperiment(1240, 'data chain of the app')\n"
+                           "move(choppers, 'wfm', wfm_delta, 0.30); move(shutter, 'closed')\n"
+                           "with nexusfile_open('dark'):\n    count(t=10)\n"
+                           "move(shutter, 'open', stage_x, 500)\n"
+                           "with nexusfile_open('open beam'):\n    count(t=30)\n"
+                           "move(stage_x, 0)\n"
+                           "with nexusfile_open('iron plate'):\n    count(t=30)\n", ["--ess"],
+                           before=ess_ready, after=ess_done)
+check(ready, "NICOS started with the data chain of ESS (--ess), as in the control room of the app")
+print(f"  start-up of the chain (launcher -> NICOS ready): {ESS.get('ready_s', float('nan')):.0f} s; memory in use: "
+      f"{ESS['mem0']:.0f} MB before, {ESS.get('mem_ready', float('nan')):.0f} MB when ready "
+      f"(+{ESS.get('mem_ready', float('nan')) - ESS['mem0']:.0f} MB), {ESS.get('mem_after', float('nan')):.0f} MB after "
+      "the three jobs", flush=True)
+raw = f"{os.environ.get('TWIN_RUN_ROOT', '')}/data/odin/{datetime.date.today().year}/1240/raw"
+kinds = []
+if os.path.isdir(raw):
+    print("  " + raw + ": " + ", ".join(sorted(os.listdir(raw))))
+    import odin_reduction as ored
+    rows = ored.measurements(raw)
+    for r in rows:
+        print("  ", r)
+    kinds = [r["kind"] for r in rows]
+check(kinds == ["dark", "open beam", "sample"],
+      f"logbook read from the files: dark, open beam, sample ({kinds})")
+names = sorted(os.listdir(raw)) if os.path.isdir(raw) else []
+if fw_here:
+    check(names and all(n.startswith("odin_job_") for n in names if n.endswith((".nxs", ".hdf"))),
+          "as at ESS, the data folder holds only the files of the ESS file-writer (one per nexusfile_open block)")
+    twin_dir = os.path.join(os.path.dirname(raw), ".twin")
+    check(os.path.isdir(twin_dir) and len([n for n in os.listdir(twin_dir) if n.endswith(".nxs")]) == 3,
+          "the twin's own files of the counts are apart, in <proposal>/.twin")
+else:
+    check(len([n for n in names if n.startswith("odin_0") and n.endswith(".nxs")]) == 3,
+          "no ESS file-writer here: the twin writes the data files itself (fallback)")
+# the MSc notebook of the exercise on these files, as a student would run it (nothing typed)
+try:
+    import nbformat
+    from nbclient import NotebookClient
+    nbp = os.path.join(TWIN, "odin", "exercises", "iron_bragg_edges", "ODIN_iron_msc.ipynb")
+    nb = nbformat.read(nbp, as_version=4)
+    for c in nb.cells:
+        if c.cell_type == "code" and "PROPOSAL = " in c.source:
+            c.source = "\n".join('PROPOSAL = "1240"' if l.startswith("PROPOSAL = ") else l for l in c.source.splitlines())
+    NotebookClient(nb, timeout=1200, kernel_name="python3", allow_errors=True,
+                   resources={"metadata": {"path": os.path.dirname(nbp)}}).execute()
+    errs = [(k, o["ename"], o["evalue"][:200]) for k, c in enumerate(nb.cells) for o in c.get("outputs", [])
+            if o.get("output_type") == "error"]
+    for e in errs:
+        print("  notebook error:", e)
+    builder = any("EdgeBuilder" in c.source and c.get("outputs") for c in nb.cells if c.cell_type == "code")
+    check(not errs and builder, "the MSc notebook of ODIN runs on these files to its end, model builder shown "
+                                f"({len(errs)} error(s))")
+except Exception as e:                               # noqa: BLE001
+    import traceback
+    traceback.print_exc()
+    check(False, f"the MSc notebook on the files of the chain: {type(e).__name__}: {e}")
 
 step("ESS live data reduction: esslivedata reduces a count of ODIN live, as at ESS (dashboard, NICOS devices)")
 import importlib.util                                  # noqa: E402

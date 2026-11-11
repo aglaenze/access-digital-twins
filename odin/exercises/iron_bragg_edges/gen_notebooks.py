@@ -2,8 +2,9 @@
 odin/ODIN_analysis.ipynb (one source: a correction there reaches every level when this script is run again):
 
   * ODIN_iron_msc.ipynb       MSc, "develop the method": parts 1-5 of the guided notebook (files, NeXus, raw counts,
-                              reduction with the ESS software), then tasks: write the Bragg-edge model and the fit
-                              yourself, checked automatically; then a systematic error to investigate;
+                              reduction with the ESS software), then the model of a Bragg edge developed with the
+                              model builder (model_builder.py: no code to write), checked automatically; then a
+                              systematic error to investigate;
   * ODIN_iron_beamtime.ipynb  beamtime (with NICOS): a starter notebook, tools only, no guidance.
 
     python gen_notebooks.py
@@ -100,8 +101,9 @@ develop the analysis, and give your verdict with its uncertainty (end of part 6)
 
 You will measure the **Bragg edges** of an iron plate with the virtual ODIN and deduce the spacing of its atomic planes.
 Parts 1 to 5 are guided: they take your files from the raw neutrons to the transmission $T(\lambda)$, with the
-official ESS reduction. Part 6 is yours: **you write the model and the fit**, and a check cell tells you whether your
-result is right (the twin knows the true sample). Part 7 is about the method itself: a systematic error to track down.
+official ESS reduction. Part 6 is yours: **you develop the analysis with a model builder** (choose the model, the
+range and the start values, fit, compare; no code to write), and a check cell tells you whether your result is right
+(the twin knows the true sample). Part 7 is about the method itself: a systematic error to track down.
 
 You start by measuring, in NICOS (part 0), as a user of ESS would.
 """), code(PATH_CELL), md("**Your sample** (from the sample library):"),
@@ -110,57 +112,61 @@ for c in src[i1:i6]:
     msc.append(FOLDER_CELL if c.cell_type == "code" and c.source.lstrip().startswith("from odin_paths import TWIN_RUN_ROOT")
                and "FOLDER" in c.source else clean(c))
 msc += [md(r"""
-## 6. Your turn: measure the (110) Bragg edge
+## 6. Your turn: model the (110) Bragg edge (nothing to type)
 
 α-iron is body-centered cubic, $a = 2.8665$ Å. The planes that can diffract are (110), (200), (211)... with spacings
-$d_{hkl} = a/\sqrt{h^2+k^2+l^2}$, and each family gives an edge at $\lambda = 2d_{hkl}$ (why? write it in one sentence
-with Bragg's law, $\lambda = 2d\sin\theta$).
+$d_{hkl} = a/\sqrt{h^2+k^2+l^2}$, and each family gives an edge at $\lambda = 2d_{hkl}$: by Bragg's law,
+$\lambda = 2d\sin\theta$, a wavelength longer than $2d$ cannot be diffracted by these planes at any angle, so the
+neutrons go through and the transmission jumps up.
 
-**Task 6.1.** An ideal edge is a sharp step. The measured one is smoothed by the wavelength resolution of the
-instrument (roughly Gaussian), and sits on a slowly varying baseline. Write a function `edge(lam, ...)` that models
-this: what is the convolution of a step with a Gaussian? Which parameters do you need?
+You develop the analysis with the **model builder** below; nothing has to be typed.
+
+1. **Choose the shape of the edge.** Start with the simplest, a sharp step, and look at the residuals.
+2. **Choose the range** of the data: the edge, with some baseline on each side.
+3. **Start values**: move the sliders until the dashed curve is close to the data, then press **Fit**.
+
+Try the three shapes, and different ranges. For each fit the builder gives $\lambda_\text{edge}$ with its uncertainty,
+the residuals (data − model, in units of the error bar) and the **reduced χ²**: about 1 when the model describes the
+data within their error bars, larger when it misses something (the residuals then show a pattern instead of noise).
+Every fit is kept in a table, so you can compare them. Under *See the code*: the Python lines your choices wrote.
 """), code(r"""
-from scipy.special import erfc
-
-def edge(lam, lam_edge, width, base, slope, jump):
-    # your model of the transmission near an edge
-    raise NotImplementedError("write the model of a smoothed Bragg edge")
-"""), md(r"""
-**Task 6.2.** Fit your model to $T(\lambda)$ (arrays `lam`, `T`, `dT` from part 5) in a window around the expected
-(110) edge. Use the error bars (`sigma=dT, absolute_sigma=True`) so that the uncertainties of the parameters mean
-something. Store the result in `lam_edge` and its uncertainty in `dlam_edge` (Å).
+import model_builder as mb
+expected = 2 * 2.8665 / np.sqrt(2)          # (110) edge: λ = 2 d_110 = a √2
+edge_builder = mb.EdgeBuilder(lam, T, dT, expected=expected, name="(110)")
 """), code(r"""
-from scipy.optimize import curve_fit
-
-lam_edge, dlam_edge = None, None     # your result [Å]
-"""), md("**Check.** Run the cell below. If it is wrong, read the explanation, try again; the solution is behind the "
-         "button (opening it is noted in your results)."), code(r"""
 import odin_exercises as ex, quiz
 q = quiz.Quiz("odin_iron_msc")
-ex.check_edge(lam_edge, dlam_edge)
-q.solution("tasks 6.1 and 6.2", explanation="A step smoothed by a Gaussian resolution of width $w$ is an error "
-           "function: $T = A + C(\\lambda-\\lambda_e) + \\frac{B}{2}\\,\\mathrm{erfc}(-(\\lambda-\\lambda_e)/(\\sqrt2\\,w))$, "
-           "on a sloped baseline. The fit window is ±0.35 Å around the expected edge, with bounds that keep the fit "
-           "on the edge.", code=chr(10).join([
-    'def edge(lam, lam_edge, width, base, slope, jump):',
-    '    return base + slope * (lam - lam_edge) + 0.5 * jump * erfc(-(lam - lam_edge) / (np.sqrt(2) * width))',
-    '',
-    'expected = 2 * 2.8665 / np.sqrt(2)                      # (110) edge: 2 d_110 = a √2',
-    'm = (lam > expected - 0.35) & (lam < expected + 0.35) & np.isfinite(T) & (dT > 0)',
-    'p, cov = curve_fit(edge, lam[m], T[m], sigma=dT[m], absolute_sigma=True,',
-    '                   p0=[expected, 0.03, T[m].min(), 0.0, 0.1],',
-    '                   bounds=([expected - 0.3, 0.005, 0, -2, 0], [expected + 0.3, 0.3, 2, 2, 1]))',
-    'lam_edge, dlam_edge = p[0], np.sqrt(cov[0, 0])']))
+q.choice("Which shape describes the (110) edge best, and why?",
+         ["The smoothed step on a sloping baseline: reduced χ² close to 1 and residuals without a pattern.",
+          "The sharp step: it is the ideal edge of a perfect crystal.",
+          "The step smoothed by the resolution, on a flat baseline: the baseline cannot vary over 0.7 Å.",
+          "Any of them: they all give the edge within 0.01 Å."],
+         answer=0, why={1: "The measured edge is not sharp: the wavelength resolution of the instrument smooths it. "
+                           "Look at the residuals of the sharp step near the edge.",
+                        2: "Fit both and compare: the χ² of the flat baseline stays above 1, and the residuals rise "
+                           "and fall on each side of the edge. The other planes and the absorption make the baseline "
+                           "vary with λ.",
+                        3: "The positions differ by more than their uncertainties, and a sharp step gives no "
+                           "uncertainty at all. The model matters."},
+         explanation="The resolution smooths the edge (an error function) and the baseline varies slowly with λ: "
+                     "only the third model leaves residuals that look like noise (χ²/n ≈ 1).",
+         hints=["Compare the reduced χ² of your fits in the table.", "Look at the residuals: noise, or a pattern?"],
+         title="Choice of the model")
+"""), md("**Check your edge.** The twin knows the true sample. If it is wrong, change the model, the range or the "
+         "start values, fit again and run this cell again."), code(r"""
+ex.check_edge(edge_builder.lam_edge, edge_builder.dlam_edge)
+q.solution("part 6", explanation="A step smoothed by a Gaussian resolution of width $w$ is an error function, "
+           "$T = A + C(\\lambda-\\lambda_e) + \\frac{B}{2}\\,\\mathrm{erfc}(-(\\lambda-\\lambda_e)/(\\sqrt2\\,w))$, on a "
+           "sloping baseline: the third shape, in a range of about ±0.35 Å around the expected edge.")
 """), md(r"""
-**Task 6.3.** Deduce $d_{110}$ and the lattice parameter $a$, with their uncertainties, and compare with 2.8665 Å.
-Store $a$ and its uncertainty in `a_fe`, `da_fe`.
+**From the edge to the lattice.** At the edge $\lambda = 2d_{110}$, and for a cubic lattice $d_{110} = a/\sqrt2$.
 """), code(r"""
-a_fe, da_fe = None, None     # your result [Å]
-ex.check_lattice(a_fe, da_fe)
-q.solution("task 6.3", explanation="At the edge $\\lambda = 2d_{110}$ and $d_{110} = a/\\sqrt2$, so "
-           "$a = \\lambda_\\mathrm{edge}/\\sqrt2$; the uncertainty is divided by the same factor.", code=chr(10).join([
-    'd110, dd110 = lam_edge / 2, dlam_edge / 2',
-    'a_fe, da_fe = d110 * np.sqrt(2), dd110 * np.sqrt(2)']))
+q.number("With your edge, what is the lattice parameter $a$ of the plate, in Å?", value=2.8665, tol=0.006, unit="Å",
+         mistakes=[(4.054, "the wavelength of the edge itself, not a"), (2.027, "d₁₁₀ = λ/2; a is √2 times larger"),
+                   (1.433, "λ/(2√2): one factor √2 too many")],
+         hints=["λ = 2 d₁₁₀, so d₁₁₀ = λ/2.", "a = √2 · d₁₁₀ = λ/√2."],
+         explanation="a = λ_edge/√2 ≈ 4.06/1.414 = 2.87 Å; its uncertainty is that of λ_edge divided by √2.",
+         title="Lattice parameter")
 """), md(r"""
 **Your verdict for the supplier.**
 """), code(r"""
@@ -180,21 +186,32 @@ q.choice("γ-iron (face-centered cubic, a = 3.59 Å) would have its (111) edge a
 ## 7. Developing the method: a systematic error
 
 Your edge is probably a few thousandths of an ångström away from the true value, more than its uncertainty. A counting
-fluctuation would shrink if you counted longer; this does not. Find where it comes from:
+fluctuation would shrink if you counted longer; this does not. Find where it comes from (nothing to type: use the
+builders and run the cells):
 
-1. **The fit window.** Fit with a 2× wider and a 2× narrower window. Does `lam_edge` move by more than `dlam_edge`?
-2. **The time → wavelength conversion.** The ESS reduction converts the arrival time into λ with a lookup table.
-   `red.reduce(..., wavelength_from="analytical")` builds it assuming a simple source pulse, the default
-   (`"simulation"`) with a realistic ESS pulse. Reduce again with the other table and fit again. Which one is closer
-   to the truth? Explain why with the shape of the ESS pulse.
-3. **Counting statistics.** Count 4 times longer: by how much do `dlam_edge` and the distance to the truth change?
-
-Write your conclusion: what limits the accuracy of a Bragg-edge measurement, and how would you calibrate it at a real
-instrument? Then check your understanding:
+1. **The range.** In the builder of part 6, fit with a 2× wider and a 2× narrower range. Does $\lambda_\text{edge}$
+   move by more than its uncertainty?
+2. **The time → wavelength conversion.** The ESS reduction converts the arrival time into λ with a lookup table. The
+   default table (`"simulation"`) uses a realistic ESS pulse; the other (`"analytical"`) assumes a simple pulse. The
+   cell below reduces your files again with the other table and opens a second builder: fit the same model and
+   compare the two edges with the truth (the check cell after it). Which table is closer, and why (the shape of the
+   ESS pulse)?
+3. **Counting statistics.** Measure the sample and the open beam 4 times longer in NICOS, run the notebook again: by
+   how much do the uncertainty and the distance to the truth change?
 """), code(r"""
-q.choice("You count 4 times longer. What happens to the uncertainty `dlam_edge` and to the distance between your edge "
-         "and the truth?", ["dlam_edge is halved; the distance to the truth stays about the same.",
-                            "Both are halved.", "Both stay the same.", "dlam_edge is divided by 4."],
+r_analytical = red.reduce(path(SAMPLE), path(OPEN), dark=path(DARK), lam=LAM, roi=ROI, wavelength_from="analytical")
+T_an, dT_an = r_analytical["spectrum"].values, np.sqrt(r_analytical["spectrum"].variances)
+edge_builder_analytical = mb.EdgeBuilder(lam, T_an, dT_an, expected=expected, name="(110), analytical table")
+"""), code(r"""
+print("default table (simulation):"); ex.check_edge(edge_builder.lam_edge, edge_builder.dlam_edge)
+print("analytical table:");           ex.check_edge(edge_builder_analytical.lam_edge, edge_builder_analytical.dlam_edge)
+"""), md(r"""
+Write your conclusion below: what limits the accuracy of a Bragg-edge measurement, and how would you calibrate it at a
+real instrument? Then check your understanding.
+"""), md("## My answer\n\n(your conclusion)"), code(r"""
+q.choice("You count 4 times longer. What happens to the uncertainty of the edge and to the distance between your edge "
+         "and the truth?", ["The uncertainty is halved; the distance to the truth stays about the same.",
+                            "Both are halved.", "Both stay the same.", "The uncertainty is divided by 4."],
          answer=0, why={1: "The distance to the truth is a systematic error: it does not depend on the number of "
                            "neutrons.",
                         2: "More neutrons always shrink the statistical uncertainty: as 1/√N.",
@@ -205,9 +222,9 @@ q.choice("You count 4 times longer. What happens to the uncertainty `dlam_edge` 
          title="Statistical or systematic?")
 q.choice("How is such a systematic error corrected at a real instrument?",
          ["By measuring a reference sample whose plane spacings are known, and correcting the wavelength scale.",
-          "By counting longer.", "By using a wider fit window.", "It cannot be corrected."],
+          "By counting longer.", "By using a wider fit range.", "It cannot be corrected."],
          answer=0, why={1: "Counting longer only shrinks the statistical error.",
-                        2: "The window changes the fit a little but does not remove an error of the wavelength scale.",
+                        2: "The range changes the fit a little but does not remove an error of the wavelength scale.",
                         3: "It can: the wavelength scale is calibrated."},
          explanation="The error comes from the conversion of the arrival time into a wavelength (flight distances, "
                      "chopper timings, shape of the ESS pulse). Instruments calibrate it with a reference powder of "

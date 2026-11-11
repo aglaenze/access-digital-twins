@@ -66,7 +66,7 @@ import loki_samples as ls
 
 if FOLDER is None:                                     # demonstration session
     FOLDER = f"{TWIN_RUN_ROOT}/loki/analysis_demo"
-    if not glob.glob(f"{FOLDER}/loki_*.nxs"):
+    if not red.data_files(FOLDER):
         from virtual_loki import VirtualLoki
         loki = VirtualLoki(session="analysis_demo", seed=1)
         loki.move(collimation="3m", detector_distance=5.0, heavy_shutter="open", shutter="open")
@@ -75,14 +75,16 @@ if FOLDER is None:                                     # demonstration session
             loki.move(sample=sample)
             loki.count(600, title=title)
 print("folder:", FOLDER)
-print("files :", sorted(os.path.basename(f) for f in glob.glob(f"{FOLDER}/loki_*.nxs")))
+print("files :", [os.path.basename(f) for f in red.data_files(FOLDER)])
 """)
 
 md(r"""
 ## 2. The logbook: which file is what?
 
-Each measurement (*count*) wrote one file `loki_000001.nxs`, `loki_000002.nxs`, ... and one line in the logbook
-`log.jsonl`, with the state of the instrument during the count. A SANS experiment needs three kinds of measurement,
+As at ESS, each `nexusfile_open` block in NICOS wrote **one file**, written by the ESS file writer
+(`loki_job_000001.hdf`, ...; on a computer without the file writer, the twin writes them itself, one per count:
+`loki_000001.nxs`, ...). Everything is in the file: its title, the sample, and the configuration of the instrument;
+the table below is read from the files themselves. A SANS experiment needs three kinds of measurement,
 **in the same configuration** (collimation, pulse skipping, detector distance):
 - **sample**: the particles in their solvent, in a cell;
 - **solvent** (the "background"): the same cell with the solvent only. Its scattering is subtracted from the sample's,
@@ -92,17 +94,7 @@ Each measurement (*count*) wrote one file `loki_000001.nxs`, `loki_000002.nxs`, 
 """)
 
 code(r"""
-rows = []
-with open(f"{FOLDER}/log.jsonl", encoding="utf-8") as f:
-    for line in f:
-        entry = json.loads(line)
-        d = entry["details"]
-        if entry["action"] != "count" or not d.get("file"):
-            continue
-        s = d["state"]
-        rows.append(dict(file=os.path.basename(d["file"]), kind=red.kind(s), title=d["title"], t_s=d["t"],
-                         collimation=s["collimation"], pulse_skipping=s.get("pulse_skipping", "off"),
-                         detector_m=s["detector_distance"], sample=s["sample"]))
+rows = red.measurements(FOLDER)                         # the logbook, read from the files
 def show_table(rows):                                  # a list of dicts, printed as a table
     if not rows:
         print("no measurement in the logbook"); return
@@ -117,7 +109,7 @@ show_table(rows)
 
 md(r"""
 The cell below takes the **last** sample measurement and the last solvent and empty beam measured in the same
-configuration. To choose other files, write their names, e.g. `SAMPLE = "loki_000003.nxs"`.
+configuration. To choose other files, write their names, e.g. `SAMPLE = "loki_job_000003.hdf"`.
 """)
 
 code(r"""
@@ -177,8 +169,9 @@ with h5py.File(path(SAMPLE), "r") as f:
                                  + red.BANK_GROUPS["middle"] + red.BANK_GROUPS["front"]})
     print("monitor events:", {m: len(e[f"instrument/{m}/monitor_events/event_time_offset"])
                               for m in ("beam_monitor_m1", "beam_monitor_m3")})
-    tw = e["twin"]
-    print(f"\nfraction of the neutrons written as events: {tw['event_sampling'][()]:.2e}")
+    tw = e.get("twin")
+    if tw is not None and "event_sampling" in tw:
+        print(f"\nfraction of the neutrons written as events: {tw['event_sampling'][()]:.2e}")
 """)
 
 md(r"""
@@ -189,7 +182,8 @@ from the position of the pixel, its wavelength from the arrival time. The pulses
 give tens of GB of events. The twin writes a random sample of them (the fraction above), the **same fraction** for the
 detectors and the monitors, so everything normalized by the monitors (the intensity in absolute units, the
 transmission) is unchanged; only the counting noise is that of the events in the file. The group `entry/twin` holds
-this fraction and the truth about the sample: it does not exist in a real file.
+the settings of the twin (and, in the files the twin writes itself, this fraction): it does not exist in a real file.
+The truth about the sample is not in the file: the twin keeps it apart.
 """)
 
 md(r"""

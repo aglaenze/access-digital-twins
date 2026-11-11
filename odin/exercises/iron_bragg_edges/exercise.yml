@@ -22,10 +22,10 @@ modes:
     open: voila
     file: odin/ODIN_virtual.ipynb
   msc:
-    label: Notebook with tasks
+    label: Notebook with a model builder
     what: >-
-      You measure in NICOS (the commands are given), then analyze in code: the reduction with the ESS software is given, you
-      write the Bragg-edge model and the fit, an automatic check tells you if your result is right.
+      You measure in NICOS (the commands are given); the reduction with the ESS software is given; you develop the model of
+      a Bragg edge with a model builder (shape, range, start values, fit: no code to write), checked automatically.
     duration: half a day
     open: lab
     file: odin/exercises/iron_bragg_edges/ODIN_iron_msc.ipynb

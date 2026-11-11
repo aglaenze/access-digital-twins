@@ -132,15 +132,19 @@ Checked first on files made like those of the file-writer (every log of real twi
 solvent, empty beam) I(Q) of the rear and middle banks identical. Then in the app image (smoke test, below).
 At ESS the same will happen with long jobs (a value at every change): to tell the scipp team.
 
-## Two kinds of files (decision proposed 2026-11-09)
+## One file per measurement, as at ESS (decision of 2026-11-11)
 
-The twin keeps writing its own files, one per count, and the file-writer (when on) writes one per job, as at ESS:
+The control room of the app starts NICOS with the data chain of ESS (`start_nicos.py --ess`: Kafka, EPICS and the
+forwarder, the EFU, the file-writer, just-bin-it), so that the files are written as at ESS:
 
-* the exercises, quizzes and notebooks read the twin's files: they hold the truths (`true_*`) and the event sampling,
-  and exist everywhere (Windows, ARM, without Kafka), where kafka-to-nexus cannot run;
-* the file-writer's files show the real ESS chain (one file per `nexusfile_open` block, the NICOS commands, the
-  comparison printed by NICOS) and reduce to the same results: an option for the control room (MSc, free beamtime),
-  off by default (a Kafka broker and every neutron twice on disk).
+* the data folder of the proposal (`<proposal>/raw`) holds only the files of the ESS file-writer, one per
+  `nexusfile_open` block (`<instrument>_job_NNNNNN.hdf`); the notebooks read their logbook from the files themselves
+  (`odin_reduction.measurements`, `loki_reduction.measurements`);
+* the twin writes its own file of each count apart, in `<proposal>/.twin` (`sample_library.truth_folder`), and NICOS
+  prints the comparison of the two ("same data"); the truths about the samples are never in a data file
+  (`<file>.json` in `.twin`);
+* where the file-writer does not exist (Apple Silicon, Windows without the container), the twin writes the data files
+  itself, one per count, in `<proposal>/raw` (the same format).
 
 ## Tests
 

@@ -69,6 +69,27 @@ READY, GO, STOP = threading.Event(), threading.Event(), threading.Event()     # 
 STREAMER = {}
 FORWARDER = {}
 FW = {}                                             # the ESS file-writer: control, producer, the job running
+RAW = {}                                            # the data folder of the proposal (NICOS), as given
+
+
+def _filewriter_mode():
+    """The ESS file-writer writes the data files (TWIN_FILEWRITER=1, start_nicos.py --filewriter or --ess): then, as
+    at ESS, the data folder of the proposal (<proposal>/raw) holds only its files; the twin writes its own files of
+    each count apart, in <proposal>/.twin (sample_library.truth_folder), to check the file-writer's."""
+    return os.environ.get("TWIN_FILEWRITER") == "1"
+
+
+def _use_folder(folder):
+    """The data folder given by NICOS (absolute path): where the twin writes its own files (apart with the
+    file-writer)."""
+    if not os.path.isabs(folder):
+        raise ValueError(f"folder must be an absolute path: {folder}")
+    RAW["folder"] = folder.replace(os.sep, "/")
+    if _filewriter_mode():
+        sys.path.insert(0, HERE)
+        import sample_library as sl
+        folder = sl.truth_folder(folder)
+    INSTR.use_folder(folder)
 
 
 def _fw():
@@ -84,9 +105,7 @@ def _fw_start(args):
     tf = _fw()
     brokers = os.environ.get("TWIN_KAFKA", "127.0.0.1:9092")
     if args.get("folder"):
-        if not os.path.isabs(args["folder"]):
-            raise ValueError(f"folder must be an absolute path: {args['folder']}")
-        INSTR.use_folder(args["folder"])
+        _use_folder(args["folder"])
     src = INSTR.nexus_template()
     run_root = os.environ.get("TWIN_RUN_ROOT", os.path.join(os.path.expanduser("~"), "McStas_runs", "twin"))
     root = os.environ.get("TWIN_FW_TEMPLATES", os.path.join(run_root, "filewriter", "templates"))
@@ -97,7 +116,8 @@ def _fw_start(args):
     if "control" not in FW:
         FW["control"] = tf.FileWriterControl(brokers, f"{INSTR_NAME}_filewriter")
         FW["producer"] = tf.producer(brokers)
-    folder = INSTR.folder
+    folder = RAW.get("folder", INSTR.folder)        # the data folder of the proposal: the file-writer's files
+    os.makedirs(folder, exist_ok=True)
     n = 1 + sum(1 for f in os.listdir(folder) if f.startswith(f"{INSTR_NAME}_job_") and f.endswith(".hdf"))
     path = f"{folder}/{INSTR_NAME}_job_{n:06d}.hdf"
     sample = INSTR.status().get("sample", "")
@@ -357,9 +377,7 @@ class Handler(BaseHTTPRequestHandler):
         try:
             RUNNING["action"] = self.path
             if self.path == "/folder":                     # data folder (NICOS proposal): its samples too
-                if not os.path.isabs(args.get("folder", "")):
-                    raise ValueError(f"folder must be an absolute path: {args.get('folder')}")
-                INSTR.use_folder(args["folder"])
+                _use_folder(args.get("folder", ""))
                 return self._reply(200, dict(folder=INSTR.folder))
             if self.path == "/filewriter/start":
                 return self._reply(200, _fw_start(args))
@@ -373,9 +391,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self._reply(200, dict(devices=INSTR.status()))
             if self.path == "/count":
                 if args.get("folder"):
-                    if not os.path.isabs(args["folder"]):
-                        raise ValueError(f"folder must be an absolute path: {args['folder']}")
-                    INSTR.use_folder(args["folder"])
+                    _use_folder(args["folder"])
                 f = INSTR.count(float(args["t"]), title=args.get("title", ""), write=args.get("write", True))
                 out = dict(file=f, number=INSTR.number, n_counts=getattr(INSTR, "last_n_counts", None))
                 fw = _fw_publish(f) if f and (FW.get("job") or _livedata()) else None

@@ -25,8 +25,9 @@ analysis notebook of the instrument (`gen_notebooks.py`). Exercises planned: `ca
 Rules for every exercise: the student has a **role and a mission** that say why the measurement matters (field
 `mission` of `exercise.yml`, shown on the card, in the page and in the notebooks, with a final verdict); every
 question is **interactive** (`quiz.py`: multiple choice or a value checked with a tolerance, a wrong answer is
-explained, the answer can be shown, MSc tasks have their solution behind a button), so that the exercises work
-without a teacher. Each instrument also has a **free beamtime** (no exercise: NICOS, sample builder, a starter
+explained, the answer can be shown), so that the exercises work without a teacher. **No code to write** at the BSc
+and MSc levels: the MSc analysis is developed with model builders (`model_builder.py`: a model chosen from pictures,
+a range, start values, Fit, residuals and χ², the code it wrote shown for the curious). Each instrument also has a **free beamtime** (no exercise: NICOS, sample builder, a starter
 notebook asking for the question and the plan first; `gen_free_beamtime.py`), a new proposal each time. As at ESS,
 NICOS finds the proposals in the user office (`user_office.py`: those of the exercises, the free beamtimes and the
 proposals a student imports), with Find my proposal in the Experiment tab. The answers are kept in
@@ -58,6 +59,7 @@ twin/
 ├── sample_library.py    the samples (one YAML file each: odin/samples, loki/samples, <proposal>/samples)
 ├── user_office.py       the proposals (exercises, free beamtimes, imported), the proposal cache of NICOS
 ├── quiz.py              interactive questions (explanations, answers on request, report, progress files)
+├── model_builder.py     model builders of the MSc notebooks: choose a model, a range, start values, fit (no code to write)
 ├── gen_free_beamtime.py starter notebooks of the free beamtime (<instrument>/exercises/free_beamtime/)
 ├── progress_summary.py  teachers: the answers of a class, from the students' progress files
 └── Sample_builder.ipynb the sample builder of the free beamtime (gen_sample_builder.py)

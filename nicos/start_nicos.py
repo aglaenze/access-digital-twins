@@ -8,6 +8,8 @@ instrument computers): choosing the instrument here is like walking into its con
     python start_nicos.py --instrument loki --no-gui        # services only (e.g. to connect another NICOS client)
     python start_nicos.py --instrument odin --mode mcstas
     python start_nicos.py --instrument odin --no-gui --background   # no console needed (stop the process to end)
+    python start_nicos.py --instrument odin --ess    # the data chain of ESS, as on the instrument (the app's default):
+                                                     # --live --filewriter --epics --efu, each where it exists
     python start_nicos.py --instrument odin --live   # live data as at ESS: Kafka broker + just-bin-it + setup "live"
     python start_nicos.py --instrument odin --filewriter   # files written by the ESS file-writer (kafka-to-nexus), as
                                                            # at ESS (Linux x86-64: the app container; TWIN_FILEWRITER=1)
@@ -138,7 +140,12 @@ def main():
     a.add_argument("--port", type=int, default=8765, help="port of the twin server")
     a.add_argument("--no-gui", action="store_true")
     a.add_argument("--background", action="store_true", help="do not wait for Enter (run until stopped)")
-    a.add_argument("--live", action="store_true", help="live data: Kafka broker, just-bin-it and setup 'live'")
+    a.add_argument("--ess", action="store_true", default=os.environ.get("TWIN_ESS") == "1",
+                   help="the data chain of ESS, as on the instrument: --live --filewriter --epics --efu, each where it "
+                        "exists (the control room of the app; default: TWIN_ESS=1). Without the file-writer (Apple "
+                        "Silicon, Windows) the twin writes the data files itself")
+    a.add_argument("--live", action="store_true", default=os.environ.get("TWIN_LIVE") == "1",
+                   help="live data: Kafka broker, just-bin-it and setup 'live' (default: TWIN_LIVE=1)")
     a.add_argument("--filewriter", action="store_true", default=os.environ.get("TWIN_FILEWRITER") == "1",
                    help="the ESS file-writer writes the files of nexusfile_open (default: TWIN_FILEWRITER=1)")
     a.add_argument("--livedata", action="store_true", default=os.environ.get("TWIN_LIVEDATA") == "1",
@@ -163,6 +170,8 @@ def main():
               "Stop it first (Enter in its launcher window, or close that launcher), then start again.")
         return 1
     instr = o.instrument or choose_instrument()
+    if o.ess:
+        o.live = o.filewriter = o.epics = o.efu = True
     if o.live and instr not in LIVE:
         print(f"Live data not available yet for {instr.upper()}: starting without it.")
         o.live = False
@@ -196,6 +205,7 @@ def main():
     os.environ["TWIN_LIVEDATA"] = "1" if o.livedata else "0"
     os.environ["TWIN_EPICS"] = "1" if o.epics else "0"
     os.environ["TWIN_EFU"] = "1" if o.efu else "0"
+    os.environ["TWIN_FILEWRITER"] = "1" if o.filewriter else "0"    # the twin server: its own files apart (.twin)
     os.makedirs(LOGS, exist_ok=True)
     if o.proposals:            # the twin's user office: the proposal cache that EssExperiment reads (user_office.py)
         r = subprocess.run([MCSTAS_PY, os.path.join(TWIN, "user_office.py"), instr,

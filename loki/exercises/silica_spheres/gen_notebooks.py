@@ -2,8 +2,9 @@
 loki/LoKI_analysis.ipynb (one source: a correction there reaches every level when this script is run again):
 
   * LoKI_silica_msc.ipynb       MSc, "develop the method": parts 1-4 of the guided notebook (files, NeXus, reduction
-                                with esssans), then tasks: the Guinier analysis and a sasmodels fit written by the
-                                student, checked automatically; then questions on the method;
+                                with esssans), then the Guinier analysis and a sasmodels fit developed with the
+                                model builder (model_builder.py: no code to write), checked automatically; then
+                                questions on the method;
   * LoKI_silica_beamtime.ipynb  beamtime (with NICOS): a starter notebook, tools only, no guidance.
 
     python gen_notebooks.py
@@ -95,7 +96,7 @@ decide whether the batch can be released (end of part 6).
 
 Silica nanoparticles dispersed in heavy water, measured on the virtual LoKI. Parts 1 to 4 are guided: they take your
 files (sample, solvent, empty beam) to the scattering curve $I(Q)$ in absolute units, with the official ESS reduction
-(`esssans`). Parts 5 and 6 are yours: **you write the Guinier analysis and the model fit**, and check cells tell you
+(`esssans`). Parts 5 and 6 are yours: **you develop the Guinier analysis and the model fit with model builders** (no code to write), and check cells tell you
 whether your results are right (the twin knows the true sample). Part 7 is about the method.
 
 You start by measuring, in NICOS (part 0), as a user of ESS would.
@@ -103,72 +104,67 @@ You start by measuring, in NICOS (part 0), as a user of ESS would.
        code(SAMPLE_CELL)]
 msc += [clean(c) for c in src[i1:i5]]
 msc += [md(r"""
-## 5. Your turn: Guinier analysis
+## 5. Your turn: Guinier analysis (nothing to type)
 
-At small $Q$ the scattering of any particle follows $I(Q) \simeq I(0)\exp(-Q^2R_g^2/3)$, valid for $Q R_g \lesssim 1.3$.
+At small $Q$ the scattering of any particle follows the **Guinier law** $I(Q) \simeq I(0)\exp(-Q^2R_g^2/3)$, where
+$R_g$ is the radius of gyration of the particle (its size, seen by the neutrons). It holds for $Q R_g \lesssim 1.3$.
 
-**Task 5.1.** Turn this law into a straight line: what do you plot against what? Make the plot with the arrays `q`,
-`I`, `dI` of part 4, for the lowest $Q$.
+You do the analysis with the **model builder** below; nothing has to be typed.
 
-**Task 5.2.** Fit the line with weights (the uncertainty of $\ln I$ is $dI/I$), in the range $Q R_g < 1.3$. The range
-depends on $R_g$, which you do not know yet: how do you proceed? Store $R_g$, its uncertainty and $I(0)$ (cm⁻¹).
+1. **Which plot turns the law into a straight line?** Try the three: a straight line can be fitted, and its slope
+   gives $R_g$.
+2. **Choose the range of Q** and press **Fit**. The range depends on $R_g$, which you do not know yet: the builder
+   tells you $Q_\text{max} R_g$ after each fit. If it is above 1.3, lower the upper limit and fit again, until
+   $R_g$ no longer changes.
+
+Every fit is kept in a table. Under *See the code*: the Python lines your choices wrote.
 """), code(r"""
-rg, drg, i0 = None, None, None     # your results [Å, Å, cm⁻¹]
-"""), md("**Check.** If it is wrong, read the explanation and try again; the solution is behind the button "
-         "(opening it is noted in your results)."), code(r"""
+import model_builder as mb
+guinier = mb.GuinierBuilder(q, I, dI)
+"""), md("**Check.** If it is wrong, read the explanation, change the range and fit again."), code(r"""
 import loki_exercises as ex, quiz
 q_ = quiz.Quiz("loki_silica_msc")
-ex.check_guinier(rg, drg, i0)
-q_.solution("tasks 5.1 and 5.2", explanation="$\\ln I = \\ln I(0) - (R_g^2/3)\\,Q^2$: a straight line in $Q^2$ "
-            "with slope $-R_g^2/3$. The valid range depends on $R_g$: start from a guess, fit, recompute the range "
-            "$Q R_g < 1.3$, and repeat until $R_g$ no longer changes.", code=chr(10).join([
-    'rg = 40.0                                                # a first guess [Å], improved below',
-    'for _ in range(6):',
-    '    m = (q * rg < 1.3) & (I > 0) & np.isfinite(dI) & (dI > 0)',
-    '    p, cov = np.polyfit(q[m] ** 2, np.log(I[m]), 1, w=I[m] / dI[m], cov="unscaled")   # w = 1 / sigma(ln I)',
-    '    rg = np.sqrt(-3 * p[0])',
-    'drg = 1.5 * np.sqrt(cov[0, 0]) / rg                      # rg = sqrt(-3 s): d rg = 1.5 ds / rg',
-    'i0 = np.exp(p[1])']))
+ex.check_guinier(guinier.rg, guinier.drg, guinier.i0)
+q_.solution("part 5", explanation="$\\ln I = \\ln I(0) - (R_g^2/3)\\,Q^2$: a straight line in $Q^2$ with slope "
+            "$-R_g^2/3$. The valid range depends on $R_g$: start wide, fit, lower $Q_\\text{max}$ until "
+            "$Q_\\text{max}R_g < 1.3$, and repeat until $R_g$ no longer changes (here about $Q < 0.03$ Å⁻¹).")
 """), md(r"""
-## 6. Your turn: a model fit with sasmodels (SasView)
+## 6. Your turn: the shape of the particles, with sasmodels (SasView)
 
-`sasmodels` is the computing engine of SasView. Its `sphere` model gives $d\Sigma/d\Omega$ in cm⁻¹, with the
-parameters `scale` (the volume fraction $\phi$), `radius` (Å), `sld` and `sld_solvent` (scattering length densities,
-$10^{-6}$ Å⁻²: silica 3.47, D₂O 6.36) and `background` (cm⁻¹). How to compute it:
+`sasmodels` is the computing engine of SasView: it computes $d\Sigma/d\Omega$ in cm⁻¹ for a shape of particle, with the
+volume fraction $\phi$ of the particles, their sizes, and the scattering length densities (silica 3.47, D₂O 6.36, in
+$10^{-6}$ Å⁻²). The builder below fits a shape to your whole curve; nothing has to be typed.
 
-```python
-from sasmodels.core import load_model
-from sasmodels.direct_model import call_kernel
-model = load_model("sphere")
-kernel = model.make_kernel([q])
-Iq = call_kernel(kernel, dict(scale=0.01, radius=50, sld=3.47, sld_solvent=6.36, background=0))
-```
+1. **Choose the shape**: a sphere, a rod (cylinder) or an ellipsoid.
+2. **Choose the range of Q** (the whole curve, at first).
+3. **Start values**: start from your Guinier result (for a sphere $R = \sqrt{5/3}\,R_g$), move the sliders until the
+   dashed curve is close to the data, then **Fit**.
 
-**Task 6.1.** Fit $\phi$, $R$ and a background to the whole curve (e.g. with `scipy.optimize.least_squares` on the
-residuals $(I_\text{model} - I)/dI$). Use your Guinier result for the starting radius. Store the results and their
-uncertainties (from the Jacobian: $\text{cov} = (J^TJ)^{-1}$).
+Fit the three shapes and compare them: the sizes, $\phi$, the reduced χ² and the residuals.
 """), code(r"""
-radius, dradius, phi, dphi = None, None, None, None     # your results [Å, Å, -, -]
-"""), md("**Check.**"), code(r"""
-ex.check_sphere(radius, dradius, phi, dphi)
-q_.solution("task 6.1", explanation="Residuals weighted by the error bars; the covariance of the parameters is "
-            "$(J^TJ)^{-1}$ with the Jacobian of these residuals. `x_scale` tells the fit the size of each parameter.",
-            code=chr(10).join([
-    'from scipy.optimize import least_squares',
-    'from sasmodels.core import load_model',
-    'from sasmodels.direct_model import call_kernel',
-    'm = np.isfinite(I) & np.isfinite(dI) & (dI > 0)',
-    'kernel = load_model("sphere").make_kernel([q[m]])',
-    '',
-    'def residuals(x):',
-    '    phi_, r_, bg_ = x',
-    '    model = call_kernel(kernel, dict(scale=phi_, radius=r_, sld=3.47, sld_solvent=6.36, background=bg_))',
-    '    return (model - I[m]) / dI[m]',
-    '',
-    'fit = least_squares(residuals, [0.01, rg * np.sqrt(5 / 3), 0.0], x_scale=[0.01, 10.0, 0.01])',
-    'cov = np.linalg.inv(fit.jac.T @ fit.jac)',
-    'phi, radius = fit.x[0], fit.x[1]',
-    'dphi, dradius = np.sqrt(cov[0, 0]), np.sqrt(cov[1, 1])']))
+shape = mb.ShapeBuilder(q, I, dI, start_radius=(guinier.rg or 39.0) * np.sqrt(5 / 3))
+"""), code(r"""
+q_.choice("The ellipsoid gives a slightly lower χ² than the sphere, with two radii of about 44 and 52 Å. What do you "
+          "conclude?",
+          ["The data do not tell them apart: the extra parameter only absorbs the smoothing of the minima by the "
+           "resolution of the instrument. The simplest model, the sphere, is kept.",
+           "The particles are ellipsoids: the lowest χ² wins.",
+           "The particles are rods: the cylinder has two sizes as well.",
+           "The fits are all wrong: χ² is below 1."],
+          answer=0, why={1: "A model with more parameters always fits at least as well. A small gain in χ² is no proof, "
+                            "and the two radii are almost equal: a sphere.",
+                         2: "Compare the χ² and the residuals of the cylinder: the minima are not where the data have them.",
+                         3: "χ²/n below 1 means the error bars are a little generous, not that the models are wrong; "
+                            "compare the models with each other."},
+          explanation="An ellipsoid with nearly equal radii is a sphere. Its extra parameter mimics the smoothing of the "
+                      "minima by the resolution (part 7); without other information, the simplest model is kept.",
+          hints=["How different are the two radii of the ellipsoid?",
+                 "A model with one more parameter always fits at least as well: is the gain worth it?"],
+          title="Which shape?")
+"""), md("**Check** (the result of your sphere fit)."), code(r"""
+ex.check_sphere(shape.radius, shape.dradius, shape.phi, shape.dphi)
+q_.solution("part 6", explanation="The sphere, over the whole curve, with a flat background, starting from "
+            "$R = \\sqrt{5/3}\\,R_g ≈ 50$ Å and φ ≈ 0.01: R ≈ 49 Å, φ ≈ 1.0 %.")
 """), md("**Your verdict.**"), code(r"""
 q_.choice("The batch must have a radius between 4.5 and 5.5 nm. With your results, what do you write?",
           ["Released: R = 5.0 nm, within the specification (its uncertainty is far smaller than the margin).",
@@ -182,17 +178,28 @@ q_.choice("The batch must have a radius between 4.5 and 5.5 nm. With your result
 """), md(r"""
 ## 7. Developing the method
 
-1. **Background.** Reduce the sample without subtracting the solvent (`red.reduce(path(SAMPLE), empty_beam=path(EMPTY))`)
-   and fit again with and without a `background` parameter. What goes wrong, and why does it matter most for $R_g$?
-2. **Resolution.** Plot your residuals: where is the model worse than the data, and why? Look at the `dq` (resolution)
-   option of `make_kernel`/`call_kernel` in the sasmodels documentation: what would you need to know about the
-   instrument to use it?
-3. **Configuration.** Particles 4 times larger: which configuration of LoKI (collimation, detector distance) would you
-   choose, and what would it cost in counting time? Check with the twin.
-4. **Statistics.** Which banks dominate the uncertainty on $R$? On $\phi$? Fit with the rear bank only to see it.
+Nothing to type: use the builders and run the cells.
 
-Then check your understanding:
+1. **Background.** The cell below reduces the sample *without* subtracting the solvent and opens a builder on it.
+   Fit a sphere with and without the box *fit a flat background*. What goes wrong without it, and why does it matter
+   most for $R_g$?
+2. **Resolution.** Look at the residuals of your sphere fit (part 6): where is the model worse than the data? The
+   instrument smooths the curve (spread of wavelengths, size of the beam): what would you need to know about LoKI to
+   include it in the model?
+3. **Configuration.** Particles 4 times larger: which configuration of LoKI would you choose (question below), and
+   what would it cost in counting time? Check with the twin.
+4. **Statistics.** The second cell below opens a builder on the rear bank alone: which banks dominate the uncertainty
+   on $R$? On $\phi$?
 """), code(r"""
+iq_raw = red.reduce(path(SAMPLE), empty_beam=path(EMPTY), banks=BANKS)       # the solvent NOT subtracted
+groups_raw = red.combine(iq_raw, thickness_cm)
+q_raw = np.concatenate([v[0] for v in groups_raw.values()]); I_raw = np.concatenate([v[1] for v in groups_raw.values()])
+dI_raw = np.concatenate([v[2] for v in groups_raw.values()]); o = np.argsort(q_raw)
+shape_no_solvent = mb.ShapeBuilder(q_raw[o], I_raw[o], dI_raw[o], start_radius=50)
+"""), code(r"""
+q_rear, I_rear, dI_rear = groups["rear"]
+shape_rear = mb.ShapeBuilder(q_rear, I_rear, dI_rear, start_radius=50)
+"""), md("## My answer\n\n(your conclusions on 1 to 4)"), code(r"""
 q_.choice("A new batch has particles 4 times larger (R = 200 Å, Rg = 155 Å). The Guinier range needs Q < 1.3/Rg. "
           "Which configuration of LoKI do you choose?",
           ["8 m collimation, detector at 10 m (rear bank from 0.0082 Å⁻¹), and count longer: fewer neutrons.",
