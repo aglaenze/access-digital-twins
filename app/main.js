@@ -313,6 +313,13 @@ async function selftest(out) {
     check("free beamtime: a new proposal, its notebook opened (" + tabsAfter + ")", /ODIN · 9\d{5}/.test(tabsAfter), t5);
     await wait(`document.querySelectorAll(".pane .loading").length === 0`, 300);
     await new Promise((r) => setTimeout(r, 4000));
+    for (let i = 0; i < 60; i++) {           // the cells above the stop mark run, then the notebook goes back to its top
+      if (/^\d+$/.test(await js(`document.querySelector(".pane.on webview").executeJavaScript("(() => { const w = window.jupyterapp.shell.currentWidget; return w && w.content.widgets.some(c => c.model.executionCount) ? '1' : 'no'; })()")`).catch(() => "no"))) break;
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+    await new Promise((r) => setTimeout(r, 9000));
+    const scrollFree = await js(`document.querySelector(".pane.on webview").executeJavaScript("(() => { const w = window.jupyterapp.shell.currentWidget; return [w.content.node, w.content.node.querySelector('.jp-WindowedPanel-outer')].filter(Boolean).map(n => n.scrollTop).join(','); })()")`).catch(() => "?");
+    check(`beamtime notebook shown from its top (scroll ${scrollFree})`, /^0(,0)*$/.test(scrollFree), t5);
     const nbFree = await js(`document.querySelector(".pane.on webview").executeJavaScript("(() => { const w = window.jupyterapp && window.jupyterapp.shell.currentWidget; return w && w.content ? w.content.widgets.map(c => c.model.sharedModel.source).filter(s => s.includes('PROPOSAL = ')).join('') : 'none'; })()")`).catch(() => "?");
     check("free beamtime: the notebook has its number (" + nbFree.split("\n").filter((l) => l.startsWith("PROPOSAL")).join("") + ")",
           /PROPOSAL = "9\d{5}"/.test(nbFree), t5);

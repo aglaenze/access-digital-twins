@@ -390,12 +390,25 @@ function openTab(url, kind, label) {
             } else {
               await a.commands.execute("notebook:run-all-cells");
             }
-            // always back to the top of the notebook
-            try {
-              w.content.activeCellIndex = 0;
-              await w.content.scrollToCell(cells[0], "start");
-            } catch (e) { /* older API */ }
-            try { w.content.node.scrollTop = 0; } catch (e) { /* */ }
+            // always back to the top of the notebook, and kept there while the outputs finish rendering (widgets
+            // grow, JupyterLab scrolls to the cells it ran), unless the student scrolls or clicks first
+            let touched = false;
+            const stopIt = () => { touched = true; };
+            for (const ev of ["wheel", "mousedown", "keydown", "touchstart"]) window.addEventListener(ev, stopIt, { once: true, capture: true });
+            const top = async () => {
+              try {
+                w.content.activeCellIndex = 0;
+                await w.content.scrollToCell(cells[0], "start");
+              } catch (e) { /* older API */ }
+              for (const n of [w.content.node, w.content.node.querySelector(".jp-WindowedPanel-outer"),
+                               document.querySelector("#main-panel"), document.scrollingElement]) {
+                try { if (n) n.scrollTop = 0; } catch (e) { /* */ }
+              }
+            };
+            for (let k = 0; k < 16 && !touched; k++) {
+              await top();
+              await new Promise((r) => setTimeout(r, 500));
+            }
             return "done";
           }
           await new Promise((r) => setTimeout(r, 500));
