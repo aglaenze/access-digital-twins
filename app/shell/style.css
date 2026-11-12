@@ -195,4 +195,5 @@ dialog form { padding: 12px 32px 24px; display: flex; justify-content: flex-end;
 
 /* the introduction of an instrument: first card of the catalogue */
 .ex.intro-card { border: 2px solid var(--teal); background: var(--teal-l); }
+.ex.intro-card .levels { grid-template-columns: 1fr; }     /* one level (all): the whole width */
 .chip.all { background: var(--ink3); } .fill.all { background: var(--ink3); }
