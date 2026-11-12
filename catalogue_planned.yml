@@ -15,12 +15,6 @@
   technique: Fast, operando imaging
   sample: Li-ion battery electrode during charge (graphite, LiC12, LiC6)
   question: Follow the lithium into the graphite electrode while the battery charges, image after image.
-- number: "3"
-  title: Where is a loaded steel part strained?
-  instrument: odin
-  technique: Bragg-edge strain mapping (WFM)
-  sample: Steel sample under tensile load
-  question: Map the shift of a Bragg edge across a steel sample under load and deduce the strain of its crystals.
 - number: "4"
   title: Where has the fuel-cell anode been reduced?
   instrument: odin

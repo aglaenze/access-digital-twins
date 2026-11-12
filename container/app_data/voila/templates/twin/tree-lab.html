@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+{# Start page of the online version of the twins (container/start.sh web: Voila alone serves the pages, and
+   this template replaces its list of files). The student gives a name and opens an exercise: the page gets
+   "?name=..." (web_user.py). In the app this page is never shown (the app opens the pages itself). #}
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ESS digital twins</title>
+  <style>
+    body { margin: 0; font-family: "Segoe UI", system-ui, -apple-system, sans-serif; background: #F5F7FA; color: #142033; }
+    header { background: #0B1220; color: #fff; padding: 16px 28px; font-size: 19px; font-weight: 700; }
+    main { max-width: 720px; margin: 48px auto; padding: 0 16px; }
+    .card { background: #fff; border: 1px solid #E2E7EE; border-radius: 16px; padding: 30px; }
+    h1 { margin: 0 0 6px; font-size: 26px; }
+    p { line-height: 1.55; color: #45526A; }
+    label { display: block; font-weight: 600; margin: 22px 0 6px; }
+    input[type=text] { width: 100%; box-sizing: border-box; padding: 11px 12px; font-size: 16px; border: 1px solid #CBD3DE;
+                       border-radius: 10px; }
+    .ex { display: flex; gap: 12px; align-items: flex-start; border: 1px solid #E2E7EE; border-radius: 12px; padding: 14px;
+          margin-top: 10px; }
+    .ex input { margin-top: 4px; }
+    .ex b { display: block; }
+    .ex span { color: #45526A; font-size: 14.5px; }
+    button { margin-top: 24px; background: #0E7C70; color: #fff; border: 0; border-radius: 10px; padding: 12px 22px;
+             font-size: 16px; font-weight: 600; cursor: pointer; }
+    button:hover { background: #0A5F56; }
+    .small { font-size: 13.5px; color: #7A8190; margin-top: 18px; }
+  </style>
+</head>
+<body>
+  <header>ESS digital twins</header>
+  <main>
+    <div class="card">
+      <h1>Welcome</h1>
+      <p>You are about to operate a digital twin of ODIN, the neutron imaging instrument of the European Spallation
+        Source: you set the instrument, measure, and analyze your own data, in this browser. Nothing to install.</p>
+      <form id="start">
+        <label for="name">Your full name</label>
+        <input id="name" type="text" autocomplete="name" required minlength="3" maxlength="60" placeholder="e.g. Maria Jensen">
+        <label>Exercise</label>
+        <div class="ex"><input type="radio" name="page" id="p1" checked
+               value="odin/exercises/steel_strain/ODIN_steel_strain.ipynb">
+          <label for="p1" style="margin:0;font-weight:400"><b>Where is a loaded steel part strained?</b>
+            <span>Bragg-edge strain mapping on ODIN: a steel specimen under load. About 2 hours.</span></label></div>
+        <button type="submit">Start</button>
+      </form>
+      <p class="small">Your measurements and your answers are kept under your name while this session is online: use
+        the same name if you come back, and download your work with <i>Submit my work</i> at the end of the page.
+        A page takes up to a minute to open.</p>
+    </div>
+  </main>
+  <script>
+    document.getElementById("start").addEventListener("submit", function (e) {
+      e.preventDefault();
+      var name = document.getElementById("name").value.trim();
+      var page = document.querySelector("input[name=page]:checked").value;
+      try { localStorage.setItem("twin-name", name); } catch (err) { /* private window */ }
+      window.location.href = "{{ base_url }}voila/render/" + page + "?name=" + encodeURIComponent(name);
+    });
+    try { document.getElementById("name").value = localStorage.getItem("twin-name") || ""; } catch (err) { /* */ }
+  </script>
+</body>
+</html>

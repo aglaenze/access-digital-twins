@@ -255,7 +255,7 @@ class Quiz:
 
         def on_check(_):
             try:
-                x = float(box.value.strip().replace(",", ".").replace(" ", ""))
+                x = float(box.value.strip().replace(",", ".").replace(" ", "").replace("−", "-"))
             except ValueError:
                 fb.value = _box("no", "Type a number first (for example 4.05).")
                 return

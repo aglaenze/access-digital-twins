@@ -1,0 +1,25 @@
+# One exercise of the catalogue of the app (read by container/twin_app.py: no generation needed).
+# Paths are relative to the root of the repository.
+title: Where is a loaded steel part strained?
+number: "3"                  # theme 3 of ODIN: Bragg-edge strain mapping with the resolution of WFM
+instrument: odin
+technique: Bragg-edge strain mapping (WFM)
+sample: Steel tensile specimen in a load frame (ferritic steel, 5 mm thick)
+question: >-
+  Measure the shift of a Bragg edge of a steel specimen under load, and deduce the strain of its crystal lattice in
+  its narrow and wide parts.
+learn: Bragg edges, lattice strain, stress and Hooke's law, Poisson's ratio, fitting an edge, counting statistics.
+mission: >-
+  You are an engineer in a team that designs steel parts for a wind turbine. A part carries a large force: where,
+  inside the steel, is the material strained, and by how much? Neutrons see the distance between the planes of atoms
+  through the steel: measure a specimen under load and tell the team whether the steel behaves as designed.
+status: ready
+samples:
+  steel_tensile: {}
+modes:
+  bsc:
+    label: Guided web page
+    what: Settings given and explained, a Count button, the edge fitted for you, a strain map, questions. No code.
+    duration: 2 hours
+    open: voila
+    file: odin/exercises/steel_strain/ODIN_steel_strain.ipynb
