@@ -31,6 +31,7 @@ import io
 import json
 import os
 import re
+import socket
 import subprocess
 import sys
 import zipfile
@@ -320,11 +321,27 @@ class Proposal(Base):
 
 class Nicos(Base):
     @web.authenticated
+    def get(self):
+        """The step of the launch of NICOS on this computer (written by nicos/start_nicos.py), shown by the app."""
+        try:
+            with open(os.path.join(run_root(), "nicos", "launch_status.json"), encoding="utf-8") as f:
+                st = json.load(f)
+        except (OSError, ValueError):
+            st = {"step": "", "state": "unknown", "time": 0}
+        self.finish(json.dumps(st))
+
+    @web.authenticated
     def post(self):
         instr = self.body().get("instrument", "")
         if instr not in ("odin", "loki"):
             raise web.HTTPError(400, "instrument: odin or loki")
         if os.environ.get("TWIN_APP_LOCAL"):          # windows of this computer
+            try:                                       # already open (its daemon answers): nothing to start
+                socket.create_connection(("localhost", 1301), timeout=1).close()
+                self.finish(json.dumps(dict(where="desktop", already=True)))
+                return
+            except OSError:
+                pass
             flags = 0
             if os.name == "nt":
                 flags = subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_BREAKAWAY_FROM_JOB

@@ -9,19 +9,22 @@
    screen. The content is put in a scroll area and the window is kept within the screen.
 3. Experiment panel: the Apply button right under the form (ExpPanel below), not at the bottom of the window.
 4. Detector image (ODIN): color levels recomputed for every new image (LiveDataPanel below).
-5. Instrument interaction tab: the device list can be enlarged. The tab is a splitter (command line and output /
-   detector image above, devices below); the detector-image panel needs ~810 pixels, so on a laptop the splitter had
-   no room left and its handle did not move. The upper part is put in a scroll area (its minimum height no longer
-   blocks the handle) and the device list gets the height the detector image does not need (~810 pixels), at
-   least a sixth of it: on a large screen the detector image and its previews (image, spectrum of arrival times)
-   are seen whole at start.
+5. Instrument interaction tab, as at ESS: command line and output / detector image on the left, device list on the
+   right (hsplit of the ESS guiconfig). NICOS restores the splitters as last saved, orientation included: a layout
+   saved by an older version of the twin (device list below) came back at each start. The orientation of each
+   splitter is set again from the configuration. The device list gets a third of the width at start. Only the tab
+   shown sets the height of the left part (a QTabWidget is otherwise as tall as its tallest tab, the detector image,
+   ~810 pixels): the Output tab fits in the window with its own scroll bar only; on a small screen the window
+   scrolls (2.) for the detector image alone.
 6. Test mode (GitHub Actions, container/desktop_test.sh): NICOS_TWIN_SHOW_TAB="Instrument interaction,Detector Image"
    opens these tabs once connected (for the screenshot of the detector image).
 """
 import os
 
 from nicos.clients.flowui.mainwindow import MainWindow as FlowuiMainWindow
-from nicos.guisupport.qt import QAction, QApplication, QFrame, QScrollArea, QSplitter, QTabWidget, QTimer
+from nicos.clients.gui.panels.splitter import HorizontalSplitter, VerticalSplitter
+from nicos.guisupport.qt import QAction, QApplication, QFrame, QScrollArea, QSizePolicy, QSplitter, QTabWidget, \
+    QTimer, Qt
 from nicos_ess.gui.panels.exp_panel import ExpPanel as EssExpPanel
 from nicos_ess.odin.gui.panels.live import MultiLiveDataPanel as OdinMultiLiveDataPanel
 
@@ -61,9 +64,33 @@ class ExpPanel(EssExpPanel):
         form.addStretch(1)                             # free space now below the button
 
 
+def _height_of_current_tab_only(tw):
+    """Only the tab shown counts for the height of a QTabWidget: the other tabs ignore their size."""
+    def update(current):
+        for i in range(tw.count()):
+            page = tw.widget(i)
+            policy = QSizePolicy.Preferred if i == current else QSizePolicy.Ignored
+            page.setSizePolicy(policy, policy)
+            page.updateGeometry()
+        tw.updateGeometry()
+
+    tw.currentChanged.connect(update)
+    update(tw.currentIndex())
+
+
 class MainWindow(FlowuiMainWindow):
+    DEVICES_SHARE = 1 / 3               # width of the device list at start (fraction of the Instrument interaction tab)
+
     def __init__(self, *args, **kwargs):
         FlowuiMainWindow.__init__(self, *args, **kwargs)
+        for sp in self.findChildren(QSplitter):        # the orientation of the configuration, not of a saved layout
+            if isinstance(sp, HorizontalSplitter):
+                sp.setOrientation(Qt.Orientation.Horizontal)
+            elif isinstance(sp, VerticalSplitter):
+                sp.setOrientation(Qt.Orientation.Vertical)
+        for tw in self.findChildren(QTabWidget):
+            if any(tw.tabText(i).strip() == "Output" for i in range(tw.count())):
+                _height_of_current_tab_only(tw)
         content = self.takeCentralWidget()
         scroll = QScrollArea(self)
         scroll.setWidgetResizable(True)
@@ -71,24 +98,8 @@ class MainWindow(FlowuiMainWindow):
         scroll.setWidget(content)
         self.setCentralWidget(scroll)
         self._fitted = False
-        self._device_splitters = []
-        for sp in self.findChildren(QSplitter):
-            kinds = [type(sp.widget(i)).__name__ for i in range(sp.count())]
-            if sp.count() < 2 or not any("DevicesPanel" in k for k in kinds):
-                continue
-            for i, k in enumerate(kinds):
-                if "DevicesPanel" not in k:            # the other part scrolls instead of blocking the handle
-                    part = sp.widget(i)
-                    area = QScrollArea()
-                    area.setWidgetResizable(True)
-                    area.setFrameShape(QFrame.NoFrame)
-                    hidden = part.isHidden()
-                    sp.replaceWidget(i, area)
-                    area.setWidget(part)
-                    part.setHidden(hidden)
-                    area.setHidden(hidden)          # replaceWidget leaves the new widget hidden
-            sp.setChildrenCollapsible(False)
-            self._device_splitters.append(sp)
+        self._device_splitters = [sp for sp in self.findChildren(QSplitter) if sp.count() >= 2 and any(
+            "DevicesPanel" in type(sp.widget(i)).__name__ for i in range(sp.count()))]
 
     def showEvent(self, event):
         FlowuiMainWindow.showEvent(self, event)
@@ -101,20 +112,16 @@ class MainWindow(FlowuiMainWindow):
             if (w, h) != (self.width(), self.height()):
                 self.resize(w, h)
                 self.move(avail.x() + (avail.width() - w) // 2, avail.y())
-            QTimer.singleShot(500, self._give_room_to_devices)     # after NICOS has restored its saved layout
+            QTimer.singleShot(500, self._size_device_list)     # after NICOS has laid out the window
 
-    DETECTOR_IMAGE_HEIGHT = 810         # pixels the detector-image panel needs (image, level bar, two previews)
-
-    def _give_room_to_devices(self):
-        """The device list gets what the detector image does not need, at least a sixth of the height of its splitter
-        (then the handle moves freely)."""
+    def _size_device_list(self):
         for sp in self._device_splitters:
             total = sum(sp.sizes())
             if total <= 0:
                 continue
             dev = [i for i in range(sp.count()) if "DevicesPanel" in type(sp.widget(i)).__name__][0]
             sizes = [0] * sp.count()
-            sizes[dev] = max(total // 6, total - self.DETECTOR_IMAGE_HEIGHT)
+            sizes[dev] = int(total * self.DEVICES_SHARE)
             others = [i for i in range(sp.count()) if i != dev]
             for i in others:
                 sizes[i] = (total - sizes[dev]) // len(others)

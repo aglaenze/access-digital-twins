@@ -33,7 +33,7 @@ def main():
                                env=env, creationflags=NO_WINDOW).stdout.strip()
     if instr:
         subprocess.run([sys.executable, os.path.join(ROOT, "nicos", "start_nicos.py"), "--instrument", instr,
-                        "--until-gui-closes"], cwd=ROOT, creationflags=NO_WINDOW,
+                        "--ess", "--until-gui-closes"], cwd=ROOT, creationflags=NO_WINDOW,
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 

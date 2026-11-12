@@ -29,6 +29,7 @@ just-bin-it, default ~/McStas_runs/just-bin-it).
 Logs: <TWIN_RUN_ROOT>/nicos/*.log.
 """
 import argparse
+import json
 import os
 import socket
 import subprocess
@@ -94,6 +95,16 @@ def start(name, cmd, env=None, cwd=None):
     PROCS.append((name, p))
     print(f"  {name} started (pid {p.pid}, log {log.name})", flush=True)
     return p
+
+
+def status(text, state="starting"):
+    """The step of the launch, for the app (GET /twin/nicos shows it while NICOS starts): <LOGS>/launch_status.json."""
+    try:
+        os.makedirs(LOGS, exist_ok=True)
+        with open(os.path.join(LOGS, "launch_status.json"), "w", encoding="utf-8") as f:
+            json.dump({"step": text, "state": state, "time": time.time()}, f)
+    except OSError:
+        pass
 
 
 def wait_for(test, what, timeout=180):
@@ -215,11 +226,24 @@ def main():
             o.proposals = False
     os.environ["TWIN_PROPOSALS"] = "1" if o.proposals else "0"
     print(f"Starting the {instr.upper()} digital twin with NICOS:", flush=True)
+    status("starting the twin and NICOS")
     try:
-        if o.live or o.filewriter or o.livedata or o.epics or o.efu:     # data streaming as at ESS: the Kafka broker
-            if not port_open(9092):
-                start("kafka", [MCSTAS_PY, os.path.join(TWIN, "kafka", "start_kafka.py")], cwd=TWIN)
-                wait_for(lambda: port_open(9092), "the Kafka broker", timeout=120)
+        # TWIN_RUN_ROOT is read by the NICOS setups (cache database, data root)
+        env = dict(os.environ, INSTRUMENT=f"nicos_twin.{instr}", TWIN_RUN_ROOT=RUN_ROOT,
+                   TWIN_FILEWRITER="1" if o.filewriter else "0",       # read by nicos_twin/commands.py
+                   PYTHONPATH=os.pathsep.join([HERE, os.environ.get("PYTHONPATH", "")]).rstrip(os.pathsep))
+        if o.epics:                    # NICOS finds the PVs (motor records of the sample stage) on this computer
+            env.update(ep_service.CLIENT)
+        # started together (none of them needs the others): the Kafka broker, the twin server, the NICOS cache
+        kafka = (o.live or o.filewriter or o.livedata or o.epics or o.efu) and not port_open(9092)
+        if kafka:                      # data streaming as at ESS: the Kafka broker
+            start("kafka", [MCSTAS_PY, os.path.join(TWIN, "kafka", "start_kafka.py")], cwd=TWIN)
+        start("twin_server", [MCSTAS_PY, os.path.join(TWIN, "twin_server.py"), "--instrument", instr,
+                              "--session", o.session, "--mode", o.mode, "--port", str(o.port)], cwd=TWIN)
+        start("nicos_cache", [NICOS_PY, os.path.join(NICOS_ROOT, "bin", "nicos-cache")], env=env, cwd=NICOS_ROOT)
+        if kafka:
+            status("starting the data streaming of ESS (Kafka)")
+            wait_for(lambda: port_open(9092), "the Kafka broker", timeout=120)
         if o.filewriter:               # the ESS file-writer (kafka-to-nexus), its topics created first
             p = fw_service.start(instr, log=os.path.join(LOGS, "filewriter.log"))
             PROCS.append(("filewriter", p))
@@ -242,25 +266,24 @@ def main():
                                   "-t", f"{instr}_jbi_commands", "-hb", f"{instr}_jbi_heartbeat",
                                   "-rt", f"{instr}_jbi_responses", "-l", "3"],
                   env=dict(os.environ, PYTHONPATH=JBI_HOME), cwd=JBI_HOME)
-        start("twin_server", [MCSTAS_PY, os.path.join(TWIN, "twin_server.py"), "--instrument", instr,
-                              "--session", o.session, "--mode", o.mode, "--port", str(o.port)], cwd=TWIN)
+        status(f"starting the twin of {instr.upper()} (its McStas model)")
         wait_for(lambda: http_ok(f"http://127.0.0.1:{o.port}/status"), "the twin server")
         if o.epics:                    # the PVs of the twin (soft IOC) and the ESS forwarder, configured with them
             for name, p in ep_service.start(instr, twin=f"http://127.0.0.1:{o.port}", logdir=LOGS):
                 AUX.append((name, p))
             print(f"  EPICS layer started ({ep_what}; logs {LOGS}/epics_ioc.log, forwarder.log)", flush=True)
-        # TWIN_RUN_ROOT is read by the NICOS setups (cache database, data root)
-        env = dict(os.environ, INSTRUMENT=f"nicos_twin.{instr}", TWIN_RUN_ROOT=RUN_ROOT,
-                   TWIN_FILEWRITER="1" if o.filewriter else "0",       # read by nicos_twin/commands.py
-                   PYTHONPATH=os.pathsep.join([HERE, os.environ.get("PYTHONPATH", "")]).rstrip(os.pathsep))
-        if o.epics:                    # NICOS finds the PVs (motor records of the sample stage) on this computer
-            env.update(ep_service.CLIENT)
-        start("nicos_cache", [NICOS_PY, os.path.join(NICOS_ROOT, "bin", "nicos-cache")], env=env, cwd=NICOS_ROOT)
+        status("starting NICOS (cache, poller, daemon)")
         wait_for(lambda: port_open(14869), "the NICOS cache")
         start("nicos_poller", [NICOS_PY, os.path.join(NICOS_ROOT, "bin", "nicos-poller")], env=env, cwd=NICOS_ROOT)
         start("nicos_daemon", [NICOS_PY, os.path.join(NICOS_ROOT, "bin", "nicos-daemon")], env=env, cwd=NICOS_ROOT)
         wait_for(lambda: port_open(1301), "the NICOS daemon")
+        if not o.no_gui:               # the window first: it takes ~20 s to build, while the daemon loads its setups
+            status("opening the NICOS window")
+            start("nicos_gui", [NICOS_PY, os.path.join(NICOS_ROOT, "bin", "nicos-gui"),
+                                "-c", os.path.join(HERE, "nicos_twin", instr, "guiconfig.py"),
+                                "student:student@localhost:1301"], env=env, cwd=NICOS_ROOT)   # logged in at once
         if o.live:                 # load the live-data setup in the daemon (as AddSetup('live') typed by the user)
+            status("connecting the live detector image")
             r = subprocess.run([NICOS_PY, os.path.join(HERE, "run_nicos_script.py"), "-c", "AddSetup('live')"],
                                capture_output=True, text=True, timeout=300, cwd=HERE)
             print("  setup 'live' loaded" if r.returncode == 0 else f"  setup 'live' NOT loaded: {r.stdout[-500:]}",
@@ -270,10 +293,7 @@ def main():
                                   ("ESS Event Formation Unit", o.efu), ("user office", o.proposals)) if on]
         print(f"{instr.upper()} services ready{' (' + ', '.join(extras) + ')' if extras else ''}. NICOS daemon on localhost:1301 "
               "(user student, password student).", flush=True)
-        if not o.no_gui:
-            start("nicos_gui", [NICOS_PY, os.path.join(NICOS_ROOT, "bin", "nicos-gui"),
-                                "-c", os.path.join(HERE, "nicos_twin", instr, "guiconfig.py"),
-                                "student:student@localhost:1301"], env=env, cwd=NICOS_ROOT)   # logged in at once
+        status("NICOS is ready: its window appears in a few seconds", "ready")
         if o.until_gui_closes and not o.no_gui:
             gui = dict(PROCS)["nicos_gui"]
             print("Close the NICOS window to stop everything.", flush=True)
@@ -293,8 +313,16 @@ def main():
                 time.sleep(2)
     except KeyboardInterrupt:
         pass
+    except Exception as e:
+        status(f"NICOS could not start: {e}", "error")
+        raise
     finally:
         stop_all()
+        try:
+            if json.load(open(os.path.join(LOGS, "launch_status.json"), encoding="utf-8")).get("state") != "error":
+                status("NICOS is closed", "closed")
+        except (OSError, ValueError):
+            pass
 
 
 if __name__ == "__main__":

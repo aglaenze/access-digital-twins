@@ -9,6 +9,25 @@ let instr = localStorage.getItem("instr") || "odin";
 const tabs = new Map();     // key -> {btn, pane, view, kind, path}
 let activeKey = "cat";
 
+// the launch of NICOS on this computer, step by step (nicos/start_nicos.py writes the step; GET /twin/nicos reads it)
+async function followNicosLaunch(name) {
+  const t0 = Date.now();
+  toast(`Starting NICOS of ${name}…`, 600000);
+  for (let i = 0; i < 240; i++) {
+    await new Promise((r) => setTimeout(r, 1500));
+    const st = await T.api("GET", "/twin/nicos").catch(() => null);
+    const s = Math.round((Date.now() - t0) / 1000);
+    if (!st || !st.time || st.time * 1000 < t0 - 2000) {          // (a step of an earlier launch)
+      toast(`Starting NICOS of ${name}… (${s} s)`, 600000);
+      continue;
+    }
+    if (st.state === "ready") { toast(`NICOS of ${name} is ready: its window appears on your desktop in a few seconds, logged in. Close it to stop NICOS.`, 12000); return; }
+    if (st.state === "error" || st.state === "closed") { toast(st.step || "NICOS stopped.", 15000); return; }
+    toast(`NICOS of ${name}: ${st.step}… (${s} s)`, 600000);
+  }
+  toast(`NICOS of ${name} takes long to start: see its logs in McStas_runs/twin/nicos.`, 15000);
+}
+
 function toast(text, ms = 5000) {
   const t = $("#toast");
   t.textContent = text;
@@ -226,7 +245,8 @@ async function act(d) {
       const r = await T.api("POST", "/twin/nicos", { instrument: d.instr });
       const name = catalogue.instruments[d.instr].name;
       if (r.where === "remote") openTab(r.url, "desktop", `NICOS · ${name}`);
-      else toast(`NICOS of ${name} opens on your desktop in about a minute, logged in. Close its window to stop it.`, 9000);
+      else if (r.already) toast(`NICOS is already open: its window is on your desktop (one instrument at a time).`, 8000);
+      else followNicosLaunch(name);
     } else if (d.act === "reset") {
       const what = d.page === "1" ? "your answers to the questions" : "your notebook and your answers";
       if (!confirm(`Start "${d.label}" again?\n\n${what[0].toUpperCase() + what.slice(1)} are put aside (kept in a ` +
@@ -323,6 +343,11 @@ function openTab(url, kind, label) {
     // a notebook opens already run: all its cells are executed once the kernel is ready (Notebook 7 exposes its
     // commands: exposeAppInBrowser in container/app_config/labconfig/page_config.json)
     view.addEventListener("did-stop-loading", () => {
+      // locked code cells look locked: gray, no blinking cursor, a "locked" mark (they cannot be changed anyway)
+      view.insertCSS(`.jp-InputArea-editor.jp-mod-readOnly { background: #EEF0F3 !important; position: relative; }
+        .jp-InputArea-editor.jp-mod-readOnly .cm-content { caret-color: transparent; cursor: default; }
+        .jp-InputArea-editor.jp-mod-readOnly::after { content: "\\1F512  locked"; position: absolute; top: 3px; right: 8px;
+          font-size: 11px; color: #7A8190; pointer-events: none; }`).catch(() => {});
       t.running = true;
       if (tabs.get(activeKey) === t) $("#saved").textContent = "Running the notebook…";
       view.executeJavaScript(`(async () => {
@@ -340,6 +365,15 @@ function openTab(url, kind, label) {
             if (stop > 0) {
               w.content.activeCellIndex = stop;
               await a.commands.execute("notebook:run-all-above");
+              // the questions after the mark need no measurement ({"twin": {"run_at_open": "always"}}): they run too,
+              // so the student sees each question, never a cell to run
+              for (let i = stop + 1; i < cells.length; i++) {
+                const m = cells[i].model.getMetadata ? cells[i].model.getMetadata("twin") : (cells[i].model.metadata || {}).twin;
+                if (m && m.run_at_open === "always") {
+                  w.content.activeCellIndex = i;
+                  await a.commands.execute("notebook:run-cell");
+                }
+              }
             } else {
               await a.commands.execute("notebook:run-all-cells");
             }

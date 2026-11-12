@@ -133,9 +133,13 @@ def tomo_frames(sino, angles_deg, xs_mm, steps=None, order="sequential"):
 
 
 # --------------------------------------------------------------------------- players (pages)
-def show_live(nexus_file, n_frames=24, autoplay=True):
+def show_live(nexus_file, n_frames=24, autoplay=True, fill_s=None, status=None):
     """Animated replay of a measurement in a notebook / Voilà page (Play button + slider); autoplay: it starts by
-    itself, as the detector image of a real instrument fills up during the count."""
+    itself, as the detector image of a real instrument fills up during the count.
+    fill_s: the count itself, as on the instrument: the image and the spectrum fill up frame by frame for fill_s
+    seconds of wall time (status: a Label showing "Counting... t s / T s"), then the Play button and the slider let
+    the student replay it."""
+    import time
     import ipywidgets as w
     import matplotlib.pyplot as plt
     from IPython.display import display
@@ -162,6 +166,21 @@ def show_live(nexus_file, n_frames=24, autoplay=True):
     slider = w.IntSlider(min=0, max=n_frames - 1, value=0, description="frame")
     w.jslink((play, "value"), (slider, "value"))
     slider.observe(lambda ch: draw(ch["new"]), names="value")
+    if fill_s:                       # the count: the frames one after the other, in real time
+        play.disabled = slider.disabled = True
+        display(w.VBox([w.HBox([play, slider]), out]))
+        t0 = time.time()
+        for k in range(n_frames):
+            draw(k)
+            if status is not None:
+                status.value = f"Counting... {fr['times'][k]:.0f} s / {fr['times'][-1]:.0f} s"
+            time.sleep(max(0.0, t0 + fill_s * (k + 1) / n_frames - time.time()))     # (drawing takes time too)
+        slider.unobserve_all("value")
+        slider.value = n_frames - 1
+        slider.observe(lambda ch: draw(ch["new"]), names="value")
+        play.value = n_frames - 1
+        play.disabled = slider.disabled = False
+        return
     draw(0)
     display(w.VBox([w.HBox([play, slider]), out]))
     if autoplay and hasattr(play, "playing"):        # ipywidgets 8: the replay starts at once

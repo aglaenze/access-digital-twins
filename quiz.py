@@ -19,9 +19,11 @@ opened again, the questions already answered right (or whose answer was shown) a
 Texts may contain $...$ formulas (rendered by MathJax in the app, by Jupyter in notebooks).
 """
 import base64
+import hashlib
 import html
 import json
 import os
+import random
 import time
 
 import ipywidgets as w
@@ -166,6 +168,14 @@ class Quiz:
         multi = not isinstance(answer, int)
         right = set(answer) if multi else {answer}
         why = why or {}
+        # the options in a shuffled order (the right one is not always first), the same at every opening: drawn from
+        # the name of the quiz and the question
+        order = list(range(len(options)))
+        random.Random(hashlib.sha256(f"{self.name}|{text}".encode()).hexdigest()).shuffle(order)
+        new_index = {old: new for new, old in enumerate(order)}
+        options = [options[k] for k in order]
+        right = {new_index[k] for k in right}
+        why = {new_index[k]: v for k, v in why.items()}
         head = w.HTMLMath(f'<div class="twq-q">{html.escape(title or item["id"])}</div>{_md(text)}')
         if multi:
             boxes = [w.Checkbox(description=o, indent=False, layout=w.Layout(width="auto")) for o in options]

@@ -64,6 +64,8 @@ def write(cells, name, all_code_locked=False):
                     break
             if c.source.lstrip().startswith(HIDDEN_START) or "nb_tools.proposal(" in c.source:
                 c.metadata["jupyter"] = {"source_hidden": True}
+            if c.source.lstrip().startswith(("q.", "q_.")):        # a question: it needs no measurement, the app
+                c.metadata["twin"] = {"run_at_open": "always"}    # runs it at opening even after the stop mark
         out.append(c)
     for c in out:
         lock(c, all_code_locked)

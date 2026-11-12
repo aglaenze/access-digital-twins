@@ -207,7 +207,7 @@ async function selftest(out) {
     const t3 = Date.now();
     // at opening: the cells before the measurements run (up to the cell marked run_at_open: stop), none after;
     // every code cell read-only (MSc: nothing to write); the notebook shown from its top
-    const nbState = `document.querySelectorAll(".pane.on webview")[0].executeJavaScript("(() => { const w = window.jupyterapp && window.jupyterapp.shell.currentWidget; if (!w || !w.content) return 'none'; const all = w.content.widgets; const k = all.findIndex(c => { const m = c.model.getMetadata ? c.model.getMetadata('twin') : null; return m && m.run_at_open === 'stop'; }); const stop = k < 0 ? all.length : k; const code = (a) => a.filter(c => c.model.type === 'code' && c.model.sharedModel.source.trim()); const before = code(all.slice(0, stop)), after = code(all.slice(stop)); const done = before.filter(c => c.model.executionCount).length; const late = after.filter(c => c.model.executionCount).length; const errs = before.filter(c => c.model.outputs.toJSON().some(o => o.output_type === 'error')).length; const ro = code(all).filter(c => c.readOnly).length; return done + '/' + before.length + ' errors ' + errs + ' after ' + late + ' readonly ' + ro + '/' + code(all).length + ' active ' + w.content.activeCellIndex; })()")`;
+    const nbState = `document.querySelectorAll(".pane.on webview")[0].executeJavaScript("(() => { const w = window.jupyterapp && window.jupyterapp.shell.currentWidget; if (!w || !w.content) return 'none'; const all = w.content.widgets; const k = all.findIndex(c => { const m = c.model.getMetadata ? c.model.getMetadata('twin') : null; return m && m.run_at_open === 'stop'; }); const stop = k < 0 ? all.length : k; const code = (a) => a.filter(c => c.model.type === 'code' && c.model.sharedModel.source.trim()); const before = code(all.slice(0, stop)), after = code(all.slice(stop)).filter(c => { const t = c.model.getMetadata ? c.model.getMetadata('twin') : null; return !(t && t.run_at_open === 'always'); }); const done = before.filter(c => c.model.executionCount).length; const late = after.filter(c => c.model.executionCount).length; const errs = before.filter(c => c.model.outputs.toJSON().some(o => o.output_type === 'error')).length; const ro = code(all).filter(c => c.readOnly).length; return done + '/' + before.length + ' errors ' + errs + ' after ' + late + ' readonly ' + ro + '/' + code(all).length + ' active ' + w.content.activeCellIndex; })()")`;
     let st = "";
     for (let i = 0; i < 300; i++) {
       st = await js(nbState).catch(() => "?");
@@ -222,6 +222,22 @@ async function selftest(out) {
       !!m && m[1] === m[2] && m[3] === "0" && m[4] === "0", t3);
     check(`MSc notebook: every code cell locked (${m ? m[5] + "/" + m[6] : "?"})`, !!m && m[5] === m[6], t3);
     check(`notebook shown from its top (active cell ${m ? m[7] : "?"})`, !!m && m[7] === "0", t3);
+    // typed as a student would: click into a code cell, type; its code must not change
+    const cellSrc = `document.querySelectorAll(".pane.on webview")[0].executeJavaScript("(() => { const w = window.jupyterapp.shell.currentWidget; const c = w.content.widgets.find(c => c.model.type === 'code' && c.model.sharedModel.source.trim()); return c.model.sharedModel.source; })()")`;
+    const srcBefore = await js(cellSrc).catch(() => "?");
+    await js(`document.querySelectorAll(".pane.on webview")[0].executeJavaScript("(() => { const w = window.jupyterapp.shell.currentWidget; const i = w.content.widgets.findIndex(c => c.model.type === 'code' && c.model.sharedModel.source.trim()); w.content.activeCellIndex = i; w.content.mode = 'edit'; w.content.widgets[i].editor.focus(); return i; })()")`);
+    await new Promise((r) => setTimeout(r, 500));
+    await js(`document.querySelectorAll(".pane.on webview")[0].focus(); true`);
+    const inEditor = await js(`document.querySelectorAll(".pane.on webview")[0].executeJavaScript("!!(document.activeElement && document.activeElement.closest('.cm-content'))")`).catch(() => false);
+    await js(`(() => { const v = document.querySelectorAll(".pane.on webview")[0];
+      for (const ch of "TYPED") { v.sendInputEvent({ type: "keyDown", keyCode: ch }); v.sendInputEvent({ type: "char", keyCode: ch }); v.sendInputEvent({ type: "keyUp", keyCode: ch }); }
+      v.sendInputEvent({ type: "keyDown", keyCode: "Backspace" }); v.sendInputEvent({ type: "keyUp", keyCode: "Backspace" });
+      v.insertText("PASTED"); return true; })()`);
+    await new Promise((r) => setTimeout(r, 1500));
+    const srcAfter = await js(cellSrc).catch(() => "?");
+    check(`MSc notebook: keys typed in a code cell change nothing (cursor in the cell: ${inEditor}; ${srcAfter === srcBefore ? "unchanged" : "the cell was changed"})`,
+      inEditor === true && srcBefore !== "?" && srcAfter === srcBefore, t3);
+    await js(`document.querySelectorAll(".pane.on webview")[0].executeJavaScript("(() => { const w = window.jupyterapp.shell.currentWidget; w.content.mode = 'command'; w.content.activeCellIndex = 0; w.content.scrollToCell(w.content.widgets[0]); return true; })()")`);
     await new Promise((r) => setTimeout(r, 2000));
     await shot("5_notebook");
     // the sample builder, opened for ODIN and a proposal (as from a beamtime notebook): a block, + a sphere, + a cylinder

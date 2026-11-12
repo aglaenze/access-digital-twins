@@ -80,11 +80,11 @@ def do_count(_):
         try:
             mode, delta = chop.value
             odin.move(choppers=mode, wfm_delta=delta, shutter=shut.value, sample=smp.value, stage_x=stage.value)
-            print("Measuring...")
+            status = w.Label("Counting... (the twin computes the neutrons of this setting)")
+            display(status)
             f = odin.count(ttime.value, title=title.value or f"{smp.value} {shut.value}")
-            clear_output()
-            print(f"File written: {os.path.basename(f)}")
-            viz.show_live(f, n_frames=16)
+            viz.show_live(f, n_frames=16, fill_s=min(ttime.value, 30), status=status)
+            status.value = f"File written: {os.path.basename(f)}"
         except Exception as e:
             print("Refused:", e)
     refresh_budget(); refresh_files()
