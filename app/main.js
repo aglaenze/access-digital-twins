@@ -240,6 +240,11 @@ async function selftest(out) {
       !!m && m[1] === m[2] && m[3] === "0" && m[4] === "0", t3);
     check(`MSc notebook: every code cell locked (${m ? m[5] + "/" + m[6] : "?"})`, !!m && m[5] === m[6], t3);
     check(`notebook shown from its top (active cell ${m ? m[7] : "?"})`, !!m && m[7] === "0", t3);
+    // the first cells are drawn at once, without leaving the tab and coming back (they stayed blank, 2026-11-12)
+    await new Promise((r) => setTimeout(r, 6000));       // (the loop keeping the notebook at its top: 8 s)
+    await shot("5a_notebook_opened");
+    const drawn = await js(`document.querySelectorAll(".pane.on webview")[0].executeJavaScript("(() => { const c = window.jupyterapp.shell.currentWidget.content.widgets.slice(0, 2); return c.filter(x => { const r = x.node.getBoundingClientRect(); return x.node.isConnected && r.height > 10 && r.top < innerHeight && r.bottom > 0 && x.node.innerText.trim().length > 0; }).length; })()")`).catch(() => "?");
+    check(`notebook at opening: its first cells drawn and in view (${drawn}/2)`, drawn === 2, t3);
     // a double click on a locked text cell leaves it rendered (no raw markdown)
     await js(`(() => { const v = document.querySelectorAll(".pane.on webview")[0]; return v.executeJavaScript("(() => { const n = window.jupyterapp.shell.currentWidget.content; const c = n.widgets.find(x => x.model.type === 'markdown' && x.readOnly); c.node.querySelector('.jp-MarkdownOutput').dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); return true; })()"); })()`).catch(() => {});
     await new Promise((r) => setTimeout(r, 500));

@@ -421,6 +421,7 @@ function openTab(url, kind, label) {
                                document.querySelector("#main-panel"), document.scrollingElement]) {
                 try { if (n) n.scrollTop = 0; } catch (e) { /* */ }
               }
+              window.dispatchEvent(new Event("resize"));      // the cells in view drawn again (as on showing the tab)
             };
             for (let k = 0; k < 16 && !touched; k++) {
               await top();

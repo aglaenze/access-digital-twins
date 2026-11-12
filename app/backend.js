@@ -98,6 +98,10 @@ class Backend {
                   TWIN_APP_LOCAL: "1", PYTHONPATH: c + (process.env.PYTHONPATH ? path.delimiter + process.env.PYTHONPATH : ""),
                   PYTHONIOENCODING: "utf-8" };
     fs.mkdirSync(this.dataDir, { recursive: true });
+    // the notebook settings of the app (container/app_settings: every cell kept in the page), copied to a folder of
+    // the app (the settings the notebook saves go there, not into the repository nor into the user's own Jupyter)
+    env.JUPYTERLAB_SETTINGS_DIR = path.join(this.dataDir, "lab_settings");
+    fs.cpSync(path.join(c, "app_settings"), env.JUPYTERLAB_SETTINGS_DIR, { recursive: true, force: true });
     const log = fs.openSync(path.join(this.dataDir, "server.log"), "w");
     // jupyter_server directly (not "jupyter server", which starts it as a second process that would outlive us)
     this.proc = spawn(py, ["-m", "jupyter_server", "--no-browser", "--ServerApp.ip=127.0.0.1", `--port=${this.port}`,

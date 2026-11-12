@@ -1,0 +1,6 @@
+{
+  // All the cells of a notebook are kept in the page ("none"), not only those in view: with the default
+  // ("contentVisibility"), the first cells of a notebook run at opening and then scrolled back to stayed blank
+  // until the tab was left and shown again. The notebooks of the app are short: no cost.
+  "windowingMode": "none"
+}

@@ -350,6 +350,23 @@ class TwinExperiment(EssExperiment):
     def _canQueryProposals(self):
         return self._client is not None
 
+    # the local contact of every proposal of the twin (the proposal cache of ESS, read by yuos_query, carries none:
+    # EssExperiment gives an empty list, and "Apply" in the Experiment tab then failed with "localcontacts must be a
+    # non-empty string!", the empty table of local contacts being sent as Exp.update(localcontacts=[]))
+    LOCAL_CONTACT = {"name": "ACCESS teacher", "email": "", "affiliation": "ACCESS course"}
+
+    def _queryProposals(self, proposal=None, kwds=None):
+        results = EssExperiment._queryProposals(self, proposal, kwds)
+        for r in results:
+            if not r.get("localcontacts"):
+                r["localcontacts"] = [dict(self.LOCAL_CONTACT)]
+        return results
+
+    def update(self, title=None, users=None, localcontacts=None):
+        if localcontacts is not None and not localcontacts:      # an empty table: no change (not an error)
+            localcontacts = None
+        EssExperiment.update(self, title, users, localcontacts)
+
     @property
     def scriptpath(self):
         """Folder of the user's scripts (default folder of Open/Save in the Scripting tab):
