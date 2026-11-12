@@ -128,7 +128,11 @@ header .right { display: flex; align-items: center; gap: 10px; position: relativ
 .instr .kind { font-size: 13.5px; font-weight: 600; color: var(--teal); }
 .instr .text { font-size: 13px; line-height: 1.45; color: var(--muted); }
 .ex { background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 24px; display: flex; flex-direction: column; gap: 16px; margin-bottom: 16px; }
-.ex.planned { opacity: .6; }
+.ex.planned { background: var(--card, #fff); }
+.ex.planned .tech { color: var(--beam); }
+.ex.planned .smp { margin: 0; font-size: 14px; color: var(--muted); font-style: italic; }
+.ex.planned.later { opacity: .45; }
+.ex.planned.later .tech { color: var(--muted); }
 .ex .tech { font-size: 12.5px; font-weight: 600; letter-spacing: .4px; text-transform: uppercase; color: var(--muted); }
 .ex h3 { margin: 4px 0 0; font-family: var(--head); font-weight: 600; font-size: 22px; }
 .ex .q { font-size: 14px; line-height: 1.5; color: var(--muted); margin: 0; }

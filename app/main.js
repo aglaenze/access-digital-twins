@@ -326,6 +326,7 @@ async function selftest(out) {
       return wait(`!document.querySelector("#proposal").open || document.querySelector("#p-error").textContent !== ""`, 60);
     };
     await newProposal("newfree", "Does a weld change the texture of steel?", "", "");
+    await wait(`[...document.querySelectorAll(".tab span:nth-child(2)")].some(s => /ODIN · 9/.test(s.textContent))`, 20);   // (the tab comes just after the dialog closes)
     const tabsAfter = await js(`[...document.querySelectorAll(".tab span:nth-child(2)")].map(s => s.textContent).join(" | ")`);
     check("free beamtime: a new proposal, its notebook opened (" + tabsAfter + ")", /ODIN · 9\d{5}/.test(tabsAfter), t5);
     await wait(`document.querySelectorAll(".pane .loading").length === 0`, 300);

@@ -7,6 +7,8 @@ iron_structures.png  ODIN, "How far apart are the atoms in iron?": the two struc
                      Bragg edges each structure gives (lambda_edge = 2 d_hkl): what the measurement has to decide.
 sans_particles.png   LoKI, "How big are these nanoparticles?": particles in heavy water, the small-angle scattering on
                      the detector, and how the size sets the curve I(Q) (sphere form factor, two sizes as examples).
+steel_strain.png     ODIN, "Where is a loaded steel part strained?": the specimen in its load frame, the lattice
+                     planes facing the beam moving closer under load (Poisson contraction), and the edge that moves.
 """
 import os
 
@@ -156,9 +158,82 @@ def sans():
     plt.close(fig)
 
 
+def steel_strain():
+    """ODIN, "Where is a loaded steel part strained?": the specimen in the load frame as the camera sees it, what
+    the load does to the lattice planes the neutrons see (seen from the side), and the edge that moves."""
+    from scipy.special import erfc
+    fig = plt.figure(figsize=(13.5, 4.9))
+    gs = fig.add_gridspec(1, 3, width_ratios=[0.8, 1.25, 1.2], left=0.03, right=0.985, bottom=0.13, top=0.86, wspace=0.22)
+
+    # (1) front view: what the camera sees
+    ax = fig.add_subplot(gs[0])
+    ax.add_patch(plt.Rectangle((-7.05, -7.05), 14.1, 14.1, fill=False, ec=GREY, ls="--", lw=1))
+    for (x0, y0, w, h) in ((-4, 3, 8, 6.5), (-4, -9.5, 8, 6.5)):
+        ax.add_patch(plt.Rectangle((x0, y0), w, h, fc="#C9D3E0", ec=INK, lw=1.2))
+    ax.add_patch(plt.Rectangle((-2, -3), 4, 6, fc="#9FB3CC", ec=INK, lw=1.2))
+    for y, dy in ((9.6, 2.6), (-9.6, -2.6)):
+        ax.annotate("", xy=(0, y + dy), xytext=(0, y), arrowprops=dict(arrowstyle="-|>", color=RED, lw=2.5))
+    ax.text(0.8, 11.2, "force F", color=RED, fontsize=11, fontweight="bold", va="center")
+    ax.text(0.8, -11.2, "force F", color=RED, fontsize=11, fontweight="bold", va="center")
+    ax.text(2.5, 0, "gauge," + chr(10) + "4 mm wide", ha="left", va="center", fontsize=9.5, color=INK)
+    ax.text(0, 5.2, "shoulder, 8 mm wide", ha="center", va="center", fontsize=9.5, color=INK)
+    ax.text(0, -5.2, "shoulder, 8 mm wide", ha="center", va="center", fontsize=9.5, color=INK)
+    ax.text(-7.3, 0, "field of view, 14 mm × 14 mm", ha="right", va="center", fontsize=8.5, color="#5B6779", rotation=90)
+    ax.set(xlim=(-9, 9), ylim=(-13.2, 13.2), aspect="equal")
+    ax.axis("off")
+    ax.set_title("Seen by the camera", color=INK, fontsize=13, fontweight="bold")
+
+    # (2) side view: the lattice planes the neutrons see, without and with load (changes exaggerated)
+    ax = fig.add_subplot(gs[1])
+    for x0, t, h, title, col in ((0.0, 3.0, 5.0, "without load", GREY), (5.6, 2.55, 5.9, "with load", RED)):
+        y0 = -h / 2
+        ax.add_patch(plt.Rectangle((x0, y0), t, h, fc="#E4EAF2", ec=INK, lw=1.2))
+        n = 7
+        for k in range(n):
+            x = x0 + t * (k + 0.5) / n
+            ax.plot([x, x], [y0 + 0.15, y0 + h - 0.15], color=TEAL, lw=1.6)
+        xa, xb = x0 + t * 2.5 / n, x0 + t * 3.5 / n
+        ax.annotate("", xy=(xb, y0 - 0.35), xytext=(xa, y0 - 0.35), arrowprops=dict(arrowstyle="<->", color=TEAL, lw=1.2))
+        ax.text(0.5 * (xa + xb), y0 - 0.75, "d" if col == GREY else "d (1 + ε), ε < 0", ha="center", va="top",
+                color=TEAL, fontsize=10.5, fontweight="bold")
+        ax.text(x0 + t / 2, 3.75, title, ha="center", va="bottom", color=INK, fontsize=11, fontweight="bold")
+    for y, dy in ((3.0, 0.9), (-3.0, -0.9)):
+        ax.annotate("", xy=(5.6 + 2.55 / 2 + 2.3, y * 0.6 + dy), xytext=(5.6 + 2.55 / 2 + 2.3, y * 0.6),
+                    arrowprops=dict(arrowstyle="-|>", color=RED, lw=2.2))
+    ax.text(5.6 + 2.55 / 2 + 2.55, 0, "F", color=RED, fontsize=12, fontweight="bold", va="center", ha="left")
+    ax.annotate("", xy=(-0.25, 0), xytext=(-2.6, 0), arrowprops=dict(arrowstyle="-|>", color=ORANGE, lw=2.5))
+    ax.text(-2.6, 0.35, "neutrons", color=ORANGE, fontsize=10.5, fontweight="bold", ha="left", va="bottom")
+    ax.annotate("", xy=(5.35, 0), xytext=(3.25, 0), arrowprops=dict(arrowstyle="-|>", color="#5B6779", lw=1.5))
+    ax.text(4.3, -4.55, "Pulled along the force, the steel gets longer, and thinner\nacross it (Poisson): the planes "
+            "facing the beam move closer.", ha="center", va="top", fontsize=9.5, color="#5B6779")
+    ax.set(xlim=(-3, 11.2), ylim=(-5.9, 4.6), aspect="equal")
+    ax.axis("off")
+    ax.set_title("Seen from the side: the planes facing the beam", color=INK, fontsize=13, fontweight="bold")
+
+    # (3) the edge moves
+    ax = fig.add_subplot(gs[2])
+    lam = np.linspace(3.9, 4.2, 600)
+    edge = lambda l0: 0.41 + 0.36 * 0.5 * erfc(-(lam - l0) / (np.sqrt(2) * 0.009))
+    shift = 0.03                                    # drawn 7 times larger than at 16 kN (0.0045 Å)
+    ax.plot(lam, edge(4.054), color=GREY, lw=2.2, label="without load: λ₀ = 2d")
+    ax.plot(lam, edge(4.054 - shift), color=RED, lw=2.2, label="with load: λ = 2d (1 + ε)")
+    ax.annotate("", xy=(4.054 - shift, 0.59), xytext=(4.054, 0.59), arrowprops=dict(arrowstyle="-|>", color=INK, lw=1.4))
+    ax.text(4.054 - shift / 2, 0.615, "the edge moves", ha="center", va="bottom", fontsize=9.5, color=INK)
+    ax.text(0.97, 0.06, "ε = (λ − λ₀) / λ₀\n(shift drawn 7× larger\nthan at 16 kN)", transform=ax.transAxes,
+            ha="right", va="bottom", fontsize=9.5, color="#5B6779")
+    ax.set(xlabel="neutron wavelength λ (Å)", ylabel="transmission", ylim=(0.3, 0.9), xlim=(3.9, 4.2))
+    ax.legend(loc="upper left", fontsize=9.5, frameon=False)
+    ax.set_title("The (110) Bragg edge moves", color=INK, fontsize=13, fontweight="bold")
+    for s_ in ("top", "right"):
+        ax.spines[s_].set_visible(False)
+    fig.savefig(os.path.join(OUT, "steel_strain.png"), dpi=150)
+    plt.close(fig)
+
+
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
     print("alpha edges:", [(h, round(l, 3)) for h, l in ALPHA], " gamma edges:", [(h, round(l, 3)) for h, l in GAMMA])
     iron()
     sans()
+    steel_strain()
     print("written", OUT)

@@ -1,5 +1,6 @@
 # One exercise of the catalogue of the app (read by container/twin_app.py: no generation needed).
 title: Unknown metals (game)
+number: "0 bis"              # the challenge that goes with exercise 0
 instrument: odin
 technique: Wavelength-resolved imaging (Bragg edges)
 sample: Three metal plates labeled A, B, C

@@ -1,0 +1,13 @@
+name: Steel tensile specimen
+description: >-
+  A flat tensile specimen of ferritic steel (α-iron, body-centered cubic), 5 mm thick, held in a load frame that
+  pulls it along the vertical axis. The gauge (the narrow part, 4 mm wide and 6 mm high, at the center) carries the
+  same force as the shoulders (8 mm wide, above and below) over half the cross-section: twice the stress.
+formula: Fe
+# pulled along y by the load frame (device "load", kN). Elastic constants of ferritic steel; the limit keeps the
+# gauge (20 mm²) at 800 MPa, below the yield strength of a quenched and tempered steel (about 900 MPa).
+load: {axis: y, max_kN: 16, young_GPa: 210, poisson: 0.29}
+volumes:
+  - {material: Fe_sg229_Iron-alpha.ncmat, center_mm: [0, 0, 0], size_mm: [4, 6, 5]}
+  - {material: Fe_sg229_Iron-alpha.ncmat, center_mm: [0, 5, 0], size_mm: [8, 4, 5]}
+  - {material: Fe_sg229_Iron-alpha.ncmat, center_mm: [0, -5, 0], size_mm: [8, 4, 5]}

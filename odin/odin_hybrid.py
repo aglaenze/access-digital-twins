@@ -141,18 +141,28 @@ def sigma_tot(cfg, lam):
     return 100.0 * tw.sigma_tot(cfg, np.asarray(lam, dtype=float))
 
 
-def volumes_transmission(volumes, stage_x, stage_rot, lam_grid=np.linspace(0.3, 20.0, 4000)):
+def volumes_transmission(volumes, stage_x, stage_rot, lam_grid=np.linspace(0.3, 20.0, 4000), strains=None):
     """Function T(x, y, λ) for a sample made of volumes [(NCrystal cfg, center (m), dims (m)[, shape]), ...] (boxes,
     spheres, vertical cylinders), centers given with
     respect to the rotation-stage axis; the stage is translated by stage_x then rotated by stage_rot (degrees) about
-    the vertical axis. Σ_tot(λ) is interpolated on a grid covering all chopper modes (NCrystal called once)."""
+    the vertical axis. Σ_tot(λ) is interpolated on a grid covering all chopper modes (NCrystal called once).
+    strains: lattice strain ε of each volume along the beam (a sample under load, sample_library.odin_strain_per_kN):
+    every lattice spacing seen by the beam becomes d (1 + ε), so every Bragg edge (λ = 2d) moves to λ (1 + ε):
+    Σ_tot(λ) of the strained volume = Σ_tot(λ / (1 + ε)) of the unstrained material. (The smooth parts of Σ_tot,
+    absorption and inelastic scattering, move with it: an error of ε, about 10⁻³, on a slowly varying term.)"""
     th = np.radians(stage_rot)
     c, s = np.cos(th), np.sin(th)
+    if strains is not None:
+        # a strain moves an edge by about 10⁻³ λ (0.004 Å), less than a step of the default grid (0.005 Å), on which
+        # the edge would jump by a whole step or not at all: a grid of 0.0001 Å for a sample in a load frame (also
+        # without load: the reference measurement must have its edge at the same place, to 10⁻⁵)
+        lam_grid = np.linspace(lam_grid[0], lam_grid[-1], int(round((lam_grid[-1] - lam_grid[0]) / 1e-4)) + 1)
     vols = []
-    for v in volumes:                     # (cfg, center, dims[, shape]): boxes, spheres, vertical cylinders
+    for k, v in enumerate(volumes):       # (cfg, center, dims[, shape]): boxes, spheres, vertical cylinders
         cfg, (cx, cy, cz), dims = v[:3]
         center = (stage_x + c * cx + s * cz, cy, -s * cx + c * cz)
-        vols.append((sigma_tot(cfg, lam_grid), center, dims, v[3] if len(v) > 3 else "box"))
+        eps = float(strains[k]) if strains is not None else 0.0
+        vols.append((sigma_tot(cfg, lam_grid / (1.0 + eps)), center, dims, v[3] if len(v) > 3 else "box"))
 
     def T(x, y, lam):
         mu = np.zeros(len(x))

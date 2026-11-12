@@ -47,6 +47,7 @@ FOV = 0.016                      # [m] McStas detector window, slightly larger t
 # Largest number of counts per file (memory: ~40 bytes per count while writing). The open beam gives ~1·10⁶ counts/s
 # in WFM mode but ~2·10⁷ counts/s in white mode. (A real Timepix3 camera would saturate at such rates; not modeled.)
 MAX_COUNTS = 5e7
+MAX_LOAD = 50.0            # [kN] capacity of the load frame; each sample has its own limit (load: max_kN)
 # Precomputed upstream parts (odin_mcstas.front): (mode, δ) -> (δ in the folder name, neutrons).
 # δ only matters in WFM mode (the other modes were computed with δ = 0.30, which has no effect without WFM choppers).
 FRONTS = {("wfm", 0.30): (0.30, 1e10), ("wfm", 0.10): (0.10, 2e8), ("wfm", 0.45): (0.45, 2e8),
@@ -121,7 +122,10 @@ FAULTS = {
 REFERENCE_SAMPLE = "iron_plate"    # McStas instrument used for the open-beam simulations of the hybrid model
 
 def _odin_sample(spec):
-    return dict(volumes=sl.odin_volumes(spec), name=spec.get("name", spec["id"]), formula=spec.get("formula", ""))
+    out = dict(volumes=sl.odin_volumes(spec), name=spec.get("name", spec["id"]), formula=spec.get("formula", ""))
+    if spec.get("load"):               # a sample in a load frame: lattice strain along the beam per kN, per volume
+        out.update(strain_per_kN=sl.odin_strain_per_kN(spec), max_kN=float(spec["load"]["max_kN"]))
+    return out
 
 
 # Built-in samples: odin/samples/*.yml (sample_library). The games add their mystery plates here; the students' own
@@ -198,6 +202,8 @@ class VirtualOdin:
             Device("stage_rot", 0.0, "deg", limits=(-180, 180), nexus="spst1_rot_y",
                    help="sample rotation about the vertical axis"),
             Device("sample", "iron_plate", choices=tuple(SAMPLES), help="sample mounted on the stage"),
+            Device("load", 0.0, "kN", limits=(0.0, MAX_LOAD),
+                   help="tensile force of the load frame on the sample (samples that can be loaded only)"),
         ]}
         self._back = {}
         self._models = {}
@@ -235,12 +241,31 @@ class VirtualOdin:
                     raise KeyError(f"{name} is read-only: it follows from the chopper mode (devices choppers, wfm_delta)")
                 raise KeyError(f"unknown device: {name}; devices: {list(self.devices)}")
             self.devices[name].check(v)
+        # the load frame: only on a sample that can be loaded, up to its own limit; a new sample is mounted unloaded
+        if "sample" in settings and "load" not in settings and self.devices["load"].value:
+            settings = dict(settings, load=0.0)
+        if settings.get("load"):
+            smp = self.samples()[settings.get("sample", self.devices["sample"].value)]
+            if not smp.get("strain_per_kN"):
+                raise ValueError(f"load: the sample {smp['name']!r} is not in a load frame (it cannot be loaded)")
+            if settings["load"] > smp["max_kN"]:
+                raise ValueError(f"load: {settings['load']} kN is above the limit of this sample ({smp['max_kN']:g} kN: "
+                                 f"beyond it the steel would deform for good)")
         for name, v in settings.items():
             self.devices[name].value = v
         self._log("move", settings)
 
     def status(self):
         return {n: d.value for n, d in self.devices.items()}
+
+    def strains(self, state=None):
+        """Lattice strain along the beam of each volume of the sample at the present load (zeros without load);
+        None: the sample is not in a load frame."""
+        state = state or self.status()
+        smp = self.samples()[state["sample"]]
+        if not smp.get("strain_per_kN"):
+            return None
+        return [k * (state.get("load") or 0.0) for k in smp["strain_per_kN"]]
 
     def readings(self):
         """Read-only values that follow from the settings (shown by NICOS as at ESS): chopper speeds and delays."""
@@ -316,7 +341,9 @@ class VirtualOdin:
                 raise ValueError(f"about {expected:.2g} counts expected, above the twin's limit of {MAX_COUNTS:.0e} "
                                  f"counts per file: count for at most {t * MAX_COUNTS / expected:.1f} s here "
                                  f"(or use a smaller pinhole / another chopper mode)")
-            T = hy.volumes_transmission(self.samples()[state["sample"]]["volumes"], state["stage_x"], state["stage_rot"])
+            smp = self.samples()[state["sample"]]
+            T = hy.volumes_transmission(smp["volumes"], state["stage_x"], state["stage_rot"],
+                                        strains=self.strains(state))
             draw = lambda dt: model.counts(dt, transmission=T, rng=self.rng, beam_factor=beam_factor)
             counts = self._in_slices(draw, t, progress)
         else:

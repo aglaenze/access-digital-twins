@@ -157,6 +157,13 @@ async function loadCatalogue() {
   renderCatalogue();
 }
 
+// order of the catalogue: the introduction, then by number (0, 0 bis, 1, 2...), the planned ones in their place
+function byPlace(a, b) {
+  const n = (e) => e.number === undefined ? 1e3 : parseFloat(e.number) + (/bis/.test(e.number) ? 0.5 : 0);
+  return ((b.kind === "introduction") - (a.kind === "introduction")) || (n(a) - n(b)) ||
+         ((a.status === "planned") - (b.status === "planned"));
+}
+
 function renderCatalogue() {
   const c = catalogue;
   // the introduction of an instrument (kind: introduction) is shown first and is not counted as an exercise
@@ -174,10 +181,12 @@ function renderCatalogue() {
   const I = c.instruments[instr];
   $("#ex-title").textContent = `Exercises on ${I.name}`;
   const ex = c.exercises.filter((e) => e.instrument === instr);
-  ex.sort((a, b) => ((b.kind === "introduction") - (a.kind === "introduction")) || ((a.status === "planned") - (b.status === "planned")));
+  ex.sort(byPlace);
+  const num = (e) => e.number !== undefined ? `Exercise ${esc(e.number)} · ` : "";
   $("#exercises").innerHTML = ex.map((e, i) => e.status === "planned"
-    ? `<article class="ex planned"><div><span class="tech">${esc(e.technique)} · planned</span><h3>${esc(e.title)}</h3></div><p class="q">${esc(e.question)}</p></article>`
-    : `<article class="ex${e.kind === "introduction" ? " intro-card" : ""}"><div><span class="tech">${esc(e.technique)}</span><h3>${esc(e.title)}</h3></div>
+    ? `<article class="ex planned${e.later ? " later" : ""}"><div><span class="tech">${num(e)}${esc(e.technique)} · ${e.later ? "later" : "in preparation"}</span><h3>${esc(e.title)}</h3></div>
+       ${e.sample ? `<p class="smp">${esc(e.sample)}</p>` : ""}<p class="q">${esc(e.question)}</p></article>`
+    : `<article class="ex${e.kind === "introduction" ? " intro-card" : ""}"><div><span class="tech">${num(e)}${esc(e.technique)}</span><h3>${esc(e.title)}</h3></div>
        ${e.kind === "introduction" ? `<p class="q">${esc(e.question)} Start here: it takes about ${esc((e.modes.all || {}).duration || "40 min")}.</p>` : ""}
        ${e.mission ? `<div class="mission">${ICON_TARGET}<span><b>Your mission.</b> ${esc(e.mission)}</span></div>` : ""}
        <div class="levels">${Object.entries(e.modes || {}).map(([k, m]) => level(e, k, m, i)).join("")}</div></article>`).join("");
@@ -261,7 +270,7 @@ async function act(d) {
       loadCatalogue();
     } else if (d.act === "sheet") {
       const e = catalogue.exercises.filter((x) => x.instrument === instr)
-        .sort((a, b) => (a.status === "planned") - (b.status === "planned"))[+d.i];
+        .sort(byPlace)[+d.i];
       $("#sheet .sheet-body").innerHTML = e.modes[d.k].sheet || "";
       $("#sheet").showModal();
     }

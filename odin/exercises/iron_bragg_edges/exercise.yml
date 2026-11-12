@@ -1,6 +1,7 @@
 # One exercise of the catalogue of the app (read by container/twin_app.py: no generation needed).
 # Paths are relative to the root of the repository.
 title: How far apart are the atoms in iron?
+number: "0"                  # place in the catalogue: 0 = the first exercise (a simple sample: the iron plate)
 instrument: odin
 technique: Wavelength-resolved imaging (Bragg edges)
 sample: Iron plate, 5 mm (alpha-iron, body-centered cubic)
