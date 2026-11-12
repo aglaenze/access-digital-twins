@@ -133,19 +133,68 @@ def tomo_frames(sino, angles_deg, xs_mm, steps=None, order="sequential"):
 
 
 # --------------------------------------------------------------------------- players (pages)
-def show_live(nexus_file, n_frames=24, autoplay=True, fill_s=None, status=None):
+class LiveCount:
+    """The detector image and the spectrum of arrival times, filling up during a count (VirtualOdin.count(...,
+    progress=live.update)), as on the instrument; then the replay of the measurement (show_live) below them."""
+
+    def __init__(self, field_mm=7.05):
+        import ipywidgets as w
+        from IPython.display import display
+        self.extent = [-field_mm, field_mm, -field_mm, field_mm]
+        self.status = w.Label("Counting...")
+        self.out = w.Output()
+        self.box = w.VBox([self.status, self.out])
+        self._last = 0.0
+        display(self.box)
+
+    def update(self, image, toa, t_done, t_total, step):
+        import time
+        import matplotlib.pyplot as plt
+        if step == "preparing":
+            self.status.value = "Counting... (the first count of a session prepares the instrument: a few seconds)"
+        elif step == "writing":
+            self.status.value = f"Counted {t_total:.0f} s: writing the file..."
+        else:
+            self.status.value = f"Counting... {t_done:.0f} s / {t_total:.0f} s"
+        if step == "counting" and t_done < t_total and time.time() - self._last < 0.8:
+            return                                      # (drawing takes ~0.4 s: not more than about once a second)
+        self._last = time.time()
+        self.out.clear_output(wait=True)
+        with self.out:
+            fig, ax = plt.subplots(1, 2, figsize=(11, 4.2), gridspec_kw=dict(width_ratios=[1, 1.4]))
+            im = ax[0].imshow(image, origin="lower", extent=self.extent, cmap="inferno", vmin=0,
+                              vmax=max(float(np.max(image)), 1.0))
+            ax[0].set(xlabel="x (mm)", ylabel="y (mm)",
+                      title=f"Detector after {t_done:.1f} s ({float(np.sum(image)):,.0f} neutrons)")
+            fig.colorbar(im, ax=ax[0], label="counts per pixel")
+            edges = np.linspace(0, PULSE_MS, len(toa) + 1)
+            ax[1].step(0.5 * (edges[1:] + edges[:-1]), toa, where="mid", color="tab:blue")
+            ax[1].set(xlabel="time since the last pulse (ms)", ylabel="counts", ylim=(0, max(float(np.max(toa)), 1) * 1.05),
+                      title="Arrival times (raw data, before reduction)")
+            ax[1].grid(alpha=0.3)
+            plt.tight_layout(); plt.show()
+
+    def done(self, nexus_file, n_frames=16):
+        """The count is over: the file name, then the replay of the measurement (Play, slider)."""
+        import os
+        self.status.value = f"File written: {os.path.basename(nexus_file)}  (Play or the slider below: replay the count)"
+        show_live(nexus_file, n_frames=n_frames, autoplay=False, start="last", into=self.out)
+
+
+
+def show_live(nexus_file, n_frames=24, autoplay=True, fill_s=None, status=None, start="first", into=None):
     """Animated replay of a measurement in a notebook / Voilà page (Play button + slider); autoplay: it starts by
     itself, as the detector image of a real instrument fills up during the count.
     fill_s: the count itself, as on the instrument: the image and the spectrum fill up frame by frame for fill_s
     seconds of wall time (status: a Label showing "Counting... t s / T s"), then the Play button and the slider let
-    the student replay it."""
+    the student replay it. start "last": shown at the end of the count. into: an Output to draw in (LiveCount)."""
     import time
     import ipywidgets as w
     import matplotlib.pyplot as plt
     from IPython.display import display
     fr = live_frames(nexus_file, n_frames=n_frames)
     vmax = max(fr["images"][-1].max(), 1)
-    out = w.Output()
+    out = into if into is not None else w.Output()
 
     def draw(k):
         out.clear_output(wait=True)   # (outside the 'with': inside it, Voila can hang when the page loads)
@@ -181,7 +230,13 @@ def show_live(nexus_file, n_frames=24, autoplay=True, fill_s=None, status=None):
         play.value = n_frames - 1
         play.disabled = slider.disabled = False
         return
-    draw(0)
-    display(w.VBox([w.HBox([play, slider]), out]))
+    if start == "last":
+        slider.unobserve_all("value")
+        slider.value = play.value = n_frames - 1
+        slider.observe(lambda ch: draw(ch["new"]), names="value")
+        draw(n_frames - 1)
+    else:
+        draw(0)
+    display(w.HBox([play, slider]) if into is not None else w.VBox([w.HBox([play, slider]), out]))
     if autoplay and hasattr(play, "playing"):        # ipywidgets 8: the replay starts at once
         play.playing = True

@@ -292,6 +292,12 @@ class Open(Base):
 
 class Proposal(Base):
     @web.authenticated
+    def get(self):
+        """The number a new free beamtime gets by default (shown, and editable, in the dialog of the app)."""
+        import user_office
+        self.finish(json.dumps(dict(next=user_office.next_free())))
+
+    @web.authenticated
     def post(self):
         import user_office
         who = user()

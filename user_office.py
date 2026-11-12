@@ -118,9 +118,19 @@ def get(proposal_id):
     return exercise_proposals().get(pid) or _load()["proposals"].get(pid)
 
 
+def next_free(db=None):
+    """The number the next free beamtime gets by default: the first free one from FIRST_FREE (not used by a proposal
+    of this computer nor by an exercise)."""
+    db = db or _load()
+    pid = str(max(int(db.get("next", FIRST_FREE)), FIRST_FREE))
+    while pid in db["proposals"] or pid in exercise_proposals():
+        pid = str(int(pid) + 1)
+    return pid
+
+
 def create(instrument, title, owner, kind="free", proposal_id=None, samples=(), owner_name=""):
-    """A new free beamtime (a new number each time) or an imported proposal (its own number). samples (imported):
-    [{"name": ..., "formula": ...}]. Returns the proposal."""
+    """A new free beamtime (a new number each time: proposal_id if given and free, else next_free()) or an imported
+    proposal (its own number). samples (imported): [{"name": ..., "formula": ...}]. Returns the proposal."""
     if instrument not in INSTRUMENTS:
         raise ValueError(f"instrument: one of {INSTRUMENTS}")
     if kind not in ("free", "imported"):
@@ -130,10 +140,15 @@ def create(instrument, title, owner, kind="free", proposal_id=None, samples=(), 
         raise ValueError("a title is needed (your question, or the title of the proposal)")
     db = _load()
     if kind == "free":
-        pid = str(max(int(db.get("next", FIRST_FREE)), FIRST_FREE))
-        while pid in db["proposals"] or pid in exercise_proposals():
-            pid = str(int(pid) + 1)
-        db["next"] = int(pid) + 1
+        pid = str(proposal_id or "").strip() or next_free(db)
+        if not pid.isdigit():
+            raise ValueError("proposal number: digits only (as at ESS)")
+        if pid in exercise_proposals():
+            raise ValueError(f"{pid} is the proposal of an exercise: choose another number (default: {next_free(db)})")
+        if pid in db["proposals"]:
+            raise ValueError(f"proposal {pid} already exists: choose another number (default: {next_free(db)})")
+        if int(pid) >= int(db.get("next", FIRST_FREE)):
+            db["next"] = int(pid) + 1
         samples = []
     else:
         pid = str(proposal_id or "").strip()

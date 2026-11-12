@@ -49,13 +49,13 @@ class Submit:
         btn.on_click(lambda _: setattr(out, "value", self.make()))
         uid, name, _ = _who()
         who = f"as <b>{html.escape(name)}</b>" if name else "(no account: the file will not carry your name)"
-        display(w.VBox([w.HTML(f'<div class="twq-q" style="background:#22354F">Submit</div>'
+        display(w.VBox([w.HTML(f'<div class="twq-q">Submit</div>'
                                f'<p>When you are done, submit your work {who}: a file is made with your answers, your '
                                f'measurements{" and your notebooks" if mode != "bsc" else ""}. Download it and send it to your '
                                f'teacher. You can submit again later: the newest file counts.'
                                + (" Save your notebook first (<i>Save</i> in the app, or Ctrl+S)." if mode != "bsc" else "")
                                + '</p>'),
-                        btn, out]).add_class("twq"))
+                        w.HBox([btn]), out]).add_class("twq"))      # (in a row: the button keeps its own width)
 
     def _title(self):
         try:

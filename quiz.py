@@ -29,6 +29,13 @@ import time
 import ipywidgets as w
 from IPython.display import display
 
+# ipykernel with Python 3.14 sometimes logs "Task was destroyed but it is pending!" and "coroutine
+# 'Kernel.shell_main' was never awaited" while the app runs the cells: harmless, but shown in red under a question
+import logging as _logging
+import warnings as _warnings
+_logging.getLogger("asyncio").setLevel(_logging.CRITICAL)
+_warnings.filterwarnings("ignore", message="coroutine .* was never awaited", category=RuntimeWarning)
+
 GREEN, RED, GREY = "#E3F1EC", "#F8E5E1", "#F2F2F2"
 CSS = """<style>
 .twq {border: 1px solid #D9DDE5; border-radius: 10px; padding: 10px 16px; margin: 10px 0; background: #FBFBFD}

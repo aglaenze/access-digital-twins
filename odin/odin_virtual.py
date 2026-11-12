@@ -42,6 +42,7 @@ RUN_ROOT = paths.RUN_ROOT
 BUILD = paths.BUILD
 COMPONENTS = paths.COMPONENTS
 FIELD = (-0.00705, 0.00705, -0.00705, 0.00705)  # [m] Timepix3 field of view of the template
+TOA_BINS = 150                                   # spectrum of arrival times shown while counting (odin_viz.LiveCount)
 FOV = 0.016                      # [m] McStas detector window, slightly larger than the Timepix3 (14 mm)
 # Largest number of counts per file (memory: ~40 bytes per count while writing). The open beam gives ~1·10⁶ counts/s
 # in WFM mode but ~2·10⁷ counts/s in white mode. (A real Timepix3 camera would saturate at such rates; not modeled.)
@@ -279,10 +280,15 @@ class VirtualOdin:
             self.number = self._last_number()
             self.samples()
 
-    def count(self, t, title="", write=True):
+    def count(self, t, title="", write=True, progress=None):
         """Measures for t seconds; returns the path of the NeXus file written.
         write=False: the detector image only (live display), no file, as a count outside a file-writing job at ESS;
-        returns None."""
+        returns None.
+        progress(image, toa, t_done, t_total, step): called while counting, as the detector image of the instrument
+        fills up: the neutrons are drawn in slices of the counting time, and after each slice progress gets the image
+        so far (128 x 128, as last_image), the spectrum of arrival times so far (TOA_BINS bins over one pulse period),
+        the counting time done; step: "preparing" (before the first neutron), "counting", then "writing" (the
+        file). The result is the same as in one go: the slices are independent Poisson draws, added."""
         if not 0 < t <= 3600:
             raise ValueError("counting time between 0 and 3600 s")
         t0 = time.time()
@@ -297,9 +303,12 @@ class VirtualOdin:
         charge = nx.pulse_charges(t, self.rng, fluctuation=self.fluctuation, outages=outages)
         ppf = nx.PULSES_PER_FRAME[state["choppers"]]
         beam_factor = charge[0::ppf].mean() / nx.Q_NOMINAL          # useful pulses (one in two with the band-pass choppers)
+        if progress is not None:
+            progress(np.zeros((128, 128)), np.zeros(TOA_BINS), 0.0, t, "preparing")
         if state["shutter"] == "closed":                              # background only
-            counts = nx.sample_counts({k: np.zeros(0) for k in ("x", "y", "t", "lam", "w")}, t, field=FIELD,
-                                      rng=self.rng)
+            draw = lambda dt: nx.sample_counts({k: np.zeros(0) for k in ("x", "y", "t", "lam", "w")}, dt,
+                                               field=FIELD, rng=self.rng)
+            counts = self._in_slices(draw, t, progress)
         elif self.mode == "hybrid":
             model = self.model(state)
             expected = model.rate() * t * beam_factor
@@ -308,7 +317,8 @@ class VirtualOdin:
                                  f"counts per file: count for at most {t * MAX_COUNTS / expected:.1f} s here "
                                  f"(or use a smaller pinhole / another chopper mode)")
             T = hy.volumes_transmission(self.samples()[state["sample"]]["volumes"], state["stage_x"], state["stage_rot"])
-            counts = model.counts(t, transmission=T, rng=self.rng, beam_factor=beam_factor)
+            draw = lambda dt: model.counts(dt, transmission=T, rng=self.rng, beam_factor=beam_factor)
+            counts = self._in_slices(draw, t, progress)
         else:
             counts = nx.counts_from_mcpl(self.simulate(state), t, field=FIELD, rng=self.rng,
                                          beam_factor=beam_factor, copies=self.copies)
@@ -325,6 +335,8 @@ class VirtualOdin:
                                     charge_uC=round(float(charge.sum()), 1), state=self.status(),
                                     compute_time=round(time.time() - t0, 1)))
             return None
+        if progress is not None:
+            progress(self.last_image, self._toa(counts), t, t, "writing")
         self.number += 1
         out_file = f"{self.folder}/odin_{self.number:06d}.nxs"
         r = nx.write_nexus(counts, out_file, t, title=title or f"run {self.number}",
@@ -338,6 +350,37 @@ class VirtualOdin:
                                 outages=[(round(a, 1), round(b, 1)) for a, b in outages],
                                 state=self.status(), compute_time=round(time.time() - t0, 1)))
         return out_file
+
+    @staticmethod
+    def _image(counts):
+        return np.histogram2d(counts["y"], counts["x"], bins=128, range=[FIELD[2:], FIELD[:2]])[0]
+
+    @staticmethod
+    def _toa(counts):
+        """Spectrum of arrival times after the last pulse (as event_time_offset in the file: the time since the
+        emitting pulse, modulo the pulse period; the frames start on a pulse)."""
+        return np.histogram(np.mod(np.asarray(counts["t"], float) * 1e3, 1e3 / nx.PULSE_HZ), bins=TOA_BINS,
+                            range=(0, 1e3 / nx.PULSE_HZ))[0]
+
+    def _in_slices(self, draw, t, progress):
+        """draw(dt) -> counts of dt seconds. Without progress: one draw. With progress: the counting time in slices
+        (about 2 s, 4 to 15 slices), the image and the spectrum shown after each, never ahead of the clock (the count
+        lasts t, as on the instrument; longer if drawing the neutrons is slower), then the slices put together."""
+        if progress is None:
+            return draw(t)
+        n = int(min(15, max(4, round(t / 2))))
+        parts, image, toa = [], np.zeros((128, 128)), np.zeros(TOA_BINS)
+        t0 = time.time()
+        for k in range(n):
+            c = draw(t / n)
+            time.sleep(max(0.0, t0 + t * (k + 1) / n - time.time()))    # in real time, as on the instrument
+            parts.append(c)
+            image += self._image(c)
+            toa += self._toa(c)
+            progress(image, toa, t * (k + 1) / n, t, "counting")
+        out = {key: (np.concatenate([p[key] for p in parts]) if isinstance(parts[0][key], np.ndarray) else parts[0][key])
+               for key in parts[0]}
+        return out
 
     def beam_used(self):
         """Counting time with the shutter open spent so far in this session [s] (from the log)."""

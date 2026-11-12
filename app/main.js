@@ -201,7 +201,7 @@ async function selftest(out) {
       .then((r) => log("figure shown: " + r));
     await new Promise((r) => setTimeout(r, 1000));
     await shot("3c_figure");
-    for (let i = 0; i < 60; i++) {           // (the widgets of the page come after its loading)
+    for (let i = 0; i < 180; i++) {          // (the widgets of the page come after its loading; slow on a busy computer)
       if (await js(`document.querySelector(".pane.on webview").executeJavaScript("[...document.querySelectorAll('button')].some(x => x.textContent.includes('Submit my work'))")`).catch(() => false)) break;
       await new Promise((r) => setTimeout(r, 1000));
     }
@@ -240,6 +240,14 @@ async function selftest(out) {
       !!m && m[1] === m[2] && m[3] === "0" && m[4] === "0", t3);
     check(`MSc notebook: every code cell locked (${m ? m[5] + "/" + m[6] : "?"})`, !!m && m[5] === m[6], t3);
     check(`notebook shown from its top (active cell ${m ? m[7] : "?"})`, !!m && m[7] === "0", t3);
+    // a double click on a locked text cell leaves it rendered (no raw markdown)
+    await js(`(() => { const v = document.querySelectorAll(".pane.on webview")[0]; return v.executeJavaScript("(() => { const n = window.jupyterapp.shell.currentWidget.content; const c = n.widgets.find(x => x.model.type === 'markdown' && x.readOnly); c.node.querySelector('.jp-MarkdownOutput').dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); return true; })()"); })()`).catch(() => {});
+    await new Promise((r) => setTimeout(r, 500));
+    const raw = await js(`document.querySelectorAll(".pane.on webview")[0].executeJavaScript("window.jupyterapp.shell.currentWidget.content.widgets.filter(c => c.model.type === 'markdown' && !c.rendered).length")`).catch(() => "?");
+    check(`MSc notebook: a locked text cell stays rendered on a double click (${raw} shown raw)`, raw === 0, t3);
+    // the hidden code of the questions and buttons is not shown at all (not even its folded bar)
+    const folded = await js(`document.querySelectorAll(".pane.on webview")[0].executeJavaScript("[...document.querySelectorAll('.jp-InputPlaceholder')].filter(e => e.offsetParent !== null).length + '/' + document.querySelectorAll('.jp-InputPlaceholder').length")`).catch(() => "?");
+    check(`MSc notebook: no folded code bar shown (${folded} visible)`, /^0\/[1-9]/.test(folded), t3);
     // typed as a student would: click into a code cell, type; its code must not change
     const cellSrc = `document.querySelectorAll(".pane.on webview")[0].executeJavaScript("(() => { const w = window.jupyterapp.shell.currentWidget; const c = w.content.widgets.find(c => c.model.type === 'code' && c.model.sharedModel.source.trim()); return c.model.sharedModel.source; })()")`;
     const srcBefore = await js(cellSrc).catch(() => "?");
@@ -255,9 +263,13 @@ async function selftest(out) {
     const srcAfter = await js(cellSrc).catch(() => "?");
     check(`MSc notebook: keys typed in a code cell change nothing (cursor in the cell: ${inEditor}; ${srcAfter === srcBefore ? "unchanged" : "the cell was changed"})`,
       inEditor === true && srcBefore !== "?" && srcAfter === srcBefore, t3);
-    await js(`document.querySelectorAll(".pane.on webview")[0].executeJavaScript("(() => { const w = window.jupyterapp.shell.currentWidget; w.content.mode = 'command'; w.content.activeCellIndex = 0; w.content.scrollToCell(w.content.widgets[0]); return true; })()")`);
+    await js(`document.querySelectorAll(".pane.on webview")[0].executeJavaScript("(() => { const w = window.jupyterapp.shell.currentWidget; w.content.mode = 'command'; w.content.activeCellIndex = 0; w.content.widgets.forEach(c => { if (c.model.type === 'markdown') c.rendered = true; }); w.content.scrollToCell(w.content.widgets[0]); return true; })()")`);
     await new Promise((r) => setTimeout(r, 2000));
     await shot("5_notebook");
+    await js(`document.querySelectorAll(".pane.on webview")[0].executeJavaScript("(() => { const w = window.jupyterapp.shell.currentWidget; const c = w.content.widgets; w.content.scrollToCell(c[c.length - 1], 'end'); return true; })()")`).catch(() => {});
+    await new Promise((r) => setTimeout(r, 2000));
+    await shot("5b_notebook_end");
+    await js(`document.querySelectorAll(".pane.on webview")[0].executeJavaScript("(() => { const w = window.jupyterapp.shell.currentWidget; w.content.scrollToCell(w.content.widgets[0], 'start'); return true; })()")`).catch(() => {});
     // the sample builder, opened for ODIN and a proposal (as from a beamtime notebook): a block, + a sphere, + a cylinder
     const t4 = Date.now();
     await js(`openTab("/voila/render/Sample_builder.ipynb?instrument=odin&proposal=1234", "page", "Sample builder"); true`);

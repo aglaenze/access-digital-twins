@@ -132,12 +132,9 @@ def do_count(_):
             mode, delta = chop.value
             odin.move(choppers=mode, wfm_delta=delta, shutter=shut.value, pinhole=pinh.value, diffuser=diff.value,
                       stage_x=stage.value / 1000, sample=smp.value)
-            status = w.Label("Counting... (the twin computes the neutrons of this setting; the first count of a "
-                             "new setting takes up to a minute)")
-            display(status)
-            f = odin.count(ttime.value, title=title.value)
-            viz.show_live(f, n_frames=16, fill_s=min(ttime.value, 30), status=status)   # fills up as on the instrument
-            status.value = f"File written: {os.path.basename(f)}  (Play or the slider: replay the measurement)"
+            live = viz.LiveCount()                  # the image and the spectrum fill up during the count
+            f = odin.count(ttime.value, title=title.value, progress=live.update)
+            live.done(f)
         except Exception as e:
             print("Error:", e)
     button.disabled = False

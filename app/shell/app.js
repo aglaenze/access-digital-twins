@@ -277,6 +277,9 @@ function askProposal(imported) {
   dlg.querySelectorAll(".only-import").forEach((e) => e.classList.toggle("hidden", !imported));
   $("#p-title-label").textContent = imported ? "Title of the proposal" : "Your question";
   $("#p-title").value = ""; $("#p-id").value = ""; $("#p-samples").value = ""; $("#p-error").textContent = "";
+  if (!imported) {        // a free beamtime: the first free number, which the student may change
+    T.api("GET", "/twin/proposal").then((r) => { if (!$("#p-id").value) $("#p-id").value = r.next; }).catch(() => {});
+  }
   dlg.showModal();
   return new Promise((resolve) => {
     $("#p-cancel").onclick = () => { dlg.close(); resolve(null); };
@@ -356,9 +359,23 @@ function openTab(url, kind, label) {
     // a notebook opens already run: all its cells are executed once the kernel is ready (Notebook 7 exposes its
     // commands: exposeAppInBrowser in container/app_config/labconfig/page_config.json)
     view.addEventListener("did-stop-loading", () => {
+      // the look of the app on the notebooks too (the questions, Submit, the buttons): the stylesheet of the pages
+      view.executeJavaScript(`(() => { if (document.getElementById("twin-css")) return;
+        const l = document.createElement("link"); l.id = "twin-css"; l.rel = "stylesheet";
+        l.href = "${server.base}/voila/templates/twin/static/twin.css"; document.head.append(l); })()`).catch(() => {});
+      // a locked text cell stays rendered: no raw markdown on a double click or on Enter (it could not be changed anyway)
+      view.executeJavaScript(`(() => { if (window.__twinKeepRendered) return; window.__twinKeepRendered = true;
+        const nb = () => { const w = window.jupyterapp && window.jupyterapp.shell.currentWidget; return w && w.content; };
+        const locked = (c) => c && c.model.type === "markdown" && c.readOnly;
+        window.addEventListener("dblclick", (e) => { const n = nb(); if (!n) return;
+          const c = n.widgets.find((x) => x.node.contains(e.target));
+          if (locked(c)) { e.stopPropagation(); e.preventDefault(); } }, true);
+        window.addEventListener("keydown", (e) => { const n = nb(); if (!n || e.key !== "Enter" || n.mode !== "command") return;
+          if (locked(n.activeCell)) { e.stopPropagation(); e.preventDefault(); } }, true); })()`).catch(() => {});
       // locked code cells look locked: gray, no blinking cursor, a "locked" mark (they cannot be changed anyway)
       view.insertCSS(`.jp-InputArea-editor.jp-mod-readOnly { background: #EEF0F3 !important; position: relative; }
         .jp-InputArea-editor.jp-mod-readOnly .cm-content { caret-color: transparent; cursor: default; }
+        .jp-Cell-inputWrapper:has(.jp-InputPlaceholder) { display: none !important; }   /* hidden code (questions, buttons): not even its folded bar */
         .jp-InputArea-editor.jp-mod-readOnly::after { content: "\\1F512  locked"; position: absolute; top: 3px; right: 8px;
           font-size: 11px; color: #7A8190; pointer-events: none; }`).catch(() => {});
       t.running = true;
