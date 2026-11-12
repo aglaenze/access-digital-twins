@@ -12,13 +12,13 @@ group = 'optional'
 BROKERS = ['127.0.0.1:9092']
 
 devices = dict(
-    live_image = device('nicos_ess.devices.datasources.just_bin_it.JustBinItImage',
+    live_image = device('nicos_twin.devices.TwinJustBinItImage',
         description = 'live detector image (128 x 128 superpixels of 32 x 32 Timepix3 pixels)',
         hist_topic = 'odin_visualisation', data_topic = 'odin_detector', source = 'odin_detector',
         brokers = BROKERS,
         unit = 'evts', hist_type = '2-D DET', det_width = 128, det_height = 128, det_range = (1, 16385),
     ),
-    live_tof = device('nicos_ess.devices.datasources.just_bin_it.JustBinItImage',
+    live_tof = device('nicos_twin.devices.TwinJustBinItImage',
         description = 'live spectrum of the arrival times after the source pulse (0-71.4 ms)',
         hist_topic = 'odin_visualisation', data_topic = 'odin_detector', source = 'odin_detector',
         brokers = BROKERS,

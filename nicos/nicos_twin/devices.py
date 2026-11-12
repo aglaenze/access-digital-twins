@@ -287,9 +287,37 @@ class TwinDetector(TwinDevice, Measurable):
 
 
 try:        # live data (Kafka): needs confluent-kafka, ess-streaming-data-types, keyring (optional for the twin)
-    from nicos_ess.devices.datasources.just_bin_it import JustBinItDetector as _EssJustBinItDetector
+    from nicos_ess.devices.datasources.just_bin_it import JustBinItDetector as _EssJustBinItDetector,         JustBinItImage as _EssJustBinItImage
+    from nicos_ess.devices.kafka.consumer import KafkaConsumer as _KafkaConsumer
 except Exception:
-    _EssJustBinItDetector = None
+    _EssJustBinItDetector = _EssJustBinItImage = _KafkaConsumer = None
+
+
+def _consumer_alive(consumer, topic, timeout=3):
+    """True if a Kafka consumer of NICOS still gets the metadata of its topic. After a hiccup of the broker (the
+    computer put to sleep, or very busy: "heartbeat ... REQUEST_TIMED_OUT" in kafka.log), a consumer could stay
+    broken ("Broker transport failure") while Kafka itself was fine again: every count then failed with
+    "could not obtain metadata for topic ..." until NICOS was restarted (2026-11-12)."""
+    try:
+        consumer._consumer.list_topics(topic, timeout=timeout)
+        return True
+    except Exception:              # noqa: BLE001
+        return False
+
+if _EssJustBinItImage is not None:
+    class TwinJustBinItImage(_EssJustBinItImage):
+        """The live image of the ESS NICOS (a histogram of just-bin-it), whose Kafka consumer is made again if it no
+        longer reaches the broker (see _consumer_alive): the count goes on instead of failing."""
+
+        def doPrepare(self):
+            if self._consumer is not None and not _consumer_alive(self._consumer, self.hist_topic):
+                self.log.warning("connection to Kafka lost (computer asleep or busy?): reconnecting")
+                try:
+                    self._consumer.close()
+                except Exception:      # noqa: BLE001
+                    pass
+                self._consumer = _KafkaConsumer.create(self.brokers)
+            _EssJustBinItImage.doPrepare(self)
 
 if _EssJustBinItDetector is not None:
     class TwinJustBinItDetector(_EssJustBinItDetector):
@@ -297,6 +325,18 @@ if _EssJustBinItDetector is not None:
         the count to 0.5 s after its end, instead of "interval" (just-bin-it would start it when it reads the command,
         a little after the twin has started streaming, and lose the first pulses). The twin keeps streaming empty pulses
         for a moment after the measurement, as a real detector streams all the time, so just-bin-it sees the end."""
+
+        def doPrepare(self):
+            # its consumer of the responses of just-bin-it made again if it no longer reaches the broker (as above)
+            if not _consumer_alive(self._response_consumer, self.response_topic):
+                self.log.warning("connection to Kafka lost (computer asleep or busy?): reconnecting")
+                try:
+                    self._response_consumer.close()
+                except Exception:      # noqa: BLE001
+                    pass
+                self._response_consumer = _KafkaConsumer.create(self.brokers)
+                self._response_consumer.subscribe(self.response_topic)
+            _EssJustBinItDetector.doPrepare(self)
 
         def _create_config(self, interval, identifier):
             config = super()._create_config(interval, identifier)

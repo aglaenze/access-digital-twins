@@ -9,12 +9,12 @@ group = 'optional'
 BROKERS = ['127.0.0.1:9092']
 
 devices = dict(
-    live_image = device('nicos_ess.devices.datasources.just_bin_it.JustBinItImage',
+    live_image = device('nicos_twin.devices.TwinJustBinItImage',
         description = 'live image of the rear detector panel (sample of the neutrons)',
         hist_topic = 'loki_visualisation', data_topic = 'loki_detector', brokers = BROKERS,
         unit = 'evts', hist_type = '2-D DET', det_width = 250, det_height = 392, det_range = (1, 98001),
     ),
-    live_tof = device('nicos_ess.devices.datasources.just_bin_it.JustBinItImage',
+    live_tof = device('nicos_twin.devices.TwinJustBinItImage',
         description = 'live spectrum of the arrival times after the source pulse (0-71.4 ms), rear panel',
         hist_topic = 'loki_visualisation', data_topic = 'loki_detector', brokers = BROKERS,
         unit = 'evts', hist_type = '1-D TOF', tof_range = (0, 71428571), num_bins = 300, det_range = (1, 98001),
