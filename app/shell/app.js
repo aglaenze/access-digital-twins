@@ -330,6 +330,19 @@ function openTab(url, kind, label) {
   cover.className = "loading";
   cover.innerHTML = `<div class="spinner"></div><span>Opening ${esc(label)}…</span><span class="small" data-t></span>`;
   pane.append(view, cover);
+  // "Submit my work" (submit.py): its download link is clicked at once, so the window to save the file opens by itself
+  view.addEventListener("dom-ready", () => {
+    view.executeJavaScript(`(() => {
+      if (window.__twinAutoDownload) return;
+      window.__twinAutoDownload = true;
+      new MutationObserver(() => {
+        document.querySelectorAll("a[data-twin-autodownload]:not([data-twin-done])").forEach((a) => {
+          a.setAttribute("data-twin-done", "1");
+          a.click();
+        });
+      }).observe(document.documentElement, { childList: true, subtree: true });
+    })()`).catch(() => {});
+  });
   $("#stage").append(pane);
   $("#tabs").append(btn);
   const t0 = Date.now();

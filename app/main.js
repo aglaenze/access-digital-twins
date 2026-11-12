@@ -199,6 +199,8 @@ async function selftest(out) {
       .then((r) => log("submit button: " + r));
     await new Promise((r) => setTimeout(r, 3000));
     await shot("3d_submitted");
+    const zips = fs.readdirSync(out).filter((f) => f.startsWith("download_") && f.endsWith(".zip"));
+    check(`Submit my work: the file to save is offered at once (${zips.join(", ") || "nothing downloaded"})`, zips.length > 0, Date.now());
     await js(`document.querySelector("#tab-cat").click(); true`);
     await new Promise((r) => setTimeout(r, 1500));
     const t2 = Date.now();
@@ -335,6 +337,10 @@ async function selftest(out) {
 app.setAppUserModelId("dk.dtu.access.twins");   // its own icon and group in the Windows taskbar
 app.whenReady().then(() => {
   session.fromPartition("persist:twins").on("will-download", (_e, item) => {
+    if (process.env.TWIN_APP_SELFTEST) {     // self-test: no window, the file goes to the folder of the screenshots
+      item.setSavePath(path.join(process.env.TWIN_APP_SELFTEST, "download_" + item.getFilename()));
+      return;
+    }
     item.setSaveDialogOptions({ title: "Save the file for your teacher",
                                 defaultPath: path.join(app.getPath("documents"), item.getFilename()) });
   });

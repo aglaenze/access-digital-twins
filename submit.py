@@ -117,5 +117,6 @@ class Submit:
             pass
         b64 = base64.b64encode(data).decode()
         return (f'<div class="twq-fb twq-ok"><b>Submitted</b> {now:%Y-%m-%d %H:%M}. {html.escape(summary)}<br>'
-                f'<a download="{fname}" href="data:application/zip;base64,{b64}"><b>Download the file</b></a> '
-                f'({len(data) // 1024 + 1} kB) and send it to your teacher.</div>')
+                f'A window opens to save the file: save it, then send it to your teacher (email, course page). '
+                f'If no window opens: <a download="{fname}" href="data:application/zip;base64,{b64}" '
+                f'data-twin-autodownload="1"><b>download the file</b></a> ({len(data) // 1024 + 1} kB).</div>')
