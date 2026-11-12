@@ -63,9 +63,16 @@ def write(cells, name, all_code_locked=False):
                     break
             if c.source.lstrip().startswith(HIDDEN_START) or "nb_tools.proposal(" in c.source:
                 c.metadata["jupyter"] = {"source_hidden": True}
-            if c.source.lstrip().startswith(("q.", "q_.")):        # a question: it needs no measurement, the app
-                c.metadata["twin"] = {"run_at_open": "always"}    # runs it at opening even after the stop mark
+            if c.source.lstrip().startswith(("q.", "q_.", "import submit")):   # a question or the Submit button: no
+                c.metadata["twin"] = {"run_at_open": "always"}    # measurement needed, the app runs it at opening
         out.append(c)
+    # the cells that read the measurements do not run at opening (nothing measured yet): the app runs the cells above
+    # the stop mark only. MSc: the mark is set above (part 1); beamtime: on the first code cell after the NICOS button
+    if not any(c.metadata.get("twin", {}).get("run_at_open") == "stop" for c in out):
+        k = next((i for i, c in enumerate(out) if c.cell_type == "code" and "nb_tools.nicos(" in c.source), None)
+        nxt = next((i for i in range(k + 1, len(out)) if out[i].cell_type == "code"), None) if k is not None else None
+        if nxt is not None:
+            out[nxt].metadata["twin"] = {"run_at_open": "stop"}
     for c in out:
         lock(c, all_code_locked)
     cells = out

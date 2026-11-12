@@ -88,11 +88,12 @@ def _livedata_service(folder="livedata"):
     return m
 
 
-def start(name, cmd, env=None, cwd=None):
+def start(name, cmd, env=None, cwd=None, aux=False):
+    """aux: a service whose failure does not stop NICOS (the live image only is lost)."""
     log = open(os.path.join(LOGS, f"{name}.log"), "w", encoding="utf-8")
     p = subprocess.Popen(cmd, env=env, cwd=cwd, stdout=log, stderr=subprocess.STDOUT,
                          creationflags=getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0))
-    PROCS.append((name, p))
+    (AUX if aux else PROCS).append((name, p))
     print(f"  {name} started (pid {p.pid}, log {log.name})", flush=True)
     return p
 
@@ -237,7 +238,7 @@ def main():
         # started together (none of them needs the others): the Kafka broker, the twin server, the NICOS cache
         kafka = (o.live or o.filewriter or o.livedata or o.epics or o.efu) and not port_open(9092)
         if kafka:                      # data streaming as at ESS: the Kafka broker
-            start("kafka", [MCSTAS_PY, os.path.join(TWIN, "kafka", "start_kafka.py")], cwd=TWIN)
+            start("kafka", [MCSTAS_PY, os.path.join(TWIN, "kafka", "start_kafka.py")], cwd=TWIN, aux=True)
         start("twin_server", [MCSTAS_PY, os.path.join(TWIN, "twin_server.py"), "--instrument", instr,
                               "--session", o.session, "--mode", o.mode, "--port", str(o.port)], cwd=TWIN)
         start("nicos_cache", [NICOS_PY, os.path.join(NICOS_ROOT, "bin", "nicos-cache")], env=env, cwd=NICOS_ROOT)
@@ -265,7 +266,7 @@ def main():
             start("just_bin_it", [MCSTAS_PY, "-c", "from just_bin_it.cli import main; main()", "-b", "127.0.0.1:9092",
                                   "-t", f"{instr}_jbi_commands", "-hb", f"{instr}_jbi_heartbeat",
                                   "-rt", f"{instr}_jbi_responses", "-l", "3"],
-                  env=dict(os.environ, PYTHONPATH=JBI_HOME), cwd=JBI_HOME)
+                  env=dict(os.environ, PYTHONPATH=JBI_HOME), cwd=JBI_HOME, aux=True)
         status(f"starting the twin of {instr.upper()} (its McStas model)")
         wait_for(lambda: http_ok(f"http://127.0.0.1:{o.port}/status"), "the twin server")
         if o.epics:                    # the PVs of the twin (soft IOC) and the ESS forwarder, configured with them

@@ -45,14 +45,19 @@ offsets.topic.replication.factor=1
 transaction.state.log.replication.factor=1
 transaction.state.log.min.isr=1
 auto.create.topics.enable=true
-# detector streams: keep 2 hours, small segments so that old data are deleted soon
-log.retention.ms=7200000
+{{RETENTION}}
 log.segment.bytes=67108864
 log.retention.check.interval.ms=60000
 # messages up to 16 MB (one source pulse of events, one histogram)
 message.max.bytes=16777216
 replica.fetch.max.bytes=16777216
 """
+# detector streams: keep 2 hours, small segments so that old data are deleted soon. On Windows Kafka cannot delete
+# a segment (the file is still open: "The process cannot access the file because it is being used by another
+# process"), takes the log folder as failed and stops: nothing is deleted while it runs, and the streams start empty
+# at each start instead (main). The streams are transient anyway: the data files of the measurements are elsewhere.
+RETENTION = ("log.retention.ms=-1" + chr(10) + "log.retention.bytes=-1" if os.name == "nt" else "log.retention.ms=7200000")
+PROPERTIES = PROPERTIES.replace("{RETENTION}", RETENTION)
 
 
 def answers(port=PORT, host="127.0.0.1"):
@@ -133,6 +138,8 @@ def main():
         sys.exit(0 if ok else 1)
     if not os.path.isdir(KAFKA_HOME):
         sys.exit(f"Kafka not found in {KAFKA_HOME} (variable KAFKA_HOME); see the docstring of this file")
+    if os.name == "nt":            # the streams start empty (see RETENTION); the topics are created again by --topics
+        shutil.rmtree(os.path.join(DATA, "logs"), ignore_errors=True)
     os.makedirs(DATA, exist_ok=True)
     props = os.path.join(DATA, "server.properties")
     with open(props, "w", encoding="utf-8") as f:

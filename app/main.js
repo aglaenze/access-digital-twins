@@ -46,6 +46,14 @@ function createWindow() {
                       backgroundThrottling: !process.env.TWIN_APP_SELFTEST },
   });
   win.removeMenu();
+  if (process.platform === "win32") {   // "Pin to taskbar": the app with its icon, not the bare Electron program
+    const ico = path.join(__dirname, "..", "container", "app_icon.ico");
+    win.setAppDetails({
+      appId: "dk.dtu.access.twins", relaunchDisplayName: "ESS digital twins",
+      relaunchCommand: app.isPackaged ? `"${process.execPath}"` : `"${process.execPath}" "${__dirname}"`,
+      appIconPath: fs.existsSync(ico) ? ico : process.execPath, appIconIndex: 0,
+    });
+  }
   win.once("ready-to-show", () => win.show());
   win.loadFile(path.join(__dirname, "shell", "index.html"));
   win.on("close", (e) => {           // the open notebooks are saved first
@@ -193,13 +201,21 @@ async function selftest(out) {
       .then((r) => log("figure shown: " + r));
     await new Promise((r) => setTimeout(r, 1000));
     await shot("3c_figure");
+    for (let i = 0; i < 60; i++) {           // (the widgets of the page come after its loading)
+      if (await js(`document.querySelector(".pane.on webview").executeJavaScript("[...document.querySelectorAll('button')].some(x => x.textContent.includes('Submit my work'))")`).catch(() => false)) break;
+      await new Promise((r) => setTimeout(r, 1000));
+    }
     await js(`document.querySelector(".pane.on webview").executeJavaScript(
       "var b = [...document.querySelectorAll('button')].find(x => x.textContent.includes('Submit my work'));" +
       " if (b) { b.scrollIntoView(); b.click(); } b ? true : [...document.querySelectorAll('button')].slice(-3).map(x => x.textContent).join(' | ')")`)
       .then((r) => log("submit button: " + r));
     await new Promise((r) => setTimeout(r, 3000));
     await shot("3d_submitted");
-    const zips = fs.readdirSync(out).filter((f) => f.startsWith("download_") && f.endsWith(".zip"));
+    let zips = [];
+    for (let i = 0; i < 20 && !zips.length; i++) {      // (the file is made by the kernel, then downloaded)
+      zips = fs.readdirSync(out).filter((f) => f.startsWith("download_") && f.endsWith(".zip"));
+      if (!zips.length) await new Promise((r) => setTimeout(r, 1000));
+    }
     check(`Submit my work: the file to save is offered at once (${zips.join(", ") || "nothing downloaded"})`, zips.length > 0, Date.now());
     await js(`document.querySelector("#tab-cat").click(); true`);
     await new Promise((r) => setTimeout(r, 1500));
