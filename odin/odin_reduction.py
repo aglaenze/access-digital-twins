@@ -245,12 +245,18 @@ def measurements(folder):
                     title = title.decode() if isinstance(title, bytes) else str(title)
                     x_mm = float(e["sample/x_translation"][()]) * 1e3
                     kind = "dark" if a.get("shutter") == "closed" else ("open beam" if abs(x_mm) > 20 else "sample")
+                    smp = e["sample/name"][()] if "sample/name" in e else b""
                     rows.append(dict(file=os.path.basename(path), kind=kind, title=title, detector="camera",
+                                     sample=smp.decode() if isinstance(smp, bytes) else str(smp),
                                      pixels=int(ins["camera/data"].shape[0]),
                                      t_s=float(e["duration"][()]), counts=int(ins["camera/data"][()].sum()),
                                      choppers=str(a.get("choppers")), pinhole_m=float(a.get("pinhole_m", 0)),
                                      stage_x_m=round(x_mm / 1e3, 4),
                                      stage_rot_deg=round(float(e["sample/rotation_angle"][()]), 2)))
+                    if ins["camera/data"].ndim == 3:     # polarized imaging: counts per wavelength (polarimetry())
+                        rows[-1].update(detector="polarized", pixels=int(ins["camera/data"].shape[-1]),
+                                        polarizer=str(a.get("polarizer")), spin_in=str(a.get("spin_in")),
+                                        spin_out=str(a.get("spin_out")))
                     continue
                 title = e["title"][()]
                 title = title.decode() if isinstance(title, bytes) else str(title)

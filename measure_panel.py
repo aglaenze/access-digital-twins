@@ -179,12 +179,62 @@ class Panel:
 
         cam.on_click(image)
         tomo.on_click(tomography)
+        # polarized imaging (samples with a field map): as polarimetry() and polarization_matrix() in NICOS
+        magnetic = [n for n in samples if (lib.get(n) or {}).get("field")]
+        pol_box = []
+        if magnetic:
+            rot = w.BoundedFloatText(value=float(st["stage_rot"]), min=-180, max=180, step=1, description="Rotation (°)")
+            polz = w.ToggleButtons(options=["out", "in"], value=st["polarizer"], description="Polarizer")
+            s_in = w.Dropdown(options=["+x", "-x", "+y", "-y", "+z", "-z"], value=st["spin_in"], description="Spin in")
+            s_out = w.Dropdown(options=["x", "y", "z"], value=st["spin_out"], description="Analyzer")
+            one = w.Button(description="Polarized image", icon="compass", layout=w.Layout(width="auto"))
+            full = w.Button(description="Polarization matrix (18 images)", icon="th", layout=w.Layout(width="auto"))
+            pbar = w.IntProgress(value=0, min=0, max=18, layout=w.Layout(width="300px"))
+
+            def pol_settings():
+                settings()
+                odin.move(stage_rot=float(rot.value), polarizer=polz.value, spin_in=s_in.value, spin_out=s_out.value)
+
+            def pol_one(_):
+                one.disabled = True
+                with out:
+                    clear_output()
+                    try:
+                        pol_settings()
+                        f = odin.polarimetry(float(t.value), title=title.value or "")
+                        print(f"polarized image written in the folder of proposal {self.proposal}: {os.path.basename(f)} "
+                              f"(spin in {s_in.value}, analyzer {s_out.value}, {odin.last_n_counts:,} counts)")
+                    except Exception as e:
+                        print("Error:", e)
+                one.disabled = False
+
+            def pol_full(_):
+                full.disabled = True
+                with out:
+                    clear_output()
+                    try:
+                        polz.value = "in"
+                        pol_settings()
+                        files = odin.polarization_matrix(float(t.value), title=title.value or "",
+                                                         progress=lambda k, n, f: setattr(pbar, "value", k))
+                        print(f"18 polarized images of {float(t.value):g} s written "
+                              f"({os.path.basename(files[('+x', 'x')])} to {os.path.basename(files[('-z', 'z')])})")
+                    except Exception as e:
+                        print("Error:", e)
+                full.disabled = False
+
+            one.on_click(pol_one)
+            full.on_click(pol_full)
+            pol_box = [w.HTML("<b>Polarized imaging</b> (Timepix3, counts per wavelength): polarizer and analyzer, "
+                              "the spin in and the direction analyzed; <i>Polarization matrix</i> takes the 18 images "
+                              "(spin in ±x, ±y, ±z; analyzer x, y, z), each of the time set above."),
+                       rot, polz, s_in, s_out, w.HBox([one, full, pbar])]
         return w.VBox([w.HTML("The instrument, as in NICOS: set the devices, then <i>Count</i> (the event camera, "
                               "Timepix3: time of flight) or <i>Camera image</i> (the integrating camera of white-beam "
                               "imaging); one file each, with its title. <i>Run the tomography</i> takes a camera image "
                               "at each angle over 180°, of the time set above."),
                        sample, shutter, stage, choppers, delta, pinhole, *([load] if max_kN else []), t, title,
-                       w.HBox([go, cam]), cam_px, w.HBox([step, tomo, bar]), out])
+                       w.HBox([go, cam]), cam_px, w.HBox([step, tomo, bar]), *pol_box, out])
 
     # ------------------------------------------------------------------ LoKI
     def _loki_panel(self):

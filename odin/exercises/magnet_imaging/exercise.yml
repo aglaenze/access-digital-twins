@@ -30,6 +30,29 @@ modes:
     variants:
       - {label: "The coil (Sales et al. 2018)", file: odin/exercises/magnet_imaging/ODIN_magnet_solenoid.ipynb}
       - {label: "The meteorite fragment (Qvistgaard et al. 2026)", file: odin/exercises/magnet_imaging/ODIN_magnet_meteorite.ipynb}
+  msc:
+    label: Notebook with method choices
+    what: >-
+      You measure in NICOS or with a panel; the files, P0 and the polarization matrix are given (code shown or
+      hidden); you choose how to get the angle of rotation (one component or the trace), the range of the fit and the
+      pixels added up, map ∫B dl and compare it with the truth (the calculation of the coil, or the RADEN data).
+    duration: 3 hours
+    open: lab
+    file: odin/exercises/magnet_imaging/ODIN_magnet_msc_solenoid.ipynb
+    variants:
+      - {label: "The coil (Sales et al. 2018)", file: odin/exercises/magnet_imaging/ODIN_magnet_msc_solenoid.ipynb}
+      - {label: "The meteorite fragment (Qvistgaard et al. 2026)", file: odin/exercises/magnet_imaging/ODIN_magnet_msc_meteorite.ipynb}
+  beamtime:
+    label: Beamtime with NICOS
+    what: >-
+      A proposal and a beamtime budget, both samples on the sample changer. You drive ODIN and its polarizer in NICOS,
+      choose the measurements yourself, then analyze your files with a starter notebook. No settings are given.
+    duration: 1 day
+    open: lab
+    file: odin/exercises/magnet_imaging/beamtime.md
+    nicos: odin
+    analysis: odin/exercises/magnet_imaging/ODIN_magnet_beamtime.ipynb
+    proposal: {id: "1270", title: "Magnetic fields inside matter by polarized neutron imaging"}
 reference: >-
   M. Sales et al., Sci. Rep. 8, 2214 (2018); C. H. Qvistgaard, E. B. Naver et al., Geochem.
   Geophys. Geosyst. 27, e2025GC012641 (2026), data DTU Data doi:10.11583/DTU.30775208 (CC BY 4.0).

@@ -298,3 +298,14 @@ def field_integral(lam, phi, lam_range=(2.0, 5.0)):
     L = lam[k].reshape((-1,) + (1,) * (phi.ndim - 1))
     ph = np.nan_to_num(phi[k])
     return np.sum(L * ph, axis=0) / np.sum(L * L, axis=0) / C_LARMOR
+
+
+def true_field_integral(name, rot_deg=0.0, bins=64, field_m=0.0141):
+    """|∫B dl| [T m] along the beam on the camera (bins × bins, rows y, columns x), from the field map of the sample
+    itself (no measurement): the answer a measurement should find (Biot–Savart for the solenoid, the reconstruction
+    of the authors for the fragment)."""
+    B, mu, vox = sample_maps(name)
+    B, mu = _rotate_sample(np.asarray(B, float), np.asarray(mu, float), rot_deg)
+    J = np.linalg.norm(B.sum(axis=2) * vox, axis=-1)
+    m = to_camera(J, vox, bins, field_m)
+    return np.where(np.isnan(m), 0.0, m)
