@@ -1,0 +1,29 @@
+name: Martian meteorite NWA 7034 (cylinder, 12 mm)
+description: >-
+  A cylinder 12 mm across and 12 mm high, cut from the Martian meteorite NWA 7034 ("Black Beauty"), a breccia: pieces of
+  Martian rocks (clasts) cemented in a fine-grained matrix, mounted on the rotation stage. Some clasts carry water
+  (hydrogen), which neutrons see very well.
+formula: Si, Mg, Al, O (matrix); H in some clasts
+# Model (the minerals NCrystal provides, in proportions giving the density of the meteorite, about 3.1 g/cm³):
+# matrix = quartz 50 %, olivine (forsterite) 30 %, corundum 20 % by volume (the real matrix: plagioclase, pyroxene and
+# iron oxides); a hydrated clast = quartz with 20 % by volume of a hydroxide (brucite, Mg(OH)2): about 6 % of water
+# by mass (the real carriers of water in NWA 7034: iron oxyhydroxides). Neutron transmission depends on the hydrogen,
+# far less on which mineral carries it.
+# Five hydrated clasts; two of them (A and E) lie one behind the other along the beam at stage_rot = 0: one spot on
+# the radiograph, two clasts in the tomography. One vesicle (a void).
+hidden_answer: >-
+  5 hydrated clasts (diameters 3.0, 2.2, 1.6, 2.0, 1.8 mm), A and E aligned along the beam at 0 degrees; 1 void (1.5 mm)
+volumes:
+  - {material: "phases<0.5*SiO2-alpha_sg154_AlphaQuartz.ncmat&0.3*Mg2SiO4_sg62_MagnesiumSilicate.ncmat&0.2*Al2O3_sg167_Corundum.ncmat>",
+     shape: cylinder, center_mm: [0, 0, 0], size_mm: [12, 12]}
+  - {material: "phases<0.8*SiO2-alpha_sg154_AlphaQuartz.ncmat&0.2*MgO2H2_sg164_MagnesiumHydroxide.ncmat>",
+     shape: sphere, inside: 0, center_mm: [2.5, 2.0, -1.5], size_mm: [3.0]}
+  - {material: "phases<0.8*SiO2-alpha_sg154_AlphaQuartz.ncmat&0.2*MgO2H2_sg164_MagnesiumHydroxide.ncmat>",
+     shape: sphere, inside: 0, center_mm: [-2.8, -1.5, 2.0], size_mm: [2.2]}
+  - {material: "phases<0.8*SiO2-alpha_sg154_AlphaQuartz.ncmat&0.2*MgO2H2_sg164_MagnesiumHydroxide.ncmat>",
+     shape: sphere, inside: 0, center_mm: [0.5, -3.5, -3.0], size_mm: [1.6]}
+  - {material: "phases<0.8*SiO2-alpha_sg154_AlphaQuartz.ncmat&0.2*MgO2H2_sg164_MagnesiumHydroxide.ncmat>",
+     shape: sphere, inside: 0, center_mm: [-1.0, 3.5, 3.5], size_mm: [2.0]}
+  - {material: "phases<0.8*SiO2-alpha_sg154_AlphaQuartz.ncmat&0.2*MgO2H2_sg164_MagnesiumHydroxide.ncmat>",
+     shape: sphere, inside: 0, center_mm: [2.3, 2.2, 3.0], size_mm: [1.8]}
+  - {material: void.ncmat, shape: sphere, inside: 0, center_mm: [1.5, -0.5, 3.0], size_mm: [1.5]}

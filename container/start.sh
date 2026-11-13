@@ -15,13 +15,16 @@ cd "$HOME/twin"
 fetch() { python container/fetch_fronts.py || echo "WARNING: upstream parts not downloaded (network?)"; }
 case "${1:-jupyter}" in
   web)     # the online version, for a class without the app: Voila alone (the guided pages, no notebook, no NICOS,
-           # nothing that runs code sent by the browser); a start page asks for the name of the student (web_user.py)
+           # nothing that runs code sent by the browser); a start page lets the student choose an exercise, anonymously
+           # (web_user.py). TWIN_WEB_PASSWORD (a secret of the server): the class password, asked once by Voila.
+           # TWIN_RESULTS_REPO + HF_TOKEN: where the results of the class are sent (web_results.py)
            fetch
            export JUPYTER_PATH="$HOME/twin/container/app_data"                                 # Voila template, start page
            export TWIN_WEB=1
+           export PYTHONPATH="$HOME/twin/container${PYTHONPATH:+:$PYTHONPATH}"                # web_login (class password)
            python container/web_warmup.py || echo "WARNING: warm-up failed (the first count will be slow)"
            [ $# -gt 0 ] && shift
-           exec voila --no-browser --Voila.ip=0.0.0.0 --port="${PORT:-7860}" --template=twin                 --Voila.root_dir="$HOME/twin" --Voila.tornado_settings="{'websocket_ping_interval': 30000}"                 --MappingKernelManager.cull_idle_timeout=7200 --MappingKernelManager.cull_interval=300 "$@" ;;
+           exec voila --no-browser --Voila.ip=0.0.0.0 --port="${PORT:-7860}" --template=twin                 --Voila.root_dir="$HOME/twin" --Voila.tornado_settings="{'websocket_ping_interval': 30000}"                 --MappingKernelManager.cull_idle_timeout=7200 --MappingKernelManager.cull_interval=300 ${TWIN_WEB_PASSWORD:+--token="$TWIN_WEB_PASSWORD" --Voila.identity_provider_class=web_login.ClassPassword} "$@" ;;
   jupyter) fetch
            mkdir -p "$TWIN_RUN_ROOT/work" && ln -sfn "$TWIN_RUN_ROOT/work" "$HOME/twin/work"   # students' notebooks, kept
            export JUPYTER_CONFIG_PATH="$HOME/twin/container/app_config"                        # no file browser

@@ -219,12 +219,17 @@ def save(instrument, spec, data_folder, name):
 # --------------------------------------------------------------------------- physics
 def odin_volumes(spec):
     """[(NCrystal file, center [m], dims [m]), ...] of an ODIN sample (format of odin_virtual); a sphere or a cylinder
-    has a 4th item, its shape (boxes keep 3 items: the same as before, for the cached simulations)."""
+    has a 4th item, its shape (boxes keep 3 items: the same as before, for the cached simulations). A volume inside
+    another one (an inclusion: "inside: k", the index of the volume around it, listed before it) has a 5th item, the
+    material it replaces (McStas: the later volume has the higher priority; hybrid model: its Σ minus the host's)."""
     out = []
     for v in spec["volumes"]:
         t = (v["material"], tuple(float(c) * 1e-3 for c in v.get("center_mm", (0, 0, 0))),
              tuple(float(s) * 1e-3 for s in v["size_mm"]))
-        out.append(t + ((v["shape"],) if v.get("shape", "box") != "box" else ()))
+        if "inside" in v:
+            out.append(t + (v.get("shape", "box"), spec["volumes"][int(v["inside"])]["material"]))
+        else:
+            out.append(t + ((v["shape"],) if v.get("shape", "box") != "box" else ()))
     return out
 
 

@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+{# Class password of the online version (start.sh web: TWIN_WEB_PASSWORD), in place of the login page of Jupyter
+   Server: the form posts the same fields (_xsrf, password) to the same address. #}
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ESS digital twins</title>
+  <style>
+    body { margin: 0; font-family: "Segoe UI", system-ui, -apple-system, sans-serif; background: #F5F7FA; color: #142033; }
+    header { background: #0B1220; color: #fff; padding: 16px 28px; font-size: 19px; font-weight: 700; }
+    main { max-width: 480px; margin: 64px auto; padding: 0 16px; }
+    .card { background: #fff; border: 1px solid #E2E7EE; border-radius: 16px; padding: 30px; }
+    h1 { margin: 0 0 6px; font-size: 24px; }
+    p { line-height: 1.55; color: #45526A; }
+    label { display: block; font-weight: 600; margin: 18px 0 6px; }
+    input[type=password] { width: 100%; box-sizing: border-box; padding: 11px 12px; font-size: 16px;
+                           border: 1px solid #CBD3DE; border-radius: 10px; }
+    button { margin-top: 20px; background: #0E7C70; color: #fff; border: 0; border-radius: 10px; padding: 12px 22px;
+             font-size: 16px; font-weight: 600; cursor: pointer; }
+    .err { color: #B42318; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <header>ESS digital twins</header>
+  <main>
+    <div class="card">
+      <h1>Welcome</h1>
+      <p>This site is for a class. Enter the password given by your teacher.</p>
+      {% if message %}<p class="err">Wrong password: ask your teacher.</p>{% endif %}
+      <form action="{{ base_url }}login?next={{ next | urlencode }}" method="post">
+        {{ xsrf_form_html() | safe }}
+        <label for="password_input">Class password</label>
+        <input type="password" name="password" id="password_input" autofocus>
+        <button type="submit">Enter</button>
+      </form>
+    </div>
+  </main>
+</body>
+</html>

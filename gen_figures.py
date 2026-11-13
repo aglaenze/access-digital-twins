@@ -9,6 +9,8 @@ sans_particles.png   LoKI, "How big are these nanoparticles?": particles in heav
                      the detector, and how the size sets the curve I(Q) (sphere form factor, two sizes as examples).
 steel_strain.png     ODIN, "Where is a loaded steel part strained?": the specimen in its load frame, the lattice
                      planes facing the beam moving closer under load (Poisson contraction), and the edge that moves.
+meteorite_tomography.png  ODIN, "What is hidden inside a Martian meteorite?": a radiograph adds up the clasts along the
+                     beam, turning the sample separates them, back-projection finds them (top view of one slice).
 """
 import os
 
@@ -230,10 +232,84 @@ def steel_strain():
     plt.close(fig)
 
 
+def meteorite_tomography():
+    """Top view of the cylinder (x across, z along the beam): two clasts one behind the other make one spot; at
+    another angle they make two; back-projecting the projections of all angles finds them."""
+    from matplotlib.patches import Circle
+    R = 6.0
+    clasts = [((2.5, -1.5), 1.5), ((2.3, 3.0), 0.9), ((-2.8, 2.0), 1.1)]       # (x, z), radius [mm] (top view)
+    fig, axs = plt.subplots(1, 3, figsize=(15, 5.3))
+
+    def sample(ax, rot=0.0):
+        th = np.radians(rot)
+        ax.add_patch(Circle((0, 0), R, fc="#D9CBB6", ec=INK, lw=1.2))
+        for (x, z), r in clasts:
+            xr, zr = x * np.cos(th) + z * np.sin(th), -x * np.sin(th) + z * np.cos(th)
+            ax.add_patch(Circle((xr, zr), r, fc="#3B4A63", ec="none"))
+        ax.set(xlim=(-9, 9), ylim=(-11, 12.5), aspect="equal")
+        ax.axis("off")
+
+    def profile(ax, rot, y0, color):
+        """−ln T along x' after a rotation rot, drawn as a camera profile at height y0."""
+        th = np.radians(rot)
+        xs = np.linspace(-8, 8, 400)
+        p = 0.25 * 2 * np.sqrt(np.clip(R ** 2 - xs ** 2, 0, None)) / 10
+        for (x, z), r in clasts:
+            xr = x * np.cos(th) + z * np.sin(th)
+            p += 0.7 * 2 * np.sqrt(np.clip(r ** 2 - (xs - xr) ** 2, 0, None)) / 10
+        ax.plot([-8, 8], [y0, y0], color=GREY, lw=3)
+        ax.plot(xs, y0 + 0.3 + 1.6 * p, color=color, lw=1.8)
+        return xs, p
+
+    ax = axs[0]
+    sample(ax)
+    for x in np.linspace(-7, 7, 8):
+        ax.annotate("", xy=(x, 7.2), xytext=(x, -9.6), arrowprops=dict(arrowstyle="-|>", color=TEAL, lw=0.8, alpha=0.6))
+    profile(ax, 0, 7.6, RED)
+    ax.text(0, -10.9, "neutron beam", ha="center", color=TEAL, fontsize=10)
+    ax.text(-8.5, 8.8, "camera:\nattenuation", ha="left", va="bottom", fontsize=9.5, color=INK)
+    ax.text(5.6, 9.6, "one peak:\ntwo clasts", ha="center", fontsize=9.5, color=RED)
+    ax.set_title("A radiograph adds up\neverything along the beam", color=INK, fontsize=12.5, fontweight="bold")
+
+    ax = axs[1]
+    sample(ax, 60)
+    for x in np.linspace(-7, 7, 8):
+        ax.annotate("", xy=(x, 7.2), xytext=(x, -9.6), arrowprops=dict(arrowstyle="-|>", color=TEAL, lw=0.8, alpha=0.6))
+    profile(ax, 60, 7.6, RED)
+    ax.annotate("", xy=(3.5, -8.2), xytext=(-3.5, -8.2),
+                arrowprops=dict(arrowstyle="-|>", color=ORANGE, lw=1.8, connectionstyle="arc3,rad=0.35"))
+    ax.text(0, -10.9, "the stage turns", ha="center", color=ORANGE, fontsize=10)
+    ax.text(5.6, 9.6, "turned by 60°:\ntwo peaks", ha="center", fontsize=9.5, color=RED)
+    ax.set_title("Turning the sample: the clasts\nseparate in the projections", color=INK, fontsize=12.5, fontweight="bold")
+
+    ax = axs[2]
+    ax.add_patch(Circle((0, 0), R, fc="#F3EEE6", ec=INK, lw=1.2))
+    for rot in np.arange(0, 180, 12):
+        th = np.radians(rot)
+        d = np.array([-np.sin(th), np.cos(th)])          # beam direction in the sample frame
+        n = np.array([np.cos(th), np.sin(th)])           # detector axis
+        for (x, z), r in clasts:
+            s = x * n[0] + z * n[1]                      # where the clast is seen on the detector
+            a, b = s * n - 8 * d, s * n + 8 * d
+            ax.plot([a[0], b[0]], [a[1], b[1]], color="#3B4A63", lw=2.2 * r, alpha=0.07, solid_capstyle="butt")
+    for (x, z), r in clasts:
+        ax.add_patch(Circle((x, z), r, fc="none", ec=RED, lw=1.4, ls="--"))
+    ax.set(xlim=(-9, 9), ylim=(-11, 12.5), aspect="equal")
+    ax.axis("off")
+    ax.text(0, -10.9, "each projection smeared back along its beam:\nthe lines cross where the clasts are",
+            ha="center", fontsize=10, color=INK)
+    ax.set_title("Back-projection gives\nthe slice back", color=INK, fontsize=12.5, fontweight="bold")
+    fig.tight_layout(rect=(0, 0.06, 1, 1))
+    fig.text(0.5, 0.025, "Tomography: seen from above, one horizontal slice of the cylinder", ha="center", fontsize=12, color="#5B6779")
+    fig.savefig(os.path.join(OUT, "meteorite_tomography.png"), dpi=150)
+    plt.close(fig)
+
+
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
     print("alpha edges:", [(h, round(l, 3)) for h, l in ALPHA], " gamma edges:", [(h, round(l, 3)) for h, l in GAMMA])
     iron()
     sans()
     steel_strain()
+    meteorite_tomography()
     print("written", OUT)

@@ -501,7 +501,7 @@ q.report()
 md(r"""
 ## 7. Submit your work
 
-When you are done, submit: the file for your teacher is made from your answers and your measurements.
+When you are done, tell what you thought of the exercise and submit your work.
 """)
 
 code(r"""

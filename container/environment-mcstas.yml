@@ -38,4 +38,5 @@ dependencies:
       - essreduce==26.10.1
       - sciline==26.9.0
       - voila==0.5.13
+      - huggingface_hub==1.33.0  # the online version: results of a class sent to a private dataset (web_results.py)
       - notebook==7.6.4    # the single-notebook view of the app (MSc notebooks, without the file browser)

@@ -1,0 +1,25 @@
+# One exercise of the catalogue of the app (read by container/twin_app.py: no generation needed).
+# Paths are relative to the root of the repository.
+title: What is hidden inside a Martian meteorite?
+number: "1"                  # theme 1 of ODIN: white-beam radiography and tomography (+ time of flight)
+instrument: odin
+technique: White-beam radiography and tomography, time of flight
+sample: Martian meteorite NWA 7034 (cylinder 12 mm, clasts rich in water)
+question: >-
+  Image a piece of a Martian meteorite with neutrons, then in 3D, find the clasts that hold water, and measure how
+  much water with the wavelength of the neutrons.
+learn: Transmission and attenuation, radiography, tomography (filtered back-projection), hydrogen contrast, time of flight.
+mission: >-
+  You work for a team of planetary scientists. The Martian meteorite NWA 7034 holds water from early Mars: where is it,
+  and how much? A gram of it is worth more than gold: find the richest clast without cutting the meteorite, so that the
+  team can drill it out.
+status: ready
+samples:
+  meteorite_nwa7034: {}
+modes:
+  bsc:
+    label: Guided web page
+    what: Settings given and explained, Take image and Run the tomography buttons, slices to explore, a time-of-flight comparison, questions. No code.
+    duration: 2 hours
+    open: voila
+    file: odin/exercises/meteorite_imaging/ODIN_meteorite.ipynb

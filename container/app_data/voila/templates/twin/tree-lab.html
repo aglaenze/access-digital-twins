@@ -1,7 +1,8 @@
 <!DOCTYPE html>
-{# Start page of the online version of the twins (container/start.sh web: Voila alone serves the pages, and
-   this template replaces its list of files). The student gives a name and opens an exercise: the page gets
-   "?name=..." (web_user.py). In the app this page is never shown (the app opens the pages itself). #}
+{# Start page of the online version of the twins (container/start.sh web: Voila alone serves the pages behind the
+   class password, and this template replaces its list of files). The student chooses an exercise; no name is asked:
+   the browser draws an anonymous id once and keeps it (localStorage), the page gets "?sid=..." (web_user.py), so a
+   reload finds the same measurements. In the app this page is never shown (the app opens the pages itself). #}
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -36,29 +37,39 @@
       <p>You are about to operate a digital twin of ODIN, the neutron imaging instrument of the European Spallation
         Source: you set the instrument, measure, and analyze your own data, in this browser. Nothing to install.</p>
       <form id="start">
-        <label for="name">Your full name</label>
-        <input id="name" type="text" autocomplete="name" required minlength="3" maxlength="60" placeholder="e.g. Maria Jensen">
-        <label>Exercise</label>
+        <label>Choose your exercise</label>
         <div class="ex"><input type="radio" name="page" id="p1" checked
+               value="odin/exercises/meteorite_imaging/ODIN_meteorite.ipynb">
+          <label for="p1" style="margin:0;font-weight:400"><b>Exercise 1 · What is hidden inside a Martian meteorite?</b>
+            <span>White-beam radiography and tomography, then the wavelength of the neutrons: find where the water is
+              hidden in the meteorite NWA 7034, without cutting it. About 2 hours.</span></label></div>
+        <div class="ex"><input type="radio" name="page" id="p3"
                value="odin/exercises/steel_strain/ODIN_steel_strain.ipynb">
-          <label for="p1" style="margin:0;font-weight:400"><b>Where is a loaded steel part strained?</b>
-            <span>Bragg-edge strain mapping on ODIN: a steel specimen under load. About 2 hours.</span></label></div>
+          <label for="p3" style="margin:0;font-weight:400"><b>Exercise 3 · Where is a loaded steel part strained?</b>
+            <span>Bragg-edge strain mapping: a steel specimen under load in a tensile frame. About 2 hours.</span></label></div>
         <button type="submit">Start</button>
       </form>
-      <p class="small">Your measurements and your answers are kept under your name while this session is online: use
-        the same name if you come back, and download your work with <i>Submit my work</i> at the end of the page.
-        A page takes up to a minute to open.</p>
+      <p class="small"><b>Anonymous:</b> no name is asked. This browser remembers your measurements and answers while
+        the session is online: come back with the same browser to continue. At the end of the page, you can leave a
+        comment on the exercise and submit your work. A page takes up to a minute to open.</p>
     </div>
   </main>
   <script>
+    function sid() {
+      var s = null;
+      try { s = localStorage.getItem("twin-sid"); } catch (err) { /* private window */ }
+      if (!s || !/^[a-z0-9]{6,16}$/.test(s)) {
+        var a = new Uint8Array(5); (window.crypto || window.msCrypto).getRandomValues(a);
+        s = Array.prototype.map.call(a, function (b) { return ("0" + b.toString(16)).slice(-2); }).join("");
+        try { localStorage.setItem("twin-sid", s); } catch (err) { /* */ }
+      }
+      return s;
+    }
     document.getElementById("start").addEventListener("submit", function (e) {
       e.preventDefault();
-      var name = document.getElementById("name").value.trim();
       var page = document.querySelector("input[name=page]:checked").value;
-      try { localStorage.setItem("twin-name", name); } catch (err) { /* private window */ }
-      window.location.href = "{{ base_url }}voila/render/" + page + "?name=" + encodeURIComponent(name);
+      window.location.href = "{{ base_url }}voila/render/" + page + "?sid=" + sid();
     });
-    try { document.getElementById("name").value = localStorage.getItem("twin-name") || ""; } catch (err) { /* */ }
   </script>
 </body>
 </html>

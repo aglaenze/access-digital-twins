@@ -142,8 +142,9 @@ def sigma_tot(cfg, lam):
 
 
 def volumes_transmission(volumes, stage_x, stage_rot, lam_grid=np.linspace(0.3, 20.0, 4000), strains=None):
-    """Function T(x, y, λ) for a sample made of volumes [(NCrystal cfg, center (m), dims (m)[, shape]), ...] (boxes,
-    spheres, vertical cylinders), centers given with
+    """Function T(x, y, λ) for a sample made of volumes [(NCrystal cfg, center (m), dims (m)[, shape[, host cfg]]), ...]
+    (boxes, spheres, vertical cylinders; an inclusion names the material of the volume around it, which it replaces),
+    centers given with
     respect to the rotation-stage axis; the stage is translated by stage_x then rotated by stage_rot (degrees) about
     the vertical axis. Σ_tot(λ) is interpolated on a grid covering all chopper modes (NCrystal called once).
     strains: lattice strain ε of each volume along the beam (a sample under load, sample_library.odin_strain_per_kN):
@@ -162,7 +163,10 @@ def volumes_transmission(volumes, stage_x, stage_rot, lam_grid=np.linspace(0.3, 
         cfg, (cx, cy, cz), dims = v[:3]
         center = (stage_x + c * cx + s * cz, cy, -s * cx + c * cz)
         eps = float(strains[k]) if strains is not None else 0.0
-        vols.append((sigma_tot(cfg, lam_grid / (1.0 + eps)), center, dims, v[3] if len(v) > 3 else "box"))
+        sig = sigma_tot(cfg, lam_grid / (1.0 + eps))
+        if len(v) > 4 and v[4]:           # an inclusion: replaces the material of the volume around it on its path
+            sig = sig - sigma_tot(v[4], lam_grid / (1.0 + eps))
+        vols.append((sig, center, dims, v[3] if len(v) > 3 else "box"))
 
     def T(x, y, lam):
         mu = np.zeros(len(x))
@@ -204,6 +208,38 @@ class HybridModel:
         """Expected count rate of the open beam in the field of view [counts/s] (detector efficiency included)."""
         from odin_nexus import efficiency
         return float((self.r * efficiency(self.S["lam"].astype(float), lam_abs)).sum())
+
+    def image(self, t_exp, transmission=None, bins=128, lam_abs=8.0, blur_m=0.1e-3, beam_factor=1.0, dark_per_s=2.0,
+              n_lam=100, rng=None):
+        """Image of an integrating camera (scintillator + sCMOS camera, as for white-beam imaging): no neutron is
+        drawn one by one (2·10⁷ per second in a white beam); each pixel gets the expected number of neutrons, the
+        spectrum S(λ) times the transmission of the sample at that pixel, summed over λ, then the L/D and scintillator
+        blurs and Poisson noise, plus a dark signal of the camera (dark_per_s counts per pixel and second). Same
+        model as counts() (spectrum, acceptance, profile, blurs): the same mean image, without the time of flight.
+        Returns a bins × bins array (rows: y, columns: x) over the field."""
+        from odin_nexus import efficiency
+        from scipy.ndimage import gaussian_filter
+        rng = rng or np.random.default_rng()
+        x0, x1, y0, y1 = self.field
+        lamS = self.S["lam"].astype(float)
+        edges = np.linspace(lamS.min(), lamS.max() + 1e-9, n_lam + 1)
+        wl = np.histogram(lamS, edges, weights=self.r * efficiency(lamS, lam_abs))[0]
+        lc = 0.5 * (edges[1:] + edges[:-1])
+        k = wl > 0
+        wl, lc = wl[k], lc[k]
+        xc = x0 + (np.arange(bins) + 0.5) * (x1 - x0) / bins
+        yc = y0 + (np.arange(bins) + 0.5) * (y1 - y0) / bins
+        X, Y = (a.ravel() for a in np.meshgrid(xc, yc))
+        f = profile(self.c_f, X, Y)
+        f = f / f.sum()                                              # share of the beam in each pixel
+        Tm = np.ones(X.size)
+        if transmission is not None:
+            Tm = sum(wk * transmission(X, Y, np.full(X.size, lk)) for lk, wk in zip(lc, wl)) / wl.sum()
+        mean = (wl.sum() * t_exp * beam_factor * f * Tm).reshape(bins, bins)
+        L = tw.Z_SAMPLE - tw.Z_PINHOLE
+        sigma = np.hypot(tw.DET_DIST * self.D / L / np.sqrt(12), blur_m) / ((x1 - x0) / bins)     # [pixels]
+        mean = gaussian_filter(mean, sigma, mode="nearest")
+        return rng.poisson(mean) + rng.poisson(dark_per_s * t_exp, mean.shape)
 
     def counts(self, t_exp, transmission=None, lam_abs=8.0, blur_m=0.1e-3, background=0.05, background_pixel=1e-3,
                beam_factor=1.0, rng=None):

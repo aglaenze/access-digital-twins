@@ -1,0 +1,141 @@
+"""Radiography and tomography with the camera images of ODIN, exercise "What is hidden inside a Martian meteorite?"
+(the tomography of time-of-flight files, by wavelength band: odin_tomo.py).
+
+    img = image(file)                                    # counts per pixel (128 x 128), its time and its angle
+    T = transmission(sample, open_beam, dark)            # T = (I - D) / (O - D), each scaled to its exposure
+    vol = reconstruct(files, open_beam, dark)            # filtered back-projection: Σ (cm⁻¹) in 3D, (y, z, x)
+
+A radiograph shows the transmission T = exp(−∫Σ dl) along each line through the sample: everything along the beam is
+added up. A tomography takes radiographs at many angles of the rotation stage; for each row of pixels (a horizontal
+slice) the projections −ln T at all angles (the sinogram) give back Σ(x, z) of that slice by filtered back-projection:
+each projection is filtered (ramp filter, |k|) and smeared back along the beam direction it was taken in.
+"""
+import functools
+import os
+
+import h5py
+import numpy as np
+
+PIXEL_MM = 14.1 / 128          # size of a pixel of the camera image in the sample plane [mm]
+
+
+@functools.lru_cache(maxsize=512)
+def _read(file, mtime):
+    with h5py.File(file, "r") as f:
+        e = f["entry"]
+        return dict(data=e["instrument/camera/data"][()].astype(float), t=float(e["duration"][()]),
+                    angle=float(e["sample/rotation_angle"][()]), x=float(e["sample/x_translation"][()]),
+                    title=e["title"][()].decode() if isinstance(e["title"][()], bytes) else str(e["title"][()]))
+
+
+def image(file):
+    """dict(data (counts, rows y, columns x), t (s), angle (deg), x (m), title) of a camera file."""
+    return _read(file, os.path.getmtime(file))
+
+
+def transmission(sample, open_beam, dark=None):
+    """T = (I − D) / (O − D), I, O and D per second of exposure."""
+    I, O = image(sample), image(open_beam)
+    i, o = I["data"] / I["t"], O["data"] / O["t"]
+    if dark:
+        D = image(dark)
+        d = D["data"] / D["t"]
+        i, o = i - d, o - d
+    with np.errstate(divide="ignore", invalid="ignore"):
+        return np.clip(np.where(o > 0, i / o, np.nan), 1e-3, 2.0)
+
+
+def extent():
+    """(x0, x1, y0, y1) of the image in mm, for imshow(..., origin="lower")."""
+    h = 64 * PIXEL_MM
+    return (-h, h, -h, h)
+
+
+def sinogram(files, open_beam, dark=None, row=None):
+    """(angles, P): projections −ln T, one line per angle (all rows: P[angle, y, x]; one row: P[angle, x])."""
+    angles = np.array([image(f)["angle"] for f in files])
+    P = np.array([-np.log(transmission(f, open_beam, dark)) for f in files])
+    P = np.nan_to_num(P)
+    o = np.argsort(angles)
+    angles, P = angles[o], P[o]
+    return angles, (P if row is None else P[:, row, :])
+
+
+def fbp(angles, sino, pixel_mm=PIXEL_MM):
+    """Filtered back-projection of one slice: sino[angle, x] (−ln T) -> Σ(z, x) in cm⁻¹ on the same pixels."""
+    n = sino.shape[1]
+    k = np.fft.fftfreq(2 * n)
+    ramp = np.abs(k) * (0.54 + 0.46 * np.cos(2 * np.pi * k))       # ramp filter, Hamming window (less noise)
+    filt = np.real(np.fft.ifft(np.fft.fft(sino, 2 * n, axis=1) * ramp, axis=1))[:, :n]
+    c = (np.arange(n) - (n - 1) / 2)
+    X, Z = np.meshgrid(c, c)                     # pixels of the slice (rows z: along the beam at angle 0)
+    out = np.zeros((n, n))
+    for a, p in zip(np.radians(angles), filt):
+        # a point (x, z) of the sample is seen at x' = x cos a + z sin a after a rotation of the stage by a
+        s = X * np.cos(a) + Z * np.sin(a) + (n - 1) / 2
+        out += np.interp(s.ravel(), np.arange(n), p, left=0, right=0).reshape(n, n)
+    span = np.radians(np.ptp(angles) + np.median(np.diff(angles)))   # 180° of data: π
+    return out * span / len(angles) / (pixel_mm * 0.1)                # [cm⁻¹]
+
+
+def reconstruct(files, open_beam, dark=None, rows=None):
+    """Σ (cm⁻¹) of the sample in 3D: vol[y, z, x], one slice per row of pixels (rows: the rows to do, all by default)."""
+    angles, P = sinogram(files, open_beam, dark)
+    rows = range(P.shape[1]) if rows is None else rows
+    return np.array([fbp(angles, P[:, r, :]) for r in rows])
+
+
+# --------------------------------------------------------------------------- the wavelength of the neutrons
+# Two disks of 0.5 mm radius on the radiograph at stage_rot = 0 (x, y, radius in mm): the darkest spot, and the
+# matrix below it, through the same thickness of meteorite (the same x: the same chord of the cylinder).
+SPOT = (2.5, 2.0, 0.5)
+MATRIX = (2.5, -2.1, 0.5)
+WINDOW = (1.2, 7.8)            # [Å] wavelengths of the WFM beam used
+BIN = 0.1                      # [Å]
+
+
+@functools.lru_cache(maxsize=16)
+def _region_counts(file, mtime, regions):
+    import scipp as sc
+    import odin_reduction as red
+    lam = sc.linspace("wavelength", WINDOW[0], WINDOW[1], int(round((WINDOW[1] - WINDOW[0]) / BIN)) + 1,
+                      unit="angstrom")
+    ev = red._event_list(red.events(file))
+    cx, cy = ev.coords["x"].values, ev.coords["y"].values
+    out = dict(lam=sc.midpoints(lam).values, duration=red.duration(file), charge=red.proton_charge(file))
+    for k, (x0, y0, r) in enumerate(regions):
+        sel = sc.array(dims=["event"], values=(cx - x0) ** 2 + (cy - y0) ** 2 < r * r)
+        out[k] = ev[sel].hist(wavelength=lam).values.astype(float)
+    return out
+
+
+def region_transmission(sample, open_beam, dark=None, regions=(SPOT, MATRIX)):
+    """(λ, [T of each region], [dT]) from time-of-flight files (Timepix3): T = (E − N) / (O − N) per proton charge."""
+    def c(f):
+        return _region_counts(f, os.path.getmtime(f), tuple(regions))
+    E, O = c(sample), c(open_beam)
+    N = c(dark) if dark else None
+    norm = lambda m: m["charge"] if m["charge"] > 0 else m["duration"]
+    Ts, dTs = [], []
+    for k in range(len(regions)):
+        v, s2 = {}, {}
+        for key, m in (("E", E), ("O", O)):
+            a, var = m[k].copy(), m[k].copy()
+            if N is not None:
+                f = m["duration"] / N["duration"]
+                a, var = a - f * N[k], var + f * f * N[k]
+            v[key], s2[key] = a / norm(m), var / norm(m) ** 2
+        with np.errstate(divide="ignore", invalid="ignore"):
+            T = v["E"] / v["O"]
+            dT = np.abs(T) * np.sqrt(s2["E"] / v["E"] ** 2 + s2["O"] / v["O"] ** 2)
+        Ts.append(T)
+        dTs.append(dT)
+    return E["lam"], Ts, dTs
+
+
+def sigma_water(lam):
+    """Σ(λ) of liquid water (cm⁻¹, NCrystal), the reference for hydrogen."""
+    import NCrystal as NC
+    m = NC.load("LiquidWaterH2O_T293.6K.ncmat")
+    lam = np.asarray(lam, float)
+    return (m.scatter.xsect(wl=lam) + m.absorption.xsect(wl=lam)) * m.info.getNumberDensity()

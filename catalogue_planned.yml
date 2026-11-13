@@ -3,12 +3,6 @@
 # exercise.yml (and the same number); remove it from here then.
 # ODIN: seven themes covering the scope of the instrument (Strobl 2015: white-beam, Bragg-edge, diffraction-complemented,
 # dark-field and polarized imaging), each with a realistic sample, ideally one already measured.
-- number: "1"
-  title: What is hidden inside a Martian meteorite?
-  instrument: odin
-  technique: White-beam radiography and tomography
-  sample: Martian meteorite NWA 7034 (hydrogen-rich clasts)
-  question: Image the meteorite with neutrons, then in 3D, and find where the hydrogen (water) is hidden.
 - number: "2"
   title: How does lithium enter a battery electrode?
   instrument: odin
