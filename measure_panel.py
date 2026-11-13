@@ -132,10 +132,57 @@ class Panel:
             go.disabled = False
 
         go.on_click(count)
-        return w.VBox([w.HTML("The instrument, as in NICOS: set the devices, then <i>Count</i> (one file per count, "
-                              "with its title). The dark, the open beam and the sample are three counts."),
+        # the integrating camera (white-beam radiography, tomography): as radiograph() and tomography() in NICOS
+        cam = w.Button(description="Camera image", icon="camera", layout=w.Layout(width="auto"))
+        step = w.Dropdown(options=[("12° (15 images)", 12.0), ("6° (30 images)", 6.0), ("3° (60 images)", 3.0)],
+                          value=6.0, description="Tomography", layout=w.Layout(width="300px"))
+        tomo = w.Button(description="Run the tomography", icon="sync", layout=w.Layout(width="auto"))
+        bar = w.IntProgress(value=0, min=0, max=1, layout=w.Layout(width="300px"))
+
+        def settings():
+            odin.move(sample=sample.value, shutter=shutter.value, stage_x=stage.value / 1000, choppers=choppers.value,
+                      wfm_delta=delta.value, pinhole=pinhole.value)
+            if max_kN:
+                odin.move(load=float(load.value))
+
+        def image(_):
+            cam.disabled = True
+            with out:
+                clear_output()
+                try:
+                    settings()
+                    f = odin.camera(float(t.value), title=title.value or "")
+                    print(f"camera image written in the folder of proposal {self.proposal}: {os.path.basename(f)} "
+                          f"({odin.last_n_counts:,} counts)")
+                except Exception as e:
+                    print("Error:", e)
+            cam.disabled = False
+
+        def tomography(_):
+            tomo.disabled = True
+            with out:
+                clear_output()
+                try:
+                    settings()
+                    angles = [k * step.value for k in range(int(round(180 / step.value)))]
+                    bar.max, bar.value = len(angles), 0
+                    files = odin.tomography(angles, float(t.value), title=title.value or "tomography",
+                                            progress=lambda k, n, f: setattr(bar, "value", k))
+                    odin.move(stage_rot=0.0)
+                    print(f"{len(files)} images of {float(t.value):g} s written ({os.path.basename(files[0])} to "
+                          f"{os.path.basename(files[-1])})")
+                except Exception as e:
+                    print("Error:", e)
+            tomo.disabled = False
+
+        cam.on_click(image)
+        tomo.on_click(tomography)
+        return w.VBox([w.HTML("The instrument, as in NICOS: set the devices, then <i>Count</i> (the event camera, "
+                              "Timepix3: time of flight) or <i>Camera image</i> (the integrating camera of white-beam "
+                              "imaging); one file each, with its title. <i>Run the tomography</i> takes a camera image "
+                              "at each angle over 180°, of the time set above."),
                        sample, shutter, stage, choppers, delta, pinhole, *([load] if max_kN else []), t, title,
-                       go, out])
+                       w.HBox([go, cam]), w.HBox([step, tomo, bar]), out])
 
     # ------------------------------------------------------------------ LoKI
     def _loki_panel(self):

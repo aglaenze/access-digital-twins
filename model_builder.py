@@ -19,6 +19,8 @@ from IPython.display import display
 from scipy.optimize import curve_fit, least_squares
 from scipy.special import erfc
 
+import live_view
+
 STYLE = {"description_width": "170px"}
 
 
@@ -29,7 +31,7 @@ def _layout():
 
 def _slider(desc, value, lo, hi, step, fmt=".3f"):
     return w.FloatSlider(value=value, min=lo, max=hi, step=step, description=desc, readout_format=fmt,
-                         continuous_update=False, layout=_layout(), style=STYLE)
+                         continuous_update=True, layout=_layout(), style=STYLE)
 
 
 def _pre(code):
@@ -43,7 +45,7 @@ class _Builder:
 
     def __init__(self):
         self.history = []                            # one row per fit
-        self.out_plot, self.out_result = w.Output(), w.Output()
+        self.out_plot, self.out_result = live_view.FigureImage(), w.Output()     # the plot follows the sliders
         self.code_box = w.VBox([])
         self.code_acc = w.Accordion(children=[self.code_box])
         self.code_acc.set_title(0, "See the code (what your choices wrote; nothing to type)")
@@ -56,7 +58,7 @@ class _Builder:
         self.ui = w.VBox([w.HTML(f"<b>{choice_label}</b>"), choice, *extra, self.fit_button, self.out_plot,
                           self.out_result, self.code_acc])
         for c in self._controls():
-            c.observe(lambda _: self._changed(), names="value")
+            c.observe(live_view.throttled(self._changed), names="value")
         display(self.ui)
         self._changed()
 
@@ -110,7 +112,7 @@ class EdgeBuilder(_Builder):
         self.model_help = w.HTML()
         self.window = w.FloatRangeSlider(value=(round(e - 1.0, 2), round(e + 1.0, 2)), min=round(e - 1.0, 2),
                                          max=round(e + 1.0, 2), step=0.01, description="range of λ [Å]",
-                                         continuous_update=False, readout_format=".2f", layout=_layout(), style=STYLE)
+                                         continuous_update=True, readout_format=".2f", layout=_layout(), style=STYLE)
         # start values: nothing chosen for the student (round values, not those of the data)
         self.p_edge = _slider("λ_edge (start) [Å]", round(e - 0.25, 1), e - 0.3, e + 0.3, 0.001)
         self.p_width = _slider("width w (start) [Å]", 0.1, 0.005, 0.2, 0.001)
@@ -169,7 +171,7 @@ class EdgeBuilder(_Builder):
                 ax[1].axhline(s, color="0.8", lw=0.8, ls="--")
             ax[1].set(xlabel="wavelength λ [Å]", ylabel="residual / σ")
             ax[1].grid(alpha=0.3)
-            plt.tight_layout(); plt.show()
+            plt.tight_layout()
 
     def fit(self):
         m = self._mask()
@@ -269,7 +271,7 @@ class GuinierBuilder(_Builder):
         qmin = float(self.q.min())
         self.plot = w.ToggleButtons(options=list(PLOTS), value="I against Q", style={"button_width": "170px"})
         self.window = w.FloatRangeSlider(value=(round(qmin, 4), 0.15), min=round(qmin, 4), max=0.15, step=0.001,
-                                         description="range of Q [Å⁻¹]", continuous_update=False,
+                                         description="range of Q [Å⁻¹]", continuous_update=True,
                                          readout_format=".3f", layout=_layout(), style=STYLE)
         self._ui("1 · Which plot turns the Guinier law I = I(0)·exp(−Q²Rg²/3) into a straight line?", self.plot,
                  [w.HTML("<b>2 · Choose the range of Q</b> (the law holds for Q·Rg ≲ 1.3), then Fit a straight line"),
@@ -310,7 +312,7 @@ class GuinierBuilder(_Builder):
             xl, yl = PLOTS[kind]
             ax.set(xlabel=xl, ylabel=yl)
             ax.legend(); ax.grid(alpha=0.3, which="both")
-            plt.tight_layout(); plt.show()
+            plt.tight_layout()
 
     def fit(self):
         m = self._mask()
@@ -382,7 +384,7 @@ class ShapeBuilder(_Builder):
         self.shape_help = w.HTML()
         self.window = w.FloatRangeSlider(value=(float(self.q.min()), float(self.q.max())),
                                          min=float(self.q.min()), max=float(self.q.max()), step=0.001,
-                                         description="range of Q [Å⁻¹]", continuous_update=False,
+                                         description="range of Q [Å⁻¹]", continuous_update=True,
                                          readout_format=".3f", layout=_layout(), style=STYLE)
         self.p_scale = _slider("volume fraction φ (start)", 0.01, 0.0005, 0.05, 0.0005, ".4f")
         self.p_bg = _slider("background (start) [cm⁻¹]", 0.0, -0.05, 0.2, 0.001)
@@ -454,7 +456,7 @@ class ShapeBuilder(_Builder):
             for s in (-2, 2):
                 ax[1].axhline(s, color="0.8", lw=0.8, ls="--")
             ax[1].set(xlabel="Q [Å⁻¹]", ylabel="residual / σ"); ax[1].grid(alpha=0.3, which="both")
-            plt.tight_layout(); plt.show()
+            plt.tight_layout()
 
     def fit(self):
         m = self._mask()

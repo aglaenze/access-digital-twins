@@ -47,8 +47,9 @@ def _show(controls, draw, text=None):
         img.value = _png(fig)
         info.value = f"<div style='font-size:14.5px;line-height:1.6;color:{INK}'>{html}</div>"
 
+    import live_view                 # (the figure follows the sliders while they move)
     for c in controls:
-        c.observe(update, names="value")
+        c.observe(live_view.throttled(update), names="value")
     update()
     display(w.VBox([*controls, img, info]))
 
@@ -56,7 +57,7 @@ def _show(controls, draw, text=None):
 # --------------------------------------------------------------------------------------------- ODIN
 def odin_time_of_flight():
     lam = w.FloatSlider(value=4.0, min=1.0, max=9.0, step=0.1, description="wavelength λ (Å)", readout_format=".1f",
-                        continuous_update=False, style=STYLE, layout=LAYOUT)
+                        continuous_update=True, style=STYLE, layout=LAYOUT)
 
     def draw():
         l = lam.value
@@ -104,7 +105,7 @@ def odin_pinhole():
     d = w.ToggleButtons(options=[("1 cm", 0.01), ("2 cm", 0.02), ("3 cm", 0.03), ("4 cm", 0.04)], value=0.03,
                         description="pinhole D", style={"button_width": "70px", "description_width": "230px"})
     l = w.FloatSlider(value=5.0, min=1.0, max=20.0, step=1.0, description="sample to camera distance l (cm)",
-                      readout_format=".0f", continuous_update=False, style=STYLE, layout=LAYOUT)
+                      readout_format=".0f", continuous_update=True, style=STYLE, layout=LAYOUT)
 
     def draw():
         ratio = ODIN_L_PINHOLE / d.value
@@ -126,9 +127,9 @@ def odin_pinhole():
 # --------------------------------------------------------------------------------------------- LoKI
 def loki_q():
     r = w.FloatSlider(value=10.0, min=2.0, max=75.0, step=1.0, description="distance r from the beam axis (cm)",
-                      readout_format=".0f", continuous_update=False, style=STYLE, layout=LAYOUT)
+                      readout_format=".0f", continuous_update=True, style=STYLE, layout=LAYOUT)
     lam = w.FloatSlider(value=6.0, min=3.0, max=11.5, step=0.5, description="wavelength λ (Å)", readout_format=".1f",
-                        continuous_update=False, style=STYLE, layout=LAYOUT)
+                        continuous_update=True, style=STYLE, layout=LAYOUT)
     dist = w.ToggleButtons(options=[("5 m", 5.0), ("10 m", 10.0)], value=5.0, description="sample to rear detector",
                            style={"button_width": "70px", "description_width": "230px"})
 

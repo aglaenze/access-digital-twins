@@ -442,6 +442,10 @@ class VirtualOdin:
                 e["sample/x_translation"] = float(state["stage_x"])
                 cam = e.create_group("instrument/camera")
                 cam.attrs["NX_class"] = "NXdetector"
+                for k in ("shutter", "choppers", "diffuser"):        # the state of the instrument during the image
+                    cam.attrs[k] = str(state[k])
+                cam.attrs["pinhole_m"] = float(state["pinhole"])
+                cam.attrs["wfm_delta_m"] = float(state["wfm_delta"])
                 d = cam.create_dataset("data", data=self.last_image, compression="gzip")
                 d.attrs["units"] = "counts"
                 cam["x_pixel_offset"] = np.linspace(FIELD[0], FIELD[1], 129)[:-1] + (FIELD[1] - FIELD[0]) / 256

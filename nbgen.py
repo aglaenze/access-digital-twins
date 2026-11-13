@@ -61,3 +61,44 @@ def write(cells, path, all_code_locked=True):
                       "language_info": {"name": "python"}}
     nbf.write(nb, path)
     print("written", os.path.basename(path), len(out), "cells")
+
+
+def distribute(cells, plan):
+    """The questions along the exercise, not all at the end: the code cell holding them (q.choice(...), q.number(...),
+    then q.report()) is split into one cell per question, each put right after the cell whose source contains its
+    anchor; the titles "Qn." are renumbered in the order of the page; q.report() stays where the questions were.
+
+    plan: [(anchor, [old numbers]), ...], e.g. [("button.on_click(do_count)", [7, 9]), ...]; a question not in the
+    plan stays at the end. The quiz (q = quiz.Quiz(...)) must be created in a cell before the first anchor."""
+    import re
+    has_q = [i for i, c in enumerate(cells) if c.cell_type == "code" and re.search(r"(?m)^q\.(choice|number)\(", c.source)]
+    k = next((i for i in has_q if "q.report()" in cells[i].source), has_q[0])
+    src = cells[k].source
+    starts = [m.start() for m in re.finditer(r"(?m)^q\.(choice|number)\(", src)]
+    head = src[:starts[0]]
+    end = src.find("\nq.report()")
+    blocks = [src[a:b].rstrip() for a, b in zip(starts, starts[1:] + [end if end > 0 else len(src)])]
+    tail = src[end:].strip() if end > 0 else ""
+    by_num = {}
+    for b in blocks:
+        m = re.search(r'title="Q(\d+)\. ', b)
+        by_num[int(m.group(1))] = b
+    placed = [n for _, ns in plan for n in ns]
+    cells[k].source = "\n".join(x for x in [head.strip(), *[by_num[n] for n in sorted(by_num) if n not in placed], tail] if x)
+    # insert, from the last anchor to the first (indices stay valid)
+    inserts = []
+    for anchor, ns in plan:
+        j = next(i for i, c in enumerate(cells) if anchor in c.source)
+        inserts.append((j, ns))
+    for j, ns in sorted(inserts, key=lambda x: -x[0]):
+        for n in reversed(ns):
+            cells.insert(j + 1, code(by_num[n]))
+    # renumber in the order of the page
+    order = []
+    for c in cells:
+        if c.cell_type == "code":
+            order += [int(m) for m in re.findall(r'title="Q(\d+)\. ', c.source)]
+    new = {old: i + 1 for i, old in enumerate(order)}
+    for c in cells:                       # every mention: titles, and "(Q3)", "question Q7" in texts and hints
+        c.source = re.sub(r"\bQ(\d+)\b", lambda m: f"Q{new.get(int(m.group(1)), int(m.group(1)))}", c.source)
+    return cells

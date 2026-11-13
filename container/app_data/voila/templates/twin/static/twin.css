@@ -47,6 +47,10 @@ body { font-family: Inter, "Segoe UI", system-ui, sans-serif; }
   height: 36px; border-radius: 8px; border: 1px solid var(--tw-line2); font-family: inherit; font-size: 14px; padding: 0 10px; background: #fff; }
 .widget-dropdown select:focus, .widget-text input:focus { outline: 2px solid var(--tw-teal); outline-offset: 1px; }
 .widget-label, .widget-label-basic { font-size: 14px; color: var(--tw-text); }
+/* the label of a slider, a box or a list is never cut ("..."): it keeps its width (the controls of a panel stay
+   aligned) and grows only when its text is longer */
+.widget-inline-hbox > .widget-label { min-width: max-content !important; max-width: none !important;
+  overflow: visible !important; text-overflow: clip !important; flex-shrink: 0 !important; }
 .widget-radio-box label { font-size: 14.5px; line-height: 1.5; }
 .widget-radio-box input, .widget-checkbox input { accent-color: var(--tw-teal); }
 .progress-bar { background: var(--tw-teal) !important; }
@@ -75,3 +79,12 @@ body .twq-ans { background: var(--tw-soft); color: var(--tw-text); }
 .twq .widget-button.mod-primary { align-self: flex-start; }
 /* icon-only buttons (remove a volume of the sample builder) */
 .jupyter-button[title="remove"] { padding: 0 !important; min-width: 40px; width: 40px !important; }
+
+/* One scroll bar only, the page's, at the right edge of the window. Voila lays the cells out in a box of fixed height
+   (#rendered_cells, inside #jp-main-content-panel, inside #main) that scrolls by itself, inside a page that can scroll
+   too: two bars, the inner one away from the edge. The boxes are made ordinary blocks that grow with their content
+   (Lumino writes their size inline: !important), and the page scrolls. */
+html, body[data-voila] { height: auto !important; overflow-y: auto !important; overflow-x: hidden !important; }
+body[data-voila] #main, body[data-voila] #jp-main-content-panel, body[data-voila] #rendered_cells {
+  position: static !important; contain: none !important; width: auto !important; height: auto !important;
+  min-height: 0 !important; overflow: visible !important; }

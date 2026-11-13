@@ -15,7 +15,7 @@ mission: >-
   team can drill it out.
 status: ready
 samples:
-  meteorite_nwa7034: {}
+  meteorite_nwa7034: {hidden: [inclusions]}
 modes:
   bsc:
     label: Guided web page
@@ -23,3 +23,23 @@ modes:
     duration: 2 hours
     open: voila
     file: odin/exercises/meteorite_imaging/ODIN_meteorite.ipynb
+  msc:
+    label: Notebook with method choices
+    what: >-
+      You measure in NICOS or with a panel; the files, the sinogram and the reconstruction are given (code shown or
+      hidden); you choose the filter and the angles of the reconstruction, find the clasts in 3D, and compare two
+      models of the wavelength dependence to identify hydrogen and measure the water.
+    duration: 3 hours
+    open: lab
+    file: odin/exercises/meteorite_imaging/ODIN_meteorite_msc.ipynb
+  beamtime:
+    label: Beamtime with NICOS
+    what: >-
+      A proposal and a beamtime budget. You drive ODIN in NICOS (camera, tomography, time of flight), choose the
+      measurements yourself, then analyze your files with a starter notebook. No settings are given.
+    duration: 1 day
+    open: lab
+    file: odin/exercises/meteorite_imaging/beamtime.md
+    nicos: odin
+    analysis: odin/exercises/meteorite_imaging/ODIN_meteorite_beamtime.ipynb
+    proposal: {id: "1250", title: "Water in a Martian meteorite by neutron tomography"}

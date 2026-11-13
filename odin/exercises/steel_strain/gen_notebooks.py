@@ -13,7 +13,7 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.abspath(os.path.join(HERE, "..", "..", "..")))
-from nbgen import code, md, nicos_step, stop, write  # noqa: E402
+from nbgen import code, distribute, md, nicos_step, stop, write  # noqa: E402
 
 PROPOSAL = "1240"
 SETUP = r'''
@@ -252,7 +252,7 @@ r1, r0 = strain.edge(BY_LOAD[LMAX], OPEN, DARK, "gauge"), strain.edge(BY_LOAD[0.
 print(f"fitted edge without load: {r0['lam_edge']:.4f} Å   (textbook: {strain.EDGE_110:.4f} Å)")
 print(f"strain with the measured reference : {(r1['lam_edge'] - r0['lam_edge']) / r0['lam_edge'] * 1e3:+.2f} × 10⁻³")
 print(f"strain with the textbook reference : {(r1['lam_edge'] - strain.EDGE_110) / strain.EDGE_110 * 1e3:+.2f} × 10⁻³")
-'''), md("## Questions"), code(r'''
+'''), md("## Your results\n\nYour score on the questions of the notebook, and a report to download."), code(r'''
 q.choice("Which shape of edge describes your data (reduced χ² close to 1, no structure in the residuals)?",
          ["The step smoothed by the resolution, on a sloping baseline.", "The sharp step.",
           "The step smoothed by the resolution, on a flat baseline."],
@@ -305,6 +305,12 @@ q.report()
 When you are done: save this notebook (*Save*), write what you thought of the exercise, then submit.
 """), code('import submit\n_ = submit.Submit("odin/exercises/steel_strain", "msc", quiz=q)')]
 
+distribute(msc, [
+    ("b1 = mb.EdgeBuilder", [2, 3, 4]),                       # the model, same choices, the reference
+    ("button_eps.on_click(show_strain)", [5, 8]),             # the strain, the counting time
+    ("ν = {-a * E_GPA", [6]),                                 # Poisson's ratio
+    ("strain with the textbook reference", [7]),              # the textbook reference
+])
 write(msc, os.path.join(HERE, "ODIN_steel_msc.ipynb"), all_code_locked=True)
 
 # --------------------------------------------------------------------------- beamtime: a starter notebook

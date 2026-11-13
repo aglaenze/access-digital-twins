@@ -51,11 +51,16 @@ ODIN_MATERIALS = {   # label shown to students: NCrystal file
     "tungsten": "W_sg229.ncmat", "lead": "Pb_sg225.ncmat", "silicon": "Si_sg227.ncmat", "zirconium": "Zr_sg194.ncmat",
     "magnesium": "Mg_sg194.ncmat", "zinc": "Zn_sg194.ncmat", "tin": "Sn_sg141.ncmat", "silver": "Ag_sg225.ncmat",
     "gold": "Au_sg225.ncmat",
+    # rocks (models made of the minerals NCrystal provides; odin/samples/meteorite_nwa7034.yml)
+    "Martian rock (model)": "phases<0.5*SiO2-alpha_sg154_AlphaQuartz.ncmat&0.3*Mg2SiO4_sg62_MagnesiumSilicate.ncmat&0.2*Al2O3_sg167_Corundum.ncmat>",
+    "rock with 6 % water (model)": "phases<0.8*SiO2-alpha_sg154_AlphaQuartz.ncmat&0.2*MgO2H2_sg164_MagnesiumHydroxide.ncmat>",
+    "void": "void.ncmat",
 }
 ODIN_COLORS = {"Fe_sg229_Iron-alpha.ncmat": "#6B7280", "Fe_sg225_Iron-gamma.ncmat": "#9CA3AF",
                "Al_sg225.ncmat": "#C7D2FE", "Cu_sg225.ncmat": "#C2410C", "Ni_sg225.ncmat": "#A3A380",
                "Pb_sg225.ncmat": "#475569", "W_sg229.ncmat": "#334155", "Au_sg225.ncmat": "#EAB308",
-               "Ag_sg225.ncmat": "#D1D5DB", "Ti_sg194.ncmat": "#94A3B8"}
+               "Ag_sg225.ncmat": "#D1D5DB", "Ti_sg194.ncmat": "#94A3B8",
+               "phases<0.5*SiO2-alpha_sg154_AlphaQuartz.ncmat&0.3*Mg2SiO4_sg62_MagnesiumSilicate.ncmat&0.2*Al2O3_sg167_Corundum.ncmat>": "#7C6A58", "phases<0.8*SiO2-alpha_sg154_AlphaQuartz.ncmat&0.2*MgO2H2_sg164_MagnesiumHydroxide.ncmat>": "#3B4A63", "void.ncmat": "#FFFFFF"}
 FIELD_MM = 14.0          # ODIN: field of view of the Timepix3 camera
 # LoKI: scattering length densities [10⁻⁶ Å⁻²] (usual values, NIST SLD calculator); incoherent scattering of the
 # solvent [cm⁻¹ sr⁻¹ per cm of... i.e. dΣ/dΩ] and removal (incoherent, mostly by H) [1/m] for pure H2O and pure D2O
@@ -324,9 +329,14 @@ def describe(instrument, spec, hidden=()):
         lines.append(spec["description"])
     if instrument == "odin":
         label = {v: k for k, v in ODIN_MATERIALS.items()}
+        n_inc = 0
         for k, v in enumerate(spec.get("volumes", [])):
+            if "inside" in v and "inclusions" in hidden:          # inclusions to be found: not described
+                n_inc += 1
+                continue
             mat = q("material", label.get(v["material"], v["material"]))
-            sx, sy, sz = v["size_mm"]; cx, cy, cz = v.get("center_mm", (0, 0, 0))
+            sx, sy, sz = (list(v["size_mm"]) * 3)[:3] if len(v["size_mm"]) == 1 else (list(v["size_mm"]) + [0, 0])[:3]
+            cx, cy, cz = v.get("center_mm", (0, 0, 0))
             at = f"centered at x = {cx:g} mm, y = {cy:g} mm" + (f", z = {cz:g} mm" if cz else "")
             shape = v.get("shape", "box")
             if shape == "sphere":
@@ -336,6 +346,8 @@ def describe(instrument, spec, hidden=()):
                              f"(vertical), {at}")
             else:
                 lines.append(f"  block {k + 1}: {mat}, {sx:g} × {sy:g} mm, {q('thickness', f'{sz:g} mm thick')}, {at}")
+        if n_inc:
+            lines.append("  inclusions inside: ? (where, how many, what: to be found)")
     else:
         if spec.get("empty"):
             lines.append("  nothing in the beam")
@@ -380,7 +392,11 @@ def draw(instrument, spec, hidden=(), fig=None):
         label = {v: k for k, v in ODIN_MATERIALS.items()}
         a1, a2 = fig.add_subplot(1, 2, 1), fig.add_subplot(1, 2, 2)
         for v in spec.get("volumes", []):
-            (sx, sy, sz), (cx, cy, cz) = v["size_mm"], v.get("center_mm", (0, 0, 0))
+            if "inside" in v and "inclusions" in hidden:      # inclusions to be found: not drawn
+                continue
+            sz_ = list(v["size_mm"])
+            (sx, sy, sz) = (sz_ * 3)[:3] if len(sz_) == 1 else (sz_ + [0, 0])[:3]
+            (cx, cy, cz) = v.get("center_mm", (0, 0, 0))
             col = "#9CA3AF" if "material" in hidden else ODIN_COLORS.get(v["material"], "#A8A29E")
             name = "?" if "material" in hidden else label.get(v["material"], v["material"])
             shape = v.get("shape", "box")

@@ -177,8 +177,20 @@ class Quiz:
         why = why or {}
         # the options in a shuffled order (the right one is not always first), the same at every opening: drawn from
         # the name of the quiz and the question
+        rng = random.Random(hashlib.sha256(f"{self.name}|{text}".encode()).hexdigest())
         order = list(range(len(options)))
-        random.Random(hashlib.sha256(f"{self.name}|{text}".encode()).hexdigest()).shuffle(order)
+        rng.shuffle(order)
+        if not multi:
+            # the right option at the place used least so far in this quiz (ties drawn): over a page, the right
+            # answers are spread over all the places, never first every time
+            used = getattr(self, "_right_places", {})
+            n = len(options)
+            least = min(used.get(k, 0) for k in range(n))
+            place = rng.choice([k for k in range(n) if used.get(k, 0) == least])
+            used[place] = used.get(place, 0) + 1
+            self._right_places = used
+            wrong = [k for k in order if k != answer]
+            order = wrong[:place] + [answer] + wrong[place:]
         new_index = {old: new for new, old in enumerate(order)}
         options = [options[k] for k in order]
         right = {new_index[k] for k in right}

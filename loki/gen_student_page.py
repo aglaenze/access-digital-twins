@@ -96,6 +96,8 @@ skip = w.ToggleButtons(options=["off", "on"], value=st["pulse_skipping"], descri
 dist = w.ToggleButtons(options=[("5 m", 5.0), ("10 m", 10.0)], value=st["detector_distance"], description="Detector")
 import sample_library as sl
 from page_output import into
+import quiz
+q = quiz.Quiz("loki_silica_bsc")          # the questions, along the page
 HIDDEN = sl.exercise_hidden("exercises/silica_spheres/exercise.yml")   # what the students have to measure
 smp = w.Dropdown(options=[(loki.sample_spec(n).get("name", n), n) for n in loki.samples()], value=st["sample"],
                  description="Sample", layout=w.Layout(width="420px"))
@@ -293,15 +295,12 @@ the real instrument's format, then reduced by the ESS software. Simplifications:
 the neutrons (LoKI counts millions per second), the empty cell is not measured separately (the solvent run includes
 the cell), and the transmission monitor always sees the beam.
 
-## 4. Questions: your verdict, and the instrument
+## 4. Your results
 
-Answer in the boxes, then click *Check*. A wrong answer is explained; after a try you can also show the answer.
-Your answers are kept, and *My results* (at the end) gives your score and a report to download.
+Your score on the questions of the page, and a report to download.
 """)
 
 code(r"""
-import quiz
-q = quiz.Quiz("loki_silica_bsc")
 q.number("Your Guinier analysis gives the **radius of gyration** $R_g$ of the particles. Which value do you find?",
          value=39.5, tol=1.6, unit="Å",
          mistakes=[(50.0, "the radius R of the sphere (from the sphere model), not its radius of gyration"),
@@ -406,6 +405,11 @@ _ = submit.Submit("loki/exercises/silica_spheres", "bsc", quiz=q)
 import sys as _sys
 _sys.path.insert(0, os.path.dirname(HERE))
 from nbfig import figure_cell, insert_after_mission
+from nbgen import distribute
+distribute(cells, [
+    ("button.on_click(do_count)", [6, 7, 8]),          # collimation, frame overlap, pulse skipping
+    ("button_an.on_click(analyze)", [1, 2, 3, 5, 4]),  # Guinier, the radius, the shape, counting time, the verdict
+])
 insert_after_mission(cells, figure_cell('sans_particles.png', 'What you measure: the particles in the liquid scatter at small angles, and their size sets the shape of the curve I(Q).'))
 nb = nbf.v4.new_notebook()
 nb["cells"] = cells

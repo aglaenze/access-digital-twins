@@ -12,6 +12,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 sys.path.insert(0, ROOT)
 from nbfig import figure_cell, insert_after_mission  # noqa: E402
+from nbgen import distribute  # noqa: E402
 
 cells = []
 md = lambda s: cells.append(nbf.v4.new_markdown_cell(s.strip()))
@@ -44,6 +45,9 @@ neutrons removed per cm). The camera records $T$ for each pixel: a **radiograph*
 everything along the beam; turning the sample and taking a radiograph at many angles gives back $\Sigma$ at every
 point inside: a **tomography** (part 4). Finally the time of flight of the neutrons gives their wavelength, and the
 way $\Sigma$ changes with the wavelength tells which element attenuates (part 5).
+
+**Questions along the page** check each step: answer in the box, then click *Check*. A wrong answer is explained;
+after a try you can also show the answer. Your answers are kept.
 """)
 
 code(r"""
@@ -58,7 +62,10 @@ import ipywidgets as w
 from IPython.display import display, clear_output
 from odin_virtual import VirtualOdin
 import odin_viz as viz, odin_radiography as tomo
+import live_view
 from page_output import into
+import quiz
+q = quiz.Quiz("odin_meteorite_bsc")      # the questions, along the page
 
 SAMPLE = "meteorite_nwa7034"
 odin = VirtualOdin(session=os.environ.get("ODIN_SESSION", "student"))
@@ -195,10 +202,11 @@ horizontal line of pixels (choose its height): through the matrix of the meteori
 """)
 
 code(r"""
-height = w.FloatSlider(value=2.0, min=-6.5, max=6.5, step=0.1, description="Line y (mm)", continuous_update=False,
+height = w.FloatSlider(value=2.0, min=-6.5, max=6.5, step=0.1, description="Line y (mm)", continuous_update=True,
                        layout=w.Layout(width="420px"))
 button_T = w.Button(description="Show the transmission", button_style="success", icon="image", layout=w.Layout(width="auto"))
 out_T = w.Output()
+img_T = live_view.FigureImage()          # follows the slider while it moves
 
 def chosen():
     if not (pick_S.value and pick_O.value):
@@ -211,17 +219,18 @@ def show_T(_=None):
         try:
             S, O, D = chosen()
             T = tomo.transmission(S, O, D)
-            fig, (a, b) = plt.subplots(1, 2, figsize=(11, 4.4), gridspec_kw=dict(width_ratios=[1, 1.25]))
-            im = a.imshow(T, origin="lower", extent=EXT, cmap="gray", vmin=0.5, vmax=1.05)
-            fig.colorbar(im, ax=a, label="transmission T")
-            a.axhline(height.value, color="tab:orange", lw=1)
-            a.set(xlabel="x (mm)", ylabel="y (mm)", title="Transmission of the meteorite")
-            row = int(np.clip(round(height.value / tomo.PIXEL_MM + 63.5), 0, 127))
-            x = np.linspace(EXT[0], EXT[1], 128)
-            b.plot(x, T[row], color="tab:orange")
-            b.set(xlabel="x (mm)", ylabel="transmission T", title=f"Profile at y = {height.value:.1f} mm", ylim=(0.5, 1.1))
-            b.grid(alpha=0.3)
-            plt.tight_layout(); plt.show()
+            with img_T:
+                fig, (a, b) = plt.subplots(1, 2, figsize=(11, 4.4), gridspec_kw=dict(width_ratios=[1, 1.25]))
+                im = a.imshow(T, origin="lower", extent=EXT, cmap="gray", vmin=0.5, vmax=1.05)
+                fig.colorbar(im, ax=a, label="transmission T")
+                a.axhline(height.value, color="tab:orange", lw=1)
+                a.set(xlabel="x (mm)", ylabel="y (mm)", title="Transmission of the meteorite")
+                row = int(np.clip(round(height.value / tomo.PIXEL_MM + 63.5), 0, 127))
+                x = np.linspace(EXT[0], EXT[1], 128)
+                b.plot(x, T[row], color="tab:orange")
+                b.set(xlabel="x (mm)", ylabel="transmission T", title=f"Profile at y = {height.value:.1f} mm", ylim=(0.5, 1.1))
+                b.grid(alpha=0.3)
+                plt.tight_layout()
             if D is None:
                 print("Note: no dark image, the dark signal of the camera is not subtracted.")
         except Exception as err:
@@ -229,8 +238,8 @@ def show_T(_=None):
             print("Not possible yet:", err)
 
 button_T.on_click(show_T)
-height.observe(lambda c: show_T() if out_T.outputs else None, "value")
-display(w.VBox([pick_S, pick_O, pick_D, w.HBox([button_T, height]), out_T]))
+height.observe(live_view.throttled(lambda: show_T() if img_T.value else None), "value")
+display(w.VBox([pick_S, pick_O, pick_D, w.HBox([button_T, height]), out_T, img_T]))
 """)
 
 md(r"""
@@ -293,21 +302,21 @@ $\Sigma$ in cm⁻¹. Move the two sliders through the whole sample: count the cl
 """)
 
 code(r"""
-ys = w.FloatSlider(value=2.0, min=-6.5, max=6.5, step=0.11, description="Height y (mm)", continuous_update=False,
+ys = w.FloatSlider(value=2.0, min=-6.5, max=6.5, step=0.11, description="Height y (mm)", continuous_update=True,
                    layout=w.Layout(width="420px"))
-zs = w.FloatSlider(value=-1.5, min=-6.5, max=6.5, step=0.11, description="Depth z (mm)", continuous_update=False,
+zs = w.FloatSlider(value=-1.5, min=-6.5, max=6.5, step=0.11, description="Depth z (mm)", continuous_update=True,
                    layout=w.Layout(width="420px"))
-out_sl = w.Output()
+img_sl = live_view.FigureImage()          # follows the sliders while they move
+txt_sl = w.HTML("Run the tomography first.")
 
 def px(mm):
     return int(np.clip(round(mm / tomo.PIXEL_MM + 63.5), 0, 127))
 
 def show_slices(_=None):
-    with into(out_sl):
-        if "vol" not in VOL:
-            print("Run the tomography first.")
-            return
-        v = VOL["vol"]
+    if "vol" not in VOL:
+        return
+    v = VOL["vol"]
+    with img_sl:
         fig, (a, b) = plt.subplots(1, 2, figsize=(11.5, 4.6))
         kw = dict(origin="lower", extent=EXT, cmap="magma", vmin=0, vmax=1.2)
         im = a.imshow(v[px(ys.value)], **kw)
@@ -317,13 +326,12 @@ def show_slices(_=None):
         b.axhline(ys.value, color="w", lw=0.8, ls="--")
         b.set(xlabel="x (mm)", ylabel="y (mm)", title=f"Vertical slice at depth z = {zs.value:.1f} mm")
         fig.colorbar(im, ax=[a, b], label="Σ (cm⁻¹)")
-        plt.show()
-        c = v[px(ys.value)][54:74, 54:74]
-        print(f"Σ in the center of the horizontal slice: {np.median(c):.2f} cm⁻¹ (median of 20 × 20 pixels)")
+    c = v[px(ys.value)][54:74, 54:74]
+    txt_sl.value = f"Σ in the center of the horizontal slice: <b>{np.median(c):.2f} cm⁻¹</b> (median of 20 × 20 pixels)"
 
-ys.observe(show_slices, "value")
-zs.observe(show_slices, "value")
-display(w.VBox([w.HBox([ys, zs]), out_sl]))
+ys.observe(live_view.throttled(show_slices), "value")
+zs.observe(live_view.throttled(show_slices), "value")
+display(w.VBox([w.HBox([ys, zs]), img_sl, txt_sl]))
 show_slices()
 """)
 
@@ -465,14 +473,12 @@ little on which mineral carries it, so the method and the orders of magnitude ar
 Water bound in a mineral does not scatter exactly as liquid water: comparing with $\Sigma$ of water gives an estimate,
 good to about 10 %.
 
-## 6. Questions: your report to the team
+## 6. Your results
 
-Answer in the boxes, then click *Check*. A wrong answer is explained; after a try you can also show the answer.
+Your score on the questions of the page, and a report to download.
 """)
 
 code(r"""
-import quiz
-q = quiz.Quiz("odin_meteorite_bsc")
 q.choice("Why are some spots of the radiograph **darker** than the rest of the meteorite?",
          ["They contain hydrogen (water), which scatters neutrons far more than the other elements of the rock.",
           "They contain heavy elements such as iron, which stop the neutrons.",
@@ -573,6 +579,11 @@ import submit
 _ = submit.Submit("odin/exercises/meteorite_imaging", "bsc", quiz=q)
 """)
 
+distribute(cells, [
+    ("button_T.on_click(show_T)", [1, 2]),                            # the radiograph
+    ("display(w.VBox([w.HBox([ys, zs]), img_sl, txt_sl]))", [3, 4, 5, 6, 7]),   # the tomography
+    ("button_cmp.on_click(compare)", [8, 9, 10]),                     # the element, the water, the report
+])
 insert_after_mission(cells, figure_cell(
     "meteorite_tomography.png", "A radiograph adds up everything along the beam (left): two clasts one behind the "
     "other make one spot. Turning the sample and taking radiographs over 180° (middle) gives back each slice by "

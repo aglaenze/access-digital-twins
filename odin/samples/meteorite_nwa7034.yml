@@ -4,6 +4,7 @@ description: >-
   Martian rocks (clasts) cemented in a fine-grained matrix, mounted on the rotation stage. Some clasts carry water
   (hydrogen), which neutrons see very well.
 formula: Si, Mg, Al, O (matrix); H in some clasts
+hidden: [inclusions]          # what the students must find: not described, not drawn
 # Model (the minerals NCrystal provides, in proportions giving the density of the meteorite, about 3.1 g/cm³):
 # matrix = quartz 50 %, olivine (forsterite) 30 %, corundum 20 % by volume (the real matrix: plagioclase, pyroxene and
 # iron oxides); a hydrated clast = quartz with 20 % by volume of a hydroxide (brucite, Mg(OH)2): about 6 % of water

@@ -75,12 +75,20 @@ def sinogram(files, open_beam, dark=None, row=None):
     return angles, (P if row is None else P[:, row, :])
 
 
-def fbp(angles, sino, pixel_mm=PIXEL_MM):
-    """Filtered back-projection of one slice: sino[angle, x] (−ln T) -> Σ(z, x) in cm⁻¹ on the same pixels."""
+FILTERS = ("none", "ramp", "ramp + Hamming window")
+
+
+def fbp(angles, sino, pixel_mm=PIXEL_MM, filter="ramp + Hamming window"):
+    """Filtered back-projection of one slice: sino[angle, x] (−ln T) -> Σ(z, x) in cm⁻¹ on the same pixels.
+    filter: "none" (plain back-projection: blurred), "ramp" (|k|: exact, but amplifies the noise), "ramp + Hamming
+    window" (|k| rolled off at high k: less noise, a little less sharp)."""
     n = sino.shape[1]
     k = np.fft.fftfreq(2 * n)
-    ramp = np.abs(k) * (0.54 + 0.46 * np.cos(2 * np.pi * k))       # ramp filter, Hamming window (less noise)
-    filt = np.real(np.fft.ifft(np.fft.fft(sino, 2 * n, axis=1) * ramp, axis=1))[:, :n]
+    if filter == "none":
+        filt = sino
+    else:
+        ramp = np.abs(k) * ((0.54 + 0.46 * np.cos(2 * np.pi * k)) if "Hamming" in filter else 1.0)
+        filt = np.real(np.fft.ifft(np.fft.fft(sino, 2 * n, axis=1) * ramp, axis=1))[:, :n]
     c = (np.arange(n) - (n - 1) / 2)
     X, Z = np.meshgrid(c, c)                     # pixels of the slice (rows z: along the beam at angle 0)
     out = np.zeros((n, n))
@@ -92,11 +100,11 @@ def fbp(angles, sino, pixel_mm=PIXEL_MM):
     return out * span / len(angles) / (pixel_mm * 0.1)                # [cm⁻¹]
 
 
-def reconstruct(files, open_beam, dark=None, rows=None):
+def reconstruct(files, open_beam, dark=None, rows=None, filter="ramp + Hamming window"):
     """Σ (cm⁻¹) of the sample in 3D: vol[y, z, x], one slice per row of pixels (rows: the rows to do, all by default)."""
     angles, P = sinogram(files, open_beam, dark)
     rows = range(P.shape[1]) if rows is None else rows
-    return np.array([fbp(angles, P[:, r, :]) for r in rows])
+    return np.array([fbp(angles, P[:, r, :], filter=filter) for r in rows])
 
 
 # --------------------------------------------------------------------------- the wavelength of the neutrons

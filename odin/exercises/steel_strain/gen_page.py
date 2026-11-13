@@ -12,6 +12,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 sys.path.insert(0, ROOT)
 from nbfig import figure_cell, insert_after_mission  # noqa: E402
+from nbgen import distribute  # noqa: E402
 
 cells = []
 md = lambda s: cells.append(nbf.v4.new_markdown_cell(s.strip()))
@@ -47,6 +48,9 @@ $\varepsilon$ is the **strain** of the lattice along the beam: a number without 
 3. the specimen **without load** (0 kN): the reference, which gives $\lambda_0$;
 4. the specimen at **8 kN**;
 5. the specimen at **16 kN**.
+
+**Questions along the page** check each step: answer in the box, then click *Check*. A wrong answer is explained;
+after a try you can also show the answer. Your answers are kept.
 """)
 
 code(r"""
@@ -63,6 +67,8 @@ from odin_virtual import VirtualOdin
 import odin_viz as viz, odin_strain as strain
 import sample_library as sl
 from page_output import into
+import quiz
+q = quiz.Quiz("odin_steel_bsc")          # the questions, along the page
 
 SAMPLE = "steel_tensile"
 odin = VirtualOdin(session=os.environ.get("ODIN_SESSION", "student"))
@@ -376,15 +382,12 @@ display(w.VBox([button_line, out_line]))
 """)
 
 md(r"""
-## 6. Questions: your verdict
+## 6. Your results
 
-Answer in the boxes, then click *Check*. A wrong answer is explained; after a try you can also show the answer.
-Your answers are kept, and *My results* (at the end) gives your score and a report to download.
+Your score on the questions of the page, and a report to download.
 """)
 
 code(r"""
-import quiz
-q = quiz.Quiz("odin_steel_bsc")
 q.number("At which wavelength is the (110) edge of the specimen **without load** (part 3, gauge)?",
          value=4.056, tol=0.012, unit="Å",
          mistakes=[(2.867, "the (200) edge; the (110) edge is the last one, near 4.05 Å"),
@@ -509,6 +512,12 @@ import submit
 _ = submit.Submit("odin/exercises/steel_strain", "bsc", quiz=q)
 """)
 
+distribute(cells, [
+    ('sl.draw("odin", spec', [3, 4]),                 # the stress, Hooke's law: before measuring
+    ("button_fit.on_click(fit_edge)", [1, 7, 8]),   # the edge, why a reference without load, the resolution
+    ("button_map.on_click(do_map)", [2, 5, 9]),     # which strain, its sign, the counting time
+    ("button_line.on_click(do_line)", [6, 10]),     # Poisson's ratio, the verdict
+])
 insert_after_mission(cells, figure_cell(
     "steel_strain.png", "The specimen in its load frame as the camera sees it (left); pulled along the force, the steel "
     "gets thinner across it, and the planes facing the beam move closer (middle); the Bragg edge of these planes moves "

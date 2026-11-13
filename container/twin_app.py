@@ -54,6 +54,7 @@ QUIZ = {  # the quiz (quiz.Quiz name) of each way into an exercise, for the prog
     ("odin/exercises/steel_strain", "bsc"): "odin_steel_bsc",
     ("odin/exercises/steel_strain", "msc"): "odin_steel_msc",
     ("odin/exercises/meteorite_imaging", "bsc"): "odin_meteorite_bsc",
+    ("odin/exercises/meteorite_imaging", "msc"): "odin_meteorite_msc",
     ("loki/exercises/silica_spheres", "bsc"): "loki_silica_bsc",
     ("loki/exercises/silica_spheres", "msc"): "loki_silica_msc",
 }

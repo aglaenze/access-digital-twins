@@ -60,6 +60,8 @@ of the camera, dashed) and from above (right: its thickness along the beam). The
 code(r"""
 import sample_library as sl
 from page_output import into
+import quiz
+q = quiz.Quiz("odin_iron_bsc")          # the questions, along the page
 smp = w.Dropdown(options=[(odin.sample_spec(n).get("name", n), n) for n in odin.samples()],
                  value=odin.status()["sample"], description="Sample", layout=w.Layout(width="420px"))
 smp_out = w.Output()
@@ -269,15 +271,12 @@ the attenuation by the sample with the Beer-Lambert law and the NCrystal cross-s
 **scattered** by the sample that still reach the detector (here less than 0.3 % of the signal, checked with a full
 McStas simulation).
 
-## 4. Questions: your verdict, and the instrument
+## 4. Your results
 
-Answer in the boxes, then click *Check*. A wrong answer is explained; after a try you can also show the answer.
-Your answers are kept, and *My results* (at the end) gives your score and a report to download.
+Your score on the questions of the page, and a report to download.
 """)
 
 code(r"""
-import quiz
-q = quiz.Quiz("odin_iron_bsc")
 q.number("On your transmission $T(\\lambda)$ of the iron plate, at which wavelength is the **last** Bragg edge (the "
          "jump at the largest λ)?", value=4.054, tol=0.05, unit="Å",
          mistakes=[(2.867, "an edge too, the (200) one; look for the last jump, at the largest λ"),
@@ -386,6 +385,12 @@ _ = submit.Submit("odin/exercises/iron_bragg_edges", "bsc", quiz=q)
 import sys as _sys
 _sys.path.insert(0, os.path.dirname(HERE))
 from nbfig import figure_cell, insert_after_mission
+from nbgen import distribute
+distribute(cells, [
+    ("button.on_click(do_count)", [8, 9]),                      # time of flight, frame overlap
+    ("review_button.on_click(do_review)", [5]),                 # a forgotten shutter
+    ("button_red.on_click(reduce_runs)", [1, 2, 3, 6, 7, 4]),   # the edges, the lattice, counting, resolution, verdict
+])
 insert_after_mission(cells, figure_cell('iron_structures.png', 'What you have to decide: α-iron (left) or γ-iron (middle)? Each structure has its own atomic planes, hence its own Bragg edges (right).'))
 nb = nbf.v4.new_notebook()
 nb["cells"] = cells
