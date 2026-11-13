@@ -161,7 +161,7 @@ BACK_INSTR = r"""/**************************************************************
 DEFINE INSTRUMENT LOKI_back(string mcpl_file = "beam_at_sample.mcpl.gz", int repeat = 12,
   string iq_file = "Iq.dat", int sample_in = 1, double thickness = 0.001, double xwidth = 0.02,
   double yheight = 0.02, double mu_abs = 0.0, double mu_rem = 0.0, double iflat = 0.0,
-  double tth_min = 0.05, double tth_max = 60.0, double p_scatter = 0.95, double lmin = 0.5, double lmax = 25.0)
+  double tth_min = 0.005, double tth_max = 60.0, double p_scatter = 0.95, double lmin = 0.5, double lmax = 25.0)
 
 USERVARS
 %{
@@ -235,17 +235,20 @@ def write_iq(path, q, dsdo):
 
 
 def back(front_dir, name, q, dsdo, thickness=1e-3, mu_abs=0.0, mu_rem=0.0, iflat=0.0, sample_in=1, repeat=8,
-         series="samples", tth_max=60.0, mpi=8, width=0.015, p_scatter=0.95):
+         series="samples", tth_max=60.0, mpi=8, width=0.015, p_scatter=0.95, tth_min=0.005):
     """Downstream part (computed, or read from the cache): a sample (table q [Å⁻¹], dsdo [cm⁻¹ sr⁻¹]) in the beam of
     one configuration (folder of front()). thickness [m]; mu_abs [1/m] at 1.798 Å; mu_rem [1/m]; iflat [cm⁻¹ sr⁻¹].
-    sample_in=0: no sample (empty beam). p_scatter: fraction of the rays sent to the "scattered" branch."""
+    sample_in=0: no sample (empty beam). p_scatter: fraction of the rays sent to the "scattered" branch.
+    tth_min [deg]: smallest scattering angle simulated. With the former 0.05 deg, the neutrons scattered below it were
+    missing; with the detector at 10 m the beam divergence brings them onto the pixels around the beam stop, and I(Q)
+    was 10-20 % too low at the smallest Q (fixed 2026-11-12). The cache depends only on the run name."""
     r = Runner(build_back(), f"{RUN_ROOT}/{series}", mpi=mpi)
     iq = f"{r.run_dir}/{name}_Iq.dat"
     write_iq(iq, q, dsdo)
     mc = mcpl_path(front_dir, "beam_at_sample")
     return r.run(name, mcpl_count(mc) * repeat, mcpl_file=mc, repeat=repeat, iq_file=iq, sample_in=sample_in,
                  thickness=thickness, xwidth=width, yheight=width, mu_abs=mu_abs, mu_rem=mu_rem, iflat=iflat,
-                 tth_max=tth_max, p_scatter=p_scatter)
+                 tth_max=tth_max, tth_min=tth_min, p_scatter=p_scatter)
 
 
 # --------------------------------------------------------------------------- MCPL files and monitors

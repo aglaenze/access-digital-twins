@@ -57,9 +57,14 @@ Then `red.reduce(sample, background=solvent, empty_beam=empty)` gives I(Q) per b
 independent of the calibration): D₂O reduced alone flat within ±3 % on all banks except their first and last Q bin
 (−16 to +10 %), and −20 to −35 % at the lowest Q of the rear bank (< 0.011 Å⁻¹, next to the beam-stop mask); without
 the flat field the middle and front banks deviated by up to +20 % / −12 % at their edges. Silica spheres minus D₂O,
-all banks: **Rg = 38.9 ± 1.2 Å (exact 38.7), I(0) = 4.18 ± 0.08 cm⁻¹ (exact 4.37), sasmodels sphere:
-R = 49.2 ± 0.1 Å (50), φ = 1.00 % (1 %), χ²/n = 0.4.** Two pitfalls met on the way (2026-11-05): a too small coverage tolerance let neutrons through the middle
+all banks: **Rg = 38.6 ± 1.2 Å (exact 38.7), I(0) = 4.20 ± 0.08 cm⁻¹ (exact 4.37), sasmodels sphere:
+R = 49.1 ± 0.1 Å (50), φ = 1.00 % (1 %), χ²/n = 0.6** (rerun 2026-11-12, after the fix below). Two pitfalls met on the way (2026-11-05): a too small coverage tolerance let neutrons through the middle
 banks (+25 % at the edges of the rear bank), and looking the pixels up along the direction from the sample center smeared the counts by the beam size next to the beam stop.
+A third, found 2026-11-12 with the LoKI notebook series (kinetics at 8 m / 10 m): the sample component drew the
+scattering angle from 0.05° up, so the neutrons scattered below 0.05° were missing; with the rear detector at 10 m the
+beam divergence brings them onto the pixels around the beam stop, where I(Q) of a sample that scatters strongly at
+small Q came out 10–20 % too low. The smallest angle is now 0.005° (`tth_min` of `loki_mcstas.back`); all cached
+sample runs were deleted and recomputed.
 
 ## Easy test case: dilute silica spheres
 

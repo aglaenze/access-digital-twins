@@ -42,7 +42,7 @@
 DEFINE COMPONENT SANS_Iq_table
 
 SETTING PARAMETERS (string Iq_file = "Iq.dat", xwidth = 0.01, yheight = 0.01, zdepth = 0.001,
-  mu_abs = 0.0, mu_rem = 0.0, iflat = 0.0, tth_min = 0.05, tth_max = 60.0, p_scatter = 0.9)
+  mu_abs = 0.0, mu_rem = 0.0, iflat = 0.0, tth_min = 0.005, tth_max = 60.0, p_scatter = 0.9)
 
 SHARE
 %{
