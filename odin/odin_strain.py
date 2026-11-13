@@ -4,8 +4,11 @@ A Bragg edge sits at λ = 2d: the neutrons are scattered straight back by the la
 d apart. Under load d becomes d (1 + ε): the edge moves to λ (1 + ε). Measured on the same region of the sample
 without load (λ0) and with load (λ), the lattice strain along the beam is ε = (λ − λ0) / λ0.
 
-    r = edge(sample_file, open_beam_file, dark_file, "gauge")  # position of the (110) edge of iron in a region
-    s = strain(loaded, reference)                               # ε and its uncertainty from two such results
+    r = edge(sample_file, open_beam_file, dark_file, "middle")  # position of the (111) edge of the steel in a region
+    s = strain(loaded, reference)                                # ε and its uncertainty from two such results
+
+The specimen: the V20 tensile specimen of austenitic stainless steel (odin/samples/gen_steel_v20.py), pulled along x;
+its last Bragg edge, (111), at 2 d_111 = 2a/√3 = 4.164 Å (a = 3.606 Å).
 """
 import functools
 import os
@@ -18,16 +21,20 @@ from scipy.special import erfc
 
 import odin_reduction as red
 
-EDGE_110 = 4.054                       # [Å] (110) edge of α-iron without strain (2 d_110, a = 2.8665 Å)
-WINDOW = (3.60, 4.50)                  # [Å] range of the fit around the edge
+A_STEEL = 3.6061                       # [Å] lattice parameter measured on the V20 specimen (notebook 14)
+EDGE = 2 * A_STEEL / np.sqrt(3)        # [Å] its (111) edge without strain: 4.164 Å
+PLANES = "(111)"
+EDGE_110 = EDGE                        # (former name, the ferritic specimen)
+WINDOW = (3.75, 4.55)                  # [Å] range of the fit around the edge (the (200) edge, 3.61 Å, left out)
 BIN = 0.01                             # [Å] wavelength bins of the fit
-# regions of the tensile specimen (odin/samples/steel_tensile.yml), inside each part [mm]: x0, x1, y0, y1
+# regions of the specimen (odin/samples/steel_tensile.yml), inside each part [mm]: x0, x1, y0, y1
 REGIONS = {
-    "gauge": (-1.8, 1.8, -2.8, 2.8),
-    "upper shoulder": (-3.8, 3.8, 3.3, 6.8),
-    "lower shoulder": (-3.8, 3.8, -6.8, -3.3),
+    "middle": (-1.0, 1.0, -2.7, 2.7),
+    "left end": (-6.8, -4.6, -4.4, 4.4),
+    "right end": (4.6, 6.8, -4.4, 4.4),
 }
-SECTION_MM2 = {"gauge": 20.0, "upper shoulder": 40.0, "lower shoulder": 40.0}     # width × thickness (5 mm)
+# cross-section [mm²]: mean height of the region (y) × thickness 2.8 mm
+SECTION_MM2 = {"middle": 6.46 * 2.8, "left end": 9.8 * 2.8, "right end": 9.8 * 2.8}
 
 def _slot(waiting):
     """A slot for a heavy operation on a server for a class (twin_slots.py, in twin/); no limit without it."""
@@ -73,6 +80,16 @@ def _read_counts(file):
 
 
 def counts(file):
+    """The counts of a file, or of several files summed (a list: repeated measurements of the same thing; their
+    neutrons, durations and proton charges add up, as one longer measurement)."""
+    if isinstance(file, (list, tuple)):
+        parts = [counts(f) for f in file]
+        out = dict(parts[0])
+        for c in parts[1:]:
+            for k, v in c.items():
+                if k != "lam":
+                    out[k] = out[k] + v
+        return out
     return _counts(file, os.path.getmtime(file))
 
 
@@ -80,9 +97,10 @@ def _norm(c):
     return c["charge"] if c["charge"] > 0 else c["duration"]
 
 
-def spectrum(sample, open_beam, dark=None, region="gauge"):
+def spectrum(sample, open_beam, dark=None, region="middle"):
     """(λ, T, dT) around the edge in a region: T = (E − N) / (O − N), the dark N scaled to the duration of each
-    measurement, each measurement divided by its proton charge (as odin_reduction.reduce); Poisson error bars."""
+    measurement, each measurement divided by its proton charge (as odin_reduction.reduce); Poisson error bars.
+    sample, open_beam, dark: a file, or a list of files (summed)."""
     E, O = counts(sample), counts(open_beam)
     N = counts(dark) if dark else None
     val, var = {}, {}
@@ -104,8 +122,8 @@ def transmission_image(sample, open_beam):
     return (E["image"] / _norm(E)) / (O["image"] / _norm(O))
 
 
-def edge(sample, open_beam, dark=None, region="gauge"):
-    """Fits the (110) edge in a region (REGIONS): dict(lam, T, dT, p, cov, lam_edge, dlam_edge, width, chi2); raises
+def edge(sample, open_beam, dark=None, region="middle"):
+    """Fits the (111) edge in a region (REGIONS): dict(lam, T, dT, p, cov, lam_edge, dlam_edge, width, chi2); raises
     ValueError with a message for the student if there is no edge to fit (no steel in the beam, too few neutrons)."""
     lam, T, dT = spectrum(sample, open_beam, dark, region)
     m = np.isfinite(T) & np.isfinite(dT) & (dT > 0)
@@ -113,11 +131,13 @@ def edge(sample, open_beam, dark=None, region="gauge"):
         raise ValueError("too few neutrons in this region to fit an edge: is the shutter open, the open beam chosen?")
     lo, hi = np.median(T[m][:15]), np.median(T[m][-15:])
     if hi - lo < 0.05:
-        raise ValueError(f"no edge found (transmission {lo:.2f} below 4.05 Å and {hi:.2f} above): is the specimen in "
+        raise ValueError(f"no edge found (transmission {lo:.2f} below {EDGE:.2f} Å and {hi:.2f} above): is the specimen in "
                          f"the beam (stage x = 0) for this run, and out of it for the open beam?")
     p, cov = curve_fit(edge_model, lam[m], T[m], sigma=dT[m], absolute_sigma=True,
-                       p0=[EDGE_110, 0.01, lo, 0.0, hi - lo],
-                       bounds=([WINDOW[0] + 0.1, 0.001, 0, -5, 0], [WINDOW[1] - 0.1, 0.1, 2, 5, 2]))
+                       p0=[EDGE, 0.008, lo, 0.0, hi - lo],
+                       # the width of the edge: the wavelength resolution (WFM: about 0.01 Å), kept physical so that
+                       # the fit cannot run into a degenerate sharp step
+                       bounds=([WINDOW[0] + 0.1, 0.004, 0, -5, 0], [WINDOW[1] - 0.1, 0.05, 2, 5, 2]))
     chi2 = float(np.sum(((T[m] - edge_model(lam[m], *p)) / dT[m]) ** 2) / (m.sum() - 5))
     return dict(lam=lam[m], T=T[m], dT=dT[m], p=p, cov=cov, lam_edge=float(p[0]), dlam_edge=float(np.sqrt(cov[0, 0])),
                 width=float(p[1]), chi2=chi2)
@@ -129,7 +149,7 @@ def strain(loaded, reference):
     return (l - l0) / l0, float(np.hypot(loaded["dlam_edge"], reference["dlam_edge"]) / l0)
 
 
-def stress_MPa(load_kN, region="gauge"):
+def stress_MPa(load_kN, region="middle"):
     """Stress along the load in a region: force / cross-section."""
     return load_kN * 1e3 / SECTION_MM2[region]
 
@@ -150,8 +170,8 @@ def plot_edges(ax, loaded, reference, load_kN, region):
         ax.plot(x, edge_model(x, *r["p"]), color=c, lw=1.6,
                 label=f"{lab}: edge at {r['lam_edge']:.4f} ± {r['dlam_edge']:.4f} Å")
         ax.axvline(r["lam_edge"], color=c, lw=0.8, ls=":")
-    ax.set(xlim=(EDGE_110 - 0.12, EDGE_110 + 0.12), xlabel="λ (Å)", ylabel="transmission T",
-           title=f"The (110) edge in the {region}")
+    ax.set(xlim=(EDGE - 0.12, EDGE + 0.12), xlabel="λ (Å)", ylabel="transmission T",
+           title=f"The {PLANES} edge in the {region}")
     ax.grid(alpha=0.3)
     ax.legend(loc="upper left", fontsize=9)
 

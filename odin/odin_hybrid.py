@@ -199,7 +199,7 @@ def volumes_transmission(volumes, stage_x, stage_rot, lam_grid=np.linspace(0.3, 
         # the edge would jump by a whole step or not at all: a grid of 0.0001 Å for a sample in a load frame (also
         # without load: the reference measurement must have its edge at the same place, to 10⁻⁵)
         lam_grid = np.linspace(lam_grid[0], lam_grid[-1], int(round((lam_grid[-1] - lam_grid[0]) / 1e-4)) + 1)
-    vols = []
+    vols, epss = [], []
     for k, v in enumerate(volumes):       # (cfg, center, dims[, shape]): boxes, spheres, vertical cylinders
         cfg, (cx, cy, cz), dims = v[:3]
         center = (stage_x + c * cx + s * cz, cy, -s * cx + c * cz)
@@ -208,9 +208,10 @@ def volumes_transmission(volumes, stage_x, stage_rot, lam_grid=np.linspace(0.3, 
         if len(v) > 4 and v[4]:           # an inclusion: replaces the material of the volume around it on its path
             sig = sig - sigma_tot(v[4], lam_grid / (1.0 + eps))
         vols.append((sig, center, dims, v[3] if len(v) > 3 else "box"))
+        epss.append(eps)
 
     if len(vols) > 20:
-        return _mapped_transmission(volumes, vols, stage_rot, lam_grid)
+        return _mapped_transmission(volumes, vols, stage_rot, lam_grid, epss)
 
     def T(x, y, lam):
         mu = np.zeros(len(x))
@@ -222,15 +223,16 @@ def volumes_transmission(volumes, stage_x, stage_rot, lam_grid=np.linspace(0.3, 
     return T
 
 
-def _mapped_transmission(volumes, vols, stage_rot, lam_grid):
+def _mapped_transmission(volumes, vols, stage_rot, lam_grid, epss=None):
     """A sample made of many volumes (a rock: hundreds of grains): the thickness crossed in each material is computed
     once, on a grid of MAP_STEP over the field (each volume only within its own extent), then read for each neutron
-    or pixel; T = exp(−Σ_m Σ_m(λ) L_m(x, y)). The volumes of the same material (and host) share one map."""
+    or pixel; T = exp(−Σ_m Σ_m(λ) L_m(x, y)). The volumes of the same material (and host, and strain) share one
+    map."""
     n = int(round(2 * MAP_HALF / MAP_STEP)) + 1
     g = -MAP_HALF + np.arange(n) * MAP_STEP
     maps, sigs = {}, {}
-    for v, (sig, center, dims, shape) in zip(volumes, vols):
-        key = (v[0], v[4] if len(v) > 4 else None)
+    for k, (v, (sig, center, dims, shape)) in enumerate(zip(volumes, vols)):
+        key = (v[0], v[4] if len(v) > 4 else None, round(float(epss[k]), 9) if epss else 0.0)
         sigs[key] = sig
         r = 0.5 * float(np.sqrt(dims[0] ** 2 + dims[2] ** 2)) if shape in ("box", "ellipsoid") else 0.5 * dims[0]
         hy = 0.5 * (dims[1] if shape != "sphere" else dims[0])

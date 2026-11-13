@@ -43,25 +43,30 @@ msc = [md(r"""
 **Your mission.** You are the engineer of a team that designs steel parts for a wind turbine. The team wants a method
 it can trust to measure, inside the steel, the strain of its crystal lattice under load. You develop it on a tensile
 specimen in a load frame: from the raw files to a strain with its uncertainty, in each part of the specimen, then
-Poisson's ratio of the steel; and you find out how large the systematic errors are.
+Poisson's ratio of the steel; and you find out how large the systematic errors are. The specimen is the tensile
+specimen of austenitic stainless steel measured at V20, the ESS test beamline at HZB, in September 2018 (public data:
+scipp/ess-notebooks-data; V20: R. Woracek *et al.*, Nucl. Instrum. Methods A 839, 102, 2016): 2.8 mm thick, 9.8 mm
+wide, narrowed to 6.4 mm in its middle, pulled along x; V20 measured it without load and under 600 MPa.
 
 **The physics.** A Bragg edge sits at $\lambda_\text{edge} = 2d$: the planes **facing the beam**, $d$ apart, scatter
 the neutrons straight back. Under load $d \to d(1+\varepsilon)$, so the edge moves:
 $\varepsilon = (\lambda - \lambda_0)/\lambda_0$, the strain of the lattice **along the beam**. Pulled along the force,
-the steel gets thinner across it (Poisson): $\varepsilon_\text{beam} = -\nu\,\sigma/E$, about $-10^{-3}$ here.
+the steel gets thinner across it (Poisson): $\varepsilon_\text{beam} = -\nu\,\sigma/E$, about $-9 \times 10^{-4}$
+here. The last edge of this steel (face-centered cubic, $a$ = 3.606 Å) is the (111) edge, at $2a/\sqrt{3}$ = 4.164 Å.
 
 The code of each step is given (and locked): read it, run it, and make the decisions; the model of the edge is built
 with the model builder, without writing code.
 """), code(SETUP), md("## The specimen"), code(SAMPLE), md(r"""
-## Before you measure: five measurements, and why
+## Before you measure: the measurements, and why
 
 1. **dark** (shutter closed): the background of the camera, in every measurement;
 2. **open beam** (shutter open, stage x = 500 mm: the specimen and its frame out of the beam);
 3. the specimen **without load** (0 kN): the reference $\lambda_0$, measured on the specimen itself;
-4. the specimen at **8 kN**, 5. at **16 kN** (800 MPa in the gauge, below the elastic limit, about 900 MPa).
+4. the specimen at **10.75 kN**: 600 MPa in the narrowest section (6.4 × 2.8 mm²), as at V20.
 
 All with the **same beam**: choppers in WFM mode with the discs 0.30 m apart (sharp edges: the resolution a shift of
-$10^{-3}$ needs) and the 3 cm pinhole; **60 s** each (the edge to about ± 0.0005 Å).
+$10^{-3}$ needs) and the 3 cm pinhole; **4 counts of 60 s** for the open beam and for the specimen at each load
+(the analysis adds them up: the strain to about ± 3 × 10⁻⁴, the precision V20 reached in 25 + 48 hours).
 """), code(r'''
 q.choice("Why must the open beam, the reference and the loaded measurements all use the same choppers and pinhole?",
          ["The transmission is a ratio: both terms must see the same beam (spectrum, resolution); and the shape of "
@@ -102,26 +107,27 @@ move(choppers, 'wfm', wfm_delta, 0.3, pinhole, 0.03, diffuser, 'in')
 ```
 move(shutter, 'closed')
 with nexusfile_open('dark'):
-    count(t=30)
-move(shutter, 'open', stage_x, 500)
-with nexusfile_open('open beam'):
     count(t=60)
+move(shutter, 'open', stage_x, 500)
+for i in range(4):
+    with nexusfile_open('open beam'):
+        count(t=60)
 ```
 """)), nicos_step(md(r"""
 ### Step 4. The specimen, without load and under load
 
-The load frame is the device `load` (kN):
+The load frame is the device `load` (kN). A block of several lines (`for`, `with`) is typed in the *Script* tab of
+NICOS, or line by line in the command line (NICOS waits for the end of the block):
 
 ```
 move(stage_x, 0, load, 0)
-with nexusfile_open('steel 0 kN'):
-    count(t=60)
-move(load, 8)
-with nexusfile_open('steel 8 kN'):
-    count(t=60)
-move(load, 16)
-with nexusfile_open('steel 16 kN'):
-    count(t=60)
+for i in range(4):
+    with nexusfile_open('steel 0 kN'):
+        count(t=60)
+move(load, 10.75)
+for i in range(4):
+    with nexusfile_open('steel 10.75 kN'):
+        count(t=60)
 move(load, 0)
 ```
 """)),
@@ -150,20 +156,20 @@ the files measured with the beam of part 0 (WFM, δ = 0.30 m, pinhole 3 cm).
 same = [r for r in rows if r.get("choppers") == "wfm" and r.get("wfm_delta_m") == 0.3 and r.get("pinhole_m") == 0.03]
 path = lambda r: os.path.join(FOLDER, r["file"])
 DARK = next((path(r) for r in reversed(same) if r["kind"] == "dark"), None)
-OPEN = next((path(r) for r in reversed(same) if r["kind"] == "open beam"), None)
-BY_LOAD = {}
+OPEN = [path(r) for r in same if r["kind"] == "open beam"]          # all the open beams: added up
+BY_LOAD = {}                                                         # all the counts of the specimen, by load
 for r in same:
     if r["kind"] == "sample" and "load_kN" in r:
-        BY_LOAD[r["load_kN"]] = path(r)
-print("dark:", DARK and os.path.basename(DARK), "| open beam:", OPEN and os.path.basename(OPEN))
-print("specimen:", {k: os.path.basename(v) for k, v in sorted(BY_LOAD.items())})
-if OPEN is None or 0.0 not in BY_LOAD or len(BY_LOAD) < 2:
+        BY_LOAD.setdefault(round(r["load_kN"], 2), []).append(path(r))
+print("dark:", DARK and os.path.basename(DARK), "| open beam:", len(OPEN), "counts")
+print("specimen:", {k: len(v) for k, v in sorted(BY_LOAD.items())}, "counts per load (kN)")
+if not OPEN or 0.0 not in BY_LOAD or len(BY_LOAD) < 2:
     raise SystemExit("Needed: an open beam, the specimen at 0 kN and under load (part 0).")
 LMAX = max(BY_LOAD)
 '''), md(r"""
 ## 3. The transmission around the edge
 
-In a region of the specimen (here the gauge, its narrow part: 4 mm × 6 mm), for each wavelength bin of 0.01 Å:
+In a region of the specimen (here its middle, the narrowest part), for each wavelength bin of 0.01 Å:
 
 $$T = \frac{(E - N)/Q_E}{(O - N)/Q_O}$$
 
@@ -171,7 +177,7 @@ $E$, $O$, $N$: the counts of the specimen, open-beam and dark files in the regio
 measurement), $Q$ the proton charge of each measurement (the number of neutrons produced is proportional to it).
 Error bars: Poisson, propagated. Reading a file of 30 million neutrons takes about 20 s the first time.
 """), code(r'''
-REGION = "gauge"
+REGION = "middle"
 lam, T0, dT0 = strain.spectrum(BY_LOAD[0.0], OPEN, DARK, REGION)
 lam, T1, dT1 = strain.spectrum(BY_LOAD[LMAX], OPEN, DARK, REGION)
 fig, ax = plt.subplots(figsize=(9, 4))
@@ -188,9 +194,9 @@ the range of the data, the start values, then *Fit*. Compare the reduced χ² (a
 within their error bars) and the uncertainty of $\lambda_\text{edge}$. Fit the reference first, then the loaded
 specimen **with the same model and the same range** (why? question Q3).
 """), code(r'''
-b0 = mb.EdgeBuilder(lam, T0, dT0, expected=4.054, name="(110), 0 kN")
+b0 = mb.EdgeBuilder(lam, T0, dT0, expected=strain.EDGE, name="(111), 0 kN")
 '''), code(r'''
-b1 = mb.EdgeBuilder(lam, T1, dT1, expected=4.054, name=f"(110), {LMAX:g} kN")
+b1 = mb.EdgeBuilder(lam, T1, dT1, expected=strain.EDGE, name=f"(111), {LMAX:g} kN")
 '''), md(r"""
 ## 5. The strain from your two fits
 
@@ -216,11 +222,11 @@ display(w.VBox([button_eps, out_eps]))
 ## 6. All the regions, all the loads
 
 Your method, applied everywhere: the model *smoothed step on a sloping baseline* (`strain.edge`, the same model as
-the builder's) is fitted in the three regions of the specimen (gauge, upper and lower shoulders) for every load you
+the builder's) is fitted in the three regions of the specimen (middle, left and right ends) for every load you
 measured. The map shows the strain at the largest load; the line, the strain against the stress $\sigma = F/A$ of
 each region: elastic steel gives one line through zero, of slope $-\nu/E$.
 """), code(r'''
-E_GPA = 210.0
+E_GPA = 195.0
 pts, res_max = [], {}
 for kN, f in sorted(BY_LOAD.items()):
     if kN == 0:
@@ -234,7 +240,7 @@ x, y, dy = (np.array([p[k] for p in pts]) for k in range(3))
 a, da = strain.line_through_zero(x, y, dy)
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13, 4.8))
 fig.colorbar(strain.plot_map(ax1, strain.transmission_image(BY_LOAD[LMAX], OPEN), res_max), ax=ax1, label="10⁻³")
-for r, c in (("gauge", "tab:red"), ("upper shoulder", "tab:blue"), ("lower shoulder", "tab:cyan")):
+for r, c in (("middle", "tab:red"), ("left end", "tab:blue"), ("right end", "tab:cyan")):
     k = [i for i, p in enumerate(pts) if p[3] == r]
     ax2.errorbar(x[k], y[k] * 1e3, dy[k] * 1e3, fmt="o", color=c, capsize=3, label=r)
 xs = np.array([0, x.max() * 1.08])
@@ -245,13 +251,15 @@ print(f"slope −ν/E = ({a * 1e6:.2f} ± {da * 1e6:.2f}) × 10⁻⁶ per MPa  -
 '''), md(r"""
 ## 7. Investigate: a reference from the textbook?
 
-Measuring the specimen without load takes beam time. Why not take $\lambda_0 = 2d_{110}$ = 4.054 Å from the
-textbook (α-iron, $a$ = 2.8665 Å)? The cell computes the strain at the largest load both ways.
+Measuring the specimen without load takes beam time. Why not take $\lambda_0$ from the textbook: a type 304
+stainless steel has $a$ ≈ 3.59 Å, so $\lambda_0 = 2a/\sqrt{3}$ = 4.145 Å? The cell computes the strain at the largest
+load both ways.
 """), code(r'''
-r1, r0 = strain.edge(BY_LOAD[LMAX], OPEN, DARK, "gauge"), strain.edge(BY_LOAD[0.0], OPEN, DARK, "gauge")
-print(f"fitted edge without load: {r0['lam_edge']:.4f} Å   (textbook: {strain.EDGE_110:.4f} Å)")
+TEXTBOOK = 2 * 3.59 / np.sqrt(3)
+r1, r0 = strain.edge(BY_LOAD[LMAX], OPEN, DARK, "middle"), strain.edge(BY_LOAD[0.0], OPEN, DARK, "middle")
+print(f"fitted edge without load: {r0['lam_edge']:.4f} Å   (textbook, a = 3.59 Å: {TEXTBOOK:.4f} Å)")
 print(f"strain with the measured reference : {(r1['lam_edge'] - r0['lam_edge']) / r0['lam_edge'] * 1e3:+.2f} × 10⁻³")
-print(f"strain with the textbook reference : {(r1['lam_edge'] - strain.EDGE_110) / strain.EDGE_110 * 1e3:+.2f} × 10⁻³")
+print(f"strain with the textbook reference : {(r1['lam_edge'] - TEXTBOOK) / TEXTBOOK * 1e3:+.2f} × 10⁻³")
 '''), md("## Your results\n\nYour score on the questions of the notebook, and a report to download."), code(r'''
 q.choice("Which shape of edge describes your data (reduced χ² close to 1, no structure in the residuals)?",
          ["The step smoothed by the resolution, on a sloping baseline.", "The sharp step.",
@@ -269,26 +277,29 @@ q.choice("Why fit the reference and the loaded specimen with the same model and 
          explanation="A change of model or range can move λ_edge by 0.001 Å or more: as much as the strain signal. "
                      "With the same choices the bias is the same and cancels.", hints=["What is the size of the shift?"],
          title="Q3. Same model, same range")
-q.number("Your edge without load (part 4): λ0 =", value=4.057, tol=0.012, unit="Å",
-         mistakes=[(2.027, "this is d; the edge is at 2d")], hints=["The builder prints λ_edge after the fit."],
-         explanation="About 4.057 Å: a few 0.001 Å above 2d = 4.054 Å (the pulse shape shifts the fitted position).",
+q.number("Your edge without load (part 4): λ0 =", value=4.163, tol=0.012, unit="Å",
+         mistakes=[(2.082, "this is d; the edge is at 2d"), (4.054, "the (110) edge of ferritic steel; this one is austenitic")],
+         hints=["The builder prints λ_edge after the fit."],
+         explanation="About 4.163 Å: 2d₁₁₁ = 2a/√3 with a = 3.606 Å, the lattice parameter measured on this specimen at V20.",
          title="Q4. The reference")
-q.number("Your strain in the gauge at 16 kN (part 5), in units of 10⁻³, with its sign:", value=-1.10, tol=0.45,
-         unit="× 10⁻³", mistakes=[(1.10, "the sign: the edge moved to a shorter wavelength")],
+q.number("Your strain in the middle at 10.75 kN (part 5), in units of 10⁻³, with its sign:", value=-0.88, tol=0.45,
+         unit="× 10⁻³", mistakes=[(0.88, "the sign: the edge moved to a shorter wavelength")],
          hints=["Part 5 prints it."],
-         explanation="Expected −ν σ/E = −0.29 × 800 / 210 000 = −1.10 × 10⁻³, measured to about ± 0.2 × 10⁻³.",
+         explanation="Expected −ν σ/E = −0.29 × 594 / 195 000 = −0.88 × 10⁻³ (594 MPa on average in the middle region), "
+                     "measured to about ± 0.3 × 10⁻³. V20: −0.76 ± 0.30 × 10⁻³.",
          title="Q5. The strain")
-q.number("Poisson's ratio from all your points (part 6):", value=0.29, tol=0.09,
-         hints=["Part 6 prints ν."], explanation="ν ≈ 0.29 for ferritic steel.", title="Q6. Poisson's ratio")
+q.number("Poisson's ratio from all your points (part 6):", value=0.29, tol=0.2,
+         hints=["Part 6 prints ν."], explanation="ν ≈ 0.29 for this steel; with one load your uncertainty is about ± 0.1.",
+         title="Q6. Poisson's ratio")
 q.choice("Part 7: what does the textbook reference do to the strain?",
-         ["It is off by about as much as the strain itself: the alloy and the instrument shift the edge by a few "
-          "0.001 Å, which a measured reference cancels.",
+         ["It is off by several times the strain itself: the alloy (a = 3.59 to 3.61 Å for these steels) and the "
+          "instrument shift the edge by far more than the load does; a measured reference cancels them.",
           "Nothing: both give the same strain.",
           "It improves it: the textbook value has no error bar."],
          answer=0, why={1: "Look at the two numbers of part 7.",
                         2: "It has no statistical error, but a systematic one as large as the signal."},
-         explanation="The difference between the fitted unloaded edge and 4.054 Å (≈ 0.003 Å, 7 × 10⁻⁴ in strain) is "
-                     "a systematic error. Real strain measurements need a stress-free reference of the same material, "
+         explanation="The difference between the fitted unloaded edge and the textbook 4.145 Å (≈ 0.018 Å, 4 × 10⁻³ in "
+                     "strain, five times the signal) is a systematic error. Real strain measurements need a stress-free reference of the same material, "
                      "measured with the same instrument: often the hardest part of the experiment.",
          hints=["Compare the two strains of part 7 with your uncertainty."], title="Q7. The reference, again")
 q.choice("Your uncertainty must be twice smaller. What do you change?",
@@ -337,11 +348,12 @@ for r in rows:
 '''), md(r"""
 ## Tools
 
-- `strain.spectrum(sample, open_beam, dark, region)` → λ, T, dT in a region (`strain.REGIONS`: gauge, upper and lower
-  shoulder; or add your own rectangle in mm: `strain.REGIONS["mine"] = (x0, x1, y0, y1)`);
+- `strain.spectrum(sample, open_beam, dark, region)` → λ, T, dT in a region (`strain.REGIONS`: middle, left end,
+  right end; or add your own rectangle in mm: `strain.REGIONS["mine"] = (x0, x1, y0, y1)`); a file or a list of files
+  (repeated counts, added up);
 - `strain.edge(sample, open_beam, dark, region)` → the fit of the (110) edge (`lam_edge`, `dlam_edge`, `chi2`, ...);
 - `strain.strain(loaded, reference)` → (ε, dε); `strain.stress_MPa(kN, region)`; `strain.line_through_zero(x, y, dy)`;
-- `mb.EdgeBuilder(lam, T, dT, expected=4.054)`: the model builder;
+- `mb.EdgeBuilder(lam, T, dT, expected=strain.EDGE)`: the model builder (the (111) edge, 4.164 Å);
 - `strain.plot_edges(ax, loaded, reference, kN, region)`, `strain.plot_map(ax, image, {region: (ε, dε)})`.
 """), code("# your analysis\n"), code(""), md("## Results for the committee\n\n(your answers, with uncertainties, and your logbook)")]
 write(bt, os.path.join(HERE, "ODIN_steel_beamtime.ipynb"), all_code_locked=False)

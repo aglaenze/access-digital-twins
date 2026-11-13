@@ -4,10 +4,10 @@ title: Where is a loaded steel part strained?
 number: "3"                  # theme 3 of ODIN: Bragg-edge strain mapping with the resolution of WFM
 instrument: odin
 technique: Bragg-edge strain mapping (WFM)
-sample: Steel tensile specimen in a load frame (ferritic steel, 5 mm thick)
+sample: The tensile specimen of austenitic stainless steel measured at V20 (HZB, 2018), in a load frame
 question: >-
   Measure the shift of a Bragg edge of a steel specimen under load, and deduce the strain of its crystal lattice in
-  its narrow and wide parts.
+  its narrow middle and its wide ends, as at V20 (HZB) in 2018.
 learn: Bragg edges, lattice strain, stress and Hooke's law, Poisson's ratio, fitting an edge, counting statistics.
 mission: >-
   You are an engineer in a team that designs steel parts for a wind turbine. A part carries a large force: where,
@@ -43,3 +43,6 @@ modes:
     nicos: odin
     analysis: odin/exercises/steel_strain/ODIN_steel_beamtime.ipynb
     proposal: {id: "1240", title: "Lattice strain of a steel specimen under load by Bragg-edge imaging"}
+reference: >-
+  V20 measurement of September 2018 (P. Kadletz), public data scipp/ess-notebooks-data (imaging/bragg-edge-imaging-2D);
+  V20: R. Woracek et al., Nucl. Instrum. Methods A 839, 102 (2016).

@@ -246,8 +246,8 @@ def odin_strain_per_kN(spec):
     """Lattice strain along the beam of each volume of an ODIN sample, per kN of tensile load: None if the sample
     cannot be loaded. A sample with
         load: {axis: y, max_kN: 16, young_GPa: 210, poisson: 0.29}
-    is pulled along the vertical axis (y) by a load frame. Each volume (a box) carries the whole force F over its
-    cross-section A = width (x) × thickness (z): stress σ = F / A (uniform in the volume: the stress concentration
+    is pulled along the vertical axis (y; or x with axis: x) by a load frame. Each volume (a box) carries the whole
+    force F over its cross-section A = width (x) × thickness (z) (axis x: height (y) × thickness (z)): stress σ = F / A (uniform in the volume: the stress concentration
     where the section changes is not modeled), strain along the load ε = σ / E (Hooke, elastic range), and across
     it, along the beam, ε_beam = −ν σ / E (Poisson contraction). Neutron transmission sees the lattice planes
     perpendicular to the beam (a Bragg edge is back-scattering): it measures ε_beam."""
@@ -255,7 +255,8 @@ def odin_strain_per_kN(spec):
     if not load:
         return None
     E, nu = float(load["young_GPa"]) * 1e9, float(load["poisson"])
-    return [-nu * 1e3 / (float(v["size_mm"][0]) * float(v["size_mm"][2]) * 1e-6 * E) for v in spec["volumes"]]
+    across = 1 if load.get("axis", "y") == "x" else 0      # pulled along x: the section is height (y) × thickness (z)
+    return [-nu * 1e3 / (float(v["size_mm"][across]) * float(v["size_mm"][2]) * 1e-6 * E) for v in spec["volumes"]]
 
 
 def solvent_sld(x):

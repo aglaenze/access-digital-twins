@@ -379,8 +379,21 @@ def tof_run(choppers, distance, neutrons=2_000_000, seed=1):
 
 
 # --------------------------------------------------------------------------- materials
+MATERIALS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "materials")   # the twin's own .ncmat files
+_NC_READY = []
+
+
+def ncrystal():
+    """NCrystal, with the twin's own materials (odin/materials/*.ncmat) on its search path."""
+    import NCrystal as NC
+    if not _NC_READY:
+        NC.addCustomSearchDirectory(MATERIALS_DIR)
+        _NC_READY.append(1)
+    return NC
+
+
 def sigma_tot(cfg, wl):
     """Σ(λ) in cm^-1 (barn/Å^3 = cm^-1), from NCrystal."""
-    import NCrystal as NC
+    NC = ncrystal()
     m = NC.load(cfg)
     return (m.scatter.xsect(wl=wl) + m.absorption.xsect(wl=wl)) * m.info.getNumberDensity()
