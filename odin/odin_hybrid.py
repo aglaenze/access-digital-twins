@@ -136,9 +136,50 @@ def cylinder_path_length(x, y, center, diameter, height):
     return np.where(np.abs(np.asarray(y) - center[1]) <= height / 2, 2 * np.sqrt(np.clip(r2, 0, None)), 0.0)
 
 
+def ellipsoid_path_length(x, y, center, dims, rot_deg):
+    """Path length (m) through an ellipsoid of axes dims = (x, y, z) (full lengths), turned by rot_deg about the
+    vertical axis (same convention as box_path_length), for rays along the beam (z) passing at (x, y)."""
+    th = np.radians(rot_deg)
+    c, s = np.cos(th), np.sin(th)
+    a, b, cz = dims[0] / 2, dims[1] / 2, dims[2] / 2
+    ox, oy, oz = np.asarray(x) - center[0], np.asarray(y) - center[1], -1.0 - center[2]
+    ox_b, oz_b = c * ox - s * oz, s * ox + c * oz
+    dx_b, dz_b = -s, c
+    A = (dx_b / a) ** 2 + (dz_b / cz) ** 2
+    B = 2 * (ox_b * dx_b / a ** 2 + oz_b * dz_b / cz ** 2)
+    C = (ox_b / a) ** 2 + (oy / b) ** 2 + (oz_b / cz) ** 2 - 1
+    disc = B * B - 4 * A * C
+    return np.sqrt(np.clip(disc, 0, None)) / A
+
+
+def _path(shape, x, y, center, dims, stage_rot):
+    own = dims[3] if len(dims) > 3 else 0.0               # a box or an ellipsoid turned in the sample: its own angle
+    if shape == "sphere":
+        return sphere_path_length(x, y, center, dims[0])
+    if shape == "cylinder":
+        return cylinder_path_length(x, y, center, dims[0], dims[1])
+    if shape == "ellipsoid":
+        return ellipsoid_path_length(x, y, center, dims, stage_rot + own)
+    return box_path_length(x, y, center, dims, stage_rot + own)
+
+
+MAP_STEP = 20e-6           # [m] grid of the thickness maps of a sample made of many volumes (below the blurs)
+MAP_HALF = 7.2e-3          # [m] half-width of that grid (the field of view of the cameras, ±7.05 mm)
+
+
+_SIGMA = {}
+
+
 def sigma_tot(cfg, lam):
-    """Σ_tot(λ) in m⁻¹ (NCrystal gives cm⁻¹)."""
-    return 100.0 * tw.sigma_tot(cfg, np.asarray(lam, dtype=float))
+    """Σ_tot(λ) in m⁻¹ (NCrystal gives cm⁻¹); kept for each material and grid (a rock: thousands of volumes, a few
+    materials)."""
+    lam = np.asarray(lam, dtype=float)
+    key = (cfg, len(lam), float(lam[0]), float(lam[-1]))
+    if key not in _SIGMA:
+        if len(_SIGMA) > 64:
+            _SIGMA.clear()
+        _SIGMA[key] = 100.0 * tw.sigma_tot(cfg, lam)
+    return _SIGMA[key]
 
 
 def volumes_transmission(volumes, stage_x, stage_rot, lam_grid=np.linspace(0.3, 20.0, 4000), strains=None):
@@ -168,18 +209,59 @@ def volumes_transmission(volumes, stage_x, stage_rot, lam_grid=np.linspace(0.3, 
             sig = sig - sigma_tot(v[4], lam_grid / (1.0 + eps))
         vols.append((sig, center, dims, v[3] if len(v) > 3 else "box"))
 
+    if len(vols) > 20:
+        return _mapped_transmission(volumes, vols, stage_rot, lam_grid)
+
     def T(x, y, lam):
         mu = np.zeros(len(x))
         for sig, center, dims, shape in vols:
-            if shape == "sphere":
-                L = sphere_path_length(x, y, center, dims[0])
-            elif shape == "cylinder":
-                L = cylinder_path_length(x, y, center, dims[0], dims[1])
-            else:
-                L = box_path_length(x, y, center, dims, stage_rot)
+            L = _path(shape, x, y, center, dims, stage_rot)
             k = L > 0
             mu[k] += np.interp(lam[k], lam_grid, sig) * L[k]
         return np.exp(-mu)
+    return T
+
+
+def _mapped_transmission(volumes, vols, stage_rot, lam_grid):
+    """A sample made of many volumes (a rock: hundreds of grains): the thickness crossed in each material is computed
+    once, on a grid of MAP_STEP over the field (each volume only within its own extent), then read for each neutron
+    or pixel; T = exp(−Σ_m Σ_m(λ) L_m(x, y)). The volumes of the same material (and host) share one map."""
+    n = int(round(2 * MAP_HALF / MAP_STEP)) + 1
+    g = -MAP_HALF + np.arange(n) * MAP_STEP
+    maps, sigs = {}, {}
+    for v, (sig, center, dims, shape) in zip(volumes, vols):
+        key = (v[0], v[4] if len(v) > 4 else None)
+        sigs[key] = sig
+        r = 0.5 * float(np.sqrt(dims[0] ** 2 + dims[2] ** 2)) if shape in ("box", "ellipsoid") else 0.5 * dims[0]
+        hy = 0.5 * (dims[1] if shape != "sphere" else dims[0])
+        ix = np.where((g >= center[0] - r - MAP_STEP) & (g <= center[0] + r + MAP_STEP))[0]
+        iy = np.where((g >= center[1] - hy - MAP_STEP) & (g <= center[1] + hy + MAP_STEP))[0]
+        if not len(ix) or not len(iy):
+            continue
+        X, Y = np.meshgrid(g[ix], g[iy])
+        L = _path(shape, X.ravel(), Y.ravel(), center, dims, stage_rot).reshape(X.shape)
+        m = maps.setdefault(key, np.zeros((n, n), np.float32))
+        m[iy[0]:iy[-1] + 1, ix[0]:ix[-1] + 1] += L.astype(np.float32)
+
+    def thickness(x, y):
+        """{material: thickness crossed [m]} at (x, y) (for images: read once, combined at each wavelength)."""
+        jx = np.clip(np.rint((np.asarray(x) + MAP_HALF) / MAP_STEP).astype(np.int64), 0, n - 1)
+        jy = np.clip(np.rint((np.asarray(y) + MAP_HALF) / MAP_STEP).astype(np.int64), 0, n - 1)
+        inside = (np.abs(x) <= MAP_HALF) & (np.abs(y) <= MAP_HALF)
+        return {key: m[jy, jx] * inside for key, m in maps.items()}
+
+    def T(x, y, lam):
+        jx = np.clip(np.rint((np.asarray(x) + MAP_HALF) / MAP_STEP).astype(np.int64), 0, n - 1)
+        jy = np.clip(np.rint((np.asarray(y) + MAP_HALF) / MAP_STEP).astype(np.int64), 0, n - 1)
+        inside = (np.abs(x) <= MAP_HALF) & (np.abs(y) <= MAP_HALF)
+        mu = np.zeros(len(x))
+        for key, m in maps.items():
+            L = m[jy, jx] * inside
+            k = L > 0
+            mu[k] += np.interp(lam[k], lam_grid, sigs[key]) * L[k]
+        return np.exp(-mu)
+    T.thickness = thickness
+    T.sigma = lambda key, lam: np.interp(lam, lam_grid, sigs[key])
     return T
 
 
@@ -209,8 +291,8 @@ class HybridModel:
         from odin_nexus import efficiency
         return float((self.r * efficiency(self.S["lam"].astype(float), lam_abs)).sum())
 
-    def image(self, t_exp, transmission=None, bins=128, lam_abs=8.0, blur_m=0.1e-3, beam_factor=1.0, dark_per_s=2.0,
-              n_lam=100, rng=None):
+    def image(self, t_exp, transmission=None, bins=128, lam_abs=8.0, blur_m=None, beam_factor=1.0, dark_per_s=None,
+              n_lam=40, rng=None):
         """Image of an integrating camera (scintillator + sCMOS camera, as for white-beam imaging): no neutron is
         drawn one by one (2·10⁷ per second in a white beam); each pixel gets the expected number of neutrons, the
         spectrum S(λ) times the transmission of the sample at that pixel, summed over λ, then the L/D and scintillator
@@ -220,6 +302,10 @@ class HybridModel:
         from odin_nexus import efficiency
         from scipy.ndimage import gaussian_filter
         rng = rng or np.random.default_rng()
+        if blur_m is None:            # the scintillator: thick and bright (128 pixels), or thin for high resolution
+            blur_m = 0.1e-3 if bins <= 128 else 0.02e-3
+        if dark_per_s is None:
+            dark_per_s = 2.0 * (128 / bins) ** 2
         x0, x1, y0, y1 = self.field
         lamS = self.S["lam"].astype(float)
         edges = np.linspace(lamS.min(), lamS.max() + 1e-9, n_lam + 1)
@@ -233,7 +319,16 @@ class HybridModel:
         f = profile(self.c_f, X, Y)
         f = f / f.sum()                                              # share of the beam in each pixel
         Tm = np.ones(X.size)
-        if transmission is not None:
+        if transmission is not None and hasattr(transmission, "thickness"):     # a sample on thickness maps
+            L = transmission.thickness(X, Y)
+            Tm = np.zeros(X.size)
+            for lk, wk in zip(lc, wl):
+                mu = np.zeros(X.size)
+                for key, Lm in L.items():
+                    mu += float(transmission.sigma(key, lk)) * Lm
+                Tm += wk * np.exp(-mu)
+            Tm /= wl.sum()
+        elif transmission is not None:
             Tm = sum(wk * transmission(X, Y, np.full(X.size, lk)) for lk, wk in zip(lc, wl)) / wl.sum()
         mean = (wl.sum() * t_exp * beam_factor * f * Tm).reshape(bins, bins)
         L = tw.Z_SAMPLE - tw.Z_PINHOLE

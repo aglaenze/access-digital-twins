@@ -402,13 +402,17 @@ class VirtualOdin:
                                 state=self.status(), compute_time=round(time.time() - t0, 1)))
         return out_file
 
-    def camera(self, t, title="", write=True):
+    def camera(self, t, title="", write=True, pixels=128):
         """Image with the integrating camera (scintillator + sCMOS: white-beam radiography and tomography) for t
         seconds: one image, no time of flight, no neutron recorded one by one (hybrid model: HybridModel.image).
         Returns the path of the file written (NeXus, entry/instrument/camera/data: counts per pixel, 128 x 128 over
-        the field of the Timepix3 camera), or None with write=False (the image is in last_image)."""
-        if not 0 < t <= 600:
-            raise ValueError("camera exposure between 0 and 600 s")
+        the field of the Timepix3 camera), or None with write=False (the image is in last_image).
+        pixels: 128 (110 µm pixels, a thick bright scintillator) or 512 (27.5 µm, the high-resolution setup: a thin
+        scintillator, 20 µm of blur: 16 times fewer neutrons per pixel, so longer exposures)."""
+        if pixels not in (128, 256, 512):
+            raise ValueError("camera pixels: 128, 256 or 512")
+        if not 0 < t <= 3600:
+            raise ValueError("camera exposure between 0 and 3600 s")
         t0 = time.time()
         state = self.status()
         if self.budget_s is not None and state["shutter"] == "open" and self.beam_used() + t > self.budget_s + 1e-9:
@@ -417,13 +421,13 @@ class VirtualOdin:
         charge = nx.pulse_charges(t, self.rng, fluctuation=self.fluctuation, outages=[])
         beam_factor = charge[0::ppf].mean() / nx.Q_NOMINAL
         if state["shutter"] == "closed":
-            img = self.rng.poisson(2.0 * t, (128, 128))
+            img = self.rng.poisson(2.0 * t * (128 / pixels) ** 2, (pixels, pixels))
         else:
             if self.mode != "hybrid":
                 raise ValueError("the camera is modeled in the hybrid mode only")
             smp = self.samples()[state["sample"]]
             T = hy.volumes_transmission(smp["volumes"], state["stage_x"], state["stage_rot"], strains=self.strains(state))
-            img = self.model(state).image(t, transmission=T, beam_factor=beam_factor, rng=self.rng)
+            img = self.model(state).image(t, transmission=T, beam_factor=beam_factor, rng=self.rng, bins=pixels)
         self.last_image = img.astype(np.uint32)
         self.last_n_counts = int(img.sum())
         out_file = None
@@ -448,21 +452,31 @@ class VirtualOdin:
                 cam.attrs["wfm_delta_m"] = float(state["wfm_delta"])
                 d = cam.create_dataset("data", data=self.last_image, compression="gzip")
                 d.attrs["units"] = "counts"
-                cam["x_pixel_offset"] = np.linspace(FIELD[0], FIELD[1], 129)[:-1] + (FIELD[1] - FIELD[0]) / 256
-                cam["y_pixel_offset"] = np.linspace(FIELD[2], FIELD[3], 129)[:-1] + (FIELD[3] - FIELD[2]) / 256
+                cam["x_pixel_offset"] = np.linspace(FIELD[0], FIELD[1], pixels + 1)[:-1] + (FIELD[1] - FIELD[0]) / (2 * pixels)
+                cam["y_pixel_offset"] = np.linspace(FIELD[2], FIELD[3], pixels + 1)[:-1] + (FIELD[3] - FIELD[2]) / (2 * pixels)
                 e["instrument/source/proton_charge"] = float(charge.sum())
         self._log("camera", dict(t=t, title=title, file=os.path.basename(out_file) if out_file else None,
-                                 n_counts=self.last_n_counts, mode=self.mode, charge_uC=round(float(charge.sum()), 1),
+                                 pixels=pixels, n_counts=self.last_n_counts, mode=self.mode, charge_uC=round(float(charge.sum()), 1),
                                  state=self.status(), compute_time=round(time.time() - t0, 1)))
         return out_file
 
-    def tomography(self, angles, t, title="tomography", progress=None):
+    def camera_spectrum(self, n=80):
+        """(λ [Å], weights) of the neutrons the camera sees in the current beam (chopper mode, pinhole): the spectrum
+        a white-beam image averages over (odin_radiography.effective_sigma)."""
+        from odin_nexus import efficiency
+        model = self.model(dict(self.status(), shutter="open"))
+        lamS = model.S["lam"].astype(float)
+        edges = np.linspace(lamS.min(), lamS.max() + 1e-9, n + 1)
+        w = np.histogram(lamS, edges, weights=model.r * efficiency(lamS, 8.0))[0]
+        return 0.5 * (edges[1:] + edges[:-1]), w
+
+    def tomography(self, angles, t, title="tomography", progress=None, pixels=128):
         """Camera images at each stage_rot of `angles` (degrees), t seconds each; returns the files.
         progress(k, n, file): after each image."""
         files = []
         for k, a in enumerate(angles):
             self.move(stage_rot=float(a))
-            files.append(self.camera(t, title=f"{title} rot={float(a):g}"))
+            files.append(self.camera(t, title=f"{title} rot={float(a):g}", pixels=pixels))
             if progress is not None:
                 progress(k + 1, len(angles), files[-1])
         return files

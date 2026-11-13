@@ -109,7 +109,7 @@ class Panel:
         max_kN = max((float((lib.get(n) or {}).get("load", {}).get("max_kN", 0)) for n in samples), default=0)
         load = w.FloatSlider(value=float(st.get("load") or 0), min=0, max=max_kN or 1, step=1, readout_format=".0f",
                              description="Load (kN)", continuous_update=False, layout=w.Layout(width="420px"))
-        t = w.BoundedFloatText(value=30, min=1, max=600, step=1, description="Time (s)")
+        t = w.BoundedFloatText(value=30, min=1, max=3600, step=1, description="Time (s)")
         title = w.Text(placeholder="e.g. open beam", description="Title")
         go = w.Button(description="Count", button_style="primary", icon="play", layout=w.Layout(width="auto"))
         out = w.Output()
@@ -134,6 +134,8 @@ class Panel:
         go.on_click(count)
         # the integrating camera (white-beam radiography, tomography): as radiograph() and tomography() in NICOS
         cam = w.Button(description="Camera image", icon="camera", layout=w.Layout(width="auto"))
+        cam_px = w.ToggleButtons(options=[("standard (128 px, 110 µm)", 128), ("high resolution (512 px, 27.5 µm)", 512)],
+                                 value=128, description="Camera", style={"button_width": "230px"})
         step = w.Dropdown(options=[("12° (15 images)", 12.0), ("6° (30 images)", 6.0), ("3° (60 images)", 3.0)],
                           value=6.0, description="Tomography", layout=w.Layout(width="300px"))
         tomo = w.Button(description="Run the tomography", icon="sync", layout=w.Layout(width="auto"))
@@ -151,7 +153,7 @@ class Panel:
                 clear_output()
                 try:
                     settings()
-                    f = odin.camera(float(t.value), title=title.value or "")
+                    f = odin.camera(float(t.value), title=title.value or "", pixels=cam_px.value)
                     print(f"camera image written in the folder of proposal {self.proposal}: {os.path.basename(f)} "
                           f"({odin.last_n_counts:,} counts)")
                 except Exception as e:
@@ -167,7 +169,7 @@ class Panel:
                     angles = [k * step.value for k in range(int(round(180 / step.value)))]
                     bar.max, bar.value = len(angles), 0
                     files = odin.tomography(angles, float(t.value), title=title.value or "tomography",
-                                            progress=lambda k, n, f: setattr(bar, "value", k))
+                                            progress=lambda k, n, f: setattr(bar, "value", k), pixels=cam_px.value)
                     odin.move(stage_rot=0.0)
                     print(f"{len(files)} images of {float(t.value):g} s written ({os.path.basename(files[0])} to "
                           f"{os.path.basename(files[-1])})")
@@ -182,7 +184,7 @@ class Panel:
                               "imaging); one file each, with its title. <i>Run the tomography</i> takes a camera image "
                               "at each angle over 180°, of the time set above."),
                        sample, shutter, stage, choppers, delta, pinhole, *([load] if max_kN else []), t, title,
-                       w.HBox([go, cam]), w.HBox([step, tomo, bar]), out])
+                       w.HBox([go, cam]), cam_px, w.HBox([step, tomo, bar]), out])
 
     # ------------------------------------------------------------------ LoKI
     def _loki_panel(self):

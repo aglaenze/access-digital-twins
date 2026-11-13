@@ -100,11 +100,95 @@ def fbp(angles, sino, pixel_mm=PIXEL_MM, filter="ramp + Hamming window"):
     return out * span / len(angles) / (pixel_mm * 0.1)                # [cm⁻¹]
 
 
+def pixel_mm(n):
+    """Size of a pixel of an n × n camera image in the sample plane [mm] (the field is 14.1 mm wide)."""
+    return 14.1 / n
+
+
 def reconstruct(files, open_beam, dark=None, rows=None, filter="ramp + Hamming window"):
-    """Σ (cm⁻¹) of the sample in 3D: vol[y, z, x], one slice per row of pixels (rows: the rows to do, all by default)."""
+    """Σ (cm⁻¹) of the sample in 3D: vol[y, z, x], one slice per row of pixels (rows: the rows to do, all by default).
+    For 128 × 128 images; larger ones: Reconstruction (slices on demand)."""
     angles, P = sinogram(files, open_beam, dark)
     rows = range(P.shape[1]) if rows is None else rows
-    return np.array([fbp(angles, P[:, r, :], filter=filter) for r in rows])
+    return np.array([fbp(angles, P[:, r, :], pixel_mm=pixel_mm(P.shape[2]), filter=filter) for r in rows])
+
+
+class Reconstruction:
+    """Filtered back-projection of a tomography, slice by slice on demand (images of 512 × 512 pixels: the whole
+    volume would take minutes and gigabytes). The projections are filtered once; a horizontal slice (one row of
+    pixels, all depths) or a vertical slice (one depth, all rows) is then back-projected when asked for.
+
+        rec = Reconstruction(files, open_beam, dark)
+        rec.horizontal(y_mm)   -> Σ(z, x) [cm⁻¹], rows z, columns x
+        rec.vertical(z_mm)     -> Σ(y, x) at that depth
+        rec.value(x_mm, y_mm, z_mm, r_mm) -> mean Σ in a small sphere (a region of interest)
+    """
+
+    def __init__(self, files, open_beam, dark=None, filter="ramp + Hamming window"):
+        angles, P = sinogram(files, open_beam, dark)
+        self.n = P.shape[2]
+        self.pixel = pixel_mm(self.n)
+        self.angles = np.radians(angles)
+        k = np.fft.fftfreq(2 * self.n)
+        ramp = np.abs(k) * ((0.54 + 0.46 * np.cos(2 * np.pi * k)) if "Hamming" in filter else 1.0)
+        F = np.fft.fft(P, 2 * self.n, axis=2) * ramp
+        self.F = np.real(np.fft.ifft(F, axis=2))[:, :, :self.n].astype(np.float32)     # (angle, row, x')
+        span = np.radians(np.ptp(angles) + np.median(np.diff(angles)))
+        self.scale = span / len(angles) / (self.pixel * 0.1)
+        self.mm = (np.arange(self.n) - (self.n - 1) / 2) * self.pixel                     # pixel centers [mm]
+
+    def _row(self, y_mm):
+        return int(np.clip(round(y_mm / self.pixel + (self.n - 1) / 2), 0, self.n - 1))
+
+    def _bp(self, rows, x, z):
+        """Σ at the points (x, z) [mm] of the given rows: array (len(rows), len(x))."""
+        out = np.zeros((len(rows), len(x)))
+        idx = np.arange(self.n)
+        for a, Fa in zip(self.angles, self.F):
+            s = (x * np.cos(a) + z * np.sin(a)) / self.pixel + (self.n - 1) / 2
+            i0 = np.clip(np.floor(s).astype(int), 0, self.n - 2)
+            f = np.clip(s - i0, 0, 1)
+            ok = (s >= 0) & (s <= self.n - 1)
+            Fr = Fa[rows]
+            out += np.where(ok, Fr[:, i0] * (1 - f) + Fr[:, i0 + 1] * f, 0)
+        return out * self.scale
+
+    def horizontal(self, y_mm):
+        X, Z = np.meshgrid(self.mm, self.mm)
+        return self._bp([self._row(y_mm)], X.ravel(), Z.ravel()).reshape(self.n, self.n)
+
+    def vertical(self, z_mm):
+        return self._bp(list(range(self.n)), self.mm, np.full(self.n, z_mm))
+
+    def value(self, x_mm, y_mm, z_mm, r_mm=0.06):
+        """Mean Σ [cm⁻¹] in a small ball around (x, y, z) [mm] (a region of interest)."""
+        d = np.arange(-r_mm, r_mm + 1e-9, self.pixel)
+        X, Y, Z = np.meshgrid(d, d, d)
+        m = X ** 2 + Y ** 2 + Z ** 2 <= r_mm ** 2
+        rows = sorted({self._row(y_mm + dy) for dy in Y[m]})
+        vals = []
+        for r in rows:
+            sel = m & (np.abs(Y + y_mm - (r - (self.n - 1) / 2) * self.pixel) <= self.pixel / 2 + 1e-9)
+            if sel.any():
+                vals.append(self._bp([r], x_mm + X[sel], z_mm + Z[sel])[0])
+        return float(np.mean(np.concatenate(vals))) if vals else float("nan")
+
+
+def effective_sigma(cfg, spectrum=None):
+    """Σ [cm⁻¹] a material shows in a white-beam tomography of ODIN: Σ(λ) averaged over the white spectrum seen by
+    the camera (a thin sample; spectrum: (λ, weights): VirtualOdin.camera_spectrum(); by default a cold
+    Maxwellian close to the white beam of the twin).
+    ICON (where NWA 7034 was measured) has a warmer spectrum (peak 1.8 Å): the same material gives a smaller value
+    there; ratios between materials change much less."""
+    import NCrystal as NC
+    if spectrum is None:
+        lam = np.linspace(1.0, 9.0, 161)
+        w = lam ** -5 * np.exp(-(2.95 / lam) ** 2) * lam ** 2       # a cold Maxwellian seen by a 1/v-like camera
+    else:
+        lam, w = spectrum
+    m = NC.load(cfg)
+    sig = (m.scatter.xsect(wl=lam) + m.absorption.xsect(wl=lam)) * m.info.getNumberDensity()
+    return float(np.sum(w * sig) / np.sum(w))
 
 
 # --------------------------------------------------------------------------- the wavelength of the neutrons

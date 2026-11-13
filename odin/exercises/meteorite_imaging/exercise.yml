@@ -1,14 +1,14 @@
 # One exercise of the catalogue of the app (read by container/twin_app.py: no generation needed).
 # Paths are relative to the root of the repository.
 title: What is hidden inside a Martian meteorite?
-number: "1"                  # theme 1 of ODIN: white-beam radiography and tomography (+ time of flight)
+number: "1"                  # theme 1 of ODIN: white-beam radiography and tomography
 instrument: odin
-technique: White-beam radiography and tomography, time of flight
-sample: Martian meteorite NWA 7034 (cylinder 12 mm, clasts rich in water)
+technique: White-beam radiography and tomography (high resolution)
+sample: Martian meteorite NWA 7034, the piece of Naver et al. 2026 (12 × 8 × 2 mm, H-rich clasts)
 question: >-
-  Image a piece of a Martian meteorite with neutrons, then in 3D, find the clasts that hold water, and measure how
-  much water with the wavelength of the neutrons.
-learn: Transmission and attenuation, radiography, tomography (filtered back-projection), hydrogen contrast, time of flight.
+  Image a piece of a Martian meteorite with neutrons, then in 3D, find the regions that hold hydrogen and estimate
+  how much water they hold, as Naver et al. (2026) did at ICON.
+learn: Transmission and attenuation, resolution (L/D, pixels), radiography, tomography (filtered back-projection), hydrogen contrast.
 mission: >-
   You work for a team of planetary scientists. The Martian meteorite NWA 7034 holds water from early Mars: where is it,
   and how much? A gram of it is worth more than gold: find the richest clast without cutting the meteorite, so that the
@@ -19,7 +19,7 @@ samples:
 modes:
   bsc:
     label: Guided web page
-    what: Settings given and explained, Take image and Run the tomography buttons, slices to explore, a time-of-flight comparison, questions. No code.
+    what: Settings given and explained, Take image and Run the tomography buttons, slices to explore, Σ of a region compared with the minerals, questions. No code.
     duration: 2 hours
     open: voila
     file: odin/exercises/meteorite_imaging/ODIN_meteorite.ipynb
@@ -28,7 +28,7 @@ modes:
     what: >-
       You measure in NICOS or with a panel; the files, the sinogram and the reconstruction are given (code shown or
       hidden); you choose the filter and the angles of the reconstruction, find the clasts in 3D, and compare two
-      models of the wavelength dependence to identify hydrogen and measure the water.
+      the attenuation of the H-rich regions with the minerals of the paper, and estimate the water.
     duration: 3 hours
     open: lab
     file: odin/exercises/meteorite_imaging/ODIN_meteorite_msc.ipynb
@@ -43,3 +43,7 @@ modes:
     nicos: odin
     analysis: odin/exercises/meteorite_imaging/ODIN_meteorite_beamtime.ipynb
     proposal: {id: "1250", title: "Water in a Martian meteorite by neutron tomography"}
+
+reference: >-
+  E. B. Naver, K. W. Nikolajsen et al., Direct detection of hydrogen reveals a new macroscopic crustal water reservoir
+  on early Mars, arXiv:2601.08390 (2026); C. B. Agee et al., Science 339, 780 (2013).

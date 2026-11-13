@@ -228,11 +228,15 @@ def odin_volumes(spec):
     another one (an inclusion: "inside: k", the index of the volume around it, listed before it) has a 5th item, the
     material it replaces (McStas: the later volume has the higher priority; hybrid model: its Σ minus the host's)."""
     out = []
+    named = spec.get("materials") or {}                 # a sample may name its materials (a rock: long mixtures)
+    mat = lambda name: named.get(name, name)
     for v in spec["volumes"]:
-        t = (v["material"], tuple(float(c) * 1e-3 for c in v.get("center_mm", (0, 0, 0))),
-             tuple(float(s) * 1e-3 for s in v["size_mm"]))
+        size = [float(s) * 1e-3 for s in v["size_mm"]]
+        if len(size) > 3:                               # the 4th item of a box or an ellipsoid: its own angle [deg]
+            size[3] = float(v["size_mm"][3])
+        t = (mat(v["material"]), tuple(float(c) * 1e-3 for c in v.get("center_mm", (0, 0, 0))), tuple(size))
         if "inside" in v:
-            out.append(t + (v.get("shape", "box"), spec["volumes"][int(v["inside"])]["material"]))
+            out.append(t + (v.get("shape", "box"), mat(spec["volumes"][int(v["inside"])]["material"])))
         else:
             out.append(t + ((v["shape"],) if v.get("shape", "box") != "box" else ()))
     return out

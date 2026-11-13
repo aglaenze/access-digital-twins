@@ -411,7 +411,8 @@ class Handler(BaseHTTPRequestHandler):
             if self.path == "/camera":                     # ODIN: an image of the integrating camera (white beam)
                 if args.get("folder"):
                     _use_folder(args["folder"])
-                f = INSTR.camera(float(args["t"]), title=args.get("title", ""), write=args.get("write", True))
+                f = INSTR.camera(float(args["t"]), title=args.get("title", ""), write=args.get("write", True),
+                                 pixels=int(args.get("pixels", 128)))
                 return self._reply(200, dict(file=f, number=INSTR.number, n_counts=INSTR.last_n_counts))
             if self.path == "/scan":
                 files = INSTR.scan(args["device"], args["values"], float(args["t"]), title=args.get("title", ""))

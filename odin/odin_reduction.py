@@ -246,6 +246,7 @@ def measurements(folder):
                     x_mm = float(e["sample/x_translation"][()]) * 1e3
                     kind = "dark" if a.get("shutter") == "closed" else ("open beam" if abs(x_mm) > 20 else "sample")
                     rows.append(dict(file=os.path.basename(path), kind=kind, title=title, detector="camera",
+                                     pixels=int(ins["camera/data"].shape[0]),
                                      t_s=float(e["duration"][()]), counts=int(ins["camera/data"][()].sum()),
                                      choppers=str(a.get("choppers")), pinhole_m=float(a.get("pinhole_m", 0)),
                                      stage_x_m=round(x_mm / 1e3, 4),

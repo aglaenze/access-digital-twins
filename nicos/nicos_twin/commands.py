@@ -158,24 +158,24 @@ def sample_info():
 
 # --------------------------------------------------------------------------- ODIN: the camera of white-beam imaging
 @usercommand
-@helparglist('t[, title]')
-def radiograph(t, title=''):
+@helparglist('t[, title, pixels]')
+def radiograph(t, title='', pixels=128):
     """One image with the integrating camera of ODIN (scintillator + camera, as for white-beam radiography and
     tomography): t seconds of exposure, no time of flight. The file (odin_NNNNNN.nxs, entry/instrument/camera/data)
-    goes to the folder of the proposal.
+    goes to the folder of the proposal. pixels: 128 (110 µm, the standard camera) or 512 (27.5 µm, high resolution).
 
     >>> move(choppers, 'white', shutter, 'open', stage_x, 0)
     >>> radiograph(2, 'meteorite 0 deg')
     """
     folder = proposal_folder() if session.experiment.propinfo.get("proposal") else None
-    r = _twin("/camera", {"t": float(t), "title": title, "folder": folder}, timeout=float(t) + 600)
+    r = _twin("/camera", {"t": float(t), "title": title, "folder": folder, "pixels": int(pixels)}, timeout=600)
     session.log.info("camera image: %s (%d counts)", os.path.basename(r["file"]), r["n_counts"])
     return r["file"]
 
 
 @usercommand
-@helparglist('t[, step, title]')
-def tomography(t, step=6.0, title='tomography'):
+@helparglist('t[, step, title, pixels]')
+def tomography(t, step=6.0, title='tomography', pixels=128):
     """A tomography with the camera: one radiograph(t) at each angle of stage_rot from 0 to 180 degrees (excluded) in
     steps of `step` degrees, then stage_rot back to 0. Measure first an open beam and a dark with radiograph().
 
@@ -187,7 +187,7 @@ def tomography(t, step=6.0, title='tomography'):
     for k in range(n):
         a = k * float(step)
         rot.maw(a)
-        files.append(radiograph(t, '%s rot=%g' % (title, a)))
+        files.append(radiograph(t, '%s rot=%g' % (title, a), pixels))
         session.log.info("tomography: image %d of %d", k + 1, n)
     rot.maw(0)
     return files
