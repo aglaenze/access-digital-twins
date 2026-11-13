@@ -138,6 +138,8 @@ def _odin_sample(spec):
     out = dict(volumes=sl.odin_volumes(spec), name=spec.get("name", spec["id"]), formula=spec.get("formula", ""))
     if spec.get("load"):               # a sample in a load frame: lattice strain along the beam per kN, per volume
         out.update(strain_per_kN=sl.odin_strain_per_kN(spec), max_kN=float(spec["load"]["max_kN"]))
+    if spec.get("field"):              # a magnetic sample: its field map for polarized imaging (odin_polarized)
+        out["field"] = spec["field"]
     return out
 
 
@@ -217,6 +219,13 @@ class VirtualOdin:
             Device("sample", "iron_plate", choices=tuple(SAMPLES), help="sample mounted on the stage"),
             Device("load", 0.0, "kN", limits=(0.0, MAX_LOAD),
                    help="tensile force of the load frame on the sample (samples that can be loaded only)"),
+            Device("polarizer", "out", choices=("out", "in"),
+                   help="polarized imaging: polarizer before the sample and analyzer after it, in or out of the beam"),
+            Device("spin_in", "+x", choices=("+x", "-x", "+y", "-y", "+z", "-z"),
+                   help="direction of the spin of the neutrons arriving at the sample (spin rotator after the "
+                        "polarizer); x horizontal, y vertical, z along the beam"),
+            Device("spin_out", "x", choices=("x", "y", "z"),
+                   help="the analyzer lets through the neutrons whose spin is along +spin_out after the sample"),
         ]}
         self._back = {}
         self._models = {}
@@ -459,6 +468,89 @@ class VirtualOdin:
                                  pixels=pixels, n_counts=self.last_n_counts, mode=self.mode, charge_uC=round(float(charge.sum()), 1),
                                  state=self.status(), compute_time=round(time.time() - t0, 1)))
         return out_file
+
+    def polarimetry(self, t, title="", write=True, pixels=128, n_lam=16):
+        """Polarized imaging (polarizer "in"): t seconds with the Timepix3 camera, the neutrons sorted by wavelength
+        (n_lam bins from 1.5 to 6 Å); the spin enters along spin_in, the analyzer passes the spin along spin_out
+        (odin_polarized.measurement). Returns the file (NeXus, entry/instrument/camera/data: counts (n_lam, y, x),
+        with entry/instrument/camera/wavelength [Å]), or None with write=False (counts in last_cube)."""
+        import odin_polarized as pol
+        if pixels not in (64, 128):
+            raise ValueError("polarimetry pixels: 64 or 128")
+        if not 0 < t <= 3600 * 4:
+            raise ValueError("exposure between 0 and 4 hours")
+        t0 = time.time()
+        state = self.status()
+        if self.budget_s is not None and state["shutter"] == "open" and self.beam_used() + t > self.budget_s + 1e-9:
+            raise ValueError(f"beamtime exhausted: {self.budget_s - self.beam_used():.0f} s left of {self.budget_s:.0f} s")
+        if self.mode != "hybrid":
+            raise ValueError("polarized imaging is modeled in the hybrid mode only")
+        ppf = nx.PULSES_PER_FRAME[state["choppers"]]
+        charge = nx.pulse_charges(t, self.rng, fluctuation=self.fluctuation, outages=[])
+        beam_factor = charge[0::ppf].mean() / nx.Q_NOMINAL
+        smp = self.samples()[state["sample"]]
+        lams = np.linspace(1.5, 6.0, n_lam + 1)
+        lam = 0.5 * (lams[1:] + lams[:-1])
+        if state["shutter"] == "closed":
+            cube = self.rng.poisson(0.02 * t / n_lam, (n_lam, pixels, pixels))
+        elif not smp.get("field") or abs(state["stage_x"]) > 0.02:
+            # no magnetic sample in the beam: the spin keeps its direction (P = identity), attenuation only
+            if not smp.get("field") and state["polarizer"] == "in" and abs(state["stage_x"]) <= 0.02:
+                print(f"note: {smp['name']} has no field map; its attenuation is not included in this image")
+            cube, lam = pol.measurement(self.model(state), "empty", 0, state["polarizer"], state["spin_in"],
+                                        state["spin_out"], t, beam_factor, self.rng, pixels, n_lam)
+        else:
+            cube, lam = pol.measurement(self.model(state), smp["field"], state["stage_rot"], state["polarizer"],
+                                        state["spin_in"], state["spin_out"], t, beam_factor, self.rng, pixels, n_lam)
+        self.last_cube = cube.astype(np.uint32)
+        self.last_image = self.last_cube.sum(axis=0)
+        self.last_n_counts = int(cube.sum())
+        out_file = None
+        if write:
+            import h5py
+            self.number += 1
+            out_file = f"{self.folder}/odin_{self.number:06d}.nxs"
+            with h5py.File(out_file, "w") as f:
+                e = f.create_group("entry")
+                e.attrs["NX_class"] = "NXentry"
+                e["title"] = title or f"run {self.number}"
+                e["start_time"] = _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="seconds")
+                e["duration"] = float(t)
+                e["sample/name"] = smp["name"]
+                e["sample/rotation_angle"] = float(state["stage_rot"])
+                e["sample/x_translation"] = float(state["stage_x"])
+                cam = e.create_group("instrument/camera")
+                cam.attrs["NX_class"] = "NXdetector"
+                for k in ("shutter", "choppers", "diffuser", "polarizer", "spin_in", "spin_out"):
+                    cam.attrs[k] = str(state[k])
+                cam.attrs["pinhole_m"] = float(state["pinhole"])
+                d = cam.create_dataset("data", data=self.last_cube, compression="gzip")
+                d.attrs["units"] = "counts"
+                d.attrs["axes"] = "wavelength, y, x"
+                cam["wavelength"] = lam
+                cam["wavelength"].attrs["units"] = "angstrom"
+                cam["x_pixel_offset"] = np.linspace(FIELD[0], FIELD[1], pixels + 1)[:-1] + (FIELD[1] - FIELD[0]) / (2 * pixels)
+                cam["y_pixel_offset"] = np.linspace(FIELD[2], FIELD[3], pixels + 1)[:-1] + (FIELD[3] - FIELD[2]) / (2 * pixels)
+                e["instrument/source/proton_charge"] = float(charge.sum())
+        self._log("polarimetry", dict(t=t, title=title, file=os.path.basename(out_file) if out_file else None,
+                                      pixels=pixels, n_lam=n_lam, n_counts=self.last_n_counts,
+                                      charge_uC=round(float(charge.sum()), 1), state=self.status(),
+                                      compute_time=round(time.time() - t0, 1)))
+        return out_file
+
+    def polarization_matrix(self, t, title="", pixels=128, n_lam=16, progress=None):
+        """The 18 measurements of the full polarization matrix: spin in along ±x, ±y, ±z, analyzer along x, y, z, t
+        seconds each (polarizer in). Returns {(spin_in, spin_out): file}. progress(k, 18, file) after each one."""
+        files, k = {}, 0
+        self.move(polarizer="in", shutter="open")
+        for j in "xyz":
+            for i in ("+x", "-x", "+y", "-y", "+z", "-z"):
+                self.move(spin_in=i, spin_out=j)
+                files[(i, j)] = self.polarimetry(t, title=f"{title} {i} {j}".strip(), pixels=pixels, n_lam=n_lam)
+                k += 1
+                if progress:
+                    progress(k, 18, files[(i, j)])
+        return files
 
     def camera_spectrum(self, n=80):
         """(λ [Å], weights) of the neutrons the camera sees in the current beam (chopper mode, pinhole): the spectrum

@@ -27,7 +27,7 @@ from nicos.utils import printTable
 from nicos_twin.devices import proposal_folder
 
 __all__ = ["nexusfile_open", "start_filewriting", "stop_filewriting", "list_filewriting_jobs", "sample_info",
-           "radiograph", "tomography"]
+           "radiograph", "tomography", "polarimetry", "polarization_matrix"]
 
 _JOBS = []          # dicts: number, title, start, stop, files
 
@@ -171,6 +171,40 @@ def radiograph(t, title='', pixels=128):
     r = _twin("/camera", {"t": float(t), "title": title, "folder": folder, "pixels": int(pixels)}, timeout=600)
     session.log.info("camera image: %s (%d counts)", os.path.basename(r["file"]), r["n_counts"])
     return r["file"]
+
+
+@usercommand
+@helparglist('t[, title, pixels]')
+def polarimetry(t, title='', pixels=128):
+    """Polarized imaging (polarizer in): t seconds with the Timepix3 camera, the neutrons sorted by wavelength
+    (16 bins from 1.5 to 6 Å). The spin enters the sample along spin_in, the analyzer passes the spin along spin_out.
+    The file (entry/instrument/camera/data: counts (wavelength, y, x)) goes to the folder of the proposal.
+
+    >>> move(polarizer, 'in', spin_in, '+y', spin_out, 'y')
+    >>> polarimetry(150, 'solenoid +y y')
+    """
+    folder = proposal_folder() if session.experiment.propinfo.get("proposal") else None
+    r = _twin("/polarimetry", {"t": float(t), "title": title, "folder": folder, "pixels": int(pixels)}, timeout=900)
+    session.log.info("polarized image: %s (%d counts)", os.path.basename(r["file"]), r["n_counts"])
+    return r["file"]
+
+
+@usercommand
+@helparglist('t[, title, pixels]')
+def polarization_matrix(t, title='', pixels=128):
+    """The 18 images of the full polarization matrix: spin_in along +x, -x, +y, -y, +z, -z for each spin_out x, y, z,
+    t seconds each (polarizer in): P_ij = (N(+i, j) - N(-i, j)) / (N(+i, j) + N(-i, j)).
+
+    >>> polarization_matrix(150, 'solenoid 0 deg')     # 18 x 150 s = 45 min, as at RADEN
+    """
+    session.getDevice("polarizer").maw("in")
+    files = []
+    for j in "xyz":
+        for i in ("+x", "-x", "+y", "-y", "+z", "-z"):
+            session.getDevice("spin_in").maw(i)
+            session.getDevice("spin_out").maw(j)
+            files.append(polarimetry(t, ("%s %s %s" % (title, i, j)).strip(), pixels))
+    return files
 
 
 @usercommand

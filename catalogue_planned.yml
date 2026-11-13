@@ -29,12 +29,6 @@
   sample: A material with micrometer-sized structures
   question: See structures far smaller than the resolution of the camera, by the small-angle scattering they cause.
   later: true
-- number: "7"
-  title: A magnet inside a meteorite
-  instrument: odin
-  technique: Polarized neutron imaging
-  sample: Magnetized fragment of the meteorite NWA 7034
-  question: See the magnetization of a meteorite fragment by the rotation of the neutron spin.
 - title: Small structures in a membrane
   instrument: loki
   technique: SANS, contrast variation

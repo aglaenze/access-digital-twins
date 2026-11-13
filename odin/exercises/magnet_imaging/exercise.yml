@@ -1,0 +1,35 @@
+# One exercise of the catalogue of the app (read by container/twin_app.py: no generation needed).
+# Paths are relative to the root of the repository. Two samples: the student chooses on the card (variants).
+title: Seeing a magnetic field with neutrons
+number: "7"                  # theme 7 of ODIN: polarized neutron imaging
+instrument: odin
+technique: Polarized neutron imaging
+sample: >-
+  Your choice: the coil of Sales et al. (RADEN, 2018), or the magnetized fragment of the Martian meteorite NWA 7034 of
+  Qvistgaard et al. (RADEN, 2026)
+question: >-
+  Measure the polarization matrix of the neutrons behind a magnetic sample and deduce, pixel by pixel, the direction
+  and the strength of the field inside it.
+learn: Spin and Larmor precession, polarizer and analyzer, the polarization matrix, rotation angle and axis, ∫B dl.
+mission: >-
+  The coil: you build the magnets of a neutron instrument; measure the field inside a new coil without opening it.
+  The meteorite: you work with paleomagnetists; find out whether neutrons can show where the field sits inside a rock.
+status: ready
+samples:
+  magnet_solenoid: {}
+  nwa7034_fragment: {}
+modes:
+  bsc:
+    label: Guided web page
+    what: >-
+      Settings given and explained, two buttons to measure, the polarization matrix at each wavelength, the field at
+      a point and over the image, questions. No code.
+    duration: 2 hours
+    open: voila
+    file: odin/exercises/magnet_imaging/ODIN_magnet_solenoid.ipynb
+    variants:
+      - {label: "The coil (Sales et al. 2018)", file: odin/exercises/magnet_imaging/ODIN_magnet_solenoid.ipynb}
+      - {label: "The meteorite fragment (Qvistgaard et al. 2026)", file: odin/exercises/magnet_imaging/ODIN_magnet_meteorite.ipynb}
+reference: >-
+  M. Sales et al., Sci. Rep. 8, 2214 (2018); C. H. Qvistgaard, E. B. Naver et al., Geochem.
+  Geophys. Geosyst. 27, e2025GC012641 (2026), data DTU Data doi:10.11583/DTU.30775208 (CC BY 4.0).

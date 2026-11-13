@@ -190,7 +190,10 @@ function renderCatalogue() {
        ${e.kind === "introduction" ? `<p class="q">${esc(e.question)} Start here: it takes about ${esc((e.modes.all || {}).duration || "40 min")}.</p>` : ""}
        ${e.mission ? `<div class="mission">${ICON_TARGET}<span><b>Your mission.</b> ${esc(e.mission)}</span></div>` : ""}
        <div class="levels">${Object.entries(e.modes || {}).map(([k, m]) => level(e, k, m, i)).join("")}</div></article>`).join("");
-  $("#exercises").querySelectorAll("[data-act]").forEach((b) => b.onclick = () => act(b.dataset));
+  $("#exercises").querySelectorAll("[data-act]").forEach((b) => b.onclick = () => {
+    const pick = b.closest(".level") && b.closest(".level").querySelector(".variant-pick");
+    act(pick ? { ...b.dataset, variant: pick.value } : b.dataset);
+  });
   const free = c.free[instr];
   // each free beamtime is a new proposal of the twin's user office (user_office.py); a real proposal can be imported
   const mine = (c.proposals || {})[instr] || [];
@@ -233,8 +236,11 @@ function level(e, k, m, i) {
   const again = p.status === "new" ? "" :
     `<button class="again" data-act="reset" ${d} data-file="${esc(k === "beamtime" ? m.analysis || "" : m.file || "")}"
        data-page="${m.open === "voila" ? 1 : 0}" title="Your notebook, your answers and the state of this exercise are put aside: you start from the beginning. Your measurements stay.">Start again</button>`;
+  // an exercise with a choice of samples: a menu above the buttons (the buttons open the sample chosen)
+  const variants = m.variants && k !== "beamtime" ? `<label class="variant">Sample <select class="variant-pick">${
+    m.variants.map((v, n) => `<option value="${n}">${esc(v.label)}</option>`).join("")}</select></label>` : "";
   return `<div class="level"><div class="row"><span class="chip ${k}">${LEVEL[k] || k}</span><span class="dur">${esc(m.duration || "")}${again}</span></div>
-    <span class="label">${esc(m.label)}</span><span class="what">${esc(m.what)}</span>
+    <span class="label">${esc(m.label)}</span><span class="what">${esc(m.what)}</span>${variants}
     <div class="prog"><div class="row"><span>${esc(p.text)}</span><b>${p.pct ? p.pct + " %" : ""}</b></div>
       <div class="track"><div class="fill ${k}" style="width:${p.pct}%"></div></div></div>
     <div class="acts">${acts}</div></div>`;
@@ -243,7 +249,8 @@ function level(e, k, m, i) {
 async function act(d) {
   try {
     if (d.act === "open") {
-      const r = await T.api("POST", "/twin/open", { dir: d.dir, mode: d.mode, what: d.what || "file" });
+      const r = await T.api("POST", "/twin/open", { dir: d.dir, mode: d.mode, what: d.what || "file",
+                                                     variant: d.variant ?? "" });
       const clean = d.mode === "msc" && (d.what || "file") === "file" && d.view === "clean";
       openTab(r.url, r.kind, d.what === "analysis" ? d.label.replace(/Beamtime$/, "Beamtime notebook") : d.label, { clean });
     } else if (d.act === "file") {

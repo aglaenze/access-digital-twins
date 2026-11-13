@@ -138,6 +138,16 @@ def edge(sample, open_beam, dark=None, region="middle"):
                        # the width of the edge: the wavelength resolution (WFM: about 0.01 Å), kept physical so that
                        # the fit cannot run into a degenerate sharp step
                        bounds=([WINDOW[0] + 0.1, 0.004, 0, -5, 0], [WINDOW[1] - 0.1, 0.05, 2, 5, 2]))
+    if not np.isfinite(cov[0, 0]) or np.sqrt(cov[0, 0]) > 0.02 or p[1] < 0.0045:
+        # the width ran to its lower bound (narrower than a wavelength bin): the position of a near-sharp step is then
+        # not fixed by the data and its uncertainty explodes. Fix the width at one bin of wavelength and fit again.
+        wfix = max(float(p[1]), float(np.median(np.diff(lam))))
+        q, c4 = curve_fit(lambda x, a, b, s, j: edge_model(x, a, wfix, b, s, j), lam[m], T[m], sigma=dT[m],
+                          absolute_sigma=True, p0=[p[0], p[2], p[3], p[4]],
+                          bounds=([WINDOW[0] + 0.1, 0, -5, 0], [WINDOW[1] - 0.1, 2, 5, 2]))
+        p = np.array([q[0], wfix, q[1], q[2], q[3]])
+        cov = np.zeros((5, 5))
+        cov[np.ix_([0, 2, 3, 4], [0, 2, 3, 4])] = c4
     chi2 = float(np.sum(((T[m] - edge_model(lam[m], *p)) / dT[m]) ** 2) / (m.sum() - 5))
     return dict(lam=lam[m], T=T[m], dT=dT[m], p=p, cov=cov, lam_edge=float(p[0]), dlam_edge=float(np.sqrt(cov[0, 0])),
                 width=float(p[1]), chi2=chi2)

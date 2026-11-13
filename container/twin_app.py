@@ -55,6 +55,9 @@ QUIZ = {  # the quiz (quiz.Quiz name) of each way into an exercise, for the prog
     ("odin/exercises/steel_strain", "msc"): "odin_steel_msc",
     ("odin/exercises/meteorite_imaging", "bsc"): "odin_meteorite_bsc",
     ("odin/exercises/meteorite_imaging", "msc"): "odin_meteorite_msc",
+    # an exercise with a choice of samples (variants on its card): one quiz per sample, the furthest one is shown
+    ("odin/exercises/magnet_imaging", "bsc"): ("odin_magnet_bsc_solenoid", "odin_magnet_bsc_meteorite"),
+    ("odin/exercises/magnet_imaging", "msc"): ("odin_magnet_msc_solenoid", "odin_magnet_msc_meteorite"),
     ("loki/exercises/silica_spheres", "bsc"): "loki_silica_bsc",
     ("loki/exercises/silica_spheres", "msc"): "loki_silica_msc",
 }
@@ -136,21 +139,24 @@ class Catalogue(Base):
         when = self.opened().get(f"{d}:{mode}")
         if when:
             out.update(status="started", text=f"Started {when[:10]}", pct=5)
-        q, p = QUIZ.get((d, mode)), self.progress()
+        qs, p = QUIZ.get((d, mode)), self.progress()
+        qs = (qs,) if isinstance(qs, str) else (qs or ())
         sub = {}
         try:
             with open(os.path.join(p, "submitted.json"), encoding="utf-8") as f:
                 sub = json.load(f)
         except (OSError, ValueError, TypeError):
             pass
-        if q and p and os.path.isfile(os.path.join(p, q + ".meta.json")):
+        for q in qs:
+            if not (p and os.path.isfile(os.path.join(p, q + ".meta.json"))):
+                continue
             try:
                 with open(os.path.join(p, q + ".meta.json"), encoding="utf-8") as f:
                     total = json.load(f).get("questions", 0)
                 import quiz
                 done = sum(1 for s in quiz._previous(os.path.join(p, q + ".jsonl")).values()
                            if s["right"] or s["revealed"])
-                if total:
+                if total and round(100 * done / total) >= out["pct"]:
                     pct = round(100 * done / total)
                     out.update(status="done" if done >= total else "started", pct=pct,
                                text=f"Questions: {done} of {total}")
@@ -216,8 +222,8 @@ class Reset(Base):
         if rel and rel.endswith(".ipynb") and m.get("open") != "voila":
             put_aside(os.path.join(self.root, "work", who, f"{instr}_{ex}", os.path.basename(rel)))
         # the answers to its questions
-        q = QUIZ.get((d, mode))
-        if q:
+        qs = QUIZ.get((d, mode))
+        for q in ((qs,) if isinstance(qs, str) else (qs or ())):
             for ext in (".jsonl", ".meta.json"):
                 put_aside(os.path.join(run_root(), "progress", who, q + ext))
         # its state in the catalogue (started, submitted)
@@ -245,6 +251,8 @@ class Open(Base):
             with open(os.path.join(self.root, d, "exercise.yml"), encoding="utf-8") as fh:
                 m = yaml.safe_load(fh)["modes"][mode]
             rel = m["analysis"] if what == "analysis" else m["file"]
+            if what == "file" and m.get("variants") and b.get("variant") not in (None, ""):
+                rel = m["variants"][int(b["variant"])]["file"]          # the sample chosen on the card
             kind = "page" if (m.get("open") == "voila" and what == "file") else "notebook"
         else:
             kind = b.get("kind", "notebook")

@@ -71,3 +71,7 @@ dialog form { padding: 12px 32px 24px; display: flex; justify-content: flex-end;
 .ex.intro-card { border: 2px solid var(--teal); background: var(--teal-l); }
 .ex.intro-card .levels { grid-template-columns: 1fr; }     /* one level (all): the whole width */
 .chip.all { background: var(--ink3); } .fill.all { background: var(--ink3); }
+
+/* an exercise with a choice of samples: the menu on its card */
+.level .variant { display: flex; gap: 6px; align-items: center; font-size: 12px; margin: 6px 0 2px; }
+.level .variant select { flex: 1; min-width: 0; font: inherit; padding: 2px 4px; }
