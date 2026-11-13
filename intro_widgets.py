@@ -86,6 +86,140 @@ def odin_time_of_flight():
     _show([lam], draw)
 
 
+ODIN_BAND = (1.0, 9.0)          # Å, band let through by the band choppers (one pulse in two)
+ODIN_FIRST_BAND_CHOPPER = 8.4   # m
+ODIN_WFM_Z = 7.0                # m, middle of the two WFM discs
+
+
+def odin_band_choppers():
+    """Distance against time for the neutrons of three pulses; a camera time picked with the slider: which
+    wavelengths (of which pulses) can arrive then? Band choppers stopped: two or more; turning: one."""
+    on = w.ToggleButtons(options=[("stopped", False), ("turning: one pulse in two", True)], value=False,
+                         description="band choppers", style={"button_width": "190px", "description_width": "230px"})
+    t_cam = w.FloatSlider(value=95.0, min=5.0, max=210.0, step=0.5, description="arrival time at the camera (ms)",
+                          readout_format=".1f", continuous_update=True, style=STYLE, layout=LAYOUT)
+    lam_all = (0.8, 14.0)          # Å: what the moderator sends (the slow tail goes on)
+
+    def draw():
+        fig, ax = plt.subplots(figsize=(8.2, 3.6))
+        cols = [RED, ORANGE, BLUE, "#7C4DA8"]
+        for k in range(4):
+            t0 = k * PERIOD_MS
+            ax.add_patch(Rectangle((t0, -2.5), 2.86, 2.5, color=cols[k], alpha=0.9))
+            ax.text(t0 + 1.4, -5, f"pulse {k + 1}", ha="center", va="top", fontsize=9, color=INK)
+            blocked = on.value and k % 2 == 1
+            lo, hi = ODIN_BAND if on.value else lam_all
+            for l in np.linspace(lo, hi, 9):
+                v = H_OVER_M / l
+                z_end = ODIN_FIRST_BAND_CHOPPER if blocked else ODIN_L
+                ax.plot([t0, t0 + z_end / v * 1e3], [0, z_end], color=cols[k], lw=1.0, alpha=0.35 if blocked else 0.75)
+            if blocked and t0 + 9 < 190:
+                ax.text(t0 + 9, ODIN_FIRST_BAND_CHOPPER + 3, "stopped", fontsize=8.5, color=cols[k])
+        if on.value:
+            ax.axhline(ODIN_FIRST_BAND_CHOPPER, color=BLUE, lw=1.2, ls="--")
+            ax.text(212, ODIN_FIRST_BAND_CHOPPER + 1, "band chopper", ha="right", va="bottom", fontsize=8.5, color=BLUE)
+        ax.axhline(ODIN_L, color=INK, lw=1)
+        ax.text(212, ODIN_L + 1.5, "camera", ha="right", va="bottom", fontsize=9.5, color=INK)
+        ax.axvline(t_cam.value, color=TEAL, lw=2)
+        # which wavelengths can reach the camera at that time
+        found = []
+        for k in range(4):
+            dt = t_cam.value - k * PERIOD_MS
+            if dt <= 0 or (on.value and k % 2 == 1):
+                continue
+            l = H_OVER_M * dt * 1e-3 / ODIN_L
+            lo, hi = ODIN_BAND if on.value else lam_all
+            if lo <= l <= hi:
+                found.append((k, l))
+                ax.plot(t_cam.value, ODIN_L, "o", ms=9, color=cols[k], mec="white", zorder=5)
+        ax.set_xlim(-3, 215); ax.set_ylim(-13, 72)
+        ax.set_xlabel("time after pulse 1 (ms)"); ax.set_ylabel("distance (m)")
+        for s in ("top", "right"):
+            ax.spines[s].set_visible(False)
+        fig.tight_layout()
+        if not found:
+            txt = "No neutron of the beam arrives at that time."
+        elif len(found) == 1:
+            k, l = found[0]
+            txt = (f"At <b>{t_cam.value:.1f} ms</b> the camera can only see a neutron of <b>{l:.2f} Å</b> from pulse "
+                   f"{k + 1}: the arrival time gives the wavelength without doubt.")
+        else:
+            txt = (f"At <b>{t_cam.value:.1f} ms</b> the camera may see " + ", or ".join(
+                f"<b>{l:.2f} Å</b> from pulse {k + 1}" for k, l in found) +
+                   ": <b>frame overlap</b>, the wavelength cannot be told.")
+        if on.value:
+            txt += (" The band choppers stop one pulse in two (143 ms between the pulses that pass) and keep 1 to 9 Å: "
+                    "the band of each pulse reaches the camera before the next one.")
+        return fig, txt
+
+    _show([on, t_cam], draw)
+
+
+def odin_wfm():
+    """The long ESS pulse cut by the WFM choppers: the neutrons of one wavelength leave during 2.86 ms, so they reach
+    the camera spread over 2.86 ms (read as a spread of wavelength); two discs δ apart at 7 m let through only those
+    that left in a short time τ = δ / v: the spread shrinks to τ, Δλ/λ = δ / (L − 7 m)."""
+    delta = w.ToggleButtons(options=[("stopped", 0.0), ("δ = 0.10 m", 0.10), ("δ = 0.30 m", 0.30), ("δ = 0.45 m", 0.45)],
+                            value=0.0, description="WFM choppers", style={"button_width": "100px", "description_width": "230px"})
+    lam = w.FloatSlider(value=4.0, min=1.5, max=9.0, step=0.1, description="wavelength λ (Å)", readout_format=".1f",
+                        continuous_update=True, style=STYLE, layout=LAYOUT)
+
+    def draw():
+        l, d = lam.value, delta.value
+        v = H_OVER_M / l
+        tau_pulse = 2.86                                     # ms
+        tau = d / v * 1e3 if d else tau_pulse                # ms: the neutrons of this λ that pass
+        t_mid = tau_pulse / 2
+        fig, (a, b) = plt.subplots(1, 2, figsize=(10.5, 3.6), gridspec_kw=dict(width_ratios=[1.5, 1]))
+        t_wfm = ODIN_WFM_Z / v * 1e3
+        a.add_patch(Rectangle((0, -0.5), tau_pulse, 0.5, color=RED))
+        a.text(tau_pulse / 2, -0.8, "the long pulse (2.86 ms)", ha="center", va="top", fontsize=9, color=INK)
+        for t0 in np.linspace(0, tau_pulse, 15):
+            passes = (not d) or abs(t0 - t_mid) <= tau / 2
+            z_end = 10.0 if passes else ODIN_WFM_Z - d / 2
+            a.plot([t0, t0 + z_end / v * 1e3], [0, z_end], color=TEAL if passes else GREY, lw=1.6 if passes else 1.0,
+                   alpha=1 if passes else 0.6)
+        if d:
+            for z in (ODIN_WFM_Z - d / 2, ODIN_WFM_Z + d / 2):
+                a.axhline(z, color=TEAL, lw=1.2, ls="--")
+            a.text(10.0 / v * 1e3 + tau_pulse + 0.6, ODIN_WFM_Z - 1.6, "two WFM discs\n(dashed): open only\nfor the neutrons\nin teal",
+                   va="top", fontsize=8.5, color=TEAL)
+        a.set_xlim(-0.5, 10.0 / v * 1e3 + tau_pulse + 7.5); a.set_ylim(-2.2, 10.5)
+        a.set_xlabel("time (ms)"); a.set_ylabel("distance from the source (m)")
+        a.set_title(f"Neutrons of {l:.1f} Å leaving during the pulse", fontsize=10.5)
+        # at the camera: arrival times of these neutrons, and the wavelength they are read as
+        t_cam = ODIN_L / v * 1e3
+        b.add_patch(Rectangle((t_cam - tau_pulse / 2, 0.55), tau_pulse, 0.3, color=GREY, alpha=0.6))
+        b.text(t_cam, 0.92, "without WFM: 2.86 ms", ha="center", va="bottom", fontsize=9, color=INK)
+        if d:
+            b.add_patch(Rectangle((t_cam - tau / 2, 0.15), tau, 0.3, color=TEAL))
+            b.text(t_cam, 0.08, f"with WFM: {tau:.2f} ms", ha="center", va="top", fontsize=9, color=TEAL)
+        b.set_xlim(t_cam - 3, t_cam + 3); b.set_ylim(-0.15, 1.15); b.set_yticks([])
+        b.set_xlabel("arrival time at the camera (ms)")
+        b.set_title("When they reach the camera", fontsize=10.5)
+        for ax_ in (a, b):
+            for s in ("top", "right"):
+                ax_.spines[s].set_visible(False)
+        fig.tight_layout()
+        if d:      # the WFM discs are the new start of the clock: the flight path is L − 7 m
+            path = ODIN_L - ODIN_WFM_Z
+            dl = H_OVER_M * tau * 1e-3 / path
+            txt = (f"Neutrons of <b>{l:.1f} Å</b> fly at {v:.0f} m/s. The WFM discs, {d:.2f} m apart, let through only "
+                   f"those that left within τ = δ / v = <b>{tau:.2f} ms</b> (<b>{100 * tau / tau_pulse:.0f} %</b> of them), "
+                   f"and the clock now starts at the discs, {path:.2f} m from the camera: Δλ = 3956 × "
+                   f"{tau * 1e-3:.5f} / {path:.2f} = <b>{dl:.4f} Å</b>, Δλ/λ = δ / (L − 7 m) = <b>{100 * dl / l:.2f} %</b>, "
+                   f"the same at every wavelength. Over the whole band (six short pulses, the gaps between them) "
+                   f"about 3 % of the neutrons are left.")
+        else:
+            dl = H_OVER_M * tau * 1e-3 / ODIN_L
+            txt = (f"Neutrons of <b>{l:.1f} Å</b> fly at {v:.0f} m/s. They arrive spread over <b>{tau:.2f} ms</b>, which "
+                   f"the clock reads as a spread of wavelength Δλ = 3956 × {tau * 1e-3:.5f} / 60.55 = <b>{dl:.3f} Å</b>, "
+                   f"Δλ/λ = <b>{100 * dl / l:.1f} %</b>. Choose a WFM setting to sharpen it.")
+        return fig, txt
+
+    _show([delta, lam], draw)
+
+
 def _pattern(blur_um, rel_flux, rng):
     """A test pattern of bars (400, 200, 100 and 50 µm wide) seen with a blur and a counting noise."""
     px = 10.0                                                  # µm per pixel

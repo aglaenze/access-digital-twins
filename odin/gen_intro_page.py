@@ -193,14 +193,27 @@ apart: this is **frame overlap**. Between two pulses the camera can only sort a 
 $3956 \times 0.0714 / 60.55$ = **4.7 Å** wide. ODIN's *band choppers* turn at 7 turns per second and let through
 **one pulse in two**: the pulses are then 143 ms apart, and a band of about 9 Å (1 to 9 Å) fits without overlap.
 
+*Try it*: choose a time at the camera with the slider. With the band choppers stopped, neutrons of two pulses (two
+different wavelengths) can arrive at that same time; start the choppers: only one remains.
+""")
+code(r"""
+iw.odin_band_choppers()
+""")
+md(r"""
 **Problem 2: the pulse is long.** The neutrons do not leave at one instant but during 2.86 ms. Two neutrons of the
 same wavelength can thus arrive 2.86 ms apart, and the clock mistakes this for a difference of wavelength of
 $3956 \times 0.00286 / 60.55$ = **0.19 Å**. At 4 Å this is an uncertainty of about 5 %: too coarse to measure, for
 instance, how much a metal is stretched (0.1 %). The *WFM choppers* (wavelength frame multiplication), 7 m from
 the source, cut the long pulse into six short ones: the wavelength is then known to **0.2 to 0.8 %**, at a price:
 only **3 % of the neutrons** are left.
+
+*Try it*: with the WFM choppers stopped, all the neutrons of one wavelength that leave during the 2.86 ms reach the
+camera spread over 2.86 ms. Start them: two discs a distance δ apart let through only those that left within a short
+time, and the spread shrinks. Change δ and the wavelength: compare the resolution Δλ/λ and the share of neutrons kept.
 """)
-fig("odin_choppers.png", "Left: the band choppers stop one pulse in two, so the neutrons of 1 to 9 Å of a pulse reach the camera before those of the next one. Right: two neutrons of the same wavelength leaving at the start and at the end of the long pulse arrive 2.86 ms apart, and are read as different wavelengths.")
+code(r"""
+iw.odin_wfm()
+""")
 md(r"""
 Hence the three chopper settings of the twin, which you will choose yourself in the exercises:
 

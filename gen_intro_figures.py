@@ -68,10 +68,14 @@ def odin_beamline():
     ax.text(ODIN_PINHOLE, 1.02, "pinhole\n(50 m)", ha="center", va="bottom", fontsize=10.5, color=INK)
     ax.add_patch(Rectangle((ODIN_SAMPLE - 0.35, -0.4), 0.3, 0.8, color=GREY, ec=INK, zorder=3))
     ax.add_patch(Rectangle((ODIN_DET + 0.25, -0.7), 0.25, 1.4, color=TEAL, zorder=3))
-    ax.text(ODIN_SAMPLE + 0.1, 1.02, "sample (60.5 m)\nand camera", ha="center", va="bottom", fontsize=10.5, color=INK)
+    # sample and camera are 5 cm apart (drawn wider apart): one label each, with an arrow
+    ax.annotate("sample\n(60.5 m)", (ODIN_SAMPLE - 0.2, 0.42), (56.6, 1.35), ha="center", va="bottom", fontsize=10.5,
+                color=INK, arrowprops=dict(arrowstyle="-|>", color=INK, lw=1.1, shrinkA=2, shrinkB=2))
+    ax.annotate("camera\n(5 cm behind)", (ODIN_DET + 0.38, 0.72), (63.8, 1.35), ha="center", va="bottom", fontsize=10.5,
+                color=TEAL, arrowprops=dict(arrowstyle="-|>", color=TEAL, lw=1.1, shrinkA=2, shrinkB=2))
     ax.annotate("", (ODIN_SAMPLE - 0.4, -1.25), (ODIN_PINHOLE, -1.25), arrowprops=dict(arrowstyle="<->", color=INK))
     ax.text((ODIN_PINHOLE + ODIN_SAMPLE) / 2, -1.33, "L = 10.5 m", ha="center", va="top", fontsize=10.5, color=INK)
-    ax.set_xlim(-3, 64); ax.set_ylim(-1.9, 2.1)
+    ax.set_xlim(-3, 67); ax.set_ylim(-1.9, 2.4)
     ax.set_xlabel("distance from the source (m)")
     _clean(ax)
     fig.tight_layout()
