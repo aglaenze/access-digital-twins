@@ -16,6 +16,7 @@ JSON over http://127.0.0.1:<port> (local connections only):
     POST /move   {"device": value, ...}
     POST /folder {"folder": "..."}       -> files (and the student's samples) in this folder
     POST /count  {"t": 10, "title": "...", "image": false, "write": true, "folder": null}
+    POST /camera {"t": 2, "title": "...", "folder": null}     (ODIN: integrating camera, one image, no time of flight)
                  -> {"file", "number", "n_counts", ["image": detector image for live displays]}
                  write=false: no file (live image only), as a count outside a file-writing job at ESS;
                  folder: where to write the files (NICOS: the proposal folder), default the session folder
@@ -407,6 +408,11 @@ class Handler(BaseHTTPRequestHandler):
                 if args.get("image"):                          # detector image for live displays (NICOS)
                     out["image"] = INSTR.last_image.tolist()
                 return self._reply(200, out)
+            if self.path == "/camera":                     # ODIN: an image of the integrating camera (white beam)
+                if args.get("folder"):
+                    _use_folder(args["folder"])
+                f = INSTR.camera(float(args["t"]), title=args.get("title", ""), write=args.get("write", True))
+                return self._reply(200, dict(file=f, number=INSTR.number, n_counts=INSTR.last_n_counts))
             if self.path == "/scan":
                 files = INSTR.scan(args["device"], args["values"], float(args["t"]), title=args.get("title", ""))
                 return self._reply(200, dict(files=files))

@@ -104,6 +104,11 @@ class Panel:
                               value=st["choppers"], description="Choppers")
         delta = w.Dropdown(options=[0.10, 0.30, 0.45], value=st["wfm_delta"], description="WFM δ (m)")
         pinhole = w.Dropdown(options=[0.01, 0.02, 0.03, 0.04], value=st["pinhole"], description="Pinhole (m)")
+        import sample_library as sl
+        lib = sl.load("odin")
+        max_kN = max((float((lib.get(n) or {}).get("load", {}).get("max_kN", 0)) for n in samples), default=0)
+        load = w.FloatSlider(value=float(st.get("load") or 0), min=0, max=max_kN or 1, step=1, readout_format=".0f",
+                             description="Load (kN)", continuous_update=False, layout=w.Layout(width="420px"))
         t = w.BoundedFloatText(value=30, min=1, max=600, step=1, description="Time (s)")
         title = w.Text(placeholder="e.g. open beam", description="Title")
         go = w.Button(description="Count", button_style="primary", icon="play", layout=w.Layout(width="auto"))
@@ -116,6 +121,8 @@ class Panel:
                 try:
                     odin.move(sample=sample.value, shutter=shutter.value, stage_x=stage.value / 1000,
                               choppers=choppers.value, wfm_delta=delta.value, pinhole=pinhole.value)
+                    if max_kN:
+                        odin.move(load=float(load.value))
                     live = viz.LiveCount()
                     f = odin.count(float(t.value), title=title.value or "", progress=live.update)
                     live.done(f)
@@ -127,7 +134,8 @@ class Panel:
         go.on_click(count)
         return w.VBox([w.HTML("The instrument, as in NICOS: set the devices, then <i>Count</i> (one file per count, "
                               "with its title). The dark, the open beam and the sample are three counts."),
-                       sample, shutter, stage, choppers, delta, pinhole, t, title, go, out])
+                       sample, shutter, stage, choppers, delta, pinhole, *([load] if max_kN else []), t, title,
+                       go, out])
 
     # ------------------------------------------------------------------ LoKI
     def _loki_panel(self):

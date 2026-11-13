@@ -390,6 +390,11 @@ class VirtualOdin:
                            pulses_per_frame=ppf,
                            settings=self._nexus_settings() | nx.chopper_settings(state["choppers"], state["wfm_delta"]))
         self.last_n_counts = r["n_counts"]
+        if self.strains(state) is not None:          # a sample in the load frame: its force, in the file (kN)
+            import h5py
+            with h5py.File(out_file, "r+") as f:
+                d = f["entry/sample"].create_dataset("applied_force", data=float(state["load"]))
+                d.attrs["units"] = "kN"
         self._log("count", dict(t=t, title=title, file=os.path.basename(out_file), n_counts=r["n_counts"],
                                 mode=self.mode, mc_factor=round(counts["mc_factor"], 3),
                                 charge_uC=round(float(charge.sum()), 1),

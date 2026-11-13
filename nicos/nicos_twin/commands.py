@@ -26,7 +26,8 @@ from nicos.utils import printTable
 
 from nicos_twin.devices import proposal_folder
 
-__all__ = ["nexusfile_open", "start_filewriting", "stop_filewriting", "list_filewriting_jobs", "sample_info"]
+__all__ = ["nexusfile_open", "start_filewriting", "stop_filewriting", "list_filewriting_jobs", "sample_info",
+           "radiograph", "tomography"]
 
 _JOBS = []          # dicts: number, title, start, stop, files
 
@@ -153,3 +154,40 @@ def sample_info():
     for line in r["text"].splitlines():
         session.log.info("".join(ascii_.get(c, c) for c in line))
     session.log.info("drawing of the sample: %s (open it in JupyterLab)", r["png"])
+
+
+# --------------------------------------------------------------------------- ODIN: the camera of white-beam imaging
+@usercommand
+@helparglist('t[, title]')
+def radiograph(t, title=''):
+    """One image with the integrating camera of ODIN (scintillator + camera, as for white-beam radiography and
+    tomography): t seconds of exposure, no time of flight. The file (odin_NNNNNN.nxs, entry/instrument/camera/data)
+    goes to the folder of the proposal.
+
+    >>> move(choppers, 'white', shutter, 'open', stage_x, 0)
+    >>> radiograph(2, 'meteorite 0 deg')
+    """
+    folder = proposal_folder() if session.experiment.propinfo.get("proposal") else None
+    r = _twin("/camera", {"t": float(t), "title": title, "folder": folder}, timeout=float(t) + 600)
+    session.log.info("camera image: %s (%d counts)", os.path.basename(r["file"]), r["n_counts"])
+    return r["file"]
+
+
+@usercommand
+@helparglist('t[, step, title]')
+def tomography(t, step=6.0, title='tomography'):
+    """A tomography with the camera: one radiograph(t) at each angle of stage_rot from 0 to 180 degrees (excluded) in
+    steps of `step` degrees, then stage_rot back to 0. Measure first an open beam and a dark with radiograph().
+
+    >>> tomography(1, 6)          # 30 images of 1 s
+    """
+    rot = session.getDevice("stage_rot")
+    n = int(round(180.0 / float(step)))
+    files = []
+    for k in range(n):
+        a = k * float(step)
+        rot.maw(a)
+        files.append(radiograph(t, '%s rot=%g' % (title, a)))
+        session.log.info("tomography: image %d of %d", k + 1, n)
+    rot.maw(0)
+    return files

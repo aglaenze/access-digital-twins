@@ -247,11 +247,12 @@ def measurements(folder):
                 pin = float(_last(ins, "pinhole_2/horizontal_gap", 0.0))
                 n = len(ins["timepix3/data/event_id"]) if "timepix3/data/event_id" in ins else 0
                 mode, delta = _chopper_mode(ins)
+                force = e["sample/applied_force"][()] if "sample/applied_force" in e else None
         except (OSError, KeyError) as err:           # a file still being written, or not a measurement
             rows.append(dict(file=os.path.basename(path), kind="?", title=f"(not readable: {err})"))
             continue
         kind = "dark" if int(shutter) != 3 else ("open beam" if abs(x_mm) > 20 else "sample")
         rows.append(dict(file=os.path.basename(path), kind=kind, title=title, t_s=round(duration(path), 1), counts=n,
                          choppers=mode, wfm_delta_m=delta, pinhole_m=round(pin / 1e3, 4), stage_x_m=round(x_mm / 1e3, 4),
-                         stage_rot_deg=round(rot, 2)))
+                         stage_rot_deg=round(rot, 2), **({} if force is None else {"load_kN": float(force)})))
     return rows
