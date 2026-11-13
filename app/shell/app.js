@@ -213,6 +213,10 @@ function short(title) {
   return t.length > 28 ? t.slice(0, 27) + "…" : t;
 }
 
+function viewOf(dir) {
+  try { return localStorage.getItem("twin-view:" + dir) || "code"; } catch { return "code"; }
+}
+
 function level(e, k, m, i) {
   const p = m.progress || { status: "new", text: "Not started", pct: 0 };
   const label = `${catalogue.instruments[e.instrument].name} · ${short(e.title)} · ${LEVEL[k] || k}`;
@@ -221,7 +225,15 @@ function level(e, k, m, i) {
   let acts;
   if (k === "bsc" || k === "all") acts = `<button class="btn go" data-act="open" ${d}>${go}</button>`;
   // (NICOS and the sample builder are opened from the notebook itself: measuring is part of the exercise)
-  else if (k === "msc") acts = `<button class="btn go" data-act="open" ${d}>${go === "Start" ? "Open the notebook" : go}</button>`;
+  // MSc: the code shown (to read and follow the method) or hidden (the notebook looks like a page: text, widgets,
+  // plots, and a button "Analyze my files"), chosen before opening; the same notebook, the same work, either way
+  else if (k === "msc") {
+    const v = viewOf(e.dir);
+    acts = `<div class="seg" role="group" aria-label="The code of the notebook">
+        <button class="${v === "code" ? "on" : ""}" data-view="code" data-dir="${esc(e.dir)}" title="The code of each step is shown">Code shown</button>
+        <button class="${v === "clean" ? "on" : ""}" data-view="clean" data-dir="${esc(e.dir)}" title="Only the text, the widgets and the plots, as on the BSc pages">Code hidden</button></div>
+      <button class="btn go" data-act="open" ${d}>${go === "Start" ? "Open the notebook" : go}</button>`;
+  }
   else acts = `<button class="btn" data-act="sheet" data-i="${i}" data-k="${k}">Your proposal</button>
       <button class="btn go" data-act="open" data-what="analysis" ${d}>Starter notebook</button>`;
   const again = p.status === "new" ? "" :
@@ -234,11 +246,19 @@ function level(e, k, m, i) {
     <div class="acts">${acts}</div></div>`;
 }
 
+document.addEventListener("click", (ev) => {
+  const b = ev.target.closest(".seg [data-view]");
+  if (!b) return;
+  try { localStorage.setItem("twin-view:" + b.dataset.dir, b.dataset.view); } catch { /* */ }
+  b.parentElement.querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b));
+});
+
 async function act(d) {
   try {
     if (d.act === "open") {
       const r = await T.api("POST", "/twin/open", { dir: d.dir, mode: d.mode, what: d.what || "file" });
-      openTab(r.url, r.kind, d.what === "analysis" ? d.label.replace(/Beamtime$/, "Beamtime notebook") : d.label);
+      const clean = d.mode === "msc" && (d.what || "file") === "file" && viewOf(d.dir) === "clean";
+      openTab(r.url, r.kind, d.what === "analysis" ? d.label.replace(/Beamtime$/, "Beamtime notebook") : d.label, { clean });
     } else if (d.act === "file") {
       const r = await T.api("POST", "/twin/open", { file: d.file, kind: d.kind, proposal: d.proposal || "" });
       openTab(r.url, r.kind, d.label);
@@ -325,9 +345,41 @@ function activate(key) {
 }
 $("#tab-cat").onclick = () => activate("cat");
 
-function openTab(url, kind, label) {
+// the code of a notebook hidden (MSc, "Code hidden"): the code cells show only their outputs (widgets, plots), and
+// a button runs the whole notebook again on the newest files; the choice can change while the tab is open
+async function applyView(t) {
+  if (t.kind !== "notebook") return;
+  if (t.cleanCss) { await t.view.removeInsertedCSS(t.cleanCss).catch(() => {}); t.cleanCss = null; }
+  if (t.clean) {
+    t.cleanCss = await t.view.insertCSS(`.jp-CodeCell .jp-Cell-inputWrapper { display: none !important; }
+      .jp-CodeCell .jp-OutputPrompt { visibility: hidden; }`).catch(() => null);
+  }
+  t.view.executeJavaScript(`(() => {
+    let b = document.getElementById("twin-analyze");
+    if (!${t.clean}) { if (b) b.remove(); return; }
+    if (b) return;
+    b = document.createElement("button");
+    b.id = "twin-analyze"; b.textContent = "▶  Analyze my files";
+    b.title = "Runs the notebook again: your newest files, your model, your answers";
+    b.style.cssText = "position:fixed;right:24px;bottom:24px;z-index:1000;background:#0E7C70;color:#fff;border:0;" +
+      "border-radius:10px;padding:11px 18px;font:600 14px system-ui,sans-serif;box-shadow:0 4px 14px rgba(0,0,0,.2);cursor:pointer";
+    b.onclick = async () => {
+      b.disabled = true; b.textContent = "Analyzing…";
+      try { await window.jupyterapp.commands.execute("notebook:run-all-cells"); }
+      finally { b.disabled = false; b.textContent = "▶  Analyze my files"; }
+    };
+    document.body.append(b);
+  })()`).catch(() => {});
+}
+
+function openTab(url, kind, label, { clean = false } = {}) {
   const key = url.split("?")[0] + (url.includes("instrument=") ? "?" + url.split("?")[1] : "");   // (NICOS: one tab per instrument)
-  if (tabs.has(key)) { activate(key); return; }
+  if (tabs.has(key)) {
+    const t = tabs.get(key);
+    if (t.kind === "notebook" && t.clean !== clean) { t.clean = clean; applyView(t); }
+    activate(key);
+    return;
+  }
   const btn = document.createElement("button");
   btn.className = "tab";
   btn.innerHTML = `<span class="dot loading"></span><span>${esc(label)}</span><span class="x" role="button" aria-label="Close ${esc(label)}">
@@ -363,7 +415,7 @@ function openTab(url, kind, label) {
   view.addEventListener("did-stop-loading", done, { once: true });
   view.addEventListener("did-fail-load", (e) => { if (e.errorCode !== -3) { done(); toast("The page did not load: " + e.errorDescription); } });
   const path = kind === "notebook" ? decodeURIComponent(key.replace(/^\/notebooks\//, "")) : null;
-  const t = { btn, pane, view, kind, path, label };
+  const t = { btn, pane, view, kind, path, label, clean };
   if (kind === "notebook") {
     // a notebook opens already run: all its cells are executed once the kernel is ready (Notebook 7 exposes its
     // commands: exposeAppInBrowser in container/app_config/labconfig/page_config.json)
@@ -372,6 +424,7 @@ function openTab(url, kind, label) {
       view.executeJavaScript(`(() => { if (document.getElementById("twin-css")) return;
         const l = document.createElement("link"); l.id = "twin-css"; l.rel = "stylesheet";
         l.href = "${server.base}/voila/templates/twin/static/twin.css"; document.head.append(l); })()`).catch(() => {});
+      applyView(t);
       // a locked text cell stays rendered: no raw markdown on a double click or on Enter (it could not be changed anyway)
       view.executeJavaScript(`(() => { if (window.__twinKeepRendered) return; window.__twinKeepRendered = true;
         const nb = () => { const w = window.jupyterapp && window.jupyterapp.shell.currentWidget; return w && w.content; };

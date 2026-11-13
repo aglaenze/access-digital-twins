@@ -108,7 +108,12 @@ def write(rows, out):
     for r in rows:
         cols += [c for c in r if c not in cols]
     if out.lower().endswith(".xlsx"):
-        from openpyxl import Workbook
+        try:
+            from openpyxl import Workbook
+        except ImportError:
+            out = out[:-5] + ".csv"
+            print("openpyxl not installed: written as CSV (Excel opens it)")
+            return write(rows, out)
         wb = Workbook()
         ws = wb.active
         ws.title = "results"

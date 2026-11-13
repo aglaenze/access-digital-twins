@@ -88,6 +88,19 @@ def _union_boxes(volumes):
             enable_refraction=0, enable_reflection=0)
     return f
 
+def _slot(waiting):
+    """A slot for a heavy operation on a server for a class (twin_slots.py, in twin/); no limit without it."""
+    import contextlib
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    if root not in sys.path:
+        sys.path.append(root)
+    try:
+        import twin_slots
+    except ImportError:
+        return contextlib.nullcontext()
+    return twin_slots.heavy(waiting)
+
+
 
 def _with_rotation(build_sample):
     """Adds the rotation stage (vertical axis, parameter sample_rot in degrees) under the sample: the sample
@@ -306,6 +319,12 @@ class VirtualOdin:
             self.samples()
 
     def count(self, t, title="", write=True, progress=None):
+        """Measures for t seconds; returns the path of the NeXus file written (see _count). On a server for a class
+        (TWIN_HEAVY_SLOTS), waits for a free slot first: a count takes about a gigabyte of memory."""
+        with _slot(lambda: print("Waiting for the instrument: other students are counting (a few seconds)...")):
+            return self._count(t, title=title, write=write, progress=progress)
+
+    def _count(self, t, title="", write=True, progress=None):
         """Measures for t seconds; returns the path of the NeXus file written.
         write=False: the detector image only (live display), no file, as a count outside a file-writing job at ESS;
         returns None.

@@ -131,6 +131,29 @@ ODIN data are NeXus files (ESS format), reduced with the official ESS code (`odi
 (`loki/loki_reduction.py`). Each instrument has a step-by-step analysis notebook for the students:
 `odin/ODIN_analysis.ipynb` (transmission, Bragg edges) and `loki/LoKI_analysis.ipynb` (reduction, Guinier, sasmodels).
 
+## Online version for a class (no app, no account)
+
+A class can work in a browser, on a site served by one computer: a start page (class password, choice of exercise,
+no name: each student is anonymous) and the guided pages, without notebook, code or NICOS.
+
+```
+python web_class.py --password <class password>      # on the teacher's computer, in the "mcstas" environment
+```
+
+prints the public address to give to the students (a free Cloudflare quick tunnel: no account, a new address at each
+start; `cloudflared` in `~/McStas_runs/tools/` or on the PATH). The computer must stay on during the class. The same
+server runs in the container (`start.sh web`, port 7860). At most two heavy operations (a count, the reading of an
+event file: up to 4 GB of memory each) run at once (`twin_slots.py`); the others wait their turn. Tested on a
+computer with 14 threads and 32 GB: 10 students at once (5 on exercise 1, 5 on exercise 3).
+
+Before *Submit*, a box for the student's comment on the exercise. Every page opened and every submission (answers and
+attempts per question, time spent, measurements, comment) is kept in `TWIN_RUN_ROOT/web_results/` (`web_results.py`;
+also sent to a private Hugging Face dataset if `HF_TOKEN` and `TWIN_RESULTS_REPO` are set). The table of the class:
+
+```
+python web_results.py ~/McStas_runs/twin/web_results results.csv      # opens in Excel (.xlsx: with openpyxl)
+```
+
 ## Python environments
 
 | Environment | Used by | Key packages |

@@ -21,6 +21,7 @@ case "${1:-jupyter}" in
            fetch
            export JUPYTER_PATH="$HOME/twin/container/app_data"                                 # Voila template, start page
            export TWIN_WEB=1
+           export TWIN_HEAVY_SLOTS="${TWIN_HEAVY_SLOTS:-2}"                                   # twin_slots.py: memory
            export PYTHONPATH="$HOME/twin/container${PYTHONPATH:+:$PYTHONPATH}"                # web_login (class password)
            python container/web_warmup.py || echo "WARNING: warm-up failed (the first count will be slow)"
            [ $# -gt 0 ] && shift

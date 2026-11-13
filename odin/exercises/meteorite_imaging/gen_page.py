@@ -347,15 +347,15 @@ the time of each neutron; the flux is lower than in white beam. Measure, at stag
 
 | Measurement | Sample | Time (s) |
 |---|---|---|
-| 6. open beam (time of flight) | **out** | 30 |
-| 7. meteorite (time of flight) | **in** | 30 |
+| 6. open beam (time of flight) | **out** | 10 |
+| 7. meteorite (time of flight) | **in** | 10 |
 
-Each count lasts as long as on the instrument (30 s), plus the time to compute it.
+Each count lasts as long as on the instrument (10 s), plus the time to compute it: about 5 million neutrons each.
 """)
 
 code(r"""
 inout2 = w.ToggleButtons(options=[("in", 0.0), ("out", 0.5)], value=0.5, description="Sample")
-ttime = w.Dropdown(options=[30, 60], value=30, description="Time (s)")
+ttime = w.Dropdown(options=[10, 20], value=10, description="Time (s)")
 button_tof = w.Button(description="Count (time of flight)", button_style="primary", icon="play", layout=w.Layout(width="auto"))
 out_tof = w.Output()
 

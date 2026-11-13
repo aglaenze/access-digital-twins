@@ -43,7 +43,7 @@ def lock(c, all_code=False):
         c.metadata["deletable"] = False
 
 
-HIDDEN_START = ("q.", "q_.", "import submit", "nb_tools.", "import nb_tools" + chr(10) + "nb_tools.nicos(")
+HIDDEN_START = ("q.", "q_.", "import submit", "nb_tools.", "import measure_panel", "import nb_tools" + chr(10) + "nb_tools.nicos(")
 
 
 def write(cells, name, all_code_locked=False):
@@ -400,6 +400,24 @@ q_.choice("On your I(Q), where are the largest structures of the sample seen?",
 }
 
 _k0 = next(k for k, c in enumerate(msc) if c.cell_type == "code" and "exercise_hidden" in c.source) + 1
+# part 0 measured in NICOS (as at ESS) or with a panel in the notebook (measure_panel.py): the student chooses
+PART0[0] = md(r"""
+## 0. Your measurements
+
+As at ESS, the measurements are yours: nobody measures for you. Choose how:
+
+- **in NICOS**, the control software of the instrument at ESS: you type commands, one at a time, each explained below.
+  This is how you will work at a real beamtime;
+- **here, with a panel**: the same devices, set with buttons, and a *Count* button.
+
+Either way your files go to the folder of proposal 3001, and the rest of the notebook reads them. You can change
+at any time.
+""")
+PART0[1] = code('import measure_panel\nmeasure_panel.Panel("loki", proposal="3001")')
+for _c in PART0[2:]:
+    if _c.cell_type == "markdown":
+        _c.source = '<span class="twin-nicos"></span>\n\n' + _c.source
+
 msc[_k0:_k0] = [QUIZ_CELL] + PREP + PART0
 out = []
 for c in msc:

@@ -9,6 +9,7 @@ without load (λ0) and with load (λ), the lattice strain along the beam is ε =
 """
 import functools
 import os
+import sys
 
 import numpy as np
 import scipp as sc
@@ -28,6 +29,19 @@ REGIONS = {
 }
 SECTION_MM2 = {"gauge": 20.0, "upper shoulder": 40.0, "lower shoulder": 40.0}     # width × thickness (5 mm)
 
+def _slot(waiting):
+    """A slot for a heavy operation on a server for a class (twin_slots.py, in twin/); no limit without it."""
+    import contextlib
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    if root not in sys.path:
+        sys.path.append(root)
+    try:
+        import twin_slots
+    except ImportError:
+        return contextlib.nullcontext()
+    return twin_slots.heavy(waiting)
+
+
 
 def edge_model(lam, lam_edge, width, base, slope, jump):
     """Transmission around an edge: a step of height `jump` at lam_edge, smoothed by the wavelength resolution of
@@ -38,6 +52,11 @@ def edge_model(lam, lam_edge, width, base, slope, jump):
 @functools.lru_cache(maxsize=32)
 def _counts(file, mtime):
     """The neutrons of a file, read once: counts per wavelength bin in each region, the image, duration and charge."""
+    with _slot(lambda: print("Waiting: other students are reading their files (a few seconds)...")):
+        return _read_counts(file)
+
+
+def _read_counts(file):
     lam = sc.linspace("wavelength", WINDOW[0], WINDOW[1], int(round((WINDOW[1] - WINDOW[0]) / BIN)) + 1, unit="angstrom")
     da = red.events(file)
     ev = red._event_list(da)

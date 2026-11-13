@@ -44,7 +44,7 @@ def lock(c, all_code=False):
         c.metadata["deletable"] = False
 
 
-HIDDEN_START = ("q.", "q_.", "import submit", "nb_tools.", "import nb_tools" + chr(10) + "nb_tools.nicos(")
+HIDDEN_START = ("q.", "q_.", "import submit", "nb_tools.", "import measure_panel", "import nb_tools" + chr(10) + "nb_tools.nicos(")
 
 
 def write(cells, name, all_code_locked=False):
@@ -457,6 +457,25 @@ q.choice("On the plate, T ≈ 0.6 at many wavelengths. What does it mean?",
                      "edges: part 6 models them.", hints=["T is a ratio: of what to what?"], title="Q6. Transmission")
 """,
 }
+
+# part 0 measured in NICOS (as at ESS) or with a panel in the notebook (as on the BSc page): the student chooses, the
+# steps of NICOS are hidden with the panel (measure_panel.py), the files go to the folder of the proposal either way
+PART0[0] = md(r"""
+## 0. Your measurements
+
+As at ESS, the measurements are yours: nobody measures for you, and if a file is wrong (shutter forgotten, sample in
+the wrong place), you will see it in part 2 and measure again. Choose how:
+
+- **in NICOS**, the control software of the instrument at ESS: you type commands, one at a time, each explained below.
+  This is how you will work at a real beamtime;
+- **here, with a panel**: the same devices, set with buttons, and a *Count* button (as on the BSc page).
+
+Either way your files go to the folder of proposal 1234, and parts 1 to 7 read them. You can change at any time.
+""")
+PART0[1] = code('import measure_panel\nmeasure_panel.Panel("odin", proposal="1234", samples=["iron_plate"])')
+for _c in PART0[2:]:
+    if _c.cell_type == "markdown":
+        _c.source = '<span class="twin-nicos"></span>\n\n' + _c.source
 
 _k0 = next(k for k, c in enumerate(msc) if c.cell_type == "code" and "exercise_hidden" in c.source) + 1
 msc[_k0:_k0] = [QUIZ_CELL] + PREP + PART0

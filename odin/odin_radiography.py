@@ -12,11 +12,25 @@ each projection is filtered (ramp filter, |k|) and smeared back along the beam d
 """
 import functools
 import os
+import sys
 
 import h5py
 import numpy as np
 
 PIXEL_MM = 14.1 / 128          # size of a pixel of the camera image in the sample plane [mm]
+
+def _slot(waiting):
+    """A slot for a heavy operation on a server for a class (twin_slots.py, in twin/); no limit without it."""
+    import contextlib
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    if root not in sys.path:
+        sys.path.append(root)
+    try:
+        import twin_slots
+    except ImportError:
+        return contextlib.nullcontext()
+    return twin_slots.heavy(waiting)
+
 
 
 @functools.lru_cache(maxsize=512)
@@ -96,6 +110,11 @@ BIN = 0.1                      # [Å]
 
 @functools.lru_cache(maxsize=16)
 def _region_counts(file, mtime, regions):
+    with _slot(lambda: print("Waiting: other students are reading their files (a few seconds)...")):
+        return _read_region_counts(file, regions)
+
+
+def _read_region_counts(file, regions):
     import scipp as sc
     import odin_reduction as red
     lam = sc.linspace("wavelength", WINDOW[0], WINDOW[1], int(round((WINDOW[1] - WINDOW[0]) / BIN)) + 1,
