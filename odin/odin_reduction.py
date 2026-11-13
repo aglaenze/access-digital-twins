@@ -253,7 +253,12 @@ def measurements(folder):
                                      choppers=str(a.get("choppers")), pinhole_m=float(a.get("pinhole_m", 0)),
                                      stage_x_m=round(x_mm / 1e3, 4),
                                      stage_rot_deg=round(float(e["sample/rotation_angle"][()]), 2)))
-                    if ins["camera/data"].ndim == 3:     # polarized imaging: counts per wavelength (polarimetry())
+                    if "cycle_time_h" in a:                # an operando sample: the time of its cycle
+                        rows[-1]["cycle_time_h"] = float(a["cycle_time_h"])
+                    if ins["camera/data"].ndim == 3 and "spin_in" not in a:     # Timepix3, histogram mode
+                        rows[-1].update(detector="tof histogram", pixels=int(ins["camera/data"].shape[-1]),
+                                        wfm_delta_m=float(a.get("wfm_delta_m", 0)))
+                    elif ins["camera/data"].ndim == 3:     # polarized imaging: counts per wavelength (polarimetry())
                         rows[-1].update(detector="polarized", pixels=int(ins["camera/data"].shape[-1]),
                                         polarizer=str(a.get("polarizer")), spin_in=str(a.get("spin_in")),
                                         spin_out=str(a.get("spin_out")))

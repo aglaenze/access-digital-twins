@@ -338,6 +338,57 @@ class HybridModel:
         mean = gaussian_filter(mean, sigma, mode="nearest")
         return rng.poisson(mean) + rng.poisson(dark_per_s * t_exp, mean.shape)
 
+    def tof_image(self, t_exp, transmission=None, lam_edges=None, bins=128, rel_sigma=0.002, lam_abs=8.0,
+                  beam_factor=1.0, rng=None, blur_m=0.055e-3):
+        """Counts of the Timepix3 camera sorted by wavelength, without drawing the neutrons one by one (the event mode,
+        counts(), is limited to a few 10⁷ neutrons per file): for each pixel and wavelength bin, the expected number,
+        spectrum × transmission, smoothed in λ by the resolution of the chopper mode (a Gaussian of standard deviation
+        rel_sigma · λ) and in space by the L/D blur, then Poisson noise. Returns (n_lam, bins, bins), rows y."""
+        from odin_nexus import efficiency
+        from scipy.ndimage import gaussian_filter, gaussian_filter1d
+        rng = rng or np.random.default_rng()
+        lam_edges = np.linspace(2.7, 4.5, 181) if lam_edges is None else np.asarray(lam_edges, float)
+        x0, x1, y0, y1 = self.field
+        # a fine grid of λ (4 points per bin), wide enough for the smoothing
+        step = float(np.min(np.diff(lam_edges))) / 4
+        pad = 5 * rel_sigma * lam_edges[-1]
+        fine = np.arange(lam_edges[0] - pad, lam_edges[-1] + pad + step, step)
+        lamS = self.S["lam"].astype(float)
+        wl = np.histogram(lamS, np.r_[fine - step / 2, fine[-1] + step / 2],
+                          weights=self.r * efficiency(lamS, lam_abs))[0]
+        xc = x0 + (np.arange(bins) + 0.5) * (x1 - x0) / bins
+        yc = y0 + (np.arange(bins) + 0.5) * (y1 - y0) / bins
+        X, Y = (a.ravel() for a in np.meshgrid(xc, yc))
+        f = profile(self.c_f, X, Y)
+        f = f / f.sum()
+        if transmission is None:
+            Tm = np.ones((X.size, fine.size))
+        elif hasattr(transmission, "thickness"):                 # thickness maps: (pixels × materials) @ (materials × λ)
+            L = transmission.thickness(X, Y)
+            keys = list(L)
+            Lm = np.array([L[k] for k in keys]).T
+            Sm = np.array([transmission.sigma(k, fine) for k in keys])
+            Tm = np.exp(-(Lm @ Sm)) if keys else np.ones((X.size, fine.size))
+        else:
+            Tm = np.empty((X.size, fine.size))
+            for j in range(0, fine.size, 64):
+                lj = fine[j:j + 64]
+                Tm[:, j:j + 64] = transmission(np.repeat(X, lj.size), np.repeat(Y, lj.size),
+                                               np.tile(lj, X.size)).reshape(X.size, lj.size)
+        mean = (t_exp * beam_factor) * f[:, None] * wl[None, :] * Tm                  # (pixels, fine λ)
+        # resolution: a Gaussian in λ whose width grows with λ (applied with the width at the middle of the range)
+        sig_bins = rel_sigma * 0.5 * (lam_edges[0] + lam_edges[-1]) / step
+        mean = gaussian_filter1d(mean, sig_bins, axis=1, mode="nearest")
+        idx = np.digitize(fine, lam_edges) - 1
+        out = np.zeros((lam_edges.size - 1, X.size))
+        for k in range(lam_edges.size - 1):
+            out[k] = mean[:, idx == k].sum(axis=1)
+        out = out.reshape(-1, bins, bins)
+        Lp = tw.Z_SAMPLE - tw.Z_PINHOLE
+        sigma = np.hypot(tw.DET_DIST * self.D / Lp / np.sqrt(12), blur_m) / ((x1 - x0) / bins)
+        out = np.array([gaussian_filter(o, sigma, mode="nearest") for o in out])
+        return rng.poisson(out)
+
     def counts(self, t_exp, transmission=None, lam_abs=8.0, blur_m=0.1e-3, background=0.05, background_pixel=1e-3,
                beam_factor=1.0, rng=None):
         """Counts measured during t_exp: same output as odin_nexus.sample_counts (x, y, t, lam).

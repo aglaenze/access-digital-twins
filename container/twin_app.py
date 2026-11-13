@@ -56,6 +56,10 @@ QUIZ = {  # the quiz (quiz.Quiz name) of each way into an exercise, for the prog
     ("odin/exercises/meteorite_imaging", "bsc"): "odin_meteorite_bsc",
     ("odin/exercises/meteorite_imaging", "msc"): "odin_meteorite_msc",
     # an exercise with a choice of samples (variants on its card): one quiz per sample, the furthest one is shown
+    ("odin/exercises/battery_operando", "bsc"): "odin_battery_bsc",
+    ("odin/exercises/battery_operando", "msc"): "odin_battery_msc",
+    ("odin/exercises/anode_reduction", "bsc"): "odin_anode_bsc",
+    ("odin/exercises/anode_reduction", "msc"): "odin_anode_msc",
     ("odin/exercises/magnet_imaging", "bsc"): ("odin_magnet_bsc_solenoid", "odin_magnet_bsc_meteorite"),
     ("odin/exercises/magnet_imaging", "msc"): ("odin_magnet_msc_solenoid", "odin_magnet_msc_meteorite"),
     ("loki/exercises/silica_spheres", "bsc"): "loki_silica_bsc",

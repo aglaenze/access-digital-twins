@@ -17,6 +17,7 @@ JSON over http://127.0.0.1:<port> (local connections only):
     POST /folder {"folder": "..."}       -> files (and the student's samples) in this folder
     POST /count  {"t": 10, "title": "...", "image": false, "write": true, "folder": null}
     POST /camera {"t": 2, "title": "...", "folder": null}     (ODIN: integrating camera, one image, no time of flight)
+    POST /tof_histogram {"t": 3600, "title": "...", "folder": null}  (ODIN: Timepix3, counts per wavelength bin)
     POST /polarimetry {"t": 150, "title": "...", "folder": null}  (ODIN: polarized imaging, counts per wavelength)
                  -> {"file", "number", "n_counts", ["image": detector image for live displays]}
                  write=false: no file (live image only), as a count outside a file-writing job at ESS;
@@ -414,6 +415,11 @@ class Handler(BaseHTTPRequestHandler):
                     _use_folder(args["folder"])
                 f = INSTR.camera(float(args["t"]), title=args.get("title", ""), write=args.get("write", True),
                                  pixels=int(args.get("pixels", 128)))
+                return self._reply(200, dict(file=f, number=INSTR.number, n_counts=INSTR.last_n_counts))
+            if self.path == "/tof_histogram":              # ODIN: the Timepix3 in histogram mode (counts per λ bin)
+                if args.get("folder"):
+                    _use_folder(args["folder"])
+                f = INSTR.tof_image(float(args["t"]), title=args.get("title", ""), pixels=int(args.get("pixels", 128)))
                 return self._reply(200, dict(file=f, number=INSTR.number, n_counts=INSTR.last_n_counts))
             if self.path == "/polarimetry":                # ODIN: polarized imaging, the Timepix3 sorted by wavelength
                 if args.get("folder"):

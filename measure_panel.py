@@ -177,8 +177,60 @@ class Panel:
                     print("Error:", e)
             tomo.disabled = False
 
+        # the Timepix3 in histogram mode (long exposures: counts per wavelength bin), as tof_histogram() in NICOS
+        hist = w.Button(description="Histogram image (Timepix3)", icon="th-large", layout=w.Layout(width="auto"))
+
+        def histogram(_):
+            hist.disabled = True
+            with out:
+                clear_output()
+                try:
+                    settings()
+                    f = odin.tof_image(float(t.value), title=title.value or "")
+                    print(f"histogram image written in the folder of proposal {self.proposal}: {os.path.basename(f)} "
+                          f"({odin.last_n_counts:,} counts)")
+                except Exception as e:
+                    print("Error:", e)
+            hist.disabled = False
+
+        hist.on_click(histogram)
+        t.max = 4 * 3600
         cam.on_click(image)
         tomo.on_click(tomography)
+        # operando samples (a battery on its cycler): the time of the cycle, and a film of the cycle with the camera
+        operando = [n for n in samples if (lib.get(n) or {}).get("operando")]
+        op_box = []
+        if operando:
+            cyc = w.BoundedFloatText(value=float(st.get("cycle_time", 0.0)), min=0, max=55, step=0.5,
+                                     description="Cycle time (h)")
+            every = w.Dropdown(options=[("every 5 h", 5.0), ("every 2.5 h", 2.5), ("every hour", 1.0)], value=2.5,
+                               description="Film", layout=w.Layout(width="300px"))
+            film = w.Button(description="Film the cycle (camera)", icon="film", layout=w.Layout(width="auto"))
+            fbar = w.IntProgress(value=0, min=0, max=1, layout=w.Layout(width="300px"))
+
+            def film_cycle(_):
+                film.disabled = True
+                with out:
+                    clear_output()
+                    try:
+                        settings()
+                        times = [round(k * every.value, 2) for k in range(int(55 / every.value + 1e-9) + 1)]
+                        fbar.max, fbar.value = len(times), 0
+                        for tc in times:
+                            odin.move(cycle_time=float(tc))
+                            odin.camera(float(t.value), title=f"{title.value or 'cell'} {tc:g} h", pixels=cam_px.value)
+                            fbar.value += 1
+                        cyc.value = times[-1]
+                        print(f"{len(times)} camera images of {float(t.value):g} s, from 0 to {times[-1]:g} h of the cycle")
+                    except Exception as e:
+                        print("Error:", e)
+                film.disabled = False
+
+            film.on_click(film_cycle)
+            cyc.observe(lambda c: odin.move(cycle_time=float(c["new"])), "value")
+            op_box = [w.HTML("<b>Battery cycler</b>: the time since the start of the cycle (the state of the cell), "
+                             "and a film of the cycle: one camera image of the time set above at each step."),
+                      cyc, w.HBox([every, film, fbar])]
         # polarized imaging (samples with a field map): as polarimetry() and polarization_matrix() in NICOS
         magnetic = [n for n in samples if (lib.get(n) or {}).get("field")]
         pol_box = []
@@ -234,7 +286,7 @@ class Panel:
                               "imaging); one file each, with its title. <i>Run the tomography</i> takes a camera image "
                               "at each angle over 180°, of the time set above."),
                        sample, shutter, stage, choppers, delta, pinhole, *([load] if max_kN else []), t, title,
-                       w.HBox([go, cam]), cam_px, w.HBox([step, tomo, bar]), *pol_box, out])
+                       w.HBox([go, cam, hist]), cam_px, w.HBox([step, tomo, bar]), *op_box, *pol_box, out])
 
     # ------------------------------------------------------------------ LoKI
     def _loki_panel(self):

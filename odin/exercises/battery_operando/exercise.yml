@@ -1,0 +1,51 @@
+# One exercise of the catalogue of the app (read by container/twin_app.py: no generation needed).
+# Paths are relative to the root of the repository.
+title: How does lithium enter a battery electrode?
+number: "2"                  # theme 2 of ODIN: fast, operando imaging
+instrument: odin
+technique: Operando white-beam imaging
+sample: >-
+  The lithium half-cell with an ultra-thick (0.4 mm) graphite electrode of Strobl et al. (SENJU, J-PARC, 2025), on its
+  cycler
+question: >-
+  Film a battery cell during a whole charge cycle and map, through the depth of the electrode, where the lithium goes,
+  when, and how much of it is lost.
+learn: Neutron contrast of lithium, operando imaging, reference images, attenuation profiles, intercalation, SEI.
+mission: >-
+  You work for a battery maker. Thicker electrodes store more energy, but does the lithium reach their far side, and
+  how much is lost in the first cycle? Watch the lithium move inside a working cell.
+status: ready
+samples:
+  battery_graphite: {}
+modes:
+  bsc:
+    label: Guided web page
+    what: >-
+      Settings given and explained, a button to film the cycle, the profiles of lithium and a map of the cycle done for
+      you, questions. No code.
+    duration: 2 hours
+    open: voila
+    file: odin/exercises/battery_operando/ODIN_battery.ipynb
+  msc:
+    label: Notebook with method choices
+    what: >-
+      You measure in NICOS or with a panel; the files and the images are given (code shown or hidden); you choose the
+      reference image, the width averaged and the conversion of the attenuation into lithium, and compare with the
+      charge counted by the cycler.
+    duration: 3 hours
+    open: lab
+    file: odin/exercises/battery_operando/ODIN_battery_msc.ipynb
+  beamtime:
+    label: Beamtime with NICOS
+    what: >-
+      A proposal and a beamtime budget, the cell on its cycler. You drive ODIN and the cycler in NICOS, choose the
+      measurements yourself, then analyze your files with a starter notebook. No settings are given.
+    duration: 1 day
+    open: lab
+    file: odin/exercises/battery_operando/beamtime.md
+    nicos: odin
+    analysis: odin/exercises/battery_operando/ODIN_battery_beamtime.ipynb
+    proposal: {id: "1260", title: "Operando imaging of lithium in an ultra-thick graphite electrode"}
+reference: >-
+  M. Strobl, M. E. Baur et al., Adv. Energy Mater. (2025), SENJU (J-PARC); M.-E. Lăcătuşu, L. Theil Kuhn et al.,
+  arXiv:2104.03564 (2021).

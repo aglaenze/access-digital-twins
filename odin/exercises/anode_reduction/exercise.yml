@@ -1,0 +1,53 @@
+# One exercise of the catalogue of the app (read by container/twin_app.py: no generation needed).
+# Paths are relative to the root of the repository.
+title: Where has the fuel-cell anode been reduced?
+number: "4"                  # theme 4 of ODIN: phase mapping, phase transitions (Bragg edges)
+instrument: odin
+technique: Bragg-edge phase mapping
+sample: >-
+  Bars of a solid-oxide-cell anode support (NiO-YSZ) reduced to Ni, as measured by Makowska et al. (NOBORU 2015,
+  Engin-X 2016): standards, and a bar reduced under a bending load with its reference
+question: >-
+  Calibrate the Bragg edges of NiO and Ni on standards of known reduction, then map how far the NiO of a loaded bar has
+  turned into Ni, and whether the stress speeds up the reduction.
+learn: Bragg edges of two phases, edge heights and phase fractions, calibration on standards, bending stress, maps.
+mission: >-
+  You work for a company that builds stacks of solid-oxide cells. Before a stack runs, hydrogen turns the NiO of the
+  anode supports into nickel, inside the stack, under load. Does the load make the reduction uneven? Map it without
+  cutting the supports.
+status: ready
+samples:
+  anode_standards_a: {}
+  anode_standards_b: {}
+  anode_loaded_700C: {}
+modes:
+  bsc:
+    label: Guided web page
+    what: >-
+      Settings given and explained, a Count button, the edges of the standards and the calibration done for you, the
+      reduction in areas and a map, questions. No code.
+    duration: 2 hours
+    open: voila
+    file: odin/exercises/anode_reduction/ODIN_anode.ipynb
+  msc:
+    label: Notebook with method choices
+    what: >-
+      You measure in NICOS or with a panel; the files and Σ(λ) are given (code shown or hidden); you choose the edges
+      of the calibration, the method (edge heights or the whole spectrum) and the size of the cells of the map.
+    duration: 3 hours
+    open: lab
+    file: odin/exercises/anode_reduction/ODIN_anode_msc.ipynb
+  beamtime:
+    label: Beamtime with NICOS
+    what: >-
+      A proposal and a beamtime budget, three holders on the sample changer. You drive ODIN in NICOS, choose the
+      measurements yourself, then analyze your files with a starter notebook. No settings are given.
+    duration: 1 day
+    open: lab
+    file: odin/exercises/anode_reduction/beamtime.md
+    nicos: odin
+    analysis: odin/exercises/anode_reduction/ODIN_anode_beamtime.ipynb
+    proposal: {id: "1280", title: "Reduction of NiO-YSZ anode supports under load by Bragg-edge imaging"}
+reference: >-
+  M. G. Makowska, M. Strobl, E. M. Lauridsen, H. L. Frandsen, A. S. Tremsin, T. Shinohara, L. Theil Kuhn, ECS Trans.
+  68(1), 1103 (2015); M. G. Makowska et al., J. Appl. Cryst. 49, 1674 (2016).

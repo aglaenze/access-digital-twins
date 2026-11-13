@@ -27,7 +27,7 @@ from nicos.utils import printTable
 from nicos_twin.devices import proposal_folder
 
 __all__ = ["nexusfile_open", "start_filewriting", "stop_filewriting", "list_filewriting_jobs", "sample_info",
-           "radiograph", "tomography", "polarimetry", "polarization_matrix"]
+           "radiograph", "tomography", "tof_histogram", "polarimetry", "polarization_matrix"]
 
 _JOBS = []          # dicts: number, title, start, stop, files
 
@@ -170,6 +170,23 @@ def radiograph(t, title='', pixels=128):
     folder = proposal_folder() if session.experiment.propinfo.get("proposal") else None
     r = _twin("/camera", {"t": float(t), "title": title, "folder": folder, "pixels": int(pixels)}, timeout=600)
     session.log.info("camera image: %s (%d counts)", os.path.basename(r["file"]), r["n_counts"])
+    return r["file"]
+
+
+@usercommand
+@helparglist('t[, title, pixels]')
+def tof_histogram(t, title='', pixels=128):
+    """The Timepix3 camera in histogram mode: t seconds, the counts summed per pixel and per wavelength bin of 0.01 A
+    (2.7 to 4.5 A) instead of neutron by neutron, for long exposures (choppers 'wfm' or 'natural'). The file
+    (entry/instrument/camera/data: counts (wavelength, y, x); .../wavelength: the bin edges) goes to the folder of
+    the proposal.
+
+    >>> move(choppers, 'wfm', wfm_delta, 0.3, shutter, 'open', stage_x, 0)
+    >>> tof_histogram(3600, 'standards')
+    """
+    folder = proposal_folder() if session.experiment.propinfo.get("proposal") else None
+    r = _twin("/tof_histogram", {"t": float(t), "title": title, "folder": folder, "pixels": int(pixels)}, timeout=900)
+    session.log.info("histogram image: %s (%d counts)", os.path.basename(r["file"]), r["n_counts"])
     return r["file"]
 
 

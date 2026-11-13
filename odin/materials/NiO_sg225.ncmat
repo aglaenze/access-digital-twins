@@ -1,0 +1,34 @@
+NCMAT v5
+#
+# Nickel oxide NiO (bunsenite), rock-salt structure (space group 225), for the twin of ODIN (exercise "Where has the
+# fuel-cell anode been reduced?"). Not in the standard library of NCrystal: written for the twin.
+#
+# Lattice parameter at room temperature a = 4.177 A (e.g. COD 1010093; the Bragg edges NiO(200) at 4.17 A and
+# NiO(220) at 2.95 A measured by Makowska et al., ECS Trans. 68, 1103 (2015), give a = 4.17 A).
+# Lattice dynamics: Debye model, Debye temperature 500 K for both elements (assumed: values of 400 to 600 K are
+# reported for NiO). Its antiferromagnetic order (magnetic Bragg peaks, the first at d = 4.82 A, edge at 9.6 A, outside
+# the band of the exercise) is not modeled: NCrystal treats nuclear scattering only.
+#
+@CELL
+  cubic 4.177
+@SPACEGROUP
+  225
+@ATOMPOSITIONS
+  Ni 0   0   0
+  Ni 0   1/2 1/2
+  Ni 1/2 0   1/2
+  Ni 1/2 1/2 0
+  O  1/2 0   0
+  O  0   1/2 0
+  O  0   0   1/2
+  O  1/2 1/2 1/2
+@DYNINFO
+  element  Ni
+  fraction 1/2
+  type     vdosdebye
+  debye_temp 500
+@DYNINFO
+  element  O
+  fraction 1/2
+  type     vdosdebye
+  debye_temp 500

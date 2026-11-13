@@ -3,18 +3,6 @@
 # exercise.yml (and the same number); remove it from here then.
 # ODIN: seven themes covering the scope of the instrument (Strobl 2015: white-beam, Bragg-edge, diffraction-complemented,
 # dark-field and polarized imaging), each with a realistic sample, ideally one already measured.
-- number: "2"
-  title: How does lithium enter a battery electrode?
-  instrument: odin
-  technique: Fast, operando imaging
-  sample: Li-ion battery electrode during charge (graphite, LiC12, LiC6)
-  question: Follow the lithium into the graphite electrode while the battery charges, image after image.
-- number: "4"
-  title: Where has the fuel-cell anode been reduced?
-  instrument: odin
-  technique: Phase mapping, phase transitions
-  sample: Solid-oxide-cell anode support (NiO to Ni)
-  question: Map where the nickel oxide has turned into nickel, from the Bragg edges of the two phases.
 - number: "5"
   title: The crystals of an iron meteorite
   instrument: odin

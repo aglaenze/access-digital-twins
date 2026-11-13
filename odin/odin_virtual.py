@@ -140,7 +140,24 @@ def _odin_sample(spec):
         out.update(strain_per_kN=sl.odin_strain_per_kN(spec), max_kN=float(spec["load"]["max_kN"]))
     if spec.get("field"):              # a magnetic sample: its field map for polarized imaging (odin_polarized)
         out["field"] = spec["field"]
+    if spec.get("operando"):           # a sample that changes in time (a battery on its cycler): materials per state
+        op, named = spec["operando"], spec.get("materials") or {}
+        out["operando"] = dict(slices=[int(k) for k in op["slices"]],
+                               states={float(t): [named.get(m, m) for m in ms] for t, ms in op["states"].items()})
     return out
+
+
+def _operando_volumes(smp, t):
+    """The volumes of an operando sample at the time t of its cycle (the last state written at or before t)."""
+    op = smp.get("operando")
+    if not op:
+        return smp["volumes"]
+    times = sorted(op["states"])
+    key = max([x for x in times if x <= t + 1e-9] or [times[0]])
+    vols = list(smp["volumes"])
+    for k, mat in zip(op["slices"], op["states"][key]):
+        vols[k] = (mat,) + tuple(vols[k][1:])
+    return vols
 
 
 # Built-in samples: odin/samples/*.yml (sample_library). The games add their mystery plates here; the students' own
@@ -219,6 +236,8 @@ class VirtualOdin:
             Device("sample", "iron_plate", choices=tuple(SAMPLES), help="sample mounted on the stage"),
             Device("load", 0.0, "kN", limits=(0.0, MAX_LOAD),
                    help="tensile force of the load frame on the sample (samples that can be loaded only)"),
+            Device("cycle_time", 0.0, "h", limits=(0.0, 55.0),
+                   help="time since the start of the charge cycle of a battery on the cycler (operando samples)"),
             Device("polarizer", "out", choices=("out", "in"),
                    help="polarized imaging: polarizer before the sample and analyzer after it, in or out of the beam"),
             Device("spin_in", "+x", choices=("+x", "-x", "+y", "-y", "+z", "-z"),
@@ -370,7 +389,7 @@ class VirtualOdin:
                                  f"counts per file: count for at most {t * MAX_COUNTS / expected:.1f} s here "
                                  f"(or use a smaller pinhole / another chopper mode)")
             smp = self.samples()[state["sample"]]
-            T = hy.volumes_transmission(smp["volumes"], state["stage_x"], state["stage_rot"],
+            T = hy.volumes_transmission(_operando_volumes(smp, state["cycle_time"]), state["stage_x"], state["stage_rot"],
                                         strains=self.strains(state))
             draw = lambda dt: model.counts(dt, transmission=T, rng=self.rng, beam_factor=beam_factor)
             counts = self._in_slices(draw, t, progress)
@@ -435,7 +454,8 @@ class VirtualOdin:
             if self.mode != "hybrid":
                 raise ValueError("the camera is modeled in the hybrid mode only")
             smp = self.samples()[state["sample"]]
-            T = hy.volumes_transmission(smp["volumes"], state["stage_x"], state["stage_rot"], strains=self.strains(state))
+            T = hy.volumes_transmission(_operando_volumes(smp, state["cycle_time"]), state["stage_x"], state["stage_rot"],
+                                        strains=self.strains(state))
             img = self.model(state).image(t, transmission=T, beam_factor=beam_factor, rng=self.rng, bins=pixels)
         self.last_image = img.astype(np.uint32)
         self.last_n_counts = int(img.sum())
@@ -459,6 +479,8 @@ class VirtualOdin:
                     cam.attrs[k] = str(state[k])
                 cam.attrs["pinhole_m"] = float(state["pinhole"])
                 cam.attrs["wfm_delta_m"] = float(state["wfm_delta"])
+                if self.samples()[state["sample"]].get("operando"):
+                    cam.attrs["cycle_time_h"] = float(state["cycle_time"])
                 d = cam.create_dataset("data", data=self.last_image, compression="gzip")
                 d.attrs["units"] = "counts"
                 cam["x_pixel_offset"] = np.linspace(FIELD[0], FIELD[1], pixels + 1)[:-1] + (FIELD[1] - FIELD[0]) / (2 * pixels)
@@ -536,6 +558,74 @@ class VirtualOdin:
                                       pixels=pixels, n_lam=n_lam, n_counts=self.last_n_counts,
                                       charge_uC=round(float(charge.sum()), 1), state=self.status(),
                                       compute_time=round(time.time() - t0, 1)))
+        return out_file
+
+    def tof_image(self, t, title="", write=True, pixels=128, lam_range=(2.7, 4.5), lam_bin=0.01):
+        """The Timepix3 camera in histogram mode: counts per pixel and wavelength bin (lam_range, bins of lam_bin Å)
+        for t seconds, computed without drawing the neutrons one by one (HybridModel.tof_image), so that long
+        exposures stay fast. The wavelength resolution is that of the chopper mode (WFM: about 0.2 % for discs 0.30 m
+        apart; natural: about 2 %). Returns the file (NeXus, entry/instrument/camera/data: counts (wavelength, y, x),
+        entry/instrument/camera/wavelength: the bin edges [Å])."""
+        if pixels not in (64, 128):
+            raise ValueError("histogram mode pixels: 64 or 128")
+        if not 0 < t <= 4 * 3600:
+            raise ValueError("exposure between 0 and 4 hours")
+        t0 = time.time()
+        state = self.status()
+        if state["choppers"] not in ("wfm", "natural"):
+            raise ValueError("histogram mode: choppers 'wfm' or 'natural' (a white beam has no time of flight)")
+        if self.budget_s is not None and state["shutter"] == "open" and self.beam_used() + t > self.budget_s + 1e-9:
+            raise ValueError(f"beamtime exhausted: {self.budget_s - self.beam_used():.0f} s left of {self.budget_s:.0f} s")
+        rel = 0.0019 * state["wfm_delta"] / 0.30 if state["choppers"] == "wfm" else 0.02
+        edges = np.arange(lam_range[0], lam_range[1] + lam_bin / 2, lam_bin)
+        ppf = nx.PULSES_PER_FRAME[state["choppers"]]
+        charge = nx.pulse_charges(t, self.rng, fluctuation=self.fluctuation, outages=[])
+        beam_factor = charge[0::ppf].mean() / nx.Q_NOMINAL
+        smp = self.samples()[state["sample"]]
+        if state["shutter"] == "closed":
+            cube = self.rng.poisson(1e-3 * t, (edges.size - 1, pixels, pixels))
+        else:
+            if self.mode != "hybrid":
+                raise ValueError("the histogram mode is modeled in the hybrid mode only")
+            T = hy.volumes_transmission(_operando_volumes(smp, state["cycle_time"]), state["stage_x"],
+                                        state["stage_rot"], strains=self.strains(state))
+            cube = self.model(state).tof_image(t, transmission=T, lam_edges=edges, bins=pixels, rel_sigma=rel,
+                                               beam_factor=beam_factor, rng=self.rng)
+        self.last_cube = cube.astype(np.uint32)
+        self.last_image = self.last_cube.sum(axis=0)
+        self.last_n_counts = int(cube.sum())
+        out_file = None
+        if write:
+            import h5py
+            self.number += 1
+            out_file = f"{self.folder}/odin_{self.number:06d}.nxs"
+            with h5py.File(out_file, "w") as f:
+                e = f.create_group("entry")
+                e.attrs["NX_class"] = "NXentry"
+                e["title"] = title or f"run {self.number}"
+                e["start_time"] = _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="seconds")
+                e["duration"] = float(t)
+                e["sample/name"] = smp["name"]
+                e["sample/rotation_angle"] = float(state["stage_rot"])
+                e["sample/x_translation"] = float(state["stage_x"])
+                cam = e.create_group("instrument/camera")
+                cam.attrs["NX_class"] = "NXdetector"
+                cam.attrs["mode"] = "tof histogram"
+                for k in ("shutter", "choppers", "diffuser"):
+                    cam.attrs[k] = str(state[k])
+                cam.attrs["pinhole_m"] = float(state["pinhole"])
+                cam.attrs["wfm_delta_m"] = float(state["wfm_delta"])
+                d = cam.create_dataset("data", data=self.last_cube, compression="gzip")
+                d.attrs["units"] = "counts"
+                d.attrs["axes"] = "wavelength, y, x"
+                cam["wavelength"] = edges
+                cam["wavelength"].attrs["units"] = "angstrom"
+                cam["x_pixel_offset"] = np.linspace(FIELD[0], FIELD[1], pixels + 1)[:-1] + (FIELD[1] - FIELD[0]) / (2 * pixels)
+                cam["y_pixel_offset"] = np.linspace(FIELD[2], FIELD[3], pixels + 1)[:-1] + (FIELD[3] - FIELD[2]) / (2 * pixels)
+                e["instrument/source/proton_charge"] = float(charge.sum())
+        self._log("tof_image", dict(t=t, title=title, file=os.path.basename(out_file) if out_file else None,
+                                    pixels=pixels, n_counts=self.last_n_counts, charge_uC=round(float(charge.sum()), 1),
+                                    state=self.status(), compute_time=round(time.time() - t0, 1)))
         return out_file
 
     def polarization_matrix(self, t, title="", pixels=128, n_lam=16, progress=None):
