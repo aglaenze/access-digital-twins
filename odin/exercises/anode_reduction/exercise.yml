@@ -23,25 +23,19 @@ samples:
 modes:
   bsc:
     label: Guided web page
-    what: >-
-      Settings given and explained, a Count button, the edges of the standards and the calibration done for you, the
-      reduction in areas and a map, questions. No code.
+    what: Settings given, one button to count, the calibration done for you, a map and questions.
     duration: 2 hours
     open: voila
     file: odin/exercises/anode_reduction/ODIN_anode.ipynb
   msc:
     label: Notebook with method choices
-    what: >-
-      You measure in NICOS or with a panel; the files and Σ(λ) are given (code shown or hidden); you choose the edges
-      of the calibration, the method (edge heights or the whole spectrum) and the size of the cells of the map.
+    what: Choose the edges of the calibration, the method and the cells of the map.
     duration: 3 hours
     open: lab
     file: odin/exercises/anode_reduction/ODIN_anode_msc.ipynb
   beamtime:
     label: Beamtime with NICOS
-    what: >-
-      A proposal and a beamtime budget, three holders on the sample changer. You drive ODIN in NICOS, choose the
-      measurements yourself, then analyze your files with a starter notebook. No settings are given.
+    what: Drive ODIN in NICOS, choose your own measurements, analyze your files.
     duration: 1 day
     open: lab
     file: odin/exercises/anode_reduction/beamtime.md

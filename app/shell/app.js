@@ -186,12 +186,12 @@ function renderCatalogue() {
   $("#exercises").innerHTML = ex.map((e, i) => e.status === "planned"
     ? `<article class="ex planned${e.later ? " later" : ""}"><div><span class="tech">${num(e)}${esc(e.technique)} · ${e.later ? "later" : "in preparation"}</span><h3>${esc(e.title)}</h3></div>
        ${e.sample ? `<p class="smp">${esc(e.sample)}</p>` : ""}<p class="q">${esc(e.question)}</p></article>`
-    : `<article class="ex${e.kind === "introduction" ? " intro-card" : ""}"><div><span class="tech">${num(e)}${esc(e.technique)}</span><h3>${esc(e.title)}</h3></div>
-       ${e.kind === "introduction" ? `<p class="q">${esc(e.question)} Start here: it takes about ${esc((e.modes.all || {}).duration || "40 min")}.</p>` : ""}
+    : e.kind === "introduction" ? introCard(e, i)
+    : `<article class="ex"><div><span class="tech">${num(e)}${esc(e.technique)}</span><h3>${esc(e.title)}</h3></div>
        ${e.mission ? `<div class="mission">${ICON_TARGET}<span><b>Your mission.</b> ${esc(e.mission)}</span></div>` : ""}
        <div class="levels">${Object.entries(e.modes || {}).map(([k, m]) => level(e, k, m, i)).join("")}</div></article>`).join("");
   $("#exercises").querySelectorAll("[data-act]").forEach((b) => b.onclick = () => {
-    const pick = b.closest(".level") && b.closest(".level").querySelector(".variant-pick");
+    const pick = b.closest(".level, .ex") && b.closest(".level, .ex").querySelector(".variant-pick");
     act(pick ? { ...b.dataset, variant: pick.value } : b.dataset);
   });
   const free = c.free[instr];
@@ -227,9 +227,8 @@ function level(e, k, m, i) {
   // MSc: opened with its code (to read and follow the method) or without (as a BSc page: text, widgets, plots, and
   // a button "Analyze my files"); the same notebook, the same work, either way
   else if (k === "msc") {
-    const verb = go === "Start" ? "Open" : go;
-    acts = `<button class="btn go" data-act="open" data-view="code" ${d} title="The code of each step is shown (and locked)">${verb} (with code)</button>
-      <button class="btn go" data-act="open" data-view="clean" ${d} title="As a page of the BSc level: text, widgets and plots, no code">${verb} (without code)</button>`;
+    acts = `<button class="btn go" data-act="open" data-view="code" ${d} title="${go}: the code of each step is shown (and locked)">With code</button>
+      <button class="btn go" data-act="open" data-view="clean" ${d} title="${go}: as a page of the BSc level (text, widgets and plots, no code)">Without code</button>`;
   }
   else acts = `<button class="btn" data-act="sheet" data-i="${i}" data-k="${k}">Your proposal</button>
       <button class="btn go" data-act="open" data-what="analysis" ${d}>Starter notebook</button>`;
@@ -240,10 +239,26 @@ function level(e, k, m, i) {
   const variants = m.variants && k !== "beamtime" ? `<label class="variant">Sample <select class="variant-pick">${
     m.variants.map((v, n) => `<option value="${n}">${esc(v.label)}</option>`).join("")}</select></label>` : "";
   return `<div class="level"><div class="row"><span class="chip ${k}">${LEVEL[k] || k}</span><span class="dur">${esc(m.duration || "")}${again}</span></div>
-    <span class="label">${esc(m.label)}</span><span class="what">${esc(m.what)}</span>${variants}
-    <div class="prog"><div class="row"><span>${esc(p.text)}</span><b>${p.pct ? p.pct + " %" : ""}</b></div>
+    <span class="label">${esc(m.label)}</span><span class="what" title="${esc(m.what)}">${esc(m.what)}</span>
+    <div class="prog">${variants}<div class="row"><span>${esc(p.text)}</span><b>${p.pct ? p.pct + " %" : ""}</b></div>
       <div class="track"><div class="fill ${k}" style="width:${p.pct}%"></div></div></div>
     <div class="acts">${acts}</div></div>`;
+}
+
+// the introduction of an instrument: one block (title, one line, progress and the button on the right)
+function introCard(e, i) {
+  const m = (e.modes || {}).all || {};
+  const p = m.progress || { status: "new", text: "Not started", pct: 0 };
+  const label = `${catalogue.instruments[e.instrument].name} · ${short(e.title)}`;
+  const d = `data-dir="${esc(e.dir)}" data-mode="all" data-label="${esc(label)}"`;
+  const go = p.status === "new" ? "Start" : (p.status === "done" ? "Open again" : "Continue");
+  const again = p.status === "new" ? "" :
+    `<button class="again" data-act="reset" ${d} data-file="${esc(m.file || "")}" data-page="${m.open === "voila" ? 1 : 0}"
+       title="Your answers and the state of this introduction are put aside: you start from the beginning.">Start again</button>`;
+  return `<article class="ex intro-card"><div class="intro-txt"><span class="tech">${esc(e.technique)} · ${esc(m.duration || "40 min")}</span>
+      <h3>${esc(e.title)}</h3><p class="q">${esc(m.what || e.question)}</p></div>
+    <div class="intro-act"><span class="st">${esc(p.text)}${p.pct ? " · " + p.pct + " %" : ""} ${again}</span>
+      <button class="btn go" data-act="open" ${d}>${go}</button></div></article>`;
 }
 
 async function act(d) {
@@ -339,7 +354,7 @@ function activate(key) {
 }
 $("#tab-cat").onclick = () => activate("cat");
 
-// MSc "Open (without code)": the notebook shown as a page of the BSc level (clean_view.js: no header, menus or
+// MSc "Without code": the notebook shown as a page of the BSc level (clean_view.js: no header, menus or
 // toolbar, outputs only, cells not selectable, a button "Analyze my files"); the choice can change while the tab is open
 async function applyView(t) {
   if (t.kind !== "notebook" || (!t.clean && !t.cleanApplied)) return;     // with code: nothing to change

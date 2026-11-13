@@ -18,23 +18,19 @@ samples:
 modes:
   bsc:
     label: Guided web page
-    what: Settings given and explained, a Measure button, plots and questions. No code.
+    what: Settings given, one button to measure, plots and questions.
     duration: 2 hours
     open: voila
     file: odin/ODIN_virtual.ipynb
   msc:
     label: Notebook with a model builder
-    what: >-
-      You measure in NICOS (the commands are given); the reduction with the ESS software is given; you develop the model of
-      a Bragg edge with a model builder (shape, range, start values, fit: no code to write), checked automatically.
+    what: Measure in NICOS, then build the model of a Bragg edge with a model builder.
     duration: 3 hours
     open: lab
     file: odin/exercises/iron_bragg_edges/ODIN_iron_msc.ipynb
   beamtime:
     label: Beamtime with NICOS
-    what: >-
-      A proposal and a beamtime budget. You drive ODIN in NICOS, choose the measurements yourself, then analyze your
-      files with a starter notebook. No settings are given.
+    what: Drive ODIN in NICOS, choose your own measurements, analyze your files.
     duration: 1 day
     open: lab
     file: odin/exercises/iron_bragg_edges/beamtime.md

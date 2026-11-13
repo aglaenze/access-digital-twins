@@ -20,26 +20,19 @@ samples:
 modes:
   bsc:
     label: Guided web page
-    what: >-
-      Settings given and explained, a button to film the cycle, the profiles of lithium and a map of the cycle done for
-      you, questions. No code.
+    what: Settings given, one button to film the cycle, the lithium profiles and questions.
     duration: 2 hours
     open: voila
     file: odin/exercises/battery_operando/ODIN_battery.ipynb
   msc:
     label: Notebook with method choices
-    what: >-
-      You measure in NICOS or with a panel; the files and the images are given (code shown or hidden); you choose the
-      reference image, the width averaged and the conversion of the attenuation into lithium, and compare with the
-      charge counted by the cycler.
+    what: Choose the reference image, the width averaged and how to convert into lithium.
     duration: 3 hours
     open: lab
     file: odin/exercises/battery_operando/ODIN_battery_msc.ipynb
   beamtime:
     label: Beamtime with NICOS
-    what: >-
-      A proposal and a beamtime budget, the cell on its cycler. You drive ODIN and the cycler in NICOS, choose the
-      measurements yourself, then analyze your files with a starter notebook. No settings are given.
+    what: Drive ODIN and the cycler in NICOS, choose your measurements, analyze your files.
     duration: 1 day
     open: lab
     file: odin/exercises/battery_operando/beamtime.md

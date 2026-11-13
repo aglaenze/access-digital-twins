@@ -10,9 +10,7 @@ status: ready
 modes:
   all:
     label: How LoKI works
-    what: >-
-      Small angles and large objects, the scattering vector Q, the collimation, the detector banks, the time of flight,
-      and the uses of LoKI: pictures to try and questions all along. No code, no measurement.
+    what: "How LoKI works, from the source to the detectors, and what it is used for. No code."
     duration: 40 min
     open: voila
     file: loki/LoKI_intro.ipynb

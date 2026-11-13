@@ -19,24 +19,19 @@ samples:
 modes:
   bsc:
     label: Guided web page
-    what: Settings given and explained, a Count button, the edge fitted for you, a strain map, questions. No code.
+    what: Settings given, one button to count, the edge fitted for you, a strain map and questions.
     duration: 2 hours
     open: voila
     file: odin/exercises/steel_strain/ODIN_steel_strain.ipynb
   msc:
     label: Notebook with a model builder
-    what: >-
-      You measure in NICOS or with a panel; the files, the transmission and the reduction are given (code shown or
-      hidden); you build the model of the edge with a model builder (no code to write), then map the strain, find
-      Poisson's ratio and the systematic error of a textbook reference.
+    what: Build the model of the edge, map the strain, find Poisson's ratio.
     duration: 3 hours
     open: lab
     file: odin/exercises/steel_strain/ODIN_steel_msc.ipynb
   beamtime:
     label: Beamtime with NICOS
-    what: >-
-      A proposal and a beamtime budget. You drive ODIN and its load frame in NICOS, choose the measurements yourself,
-      then analyze your files with a starter notebook. No settings are given.
+    what: Drive ODIN and its load frame in NICOS, choose your measurements, analyze your files.
     duration: 1 day
     open: lab
     file: odin/exercises/steel_strain/beamtime.md

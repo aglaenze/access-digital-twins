@@ -10,9 +10,7 @@ status: ready
 modes:
   all:
     label: How ODIN works
-    what: >-
-      A picture made with neutrons, the pinhole, the time of flight, the choppers, and the uses of ODIN: pictures to
-      try and questions all along. No code, no measurement.
+    what: "How ODIN works, from the source to the camera, and what it is used for. No code."
     duration: 40 min
     open: voila
     file: odin/ODIN_intro.ipynb

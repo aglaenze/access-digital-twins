@@ -202,10 +202,22 @@ dialog form { padding: 12px 32px 24px; display: flex; justify-content: flex-end;
 #toast.on { opacity: 1; transform: translateX(-50%); }
 
 /* the introduction of an instrument: first card of the catalogue */
-.ex.intro-card { border: 2px solid var(--teal); background: var(--teal-l); }
-.ex.intro-card .levels { grid-template-columns: 1fr; }     /* one level (all): the whole width */
+/* the introduction of an instrument: one block, the text on the left, the progress and the button on the right */
+.ex.intro-card { border: 2px solid var(--teal); background: var(--teal-l); flex-direction: row; align-items: center; gap: 24px; padding: 18px 24px; }
+.intro-card .intro-txt { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.intro-card .intro-txt .q { margin-top: 4px; }
+.intro-card .intro-act { display: flex; align-items: center; gap: 14px; flex-shrink: 0; }
+.intro-card .st { font-size: 12.5px; color: var(--muted); display: flex; gap: 10px; align-items: center; }
 .chip.all { background: var(--ink3); } .fill.all { background: var(--ink3); }
 
 /* an exercise with a choice of samples: the menu on its card */
-.level .variant { display: flex; gap: 6px; align-items: center; font-size: 12px; margin: 6px 0 2px; }
+.level .variant { display: flex; gap: 6px; align-items: center; font-size: 12px; margin-bottom: 4px; min-width: 0; }
 .level .variant select { flex: 1; min-width: 0; font: inherit; padding: 2px 4px; }
+
+/* at most two lines of text in a level (the whole text in its tooltip); the buttons on one line */
+.level .what { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.level .acts { flex-wrap: nowrap; }
+.level .acts .btn { flex: 0 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* a long sample name in the menu must not widen its level */
+.level { grid-template-columns: minmax(0, 1fr); min-width: 0; }
+.level .variant select { width: 100%; text-overflow: ellipsis; }
