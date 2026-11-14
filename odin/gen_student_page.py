@@ -81,8 +81,7 @@ display(w.VBox([smp, smp_out]))
 md(r"""
 ## 1. Operate the instrument
 
-After each count, a replay shows the detector filling up neutron by neutron, as on a live display; the
-"chopper diagram" button shows the flight of the neutrons through the choppers for the selected mode.
+After each count, a replay shows the detector filling up neutron by neutron, as on a live display.
 The detector field of view is 14 mm × 14 mm. The iron plate (10 mm × 10 mm, 5 mm thick) is centered when the stage
 is at 0. The first count with a new configuration (chopper mode, pinhole, diffuser) starts a McStas simulation and
 can take a few minutes. The following ones are fast.
@@ -142,17 +141,8 @@ def do_count(_):
     button.disabled = False
     refresh_list()
 
-diag_button = w.Button(description="Show chopper diagram", icon="clock", layout=w.Layout(width="auto"))
-diag_out = w.Output()
-
-def show_diagram(_):
-    with diag_out:
-        clear_output()
-        mode, delta = chop.value
-        fig, ax = plt.subplots(figsize=(8, 5)); viz.chopper_diagram(mode, delta, ax=ax, neutrons=30_000); plt.show()
-
-button.on_click(do_count); diag_button.on_click(show_diagram)
-display(w.VBox([chop, shut, pinh, diff, stage, ttime, title, w.HBox([button, diag_button]), out, diag_out]))
+button.on_click(do_count)
+display(w.VBox([chop, shut, pinh, diff, stage, ttime, title, button, out]))
 """)
 
 md(r"""
