@@ -43,7 +43,8 @@ def sign_in():
     page opened directly), one is drawn for this visit."""
     if not web():
         return True
-    _wait_for_request()
+    if not _wait_for_request():
+        return False                  # a kernel kept in reserve, released without a student (the server stops)
     queue_banner()
     sid = (parse_qs(os.environ.get("QUERY_STRING", "")).get("sid") or [""])[0]
     sid = re.sub(r"[^a-z0-9]", "", sid.lower())[:16]
@@ -95,12 +96,13 @@ def _wait_for_request():
     """With pre-heated kernels (web_class.py --preheat), Voila runs the page before a student asks for it: wait here
     for the student's request, which brings the address (sid) into the environment. Without them: nothing to do."""
     if os.environ.get("VOILA_PREHEAT", "False") == "False":
-        return
+        return True
     try:
         from voila.utils import wait_for_request
         wait_for_request()
     except Exception:
-        pass
+        return False
+    return "QUERY_STRING" in os.environ          # set by Voila from the request of the student
 
 
 _BANNER = []

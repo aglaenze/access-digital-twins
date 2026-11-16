@@ -569,9 +569,10 @@ distribute(cells, [
     ("display(w.VBox([button_w, out_w]))", [8, 9, 10]),                   # the water, its share, the report
 ])
 insert_after_mission(cells, figure_cell(
-    "meteorite_tomography.png", "A radiograph adds up everything along the beam (left): two clasts one behind the "
-    "other make one spot. Turning the sample and taking radiographs over 180° (middle) gives back each slice by "
-    "filtered back-projection (right)."))
+    "meteorite_tomography.png", "One horizontal slice of the piece (8 mm × 2 mm), seen from above. A radiograph adds "
+    "up everything along the beam (left): two clasts one behind the other make one peak. Turning the sample and "
+    "taking radiographs over 180° (middle) gives back each slice by filtered back-projection (right). The H-rich "
+    "clasts, about 0.3 mm across, are drawn 3 times larger."))
 nb = nbf.v4.new_notebook()
 nb["cells"] = cells
 nb["metadata"]["kernelspec"] = {"name": "python3", "display_name": "Python 3", "language": "python"}

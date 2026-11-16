@@ -50,7 +50,10 @@ code(r"""
 import sys, os, warnings
 warnings.filterwarnings("ignore")
 sys.path.insert(0, os.path.abspath(".."))
-import quiz, intro_widgets as iw
+import intro_widgets as iw
+import web_user
+web_user.sign_in()            # the online version: the anonymous student of the start page (nothing to do in the app)
+import quiz
 q = quiz.Quiz("odin_intro")
 """)
 
@@ -382,7 +385,7 @@ q.report()
 """)
 
 md(r"""
-**Next.** Close this tab and open the first chapter of your thread on the map of the catalogue.
+**Next.** Close this tab and open your exercise: the first chapter of your thread on the map of the catalogue (online: the start page of the class).
 """)
 
 nb = nbf.v4.new_notebook()

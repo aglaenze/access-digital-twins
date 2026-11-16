@@ -1,59 +1,135 @@
 <!DOCTYPE html>
-{# Start page of the online version of the twins (container/start.sh web: Voila alone serves the pages behind the
-   class password, and this template replaces its list of files). The student chooses an exercise; no name is asked:
-   the browser draws an anonymous id once and keeps it (localStorage), the page gets "?sid=..." (web_user.py), so a
-   reload finds the same measurements. In the app this page is never shown (the app opens the pages itself). #}
+{# Start page of the online version of the twins (container/start.sh web, web_class.py: Voila alone serves the pages
+   behind the class password, and this template replaces its list of files). Two steps, as a game: the briefing (the
+   introduction to ODIN), then one mission (an exercise). No name is asked: the browser draws an anonymous id once and
+   keeps it (localStorage), each page gets "?sid=..." (web_user.py), so a reload finds the same measurements; the
+   pages opened are remembered in the browser to mark them. In the app this page is never shown. #}
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ESS digital twins</title>
   <style>
-    body { margin: 0; font-family: "Segoe UI", system-ui, -apple-system, sans-serif; background: #F5F7FA; color: #142033; }
-    header { background: #0B1220; color: #fff; padding: 16px 28px; font-size: 19px; font-weight: 700; }
-    main { max-width: 720px; margin: 48px auto; padding: 0 16px; }
-    .card { background: #fff; border: 1px solid #E2E7EE; border-radius: 16px; padding: 30px; }
-    h1 { margin: 0 0 6px; font-size: 26px; }
-    p { line-height: 1.55; color: #45526A; }
-    label { display: block; font-weight: 600; margin: 22px 0 6px; }
-    input[type=text] { width: 100%; box-sizing: border-box; padding: 11px 12px; font-size: 16px; border: 1px solid #CBD3DE;
-                       border-radius: 10px; }
-    .ex { display: flex; gap: 12px; align-items: flex-start; border: 1px solid #E2E7EE; border-radius: 12px; padding: 14px;
-          margin-top: 10px; }
-    .ex input { margin-top: 4px; }
-    .ex b { display: block; }
-    .ex span { color: #45526A; font-size: 14.5px; }
-    button { margin-top: 24px; background: #0E7C70; color: #fff; border: 0; border-radius: 10px; padding: 12px 22px;
-             font-size: 16px; font-weight: 600; cursor: pointer; }
-    button:hover { background: #0A5F56; }
-    .small { font-size: 13.5px; color: #7A8190; margin-top: 18px; }
+    :root { --bg: #08111F; --panel: #0F1D31; --line: #22344F; --ink: #EAF0F8; --mute: #9FB0C7; --teal: #2BB3A3;
+            --amber: #F2B544; --rust: #E07B4F; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: "Segoe UI", system-ui, -apple-system, sans-serif; color: var(--ink);
+           background: radial-gradient(1200px 600px at 80% -10%, #16365A 0%, transparent 60%),
+                       radial-gradient(900px 500px at -10% 110%, #123A3A 0%, transparent 55%), var(--bg);
+           min-height: 100vh; }
+    header { display: flex; align-items: center; gap: 12px; padding: 16px 28px; border-bottom: 1px solid var(--line);
+             font-weight: 700; letter-spacing: .3px; }
+    header .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--teal); box-shadow: 0 0 12px var(--teal); }
+    header .sub { margin-left: auto; font-weight: 500; color: var(--mute); font-size: 14px; }
+    main { max-width: 1060px; margin: 0 auto; padding: 36px 20px 60px; }
+    .hero { display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: center; margin-bottom: 30px; }
+    .badge { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px;
+             background: rgba(242,181,68,.12); color: var(--amber); font-weight: 600; font-size: 13px;
+             border: 1px solid rgba(242,181,68,.35); }
+    h1 { font-size: clamp(26px, 4vw, 38px); margin: 14px 0 10px; line-height: 1.15; }
+    .hero p { color: var(--mute); line-height: 1.6; max-width: 640px; margin: 0; font-size: 16px; }
+    .emblem { width: 150px; height: 150px; }
+    .step { display: flex; align-items: center; gap: 12px; margin: 34px 0 14px; color: var(--mute);
+            font-size: 13px; letter-spacing: 1.6px; text-transform: uppercase; font-weight: 700; }
+    .step .n { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; color: var(--bg);
+               background: var(--teal); font-size: 15px; letter-spacing: 0; }
+    .step .bar { flex: 1; height: 1px; background: var(--line); }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; }
+    .card { position: relative; background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,0)), var(--panel);
+            border: 1px solid var(--line); border-radius: 18px; padding: 22px; display: flex; flex-direction: column;
+            gap: 12px; transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease; }
+    .card:hover { transform: translateY(-3px); border-color: #35527A; box-shadow: 0 14px 34px rgba(0,0,0,.35); }
+    .card.brief { border-color: rgba(43,179,163,.45); }
+    .top { display: flex; align-items: center; gap: 14px; }
+    .icon { width: 52px; height: 52px; border-radius: 14px; display: grid; place-items: center; flex: none; }
+    .kicker { font-size: 12.5px; color: var(--mute); font-weight: 600; letter-spacing: .4px; }
+    .card h2 { margin: 2px 0 0; font-size: 19px; line-height: 1.3; }
+    .card p { margin: 0; color: var(--mute); line-height: 1.55; font-size: 14.5px; }
+    .tags { display: flex; flex-wrap: wrap; gap: 8px; }
+    .tag { font-size: 12.5px; padding: 4px 10px; border-radius: 999px; background: #15263D; color: #C6D3E4;
+           border: 1px solid var(--line); }
+    .foot { margin-top: auto; display: flex; align-items: center; gap: 12px; padding-top: 6px; }
+    .go { appearance: none; border: 0; cursor: pointer; border-radius: 12px; padding: 12px 18px; font-weight: 700;
+          font-size: 15px; color: #06141A; background: var(--teal); display: inline-flex; align-items: center; gap: 8px; }
+    .go:hover { filter: brightness(1.1); }
+    .card.mission .go { background: var(--amber); }
+    .seen { display: none; font-size: 13px; color: var(--teal); font-weight: 600; }
+    .card.opened .seen { display: inline; }
+    .time { margin-left: auto; color: var(--mute); font-size: 13px; }
+    .note { margin-top: 34px; padding: 16px 18px; border-radius: 14px; border: 1px dashed var(--line); color: var(--mute);
+            font-size: 14px; line-height: 1.55; }
+    .note b { color: var(--ink); }
+    @media (max-width: 640px) { .hero { grid-template-columns: 1fr; } .emblem { display: none; } main { padding-top: 22px; } }
   </style>
 </head>
 <body>
-  <header>ESS digital twins</header>
+  <header><span class="dot"></span> ESS digital twins <span class="sub">ODIN · neutron imaging</span></header>
   <main>
-    <div class="card">
-      <h1>Welcome to the Neutron Solutions Team</h1>
-      <p>You join a (fictional) team of the European Spallation Source as a trainee: companies and research teams bring
-        it their questions, and you answer them with a digital twin of ODIN, the neutron imaging instrument of ESS. You
-        set the instrument, measure, and analyze your own data, in this browser. Nothing to install.</p>
-      <form id="start">
-        <label>Choose your exercise</label>
-        <div class="ex"><input type="radio" name="page" id="p1" checked
-               value="odin/exercises/meteorite_imaging/ODIN_meteorite.ipynb">
-          <label for="p1" style="margin:0;font-weight:400"><b>Exercise 1 · What is hidden inside a Martian meteorite?</b>
-            <span>White-beam radiography and tomography, then the wavelength of the neutrons: find where the water is
-              hidden in the meteorite NWA 7034, without cutting it, for the Mars team. About 2 hours.</span></label></div>
-        <div class="ex"><input type="radio" name="page" id="p3"
-               value="odin/exercises/steel_strain/ODIN_steel_strain.ipynb">
-          <label for="p3" style="margin:0;font-weight:400"><b>Exercise 3 · Where is a loaded steel part strained?</b>
-            <span>Bragg-edge strain mapping: a steel specimen under load in a tensile frame, for the wind turbines of Fyrø Energy Island. About 2 hours.</span></label></div>
-        <button type="submit">Start</button>
-      </form>
-      <p class="small"><b>Anonymous:</b> no name is asked. This browser remembers your measurements and answers while
-        the session is online: come back with the same browser to continue. At the end of the page, you can leave a
-        comment on the exercise and submit your work. A page takes up to a minute to open.</p>
+    <section class="hero">
+      <div>
+        <span class="badge">★ Rank: trainee · Neutron Solutions Team</span>
+        <h1>Your first day at the European Spallation Source</h1>
+        <p>You join a (fictional) team of ESS: companies and research teams bring it their questions, and you answer
+          them with ODIN, the neutron imaging instrument, through its digital twin. You set the instrument, measure,
+          and analyze your own data, in this browser. Nothing to install.</p>
+      </div>
+      <svg class="emblem" viewBox="0 0 120 120" aria-hidden="true">
+        <defs><radialGradient id="g" cx="50%" cy="45%" r="60%"><stop offset="0" stop-color="#2BB3A3" stop-opacity=".55"/>
+          <stop offset="1" stop-color="#2BB3A3" stop-opacity="0"/></radialGradient></defs>
+        <circle cx="60" cy="60" r="56" fill="url(#g)"/>
+        <circle cx="60" cy="60" r="40" fill="none" stroke="#2BB3A3" stroke-width="2" stroke-dasharray="4 6"/>
+        <ellipse cx="60" cy="60" rx="46" ry="16" fill="none" stroke="#F2B544" stroke-width="2" transform="rotate(30 60 60)"/>
+        <ellipse cx="60" cy="60" rx="46" ry="16" fill="none" stroke="#9FB0C7" stroke-width="1.5" transform="rotate(-30 60 60)"/>
+        <circle cx="60" cy="60" r="9" fill="#EAF0F8"/>
+      </svg>
+    </section>
+
+    <div class="step"><span class="n">1</span> Briefing <span class="bar"></span></div>
+    <div class="grid">
+      <article class="card brief" data-page="odin/ODIN_intro.ipynb">
+        <div class="top">
+          <div class="icon" style="background:rgba(43,179,163,.15)">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#2BB3A3" stroke-width="2" stroke-linecap="round"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></div>
+          <div><div class="kicker">MAJA, INSTRUMENT SCIENTIST, SHOWS YOU ODIN</div><h2>Meet ODIN</h2></div>
+        </div>
+        <p>How a neutron picture differs from an X-ray one, the parts of ODIN from the source to the camera, how a
+          hole sets the sharpness, how the time of flight gives the wavelength of every neutron, how the neutrons are
+          detected, and every setting of the instrument in one table. Pictures to try and questions all along.</p>
+        <div class="tags"><span class="tag">pinhole and blur</span><span class="tag">time of flight</span><span class="tag">choppers</span><span class="tag">detection</span></div>
+        <div class="foot"><button class="go" type="button">▶ Open the briefing</button><span class="seen">✓ opened</span><span class="time">about 30–40 min</span></div>
+      </article>
     </div>
+
+    <div class="step"><span class="n">2</span> Your mission: choose one <span class="bar"></span></div>
+    <div class="grid">
+      <article class="card mission" data-page="odin/exercises/meteorite_imaging/ODIN_meteorite.ipynb">
+        <div class="top">
+          <div class="icon" style="background:rgba(224,123,79,.15)">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#E07B4F" stroke-width="2" stroke-linejoin="round"><path d="M12 3l7 4v6c0 4-3 7-7 8-4-1-7-4-7-8V7z"/><circle cx="10" cy="11" r="1.6" fill="#E07B4F"/><circle cx="14.5" cy="14" r="1.1" fill="#E07B4F"/></svg></div>
+          <div><div class="kicker">CLIENT: THE MARS TEAM</div><h2>What is hidden inside a Martian meteorite?</h2></div>
+        </div>
+        <p>A piece of NWA 7034 ("Black Beauty"), the one of Naver <i>et al.</i> (2026). Radiography and tomography
+          with neutrons: find where the water is hidden, without cutting it, and why X-rays alone miss it.</p>
+        <div class="tags"><span class="tag">radiography</span><span class="tag">tomography</span><span class="tag">hydrogen contrast</span></div>
+        <div class="foot"><button class="go" type="button">▶ Start the mission</button><span class="seen">✓ opened</span><span class="time">rest of the session</span></div>
+      </article>
+      <article class="card mission" data-page="odin/exercises/steel_strain/ODIN_steel_strain.ipynb">
+        <div class="top">
+          <div class="icon" style="background:rgba(242,181,68,.15)">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#F2B544" stroke-width="2" stroke-linecap="round"><path d="M4 12h16M4 12l3-3M4 12l3 3M20 12l-3-3M20 12l-3 3"/><rect x="9" y="8" width="6" height="8" rx="1"/></svg></div>
+          <div><div class="kicker">CLIENT: FYRØ ENERGY ISLAND</div><h2>Where is a loaded steel part strained?</h2></div>
+        </div>
+        <p>The steel specimen measured at V20 (HZB), under load in a tensile frame. Bragg-edge imaging with the time
+          of flight: map the strain of the crystal lattice, compare it with Hooke's law.</p>
+        <div class="tags"><span class="tag">Bragg edges</span><span class="tag">strain mapping</span><span class="tag">WFM choppers</span></div>
+        <div class="foot"><button class="go" type="button">▶ Start the mission</button><span class="seen">✓ opened</span><span class="time">rest of the session</span></div>
+      </article>
+    </div>
+
+    <div class="note"><b>Anonymous:</b> no name is asked. This browser remembers your measurements and answers while the
+      session is online: come back with the same browser to continue. At the end of a mission, leave a comment and
+      submit your work. A page takes a few seconds to open (up to a minute when many open at once); a measurement may
+      wait for its turn on the server: the page tells you.</div>
   </main>
   <script>
     function sid() {
@@ -66,10 +142,23 @@
       }
       return s;
     }
-    document.getElementById("start").addEventListener("submit", function (e) {
-      e.preventDefault();
-      var page = document.querySelector("input[name=page]:checked").value;
-      window.location.href = "{{ base_url }}voila/render/" + page + "?sid=" + sid();
+    function opened(page, set) {
+      try {
+        var o = JSON.parse(localStorage.getItem("twin-opened") || "{}");
+        if (set) { o[page] = 1; localStorage.setItem("twin-opened", JSON.stringify(o)); }
+        return !!o[page];
+      } catch (err) { return false; }
+    }
+    document.querySelectorAll(".card[data-page]").forEach(function (card) {
+      var page = card.getAttribute("data-page");
+      if (opened(page)) {
+        card.classList.add("opened");
+        card.querySelector(".go").textContent = "▶ Continue";
+      }
+      card.querySelector(".go").addEventListener("click", function () {
+        opened(page, true);
+        window.location.href = "{{ base_url }}voila/render/" + page + "?sid=" + sid();
+      });
     });
   </script>
 </body>

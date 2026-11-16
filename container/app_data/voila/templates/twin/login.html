@@ -7,22 +7,29 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ESS digital twins</title>
   <style>
-    body { margin: 0; font-family: "Segoe UI", system-ui, -apple-system, sans-serif; background: #F5F7FA; color: #142033; }
-    header { background: #0B1220; color: #fff; padding: 16px 28px; font-size: 19px; font-weight: 700; }
-    main { max-width: 480px; margin: 64px auto; padding: 0 16px; }
-    .card { background: #fff; border: 1px solid #E2E7EE; border-radius: 16px; padding: 30px; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: "Segoe UI", system-ui, -apple-system, sans-serif; color: #EAF0F8; min-height: 100vh;
+           background: radial-gradient(1000px 500px at 80% -10%, #16365A 0%, transparent 60%),
+                       radial-gradient(800px 450px at -10% 110%, #123A3A 0%, transparent 55%), #08111F; }
+    header { display: flex; align-items: center; gap: 12px; padding: 16px 28px; border-bottom: 1px solid #22344F;
+             font-weight: 700; }
+    header .dot { width: 10px; height: 10px; border-radius: 50%; background: #2BB3A3; box-shadow: 0 0 12px #2BB3A3; }
+    main { max-width: 460px; margin: 72px auto; padding: 0 16px; }
+    .card { background: #0F1D31; border: 1px solid #22344F; border-radius: 18px; padding: 30px; }
     h1 { margin: 0 0 6px; font-size: 24px; }
-    p { line-height: 1.55; color: #45526A; }
+    p { line-height: 1.55; color: #9FB0C7; }
     label { display: block; font-weight: 600; margin: 18px 0 6px; }
-    input[type=password] { width: 100%; box-sizing: border-box; padding: 11px 12px; font-size: 16px;
-                           border: 1px solid #CBD3DE; border-radius: 10px; }
-    button { margin-top: 20px; background: #0E7C70; color: #fff; border: 0; border-radius: 10px; padding: 12px 22px;
-             font-size: 16px; font-weight: 600; cursor: pointer; }
-    .err { color: #B42318; font-weight: 600; }
+    input[type=password] { width: 100%; padding: 12px; font-size: 16px; color: #EAF0F8; background: #0B1626;
+                           border: 1px solid #35527A; border-radius: 12px; }
+    input[type=password]:focus { outline: 2px solid #2BB3A3; border-color: #2BB3A3; }
+    button { margin-top: 20px; background: #2BB3A3; color: #06141A; border: 0; border-radius: 12px; padding: 12px 22px;
+             font-size: 16px; font-weight: 700; cursor: pointer; }
+    button:hover { filter: brightness(1.1); }
+    .err { color: #F28B7A; font-weight: 600; }
   </style>
 </head>
 <body>
-  <header>ESS digital twins</header>
+  <header><span class="dot"></span> ESS digital twins</header>
   <main>
     <div class="card">
       <h1>Welcome</h1>
