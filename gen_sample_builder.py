@@ -84,14 +84,20 @@ def part_row(box, label=PARTS[0], pct=50.0):
     rm.on_click(lambda _: setattr(box, "children", tuple(x for x in box.children if x is not r)))
     box.children = box.children + (r,)
 
-def add_odin(shape):
-    mat = w.Dropdown(options=MATS, value=MATS[0][1], layout=w.Layout(width="190px"))
+HOLDER = dict(mat=sl.ODIN_MATERIALS["aluminium"], pos=(0.0, -7.5, 0.0), size=(12.0, 5.0, 7.0))
+
+def add_odin(shape, holder=False, mat0=None, pos0=(0.0, 0.0, 0.0), size0=None):
+    # a volume of the sample; holder=True: the holder (a volume like the others, all its fields can be changed;
+    # told apart in the description and the drawing, it carries no load)
+    mat = w.Dropdown(options=MATS, value=mat0 or MATS[0][1], layout=w.Layout(width="190px"))
     dens = w.BoundedFloatText(value=100.0, min=5, max=100, step=1, description="density %", layout=w.Layout(width="150px"),
                               style={"description_width": "70px"})
-    pos = [small(d, 0.0) for d in ("x [mm]", "y [mm]", "z [mm]")]
-    size = [small(d, v) for d, v in SIZES[shape]]
+    pos = [small(d, v) for d, v in zip(("x [mm]", "y [mm]", "z [mm]"), pos0)]
+    size = [small(d, v if size0 is None else size0[k]) for k, (d, v) in enumerate(SIZES[shape])]
     rm = w.Button(description="", icon="trash", tooltip="remove", layout=w.Layout(width="44px"))
-    line = w.HBox([w.HTML(f"<b style='display:inline-block;width:64px'>{LABEL[shape]}</b>"), mat, dens] + pos + size + [rm],
+    tag = (f"<b style='display:inline-block;width:64px;color:#64748B'>Holder</b>" if holder else
+           f"<b style='display:inline-block;width:64px'>{LABEL[shape]}</b>")
+    line = w.HBox([w.HTML(tag), mat, dens] + pos + size + [rm],
                   layout=w.Layout(flex_flow="row wrap", align_items="center"))
     # the mixture: its components (shown when "Mixture of minerals…" is chosen)
     parts = w.VBox()
@@ -111,6 +117,7 @@ def add_odin(shape):
     mat.observe(lambda c: setattr(mix.layout, "display", "" if c["new"] == MIX else "none"), "value")
     row = w.VBox([line, mix])
     row.shape, row.mat, row.dens, row.pos, row.size, row.parts = shape, mat, dens, pos, size, parts
+    row.holder = holder
     rm.on_click(lambda _: setattr(odin_items, "children", tuple(r for r in odin_items.children if r is not row)))
     odin_items.children = odin_items.children + (row,)
 
@@ -130,20 +137,29 @@ def odin_spec():
         else:
             material = sl.odin_material(r.mat.value, r.dens.value)
         vols.append(dict(material=material, center_mm=[p.value for p in r.pos], size_mm=size,
-                         **({"shape": r.shape} if r.shape != "box" else {})))
+                         **({"shape": r.shape} if r.shape != "box" else {}), **({"holder": True} if r.holder else {})))
     return dict(name=title.value or name.value, description=description.value, volumes=vols,
                 **({"materials": named} if named else {}))
 
 add_odin("box")
+# every sample stands on a holder: an aluminium base under it, proposed by default; change it (material, size,
+# position: move it if you change the sample) or remove it
+add_odin("box", holder=True, mat0=HOLDER["mat"], pos0=HOLDER["pos"], size0=HOLDER["size"])
 odin_buttons = [w.Button(description=f"Add a {LABEL[s].lower()}", icon="plus", layout=w.Layout(width="auto")) for s in SIZES]
 for b, s in zip(odin_buttons, SIZES):
     b.on_click(lambda _, s=s: add_odin(s))
+holder_button = w.Button(description="Add a holder", icon="plus", layout=w.Layout(width="auto"))
+holder_button.on_click(lambda _: add_odin("box", holder=True, mat0=HOLDER["mat"], pos0=HOLDER["pos"],
+                                          size0=HOLDER["size"]))
+odin_buttons.append(holder_button)
 odin_box = w.VBox([w.HTML("As many volumes as you want, each of one crystalline material or of a mixture (a rock, a "
                           "wet material: choose <i>Mixture of minerals…</i>, start from a model and change its "
                           "components); the density is in % of that of the compact material (less with pores). The "
                           "volumes must not overlap. x is horizontal, y vertical (mm, from the center of the beam), z "
                           "along the beam; cylinders stand vertically (the axis of the rotation stage). The camera sees "
-                          "14 mm × 14 mm."),
+                          "14 mm × 14 mm. The <b>holder</b> (an aluminium base under the sample, proposed by "
+                          "default) is a volume like the others: change its material, size and position (move it if "
+                          "you change your sample: it must touch it without overlapping), or remove it."),
                    odin_items, w.HBox(odin_buttons)])
 
 # ---------------------------------------------------------------- LoKI: kinds of particles in a solvent

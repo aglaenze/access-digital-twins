@@ -3,6 +3,8 @@ address (a Cloudflare "quick tunnel": no account, the address changes at each st
 
     python web_class.py --password <class password>                  # in the "mcstas" environment
     python web_class.py --password <class password> --no-tunnel      # this computer / local network only
+    python web_class.py --password <class password> --preheat odin/exercises/meteorite_imaging/ODIN_meteorite.ipynb                         odin/exercises/steel_strain/ODIN_steel_strain.ipynb --pool 3
+                        # pages of the class opened faster: kernels kept ready, their modules already loaded
 
 The same server as the container (container/start.sh web): Voila alone serves the start page and the guided pages
 (no notebook, no code, no NICOS), behind the class password, each student anonymous (web_user.py). It prints the
@@ -16,6 +18,7 @@ cloudflared (the tunnel) is looked for on the PATH, then in ~/McStas_runs/tools/
 https://github.com/cloudflare/cloudflared/releases (one executable).
 """
 import argparse
+import json
 import os
 import re
 import shutil
@@ -48,6 +51,11 @@ def main():
     ap.add_argument("--port", type=int, default=7860)
     ap.add_argument("--no-tunnel", action="store_true", help="no public address")
     ap.add_argument("--no-warmup", action="store_true", help="do not prepare the beams first")
+    ap.add_argument("--preheat", nargs="*", default=[], metavar="PAGE",
+                    help="pages (paths below twin/) for which Voila keeps kernels ready, their modules loaded, so "
+                         "that they open faster (the page waits for the student in web_user.sign_in)")
+    ap.add_argument("--pool", type=int, default=2, help="kernels kept ready for each page of --preheat (default 2; "
+                                                        "about 0.5 GB of memory each)")
     a = ap.parse_args()
 
     env = dict(os.environ, TWIN_WEB="1", PYTHONIOENCODING="utf-8", TWIN_HEAVY_SLOTS=os.environ.get("TWIN_HEAVY_SLOTS", "2"),
@@ -57,11 +65,28 @@ def main():
     if not a.no_warmup:
         print("Preparing the beams (a few seconds, or minutes the very first time)...")
         subprocess.run([sys.executable, os.path.join(HERE, "container", "web_warmup.py")], env=env, check=False)
+    extra = []
+    if a.preheat:
+        # pre-heated kernels for the pages of the class only (none for the others): a configuration file, read by
+        # Voila from the folder given; pools named by the path of the page with "/" (container/voila_launch.py)
+        pools = {"default": {"pool_size": 0}}
+        for page in a.preheat:
+            page = page.replace("\\", "/").strip("/")
+            if not os.path.isfile(os.path.join(HERE, page)):
+                sys.exit(f"--preheat: no page {page}")
+            pools[page] = {"pool_size": a.pool}
+        cfg_dir = os.path.join(run_root(), "voila_config")
+        os.makedirs(cfg_dir, exist_ok=True)
+        with open(os.path.join(cfg_dir, "voila.json"), "w", encoding="utf-8") as f:
+            json.dump({"VoilaConfiguration": {"preheat_kernel": True, "default_pool_size": 0},
+                       "VoilaKernelManager": {"kernel_pools_config": pools}}, f, indent=1)
+        extra = [f"--Voila.config_file_paths=['{cfg_dir.replace(os.sep, '/')}']"]
+        print(f"Pre-heated kernels: {a.pool} for each of {len(a.preheat)} page(s)")
     voila = subprocess.Popen(
-        [sys.executable, "-m", "voila", "--no-browser", "--Voila.ip=0.0.0.0", f"--port={a.port}", "--template=twin",
+        [sys.executable, os.path.join(HERE, "container", "voila_launch.py"), "--no-browser", "--Voila.ip=0.0.0.0", f"--port={a.port}", "--template=twin",
          f"--Voila.root_dir={HERE}", "--Voila.tornado_settings={'websocket_ping_interval': 30000}",
          "--MappingKernelManager.cull_idle_timeout=7200", "--MappingKernelManager.cull_interval=300",
-         f"--token={a.password}", "--Voila.identity_provider_class=web_login.ClassPassword"],
+         f"--token={a.password}", "--Voila.identity_provider_class=web_login.ClassPassword"] + extra,
         env=env, cwd=HERE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8",
         errors="replace")
     log = open(os.path.join(run_root(), "web_class.log"), "a", encoding="utf-8")

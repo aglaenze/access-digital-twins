@@ -47,6 +47,11 @@ FOV = 0.016                      # [m] McStas detector window, slightly larger t
 # Largest number of counts per file (memory: ~40 bytes per count while writing). The open beam gives ~1·10⁶ counts/s
 # in WFM mode but ~2·10⁷ counts/s in white mode. (A real Timepix3 camera would saturate at such rates; not modeled.)
 MAX_COUNTS = 5e7
+# Count rate above which a real Timepix3 camera loses neutrons (approximate): the chip reads about 80 million pixel
+# hits per second (40 Mhits/s/cm², 2 cm²) and each neutron lights a cluster of about ten pixels through the
+# scintillator and the intensifier: a few million neutrons per second at most. The losses are not modeled: the twin
+# warns instead.
+TPX_MAX_RATE = 5e6               # [neutrons/s in the field of view]
 MAX_LOAD = 50.0            # [kN] capacity of the load frame; each sample has its own limit (load: max_kN)
 # Precomputed upstream parts (odin_mcstas.front): (mode, δ) -> (δ in the folder name, neutrons).
 # δ only matters in WFM mode (the other modes were computed with δ = 0.30, which has no effect without WFM choppers).
@@ -424,6 +429,12 @@ class VirtualOdin:
         if counts["mc_factor"] > 1.2:
             print(f"Warning: counting time too long for the statistics of the simulation; the Poisson error bars are "
                   f"underestimated by a factor {counts['mc_factor']:.2f}.")
+        rate = len(counts["x"]) / max(t, 1e-9)
+        if rate > TPX_MAX_RATE:
+            print(f"Warning: about {rate / 1e6:.0f} million neutrons per second reach the camera. A real Timepix3 "
+                  f"camera loses neutrons above a few million per second (each neutron lights a cluster of pixels, "
+                  f"the chip reads about 80 million pixel hits per second); the twin does not model this loss. "
+                  f"Close the pinhole or use the choppers (natural or WFM mode) for a realistic rate.")
         # Detector image of this measurement (128 × 128 pixels of 110 µm), for live displays (NICOS, page)
         self.last_image = np.histogram2d(counts["y"], counts["x"], bins=128,
                                          range=[FIELD[2:], FIELD[:2]])[0].astype(np.uint32)

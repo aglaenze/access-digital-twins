@@ -15,6 +15,7 @@ import datetime
 import json
 import os
 import sys
+import time
 
 import ipywidgets as w
 from IPython.display import clear_output, display
@@ -253,8 +254,16 @@ class Panel:
                     settings()
                     angles = [k * step.value for k in range(int(round(180 / step.value)))]
                     bar.max, bar.value, bar.layout.display = len(angles), 0, ""
+                    bar.style.description_width = "initial"
+                    t_start = time.time()
+
+                    def advance(k, n, f):
+                        bar.value = k
+                        el = time.time() - t_start
+                        fmt = lambda s: f"{int(s // 60)} min {int(s % 60):02d} s" if s >= 60 else f"{int(s)} s"
+                        bar.description = f"{k}/{n}" + (f" · {fmt(el / k * (n - k))} left" if 0 < k < n else "")
                     files = odin.tomography(angles, float(t.value), title=title.value or "tomography",
-                                            progress=lambda k, n, f: setattr(bar, "value", k), pixels=cam_px.value)
+                                            progress=advance, pixels=cam_px.value)
                     odin.move(stage_rot=0.0)
                     print(f"{len(files)} images of {float(t.value):g} s written ({os.path.basename(files[0])} to "
                           f"{os.path.basename(files[-1])})")

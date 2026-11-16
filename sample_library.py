@@ -241,8 +241,8 @@ def validate(instrument, spec):
     errors = []
     if instrument == "odin":
         vols = spec.get("volumes") or []
-        if not vols:
-            errors.append("at least one volume (block, sphere or cylinder) is needed")
+        if not [v for v in vols if not v.get("holder")]:
+            errors.append("at least one volume (block, sphere or cylinder) is needed, besides the holder")
         boxes = []
         for k, v in enumerate(vols):
             shape = v.get("shape", "box")

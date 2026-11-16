@@ -60,16 +60,18 @@ code(r"""
 import sys, os, json, warnings
 warnings.filterwarnings("ignore")
 sys.path[:0] = [os.path.abspath("../../.."), os.path.abspath("../..")]     # twin/ and twin/odin/
-import web_user
-web_user.sign_in()            # the online version: the anonymous student of the start page (nothing to do in the app)
 import numpy as np
 import matplotlib.pyplot as plt
 import ipywidgets as w
 from IPython.display import display, clear_output
 from odin_virtual import VirtualOdin
 import odin_radiography as tomo
+import odin_viz as viz
 import live_view
 from page_output import into
+import web_user
+web_user.sign_in()            # the online version: the anonymous student of the start page (nothing to do in the app;
+                              # with pre-heated kernels the modules above are loaded before the student arrives)
 import quiz
 q = quiz.Quiz("odin_meteorite_bsc")      # the questions, along the page
 
@@ -297,7 +299,7 @@ took 1125 images of 4 minutes at ICON (75 hours), with pixels of 6.2 µm.
 
 code(r"""
 button_tomo = w.Button(description="Run the tomography", button_style="primary", icon="sync", layout=w.Layout(width="auto"))
-bar = w.IntProgress(value=0, min=0, max=60, description="Images", layout=w.Layout(width="420px"))
+bar = viz.Progress(60, "Images")            # images done, time elapsed, time left
 out_tomo = w.Output()
 REC = {}
 
@@ -310,11 +312,11 @@ def run_tomo(_):
             refresh_list()
             _, O, D = chosen()
             angles = np.arange(0, 180, 3.0)
-            bar.max, bar.value = len(angles), 0
+            bar.start(len(angles))
             px, Dp = SETUPS["high resolution"]
             odin.move(choppers="white", pinhole=Dp, diffuser="in", shutter="open", stage_x=0.0, sample=SAMPLE)
             files = odin.tomography(angles, 300.0, title="tomography", pixels=px,
-                                    progress=lambda k, n, f: setattr(bar, "value", k))
+                                    progress=bar.update)
             odin.move(stage_rot=0.0)
             print("Filtering the projections...")
             REC["rec"] = tomo.Reconstruction(files, O, D)
@@ -328,7 +330,7 @@ def run_tomo(_):
     refresh_list()
 
 button_tomo.on_click(run_tomo)
-display(w.VBox([button_tomo, bar, out_tomo]))
+display(w.VBox([button_tomo, bar.box, out_tomo]))
 """)
 
 md(r"""

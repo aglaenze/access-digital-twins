@@ -289,8 +289,11 @@ neutrons per pixel: much longer exposures.
 
 The pixel size is **your choice** among these settings of the cameras; the field of view, the distance from the
 sample to the camera and the efficiency are **fixed** in the twin. The real ODIN has more detectors and optics to
-choose from (larger fields, other pixels). *Limit of the twin*: a real Timepix3 camera loses neutrons when too many
-arrive at once (in the white beam); the twin does not.
+choose from (larger fields, other pixels). *Limits of the twin*: a real Timepix3 camera loses neutrons above a few
+million per second (in the white beam with a large pinhole); the twin does not lose them, it warns you. And the
+neutrons **scattered** by the sample that still reach the camera, 5 cm behind it, are left out: on the real
+instrument they add a faint halo, which matters for thick samples rich in hydrogen (water, plastics) and makes their
+transmission look a little higher.
 """)
 
 code(r"""

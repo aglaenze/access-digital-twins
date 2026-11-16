@@ -53,8 +53,6 @@ code(r"""
 import sys, os, json, warnings
 warnings.filterwarnings("ignore")
 sys.path[:0] = [os.path.abspath("../../.."), os.path.abspath("../..")]     # twin/ and twin/odin/
-import web_user
-web_user.sign_in()            # the online version: the anonymous student of the start page (nothing to do in the app)
 import numpy as np
 import matplotlib.pyplot as plt
 import ipywidgets as w
@@ -64,6 +62,9 @@ import odin_viz as viz, odin_phases as ph, odin_mcstas as tw
 import sample_library as sl
 import live_view
 from page_output import into
+import web_user
+web_user.sign_in()            # the online version: the anonymous student of the start page (nothing to do in the app;
+                              # with pre-heated kernels the modules above are loaded before the student arrives)
 import quiz
 q = quiz.Quiz("odin_anode_bsc")          # the questions, along the page
 

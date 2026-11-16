@@ -25,10 +25,10 @@ jobs:
         run: |
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
           df -h /
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
+      - uses: actions/checkout@v5
+      - uses: docker/setup-buildx-action@v4
       - name: Build kafka-to-nexus
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: filewriter/Containerfile
@@ -50,7 +50,7 @@ jobs:
           docker push "ghcr.io/${{ github.repository }}-filewriter:latest"
       # Steps 2 to 4: the twin's streams written by the file-writer, compared with the twin's own file (ODIN, LoKI).
       # A Kafka broker and kafka-to-nexus on the runner; filewriter/e2e_test.py plays the twin and NICOS.
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       # kafka-to-nexus logs only to syslog: /dev/log of the runner (journald) is given to its container

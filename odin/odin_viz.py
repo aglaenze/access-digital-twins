@@ -133,6 +133,38 @@ def tomo_frames(sino, angles_deg, xs_mm, steps=None, order="sequential"):
 
 
 # --------------------------------------------------------------------------- players (pages)
+class Progress:
+    """The progress of a series of images (a tomography): a bar, and beside it how many images are done, the time
+    elapsed and an estimate of the time left (from the mean time per image so far).
+
+        p = Progress(60, "Images")
+        display(p.box)
+        odin.tomography(angles, 300, progress=p.update)
+    """
+
+    def __init__(self, n=1, description="Images", width="420px"):
+        import ipywidgets as w
+        self.bar = w.IntProgress(value=0, min=0, max=n, description=description, layout=w.Layout(width=width))
+        self.text = w.HTML("")
+        self.box = w.HBox([self.bar, self.text], layout=w.Layout(align_items="center", gap="12px"))
+        self.t0 = None
+
+    def start(self, n):
+        import time
+        self.bar.max, self.bar.value, self.t0 = n, 0, time.time()
+        self.text.value = f"0 / {n} · starting…"
+
+    def update(self, k, n, _file=None):
+        import time
+        if self.t0 is None:
+            self.start(n)
+        self.bar.max, self.bar.value = n, k
+        el = time.time() - self.t0
+        fmt = lambda s: f"{int(s // 60)} min {int(s % 60):02d} s" if s >= 60 else f"{int(s)} s"
+        left = f" · about {fmt(el / k * (n - k))} left" if 0 < k < n else (" · done" if k >= n else "")
+        self.text.value = f"{k} / {n} · {fmt(el)} elapsed{left}"
+
+
 class LiveCount:
     """The detector image and the spectrum of arrival times, filling up during a count (VirtualOdin.count(...,
     progress=live.update)), as on the instrument; then the replay of the measurement (show_live) below them."""

@@ -93,8 +93,6 @@ SETUP = r"""
 import sys, os, json, warnings
 warnings.filterwarnings("ignore")
 sys.path[:0] = [os.path.abspath("../../.."), os.path.abspath("../..")]     # twin/ and twin/odin/
-import web_user
-web_user.sign_in()            # the online version: the anonymous student of the start page (nothing to do in the app)
 import numpy as np
 import matplotlib.pyplot as plt
 import ipywidgets as w
@@ -103,6 +101,9 @@ from odin_virtual import VirtualOdin
 import odin_polarized as pol
 import live_view
 from page_output import into
+import web_user
+web_user.sign_in()            # the online version: the anonymous student of the start page (nothing to do in the app;
+                              # with pre-heated kernels the modules above are loaded before the student arrives)
 import quiz
 q = quiz.Quiz("@@QUIZ@@")      # the questions, along the page
 
@@ -222,10 +223,11 @@ def measure_matrix(_):
         clear_output()
         try:
             _prepare(0.0, rot.value)
-            prog = w.IntProgress(min=0, max=18, description="images")
-            display(prog)
+            import odin_viz
+            prog = odin_viz.Progress(18, "images")      # images done, time elapsed, time left
+            display(prog.box)
             odin.polarization_matrix(float(expo.value), title=f"{SAMPLE} {rot.value:g} deg",
-                                     progress=lambda k, n, f: setattr(prog, "value", k))
+                                     progress=prog.update)
             print(f"18 images of {expo.value} s: {18 * expo.value / 60:.0f} minutes of beam. Parts 3 to 5 now use them.")
             refresh_all()
         except Exception as e:

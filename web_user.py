@@ -43,6 +43,8 @@ def sign_in():
     page opened directly), one is drawn for this visit."""
     if not web():
         return True
+    _wait_for_request()
+    queue_banner()
     sid = (parse_qs(os.environ.get("QUERY_STRING", "")).get("sid") or [""])[0]
     sid = re.sub(r"[^a-z0-9]", "", sid.lower())[:16]
     known = len(sid) >= 6
@@ -87,3 +89,48 @@ def opened(page_part):
         if page_part in page:
             return t
     return None
+
+
+def _wait_for_request():
+    """With pre-heated kernels (web_class.py --preheat), Voila runs the page before a student asks for it: wait here
+    for the student's request, which brings the address (sid) into the environment. Without them: nothing to do."""
+    if os.environ.get("VOILA_PREHEAT", "False") == "False":
+        return
+    try:
+        from voila.utils import wait_for_request
+        wait_for_request()
+    except Exception:
+        pass
+
+
+_BANNER = []
+
+
+def queue_banner():
+    """A banner at the bottom right of the page while a measurement waits for its turn on the server (twin_slots.py:
+    a few heavy operations at once, first come, first served): how many are before it and about how long."""
+    if _BANNER:
+        return _BANNER[0]
+    try:
+        import ipywidgets as w
+        from IPython.display import display
+        import twin_slots
+    except ImportError:
+        return None
+    style = ("position:fixed;right:18px;bottom:18px;z-index:1000;max-width:340px;padding:12px 16px;border-radius:10px;"
+             "background:#0F1D31;color:#F8FAFC;box-shadow:0 6px 24px rgba(0,0,0,.25);font:14px/1.4 system-ui,sans-serif")
+    banner = w.HTML("")
+
+    def show(state):
+        if state is None:
+            banner.value = ""
+            return
+        ahead, m = state["ahead"], max(1, round(state["wait_s"] / 60))
+        who = "1 measurement" if ahead == 1 else f"{ahead} measurements"
+        banner.value = (f"<div style='{style}'><b>Your measurement is in line.</b><br>{who} before yours (the server "
+                        f"runs {state['slots']} at a time): about {m} min. It starts by itself, keep the page "
+                        f"open.</div>")
+    twin_slots.listen(show)
+    display(banner)
+    _BANNER.append(banner)
+    return banner
