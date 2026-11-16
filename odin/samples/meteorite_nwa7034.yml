@@ -3,7 +3,7 @@ name: Martian meteorite NWA 7034 (piece of 12 × 8 × 2 mm)
 description: 'A flat piece of the Martian meteorite NWA 7034 ("Black Beauty"), 12 mm high, 8 mm wide and 2 mm thick, standing
   on the rotation stage (its 2 mm thickness along the beam at 0°): the piece studied by Naver et al. (2026). A breccia: feldspar
   grains, Fe-Ti oxides and lithic clasts in a fine-grained matrix; some clasts hold hydrogen (iron oxyhydroxides), which neutrons
-  see very well.'
+  see very well. It is glued on an aluminium pin (3 mm in diameter) on the axis of the rotation stage.'
 formula: matrix (plagioclase, pyroxenes, Fe oxides, apatite); feldspar, Fe-Ti oxides; H in Fe-oxyhydroxides
 hidden:
 - inclusions
@@ -19,6 +19,7 @@ materials:
   H-rich Fe-oxyhydroxide: phases<0.5779*solid::Fe618O1211Ti83Na10Ca10Al30Si50/4.533gcm3&0.4221*stdlib::LiquidWaterH2O_T293.6K.ncmat>
   feldspar: solid::Na14Ca10Al34Si61O188/2.679gcm3
   Fe-Ti oxide: solid::Fe50O83Ti10/5.000gcm3
+  aluminium: Al_sg225.ncmat
 volumes:
 - material: matrix
   center_mm:
@@ -25565,3 +25566,14 @@ volumes:
   - 0.0725
   - 0.0672
   - 144.0
+- material: aluminium
+  shape: cylinder
+  center_mm:
+  - 0
+  - -9.0
+  - 0
+  size_mm:
+  - 3.0
+  - 6.0
+  - 3.0
+  holder: true

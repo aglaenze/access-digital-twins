@@ -42,7 +42,9 @@ by hand: read, try the pictures, answer the questions. About 40 minutes.
 3. the parts of LoKI, from the source to the detectors;
 4. what the collimation and the detector distance change;
 5. how LoKI knows the wavelength of each neutron;
-6. which exercises of the catalogue use which capability.
+6. how the neutrons are detected;
+7. which exercises of the catalogue use which capability;
+8. everything that sets the instrument, in one table: what you choose, what is fixed.
 """)
 
 code(r"""
@@ -212,7 +214,46 @@ q.number("A 3 Å neutron reaches the rear bank after 22 ms, an 11.5 Å neutron a
 """)
 
 md(r"""
-## 6. A measurement on LoKI, and what it is used for
+## 6. Detecting the neutrons
+
+A neutron has no electric charge: it is detected by what it does when it is absorbed. LoKI's detectors are **straw
+tubes**: thin tubes (straws) coated inside with **boron-10**, filled with gas, a wire along their axis. A neutron
+absorbed by the boron gives two charged particles that ionize the gas: an electric pulse on the wire. Which straw
+gives one coordinate; the share of the pulse that reaches each end of the wire gives the position along it.
+
+- A **tube** (28.4 mm) holds **7 straws**, and each bank has 4 layers of tubes, offset from one another: in the twin a
+  **pixel** is about **4 mm × 4 mm** (4.1 mm across the straws, 4 mm along them).
+- Each detected neutron is an **event**: its pixel and its arrival time. The pixel gives the angle $2\theta$, the time
+  gives the wavelength (part 5), and both give $Q$ (part 2).
+- The **beam stop**, a 7 cm × 7 cm absorber just in front of the rear bank, takes the direct beam: far too intense for
+  the detector, and it carries no scattering. It sets the smallest angle measured.
+- Two **beam monitors** count a small share (1 in 1000) of the beam: **m1**, 8.4 m before the sample, the neutrons
+  sent; **m3**, 0.2 m after the sample, in the direct beam, those that went through: the **transmission**. They give
+  $I(Q)$ in absolute units.
+
+The pixel size is set by the detectors as built: you do not choose it. What you choose is **where** the rear bank is:
+the same 4 mm seen from 10 m is half the angle it is from 5 m, so a finer step in $Q$ and smaller $Q$ reached
+(question Q3). *Limits of the twin*: every neutron that reaches a straw is counted (the real straws do not detect all of them); a file
+keeps a random share of the events (written in the file), the same for the detectors and the monitors, so that it stays
+small; $I(Q)$ is unchanged, only its noise.
+""")
+
+code(r"""
+q.choice("Why does the rear bank have a beam stop in front of it?",
+         ["The direct beam is far too intense for the detector and carries no information on the sample's structure.",
+          "To stop the neutrons scattered at large angles.",
+          "To measure the wavelength of the neutrons.",
+          "To protect the sample from the neutrons."],
+         answer=0, why={1: "Those reach the front and middle banks; the beam stop only covers the beam axis.",
+                        2: "The wavelength comes from the arrival time (part 5).",
+                        3: "It is behind the sample, 5 or 10 m away."},
+         explanation="Almost all neutrons go straight through the sample. Counted directly they would saturate the "
+                     "straws around the axis; the monitor m3 measures them instead, for the transmission.",
+         hints=["Where does the direct beam land?"], title="Q7. The beam stop")
+""")
+
+md(r"""
+## 7. A measurement on LoKI, and what it is used for
 
 A SANS result needs **three measurements** in the same setting: the **sample** (the objects in their liquid), the
 **solvent** alone (its own scattering is subtracted), and the **empty beam** (how many neutrons arrive, to know which
@@ -243,7 +284,7 @@ q.choice("Why does a SANS measurement of particles in a liquid also need a measu
                            "wrong by the same amount."},
          explanation="I(Q) of the particles = sample − solvent, each divided by the number of neutrons sent. The empty "
                      "beam gives the fraction of neutrons that crosses each of them.",
-         hints=["What else than the particles is in the beam?"], title="Q7. Why the solvent?")
+         hints=["What else than the particles is in the beam?"], title="Q8. Why the solvent?")
 q.choice("You want to measure the large pores (60 nm) of an electrode. Which setting do you choose?",
          ["Rear bank at 10 m with the 8 m collimation: the smallest Q, and you count longer.",
           "Rear bank at 5 m with the 3 m collimation: the most neutrons.",
@@ -255,7 +296,36 @@ q.choice("You want to measure the large pores (60 nm) of an electrode. Which set
          explanation="60 nm = 600 Å scatters around Q = 2π/600 = 0.0105 Å⁻¹. With the rear bank at 5 m the curve starts "
                      "at 0.0115 Å⁻¹; at 10 m it starts at 0.008 Å⁻¹. The "
                      "beam has 12 times fewer neutrons: a longer count.",
-         hints=["Large objects: which Q? (Q2)", "What did moving the detector do? (Q3)"], title="Q8. Which setting?")
+         hints=["Large objects: which Q? (Q2)", "What did moving the detector do? (Q3)"], title="Q9. Which setting?")
+""")
+
+md(r"""
+## 8. Summary: everything that sets the instrument
+
+What sets a measurement on the twin's LoKI, and who decides: **you** (a setting of NICOS or of the panel), **follows**
+(it follows from another setting), or **fixed** (the instrument as built).
+
+| Part | Setting | Values in the twin | Who | What it changes |
+|---|---|---|---|---|
+| Source | pulses | 14 per second, 2.86 ms long | fixed | the time-of-flight clock |
+| | distance source → sample | 23.5 m | fixed | arrival time of each wavelength |
+| Choppers | wavelength band | 3 to 11.5 Å; 3 to 10 Å with the 8 m collimation | follows (collimation) | the range of Q in one measurement |
+| | pulse skipping | off; on (3 m collimation only): choppers at 7 Hz, band 3 to 21.4 Å | you | wider band, half of the pulses |
+| | speeds and delays of the discs | read in NICOS | follows (band, pulse skipping) | which neutrons pass |
+| Beam | heavy shutter, fast shutter | open, closed | you | closed: no beam |
+| | collimation length | 3, 5, 8 m | you | parallel beam against flux (part 4) |
+| | apertures | 3 cm (3 m) or 2 cm (5 and 8 m) at the start of the collimation; 1 cm before the sample | follows (collimation) | divergence, beam size |
+| Sample | sample in the beam | the samples of your proposal; empty beam; empty cell | you | — |
+| | cell | fused quartz, windows 1.25 mm; 1 mm of liquid (your own samples: the thickness you set in the sample builder) | fixed (thickness: sample builder) | signal and transmission |
+| Detection | rear bank distance | 5 or 10 m (10 m: with the 8 m collimation) | you | the smallest Q, the step in Q (part 2, Q3) |
+| | middle and front banks | about 3 m and 1.3 to 1.75 m | fixed | the large Q |
+| | pixel | about 4 mm × 4 mm (straw tubes) | fixed | the step in angle |
+| | beam stop | 7 cm × 7 cm, in front of the rear bank | fixed | the smallest angle |
+| | monitors m1, m3 | 8.4 m before, 0.2 m after the sample | fixed | normalization, transmission |
+| | counting time | up to 24 h | you | statistics |
+""")
+
+code(r"""
 q.report()
 """)
 

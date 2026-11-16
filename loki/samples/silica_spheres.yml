@@ -1,5 +1,5 @@
 name: Silica nanoparticles in D2O
-description: Monodisperse silica spheres dispersed in heavy water, dilute (no interaction), in a 1 mm cell.
+description: Monodisperse silica spheres dispersed in heavy water, dilute (no interaction), in a quartz cell, 1 mm of liquid between its windows.
 model: sphere
 parameters: {radius: 50}
 particle: silica

@@ -1,0 +1,4 @@
+name: Empty cell
+description: The quartz cell alone, empty (air between its windows), on the sample position (the measurement that tells what the cell itself does to the beam).
+empty_cell: true
+thickness_mm: 1

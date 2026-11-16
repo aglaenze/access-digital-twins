@@ -41,7 +41,9 @@ About 40 minutes.
 3. how the size of a hole sets the sharpness of the picture;
 4. how ODIN knows the wavelength of each neutron: the time of flight;
 5. what the choppers are for;
-6. which exercises of the catalogue use which capability.
+6. how the neutrons are detected, and how sharp the pictures can be;
+7. which exercises of the catalogue use which capability;
+8. everything that sets the instrument, in one table: what you choose, what is fixed.
 """)
 
 code(r"""
@@ -260,7 +262,55 @@ q.choice("You must measure how much a steel part is stretched: its Bragg edge mo
 """)
 
 md(r"""
-## 6. What ODIN is used for
+## 6. Detecting the neutrons
+
+A neutron has no electric charge: no camera sees it directly. ODIN turns each neutron into a flash of light in a
+**scintillator**, a thin screen containing lithium-6 that absorbs the neutron and glows; a camera, out of the beam
+behind a mirror, films the light. Two consequences you meet in every exercise:
+
+- **Thick or thin screen.** A thick scintillator stops more neutrons (a bright picture) but the light spreads in it
+  (a blurred picture); a thin one is sharp but stops fewer neutrons.
+- **Not every neutron is counted.** The screen stops slow neutrons better than fast ones. In the twin the share of
+  neutrons detected is $\varepsilon(\lambda) = 1 - e^{-\lambda / 8\,\text{Å}}$: 22 % at 2 Å, 39 % at 4 Å, 63 % at 8 Å.
+  It cancels in a transmission (sample and open beam are detected the same way).
+
+The twin's ODIN has **two cameras**, with the same field of view, **14 mm × 14 mm**, 5 cm behind the sample:
+
+| | Timepix3 camera (event mode) | Integrating camera (scintillator + sCMOS) |
+|---|---|---|
+| What it records | **each neutron**: where it arrived and when, hence its wavelength (part 4) | the light summed over the exposure: a picture, **no time, no wavelength** |
+| Pixels | positions kept on a grid of 4096 × 4096 (3.4 µm); the pictures are shown in 128 × 128 pixels of 110 µm (64 × 64 of 220 µm if you choose it for the pictures per wavelength, to keep more neutrons per pixel) | **standard**: 128 × 128 pixels of 110 µm, thick scintillator (blur 0.1 mm); **high resolution**: 512 × 512 pixels of 27.5 µm, thin scintillator (blur 0.02 mm), 16 times fewer neutrons per pixel |
+| Used for | Bragg edges, strain, polarized imaging | radiography, tomography, battery |
+
+**How sharp is the picture?** Three blurs add up, and the largest one wins: the pinhole ($l / (L/D)$, part 3), the
+scintillator, and the pixel. Standard setup with the 3 cm pinhole: 0.14 mm, 0.1 mm and 0.11 mm, about **0.2 mm** in
+all. High resolution with the 1 cm pinhole: 0.05 mm, 0.02 mm and 0.03 mm, about **0.06 mm**, but with far fewer
+neutrons per pixel: much longer exposures.
+
+The pixel size is **your choice** among these settings of the cameras; the field of view, the distance from the
+sample to the camera and the efficiency are **fixed** in the twin. The real ODIN has more detectors and optics to
+choose from (larger fields, other pixels). *Limit of the twin*: a real Timepix3 camera loses neutrons when too many
+arrive at once (in the white beam); the twin does not.
+""")
+
+code(r"""
+q.choice("You want to see details of 0.1 mm in a sample. Which setting do you choose?",
+         ["The integrating camera in high resolution, with the 1 cm pinhole, and a long exposure.",
+          "The integrating camera in standard resolution, with the 4 cm pinhole: the most neutrons.",
+          "The high-resolution camera with the 4 cm pinhole.",
+          "The Timepix3 camera: it keeps positions to 3.4 µm."],
+         answer=0, why={1: "Its pixels (110 µm), its scintillator (0.1 mm) and the pinhole (0.14 mm with 3 cm) add up to about 0.2 mm: larger than the details.",
+                        2: "The pinhole then blurs by 5 cm / 262 = 0.19 mm: the thin scintillator does not help.",
+                        3: "The positions are written finely, but the light still spreads by about 0.1 mm in the "
+                           "screen: the sharpness is that of the blur, not of the grid."},
+         explanation="Every blur must be smaller than the details: 1 cm pinhole (0.05 mm), thin scintillator "
+                     "(0.02 mm), pixels of 27.5 µm: about 0.06 mm in all. The price: 16 times fewer neutrons per "
+                     "pixel, and 9 times fewer through the 1 cm pinhole than the 3 cm one: a much longer exposure.",
+         hints=["Compare each blur with 0.05 mm.", "Part 3: blur = 5 cm / (L/D) = 5 cm × D / 10.5 m."], title="Q10. Sharp enough?")
+""")
+
+md(r"""
+## 7. What ODIN is used for
 
 Everything ODIN does combines the three ingredients of this page: a picture (part 3), a wavelength for every neutron
 (part 4), and a choice of resolution (part 5). The catalogue of the app has, or will have, an exercise for each use:
@@ -268,17 +318,14 @@ Everything ODIN does combines the three ingredients of this page: a picture (par
 | What you look at | What it tells | Typical question | In the catalogue |
 |---|---|---|---|
 | The picture itself, all wavelengths | where the material is | Where is the water in this fuel cell? | planned |
-| Many pictures while the sample turns (**tomography**) | the object in 3D | What is inside this object? | *Inside an object without opening it* (planned) |
-| The transmission against the wavelength: **Bragg edges** | the crystal structure, the distance between atoms | Is this steel ferritic? | **How far apart are the atoms in iron?** · **Unknown metals** (game) |
-| The exact position of an edge (WFM mode) | how much the material is stretched | Where is this weld under stress? | planned |
-| A sample that changes with time | what happens during operation | How does lithium enter a battery electrode? | planned |
-| The spin of the neutrons (**polarized** imaging) | magnetic fields inside matter | What is the field inside this coil? | *Magnetic fields made visible* (planned) |
-
-Start with **How far apart are the atoms in iron?**: you will choose the chopper mode and the pinhole, measure a
-plate of iron, and read the distance between its atoms from the Bragg edges.
+| Many pictures while the sample turns (**tomography**) | the object in 3D | What is inside this object? | **What is hidden inside a Martian meteorite?** |
+| The transmission against the wavelength: **Bragg edges** | the crystal structure, the phases | How much of this anode is reduced? | **Where has the fuel-cell anode been reduced?** |
+| The exact position of an edge (WFM mode) | how much the material is stretched | Where is this part under stress? | **Where is a loaded steel part strained?** |
+| A sample that changes with time | what happens during operation | How does lithium enter a battery electrode? | **How does lithium enter a battery electrode?** |
+| The spin of the neutrons (**polarized** imaging) | magnetic fields inside matter | What is the field inside this coil? | **Seeing a magnetic field with neutrons** |
 """)
-fig("iron_structures.png", "The first exercise: tell two crystal structures of iron apart by their Bragg edges, "
-    "the wavelengths at which the transmission jumps.")
+fig("iron_structures.png", "Bragg edges: two crystal structures of iron told apart by the wavelengths at which the "
+    "transmission jumps.")
 
 code(r"""
 q.choice("A colleague wants to know whether a part is made of ferritic or austenitic steel, without cutting it. "
@@ -292,13 +339,47 @@ q.choice("A colleague wants to know whether a part is made of ferritic or austen
                         3: "Ferritic steel is magnetic and austenitic is not, but this is an indirect and harder way; "
                            "the Bragg edges answer directly."},
          explanation="The edges are at λ = 2d, where d is a distance between planes of atoms: each crystal structure "
-                     "has its own. This is the first exercise of the catalogue.",
-         hints=["Which line of the table speaks of the crystal structure?"], title="Q10. Which measurement?")
+                     "has its own. The anode and the steel of the catalogue are measured this way.",
+         hints=["Which line of the table speaks of the crystal structure?"], title="Q11. Which measurement?")
+""")
+
+md(r"""
+## 8. Summary: everything that sets the instrument
+
+What sets a measurement on the twin's ODIN, and who decides: **you** (a setting of NICOS or of the panel), **follows**
+(it follows from another setting), or **fixed** (the instrument as built).
+
+| Part | Setting | Values in the twin | Who | What it changes |
+|---|---|---|---|---|
+| Source | pulses | 14 per second, 2.86 ms long | fixed | the time-of-flight clock (part 4) |
+| | distance source → sample | 60.5 m | fixed | arrival time of each wavelength |
+| Choppers | mode | white (none), natural (band-pass + T0), WFM | you | resolution in wavelength against flux (part 5) |
+| | WFM disc separation δ | 0.10, 0.30, 0.45 m | you (WFM) | smaller δ: finer resolution, fewer neutrons |
+| | speeds and phases of the discs | read in NICOS | follows (mode, δ) | which neutrons pass, when |
+| | wavelength band | 1 to 9 Å (WFM, natural); 0.5 to 15 Å (white) | follows (mode) | which Bragg edges are seen |
+| Beam | experiment shutter | open, closed | you | closed: the dark picture |
+| | pinhole side D | 1, 2, 3, 4 cm | you | sharpness against flux (part 3) |
+| | distance pinhole → sample L | 10.5 m (L/D from 1050 to 262) | fixed | with D, the blur |
+| | diffuser | in, out | you | a more even beam |
+| Sample | sample mounted | the samples of your proposal; none | you | — |
+| | stage translation x | −500 to +500 mm (beyond 20 mm: out of the field, open beam) | you | sample in or out of the beam |
+| | stage rotation | −180° to +180° | you | the angle (tomography) |
+| | load frame | 0 kN up to the limit of the sample (frame: 50 kN) | you (samples that can be loaded) | strain |
+| | battery cycler | time in the cycle, 0 to 55 h | you (batteries) | state of charge |
+| | polarizer and analyzer | in, out; spin in ±x, ±y, ±z; spin analyzed x, y, z | you | polarized imaging |
+| Detection | distance sample → camera | 5 cm | fixed | with L/D, the blur |
+| | field of view | 14 mm × 14 mm | fixed | the largest object seen at once |
+| | Timepix3 camera | counting time; pictures per wavelength: range, bin (0.01 Å), 128 or 64 pixels | you | wavelength, statistics |
+| | integrating camera | exposure (up to 3600 s); standard (110 µm) or high resolution (27.5 µm) | you | sharpness against neutrons per pixel |
+| | efficiency of the scintillator | 1 − exp(−λ / 8 Å) | fixed | counts at short wavelengths |
+""")
+
+code(r"""
 q.report()
 """)
 
 md(r"""
-**Next.** Close this tab and open *How far apart are the atoms in iron?* in the catalogue.
+**Next.** Close this tab and open the first chapter of your thread on the map of the catalogue.
 """)
 
 nb = nbf.v4.new_notebook()

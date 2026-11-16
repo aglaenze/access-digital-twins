@@ -81,6 +81,24 @@ def bent_map():
     return xs, ys, R_FREE + k * s
 
 
+def holder(loaded=False):
+    """The holder (assumed: the papers only say the bars stand on their edge in a holder): two aluminium posts with
+    slots, holding the ends of the bars, outside the field of view (|x| from 10 to 12 mm). The loaded bar: its left end
+    in an aluminium clamp (two jaws on its faces, x from -10 to -7 mm, the end of the clamp at the edge of the field of
+    view), and an alumina push rod (1.5 mm) pressing on its top edge at the load point."""
+    vols = [dict(material="aluminium", center_mm=[s * 11.0, 0, 0], size_mm=[2.0, 15.0, 3.0], holder=True)
+            for s in (-1, 1)]
+    if loaded:
+        vols += [dict(material="aluminium", center_mm=[(CLAMP - 3.0 + CLAMP) / 2, Y_TOP, s * (THICK / 2 + 0.5)],
+                      size_mm=[3.0, HEIGHT, 1.0], holder=True) for s in (-1, 1)]
+        vols.append(dict(material="alumina", shape="cylinder",
+                         center_mm=[LOAD, Y_TOP + HEIGHT / 2 + 3.0, 0], size_mm=[1.5, 6.0, 1.5], holder=True))
+    return vols
+
+
+HOLDER_MATERIALS = {"aluminium": "Al_sg225.ncmat", "alumina": "Al2O3_sg167_Corundum.ncmat"}
+
+
 def main():
     out = {}
     for key, (top, bottom) in (("anode_standards_a", (0.0, 0.52)), ("anode_standards_b", (0.11, 0.92))):
@@ -92,8 +110,8 @@ def main():
                 f"{round(100 * bottom)} % (NiO turned into Ni, measured by weighing). Uniform: standards to calibrate "
                 f"the Bragg edges against the reduction degree."),
             "formula": "NiO + Ni + 3YSZ, porous",
-            "materials": {name(top): material(top), name(bottom): material(bottom)},
-            "volumes": [bar(top, Y_TOP), bar(bottom, Y_BOTTOM)],
+            "materials": {name(top): material(top), name(bottom): material(bottom), "aluminium": "Al_sg225.ncmat"},
+            "volumes": [bar(top, Y_TOP), bar(bottom, Y_BOTTOM)] + holder(),
         }
     xs, ys, R = bent_map()
     Rq = np.round(R / QUANT) * QUANT
@@ -101,13 +119,17 @@ def main():
     vols = [dict(material=name(Rq[i, j]), center_mm=[round(float(x), 3), round(float(Y_TOP + y), 3), 0],
                  size_mm=[STEP, STEP, THICK]) for i, x in enumerate(xs) for j, y in enumerate(ys)]
     vols.append(bar(0.27, Y_BOTTOM))
+    vols += holder(loaded=True)
+    mats.update(HOLDER_MATERIALS)
     out["anode_loaded_700C"] = {
         "name": "Anode supports reduced at 700 °C for 5 min: loaded (top) and reference (bottom)",
         "description": (
             "Two bars of a solid-oxide-cell anode support (NiO-YSZ), 20 x 6 x 0.9 mm3, on their edge in a holder, reduced "
             "together for 5 minutes at 700 °C in 9 % H2: the top one clamped at its left end and loaded at x = +3 mm "
             "(bent: stretched at its top edge, compressed at its bottom edge, between the clamp and the load point), "
-            "the bottom one without load. The reaction was then stopped (frozen by cooling in N2)."),
+            "the bottom one without load. The reaction was then stopped (frozen by cooling in N2). The holder: two "
+            "aluminium posts at the ends of the bars, an aluminium clamp on the left end of the top bar (up to x = -7 "
+            "mm) and an alumina push rod on its top edge at x = +3 mm."),
         "formula": "NiO + Ni + 3YSZ, porous",
         "hidden": ["materials"],
         "hidden_answer": (f"bent bar: area A (x -7 to 3 mm) {R[(xs >= CLAMP) & (xs < LOAD)].mean():.0%}, area B (x > 3) "

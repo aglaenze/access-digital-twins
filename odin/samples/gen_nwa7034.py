@@ -170,13 +170,19 @@ def main():
     vols, n_clasts, frac = build()
     for v in vols[1:]:
         v.setdefault("inside", 0)
+    # the holder (assumed): an aluminium pin, 3 mm in diameter, on the axis of the rotation stage, the piece glued on
+    # its top (the glue, a fraction of a millimeter, not modeled)
+    vols.append(dict(material="aluminium", shape="cylinder", center_mm=[0, -9.0, 0], size_mm=[3.0, 6.0, 3.0],
+                     holder=True))
+    mats["aluminium"] = "Al_sg225.ncmat"
     spec = {
         "name": "Martian meteorite NWA 7034 (piece of 12 × 8 × 2 mm)",
         "description": (
             "A flat piece of the Martian meteorite NWA 7034 (\"Black Beauty\"), 12 mm high, 8 mm wide and 2 mm thick, "
             "standing on the rotation stage (its 2 mm thickness along the beam at 0°): the piece studied by Naver et "
             "al. (2026). A breccia: feldspar grains, Fe-Ti oxides and lithic clasts in a fine-grained matrix; some "
-            "clasts hold hydrogen (iron oxyhydroxides), which neutrons see very well."),
+            "clasts hold hydrogen (iron oxyhydroxides), which neutrons see very well. It is glued on an aluminium pin "
+            "(3 mm in diameter) on the axis of the rotation stage."),
         "formula": "matrix (plagioclase, pyroxenes, Fe oxides, apatite); feldspar, Fe-Ti oxides; H in Fe-oxyhydroxides",
         "hidden": ["inclusions"],
         "hybrid_only": True,

@@ -3,7 +3,8 @@ name: Steel tensile specimen (V20, austenitic stainless steel)
 description: 'A flat tensile specimen of austenitic stainless steel (type 304, face-centered cubic), 2.8 mm thick, held in
   a load frame that pulls it along x (horizontal in the image). It is 9.8 mm wide, narrowed in its middle to 6.4 mm by two
   circular arcs: the same force crosses every section, so the stress is largest in the middle. The specimen measured at V20
-  (HZB) in 2018, at 0 and 600 MPa (10.75 kN).'
+  (HZB) in 2018, at 0 and 600 MPa (10.75 kN). Its ends are clamped in the steel grips of the load frame, outside the field
+  of view (|x| > 12 mm).'
 formula: Fe0.70Cr0.19Ni0.11 (fcc)
 hybrid_only: true
 reference: 'V20 measurement of September 2018 (P. Kadletz), data scipp/ess-notebooks-data; V20: R. Woracek et al., Nucl. Instrum.
@@ -15,6 +16,7 @@ load:
   poisson: 0.29
 materials:
   steel: SS304_V20.ncmat;atomdb=Fe:is:0.70:Fe:0.19:Cr:0.11:Ni
+  grip steel: Fe_sg229_Iron-alpha.ncmat
 volumes:
 - material: steel
   center_mm:
@@ -394,3 +396,23 @@ volumes:
   - 8.0
   - 9.8
   - 2.8
+- material: grip steel
+  center_mm:
+  - -17.0
+  - 0
+  - 0
+  size_mm:
+  - 10.0
+  - 20.0
+  - 12.0
+  holder: true
+- material: grip steel
+  center_mm:
+  - 17.0
+  - 0
+  - 0
+  size_mm:
+  - 10.0
+  - 20.0
+  - 12.0
+  holder: true

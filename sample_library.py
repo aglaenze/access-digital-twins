@@ -155,6 +155,14 @@ SLD = {"D2O": 6.36, "H2O": -0.56, "silica": 3.47, "polystyrene": 1.41, "deuterat
        "PMMA": 1.07}
 SOLVENT_INC = {"D2O": 0.05, "H2O": 0.43}       # cm⁻¹ sr⁻¹ (H2O: σ_inc(H) = 80 b, 6.7·10²² H/cm³, /4π)
 SOLVENT_REMOVAL = {"D2O": 0.0, "H2O": 536.0}   # 1/m (H2O: Σ_inc = 5.36 cm⁻¹); D2O neglected (as before)
+# LoKI: the liquid is held in a cell of fused quartz (as the usual Hellma cells for SANS): two windows of 1.25 mm, the
+# liquid between them. Fused silica, 2.20 g/cm³: 2.205·10²² SiO2/cm³; σ_s = 2.17 (Si) + 2 × 4.23 (O) = 10.63 b,
+# σ_abs(1.8 Å) = 0.17 b -> Σ_s = 0.234 cm⁻¹ (23.4 /m), Σ_abs = 0.0038 cm⁻¹ (0.38 /m). The windows remove neutrons from
+# the beam (transmission 0.94 for both together); their own small-angle scattering (flat and weak for a polished
+# glass) is neglected.
+CELL_WINDOWS_MM = 2 * 1.25
+EMPTY_CELL_DSDO = 1e-4                           # cm⁻¹ sr⁻¹ per cm of the cell's gap: nearly nothing (not 0 for McStas)
+QUARTZ_REMOVAL, QUARTZ_ABS = 23.4, 0.38          # 1/m
 LOKI_MODELS = {"none": [], "sphere": ["radius"], "cylinder": ["radius", "length"],
                "core_shell_sphere": ["radius", "thickness"]}
 UNITS = {"radius": "Å", "length": "Å", "thickness": "Å"}
@@ -343,7 +351,8 @@ def odin_strain_per_kN(spec):
         return None
     E, nu = float(load["young_GPa"]) * 1e9, float(load["poisson"])
     across = 1 if load.get("axis", "y") == "x" else 0      # pulled along x: the section is height (y) × thickness (z)
-    return [-nu * 1e3 / (float(v["size_mm"][across]) * float(v["size_mm"][2]) * 1e-6 * E) for v in spec["volumes"]]
+    return [0.0 if v.get("holder") else -nu * 1e3 / (float(v["size_mm"][across]) * float(v["size_mm"][2]) * 1e-6 * E)
+            for v in spec["volumes"]]
 
 
 def solvent_sld(x):
@@ -357,6 +366,8 @@ def loki_cross_section(spec, q=None):
     if spec.get("empty"):
         return None
     q = ls.q_grid() if q is None else np.asarray(q)
+    if spec.get("empty_cell"):                  # the cell alone, with air inside: its windows scatter (almost) nothing
+        return q, np.full_like(q, EMPTY_CELL_DSDO, dtype=float), dict(background=EMPTY_CELL_DSDO)
     x = float((spec.get("solvent") or {}).get("d2o_fraction", 1.0))
     bg = x * SOLVENT_INC["D2O"] + (1 - x) * SOLVENT_INC["H2O"]
     model = spec.get("model", "none")
@@ -399,9 +410,13 @@ def loki_sample(spec):
     loki_samples.SAMPLES; function None for the empty beam."""
     if spec.get("empty"):
         return (None, {}, 0.0, 0.0, 0.0)
+    thick_mm = float(spec.get("thickness_mm", 1))
     x = float((spec.get("solvent") or {}).get("d2o_fraction", 1.0))
-    mu_rem = x * SOLVENT_REMOVAL["D2O"] + (1 - x) * SOLVENT_REMOVAL["H2O"]
-    return (lambda: loki_cross_section(spec), {}, float(spec.get("thickness_mm", 1)) * 1e-3, 0.0, float(mu_rem))
+    mu_rem = 0.0 if spec.get("empty_cell") else x * SOLVENT_REMOVAL["D2O"] + (1 - x) * SOLVENT_REMOVAL["H2O"]
+    # the quartz windows of the cell, as the same removal spread over the thickness of the liquid (the McStas sample
+    # is one slab): exp(-Σ_q · 2.5 mm) on every neutron, transmitted or scattered at small angle
+    w = CELL_WINDOWS_MM / thick_mm
+    return (lambda: loki_cross_section(spec), {}, thick_mm * 1e-3, QUARTZ_ABS * w, float(mu_rem) + QUARTZ_REMOVAL * w)
 
 
 # --------------------------------------------------------------------------- what the student sees
@@ -425,12 +440,18 @@ def describe(instrument, spec, hidden=()):
             if "inside" in v and "inclusions" in hidden:          # inclusions to be found: not described
                 n_inc += 1
                 continue
-            mat = q("material", odin_material_label(spec, v["material"]))
+            mat = (odin_material_label(spec, v["material"]) if v.get("holder")
+                   else q("material", odin_material_label(spec, v["material"])))
             sx, sy, sz = (list(v["size_mm"]) * 3)[:3] if len(v["size_mm"]) == 1 else (list(v["size_mm"]) + [0, 0])[:3]
             cx, cy, cz = v.get("center_mm", (0, 0, 0))
             at = f"centered at x = {cx:g} mm, y = {cy:g} mm" + (f", z = {cz:g} mm" if cz else "")
             shape = v.get("shape", "box")
-            if shape == "sphere":
+            if v.get("holder"):
+                what = {"sphere": "sphere", "cylinder": "cylinder"}.get(shape, "block")
+                dims = (f"diameter {sx:g} mm" + (f", height {sy:g} mm" if shape == "cylinder" else "")
+                        if shape in ("sphere", "cylinder") else f"{sx:g} × {sy:g} mm, {sz:g} mm thick")
+                lines.append(f"  holder ({what}): {mat}, {dims}, {at}")
+            elif shape == "sphere":
                 lines.append(f"  sphere {k + 1}: {mat}, diameter {q('thickness', f'{sx:g} mm')}, {at}")
             elif shape == "cylinder":
                 lines.append(f"  cylinder {k + 1}: {mat}, diameter {q('thickness', f'{sx:g} mm')}, height {sy:g} mm "
@@ -444,8 +465,12 @@ def describe(instrument, spec, hidden=()):
             lines.append("  nothing in the beam")
             return "\n".join(lines)
         x = float((spec.get("solvent") or {}).get("d2o_fraction", 1.0))
-        lines.append(f"  cell {float(spec.get('thickness_mm', 1)):g} mm thick, solvent {100 * x:.0f} % D2O / "
-                     f"{100 * (1 - x):.0f} % H2O")
+        if spec.get("empty_cell"):
+            lines.append(f"  cell of fused quartz (windows 1.25 mm), {float(spec.get('thickness_mm', 1)):g} mm gap, "
+                         f"empty (air)")
+            return "\n".join(lines)
+        lines.append(f"  cell of fused quartz (windows 1.25 mm), {float(spec.get('thickness_mm', 1)):g} mm of solvent: "
+                     f"{100 * x:.0f} % D2O / {100 * (1 - x):.0f} % H2O")
         for pop in populations(spec):
             pars = ", ".join(f"{p} {q(p, f'{float(v):g} {UNITS.get(p, "")}'.strip())}"
                              for p, v in (pop.get("parameters") or {}).items())
@@ -491,6 +516,8 @@ def draw(instrument, spec, hidden=(), fig=None):
             col = "#9CA3AF" if "material" in hidden else ODIN_COLORS.get(_split_density(cfg)[0],
                                                                         "#7C6A58" if "phases<" in cfg else "#A8A29E")
             name = "?" if "material" in hidden else odin_material_label(spec, v["material"])
+            if v.get("holder"):                        # the holder: always shown, hatched
+                col, name = "#E5E7EB", f"holder ({odin_material_label(spec, v['material'])})"
             shape = v.get("shape", "box")
             if shape == "sphere":                      # a disk in both views
                 a1.add_patch(Circle((cx, cy), sx / 2, fc=col, ec="k", alpha=0.85, label=name))
@@ -526,8 +553,11 @@ def draw(instrument, spec, hidden=(), fig=None):
             return fig
         x = float((spec.get("solvent") or {}).get("d2o_fraction", 1.0))
         solvent = np.array([0.80, 0.90, 1.0]) * x + np.array([0.93, 0.97, 0.93]) * (1 - x)
-        ax.add_patch(Rectangle((0.4, 0.5), 3.2, 3.2, fc=solvent, ec="#334155", lw=2))
-        ax.text(2.0, 0.2, f"cell: {float(spec.get('thickness_mm', 1)):g} mm of solvent", ha="center", fontsize=10)
+        ax.add_patch(Rectangle((0.25, 0.35), 3.5, 3.5, fc="#E0F2FE", ec="#64748B", lw=1.5))     # the quartz cell
+        ax.add_patch(Rectangle((0.4, 0.5), 3.2, 3.2, fc="white" if spec.get("empty_cell") else solvent, ec="#334155",
+                               lw=1))
+        ax.text(2.0, 0.05, f"quartz cell: {float(spec.get('thickness_mm', 1)):g} mm of "
+                           f"{'air (empty cell)' if spec.get('empty_cell') else 'solvent'}", ha="center", fontsize=10)
         pops = populations(spec)
         rng = np.random.default_rng(1)
         for k, pop in enumerate(pops):
