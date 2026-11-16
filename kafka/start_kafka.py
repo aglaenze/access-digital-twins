@@ -16,6 +16,7 @@ it; the files are written by the twin itself.
 """
 import argparse
 import base64
+import glob
 import os
 import shutil
 import socket
@@ -39,7 +40,7 @@ advertised.listeners=PLAINTEXT://127.0.0.1:{PORT}
 controller.listener.names=CONTROLLER
 inter.broker.listener.name=PLAINTEXT
 listener.security.protocol.map=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
-log.dirs={os.path.join(DATA, "logs").replace(os.sep, "/")}
+log.dirs={{LOGS}}
 num.partitions=1
 offsets.topic.replication.factor=1
 transaction.state.log.replication.factor=1
@@ -138,13 +139,18 @@ def main():
         sys.exit(0 if ok else 1)
     if not os.path.isdir(KAFKA_HOME):
         sys.exit(f"Kafka not found in {KAFKA_HOME} (variable KAFKA_HOME); see the docstring of this file")
+    logs = os.path.join(DATA, "logs")
     if os.name == "nt":            # the streams start empty (see RETENTION); the topics are created again by --topics
-        shutil.rmtree(os.path.join(DATA, "logs"), ignore_errors=True)
+        # a new folder at each start: an old one that could not be deleted entirely (a file still held, 2026-11-16)
+        # made Kafka start from a half-deleted state and stop on its own files ("being used by another process")
+        for d in glob.glob(os.path.join(DATA, "logs*")):
+            shutil.rmtree(d, ignore_errors=True)
+        logs = os.path.join(DATA, f"logs-{int(time.time())}")
     os.makedirs(DATA, exist_ok=True)
     props = os.path.join(DATA, "server.properties")
     with open(props, "w", encoding="utf-8") as f:
-        f.write(PROPERTIES)
-    if not os.path.isfile(os.path.join(DATA, "logs", "meta.properties")):        # first start: format the storage
+        f.write(PROPERTIES.replace("{LOGS}", logs.replace(os.sep, "/")))
+    if not os.path.isfile(os.path.join(logs, "meta.properties")):        # first start: format the storage
         subprocess.run(java("kafka.tools.StorageTool", "format", f"--cluster-id={cluster_id()}", "-c", props,
                             heap="-Xmx256M"),
                        check=True)
