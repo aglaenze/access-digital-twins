@@ -705,9 +705,10 @@ print("  " + "\n  ".join(props))
 check(any(x.startswith("1234 | Lattice spacing") and "['iron_plate']" in x for x in props)
       and any(x.startswith(free["id"] + " | Does a weld") and "[]" in x for x in props)
       and any(x.startswith("2025123 | Residual strain") and "turbine_blade_nickel_alloy" in x for x in props)
-      and len(props) == 3,
-      f"user office: Find my proposal lists the proposal of the exercise (1234, its sample), the student's free beamtime "
-      f"({free['id']}, no sample) and imported proposal (2025123, its sample to build)")
+      and [int(x.split(" |")[0]) for x in props] == sorted(int(x.split(" |")[0]) for x in props),
+      f"user office: Find my proposal lists the proposals of the exercises (1234 and the others, their samples), the "
+      f"student's free beamtime ({free['id']}, no sample) and imported proposal (2025123, its sample to build), in "
+      f"ascending order")
 check("experiment 1234, mounted none" in out and "First step: mount it, move(sample_holder, 'iron_plate')" in out,
       "user office: applying the proposal of the exercise takes the previous sample off and tells which one to mount")
 check(f"experiment {free['id']}, mounted none" in out and f"proposal {free['id']} has no sample" in out,
