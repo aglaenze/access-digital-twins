@@ -498,6 +498,56 @@ q.report()
 """)
 
 md(r"""
+### For X-ray experts (optional)
+
+You know X-ray imaging or diffraction: these questions compare it with what you just did with neutrons, with numbers.
+They count in your score like the others. Values used: neutrons at 1.8 Å (NCrystal, as in the twin), X-rays from the
+NIST tables (XCOM).
+""")
+
+code(r"""
+q.number("The (111) edge of the specimen is at 4.163 Å (part 3), so d₁₁₁ = 2.0815 Å. At which angle 2θ would a laboratory "
+         "X-ray diffractometer (Cu Kα, 1.5406 Å) see the same (111) reflection (°)?",
+         value=43.44, tol=0.05, unit="°",
+         mistakes=[(21.72, "that is θ; the diffractometer reads 2θ"),
+                   (68.6, "λ = 2d sin θ with d = 2.0815 Å, not d = 4.163 Å (the edge is at λ = 2d)")],
+         hints=["Bragg's law: λ = 2 d sin θ.", "θ = arcsin(1.5406 / (2 × 2.0815))."],
+         explanation="sin θ = 1.5406 / 4.163 = 0.370, θ = 21.72°, 2θ = 43.44°. The Bragg edge is the same Bragg law "
+                     "at its limit, 2θ = 180°: λ_edge = 2d. Above it, no angle satisfies the law for these planes and "
+                     "they stop scattering: the transmission jumps.", title="X1. The edge and the diffractometer")
+q.choice("Why measure the strain of this 2.8 mm steel specimen with neutrons rather than with a laboratory "
+         "diffractometer (Cu Kα, 8 keV)?",
+         ["Cu Kα X-rays enter steel by a few micrometers only (μ ≈ 2400 cm⁻¹): they see the surface. Neutrons cross the "
+          "whole specimen (Σ ≈ 1.1 to 1.4 cm⁻¹ from 1.8 to 4 Å: about 70 % transmitted through 2.8 mm) and give the "
+          "strain through its thickness.",
+          "X-rays cannot be diffracted by steel.",
+          "Neutrons have a better wavelength resolution than any X-ray diffractometer.",
+          "X-rays would deform the specimen."],
+         answer=0, why={1: "They are: steel is studied with X-rays every day, at its surface.",
+                        2: "A laboratory diffractometer resolves d to 10⁻⁴ or better; the reason is the depth.",
+                        3: "X-rays do not deform steel."},
+         explanation="Attenuation lengths: in iron, Cu Kα 8 keV about 4 µm, synchrotron 80 keV about 2 mm; neutrons in "
+                     "this steel 7 to 9 mm. Only high-energy synchrotron X-rays and neutrons see the bulk; neutrons do it "
+                     "with a large field of view at once (here 14 mm × 14 mm in one exposure).",
+         title="X2. Surface or bulk")
+q.choice("Your strain map gives one value per pixel. What exactly is it, compared with a diffraction measurement (X-rays "
+         "or neutrons) in a small gauge volume?",
+         ["An average along the whole path of the beam through the specimen, for the planes perpendicular to the beam "
+          "only; a diffraction gauge volume gives the strain at one point, in the direction of its scattering vector.",
+          "The strain at the surface facing the camera.",
+          "The strain in the middle of the thickness only.",
+          "The full strain tensor at each point."],
+         answer=0, why={1: "Transmission sees every layer the beam crosses, not only the surface.",
+                        2: "All the thickness counts, not the middle only.",
+                        3: "One direction only (along the beam); the tensor needs other directions, hence rotations "
+                           "(strain tomography) or diffraction."},
+         explanation="Bragg-edge imaging trades the point-by-point gauge volume for a full 2D map in one measurement, "
+                     "averaged along the beam. For a plate pulled in its plane, as here, that average is what matters; "
+                     "for a strain that varies through the thickness, diffraction or strain tomography is needed.",
+         title="X3. What a pixel measures")
+""")
+
+md(r"""
 ## 7. Submit your work
 
 When you are done, tell what you thought of the exercise and submit your work.

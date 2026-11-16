@@ -552,6 +552,66 @@ q.report()
 """)
 
 md(r"""
+### For X-ray experts (optional)
+
+You know X-ray imaging or diffraction: these questions compare it with what you just did with neutrons, with numbers.
+They count in your score like the others. Values used: neutrons at 1.8 Å (NCrystal, as in the twin), X-rays from the
+NIST tables (XCOM).
+""")
+
+code(r"""
+q.number("1 mm of water in the beam. With neutrons of 1.8 Å its attenuation coefficient is Σ = 3.6 cm⁻¹ (hydrogen); "
+         "with X-rays of 60 keV, μ = 0.21 cm⁻¹. Which fraction of the **neutrons** does it remove, 1 − T (%)?",
+         value=30.4, tol=1.5, unit="%",
+         mistakes=[(2.0, "that is the X-ray value (μ = 0.21 cm⁻¹); the question is about neutrons"),
+                   (36, "3.6 cm⁻¹ × 0.1 cm = 0.36 is −ln T, not 1 − T: T = e^(−0.36)")],
+         hints=["T = exp(−Σ d), with d = 0.1 cm.", "1 − exp(−0.36)."],
+         explanation="1 − e^(−0.36) = 30 % with neutrons, 1 − e^(−0.021) = 2 % with X-rays. And 1 mm of iron: neutrons "
+                     "11 % (Σ = 1.2 cm⁻¹), X-rays of 60 keV 61 % (μ = 9.5 cm⁻¹). The contrasts are reversed: X-rays see "
+                     "the heavy elements, neutrons see the hydrogen.", title="X1. Water, for neutrons and X-rays")
+q.number("An H-rich clast of 0.3 mm in the matrix of the meteorite (ICON, 1.8 Å: Σ = 1.9 cm⁻¹ against 0.45 cm⁻¹). By how "
+         "much does it lower the transmission of a line that crosses it, compared with the matrix around (%)?",
+         value=4.3, tol=0.4, unit="%",
+         mistakes=[(14.5, "(1.9 − 0.45) × 0.1: the clast is 0.3 mm = 0.03 cm thick, not 1 mm")],
+         hints=["Only the difference of Σ matters, over the thickness of the clast.", "1 − exp(−(1.9 − 0.45) × 0.03)."],
+         explanation="1 − e^(−1.45 × 0.03) = 4.3 %: a small contrast in one radiograph, where the clasts also overlap "
+                     "the matrix in front and behind. The tomography separates them, and each voxel then holds the full "
+                     "ratio of Σ (4 times the matrix). With X-rays the same clasts stand out by their iron, not by their "
+                     "hydrogen: they look like the Fe-Ti oxides.", title="X2. The contrast of a clast")
+q.choice("A laboratory micro-CT magnifies the sample by bringing it close to a small focal spot (a cone beam). Why does "
+         "ODIN put the camera **5 cm** behind the sample instead, without magnification?",
+         ["The neutron source seen by the sample is the pinhole, 1 to 4 cm wide: a magnifying geometry would multiply its "
+          "blur. ODIN keeps the camera close and the beam almost parallel (L/D up to 1000); the resolution is set by "
+          "L/D and by the detector.",
+          "Neutrons have no charge, so they cannot be magnified.",
+          "There is no room behind the sample on ODIN.",
+          "The camera pixels are small enough: magnification would not help."],
+         answer=0, why={1: "X-ray micro-CT does not use lenses either: its magnification is geometric (cone beam), and "
+                           "neutrons would follow the same geometry. The problem is the size of the source.",
+                        2: "Room is not the reason: the blur is (part 3 of the introduction: blur = l · D / L).",
+                        3: "Pixels of 27.5 µm are not the limit: with the camera 1 m away the 1 cm pinhole would blur by "
+                           "1 mm."},
+         explanation="Geometric blur = l · D / L. With a focal spot of a few µm, X-rays can afford a large l (and "
+                     "magnify); with a pinhole of 1 cm at 10.5 m, every cm of l adds 10 µm of blur: the camera stays "
+                     "close, and the parallel-beam reconstruction (180°) applies.", title="X3. No magnification")
+q.choice("For X-rays in a white beam, a thick sample **hardens** the beam (the soft photons are absorbed first), which "
+         "biases the reconstruction. What happens to a white neutron beam crossing the hydrated meteorite?",
+         ["The long wavelengths are removed more (absorption grows as λ, the scattering by hydrogen too): the mean "
+          "wavelength goes down, the analog of beam hardening.",
+          "Nothing: neutrons are not absorbed.",
+          "The short wavelengths are removed more, as for X-rays.",
+          "Each neutron changes its wavelength in the sample."],
+         answer=0, why={1: "Hydrogen and many nuclei remove neutrons strongly: that is the contrast of this exercise.",
+                        2: "For neutrons it is the other way: the cross-sections grow with the wavelength (water: Σ = "
+                           "3.6 cm⁻¹ at 1.8 Å, 4.9 cm⁻¹ at 3 Å).",
+                        3: "Most neutrons that reach the camera crossed without exchanging energy; the attenuation "
+                           "removes neutrons, it does not shift the wavelength of the others."},
+         explanation="The attenuation depends on λ: a white-beam Σ is an average over the spectrum that changes with "
+                     "the thickness crossed. ODIN can avoid it by selecting the wavelength (time of flight): one Σ per "
+                     "wavelength.", title="X4. Beam hardening, for neutrons")
+""")
+
+md(r"""
 ## 8. Submit your work
 
 When you are done, tell what you thought of the exercise and submit your work.

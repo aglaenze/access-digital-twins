@@ -427,9 +427,22 @@ def exercise_hidden(exercise_yml):
     return {n: (v or {}).get("hidden", []) for n, v in (ex.get("samples") or {}).items()}
 
 
+def _secret_material(spec, hidden, k):
+    """Whether the material of volume k is hidden from the student: "material(s)" hidden, and the volume is not the
+    holder; for an operando sample (a battery) only its slices that change with time (the casing, the lithium foil...
+    are no secret)."""
+    v = spec["volumes"][k]
+    if "material" not in hidden or v.get("holder"):
+        return False
+    op = spec.get("operando")
+    return k in {int(i) for i in op.get("slices", [])} if op else True
+
+
 def describe(instrument, spec, hidden=()):
     """Plain-text description of a sample, with the hidden properties replaced by "?" (what is to be measured)."""
     hidden = set(hidden or spec.get("hidden", []))
+    if "materials" in hidden:                          # (the samples write "materials", the code tests "material")
+        hidden.add("material")
     q = lambda k, txt: "?" if k in hidden else txt
     lines = [f"{spec.get('name', spec.get('id'))}" + (f"  ({spec['source']} sample)" if spec.get("source") else "")]
     if spec.get("description"):
@@ -440,8 +453,7 @@ def describe(instrument, spec, hidden=()):
             if "inside" in v and "inclusions" in hidden:          # inclusions to be found: not described
                 n_inc += 1
                 continue
-            mat = (odin_material_label(spec, v["material"]) if v.get("holder")
-                   else q("material", odin_material_label(spec, v["material"])))
+            mat = "?" if _secret_material(spec, hidden, k) else odin_material_label(spec, v["material"])
             sx, sy, sz = (list(v["size_mm"]) * 3)[:3] if len(v["size_mm"]) == 1 else (list(v["size_mm"]) + [0, 0])[:3]
             cx, cy, cz = v.get("center_mm", (0, 0, 0))
             at = f"centered at x = {cx:g} mm, y = {cy:g} mm" + (f", z = {cz:g} mm" if cz else "")
@@ -502,49 +514,90 @@ def draw(instrument, spec, hidden=(), fig=None):
     import matplotlib.pyplot as plt
     from matplotlib.patches import Circle, Rectangle
     hidden = set(hidden or spec.get("hidden", []))
+    if "materials" in hidden:                          # (the samples write "materials", the code tests "material")
+        hidden.add("material")
     fig = fig or plt.figure(figsize=(10, 4.2))
     fig.clf()
     if instrument == "odin":
-        a1, a2 = fig.add_subplot(1, 2, 1), fig.add_subplot(1, 2, 2)
-        for v in spec.get("volumes", []):
+        # two views at the same scale, framed on the sample (and the field of view of the camera); the holder hatched
+        # and behind; the legend under the views
+        ink, mute, beam = "#1F2A3C", "#6B7689", "#B4562B"
+        a1, a2 = fig.subplots(1, 2, gridspec_kw=dict(wspace=0.28))
+        front, top = [], []                            # extents [(x0, x1, y0, y1)] of what is drawn in each view
+        legend = {}
+        # many small volumes (a profile drawn in slices, a map of cells): no outline each, the colors only
+        thin = sum(1 for v in spec.get("volumes", []) if not v.get("holder")) > 20
+        for k, v in enumerate(spec.get("volumes", [])):
             if "inside" in v and "inclusions" in hidden:      # inclusions to be found: not drawn
                 continue
+            secret = _secret_material(spec, hidden, k)
             sz_ = list(v["size_mm"])
             (sx, sy, sz) = (sz_ * 3)[:3] if len(sz_) == 1 else (sz_ + [0, 0])[:3]
             (cx, cy, cz) = v.get("center_mm", (0, 0, 0))
             cfg = (spec.get("materials") or {}).get(v["material"], v["material"])
-            col = "#9CA3AF" if "material" in hidden else ODIN_COLORS.get(_split_density(cfg)[0],
-                                                                        "#7C6A58" if "phases<" in cfg else "#A8A29E")
-            name = "?" if "material" in hidden else odin_material_label(spec, v["material"])
-            if v.get("holder"):                        # the holder: always shown, hatched
-                col, name = "#E5E7EB", f"holder ({odin_material_label(spec, v['material'])})"
+            col = "#9CA3AF" if secret else ODIN_COLORS.get(_split_density(cfg)[0],
+                                                          "#7C6A58" if "phases<" in cfg else "#A8A29E")
+            name = "? (to be measured)" if secret else odin_material_label(spec, v["material"])
+            holder = bool(v.get("holder"))
+            style = (dict(fc="#EEF1F5", ec="#8A94A6", lw=1.0, hatch="////", zorder=1) if holder else
+                     dict(fc=col, ec=col if thin else ink, lw=0.4 if thin else 1.1, zorder=3))
+            if holder:                                 # its own name in the sample (grip steel), or its material
+                name = "holder: " + (v["material"] if v["material"] in (spec.get("materials") or {})
+                                     else odin_material_label(spec, v["material"]))
             shape = v.get("shape", "box")
             if shape == "sphere":                      # a disk in both views
-                a1.add_patch(Circle((cx, cy), sx / 2, fc=col, ec="k", alpha=0.85, label=name))
-                a2.add_patch(Circle((cz, cx), sx / 2, fc=col, ec="k", alpha=0.85))
+                p1 = Circle((cx, cy), sx / 2, **style); p2 = Circle((cz, cx), sx / 2, **style)
             elif shape == "cylinder":                  # vertical: a rectangle seen by the beam, a disk from above
-                a1.add_patch(Rectangle((cx - sx / 2, cy - sy / 2), sx, sy, fc=col, ec="k", alpha=0.85, label=name))
-                a2.add_patch(Circle((cz, cx), sx / 2, fc=col, ec="k", alpha=0.85))
+                p1 = Rectangle((cx - sx / 2, cy - sy / 2), sx, sy, **style); p2 = Circle((cz, cx), sx / 2, **style)
             else:
-                a1.add_patch(Rectangle((cx - sx / 2, cy - sy / 2), sx, sy, fc=col, ec="k", alpha=0.85, label=name))
-                a2.add_patch(Rectangle((cz - sz / 2, cx - sx / 2), sz, sx, fc=col, ec="k", alpha=0.85))
+                p1 = Rectangle((cx - sx / 2, cy - sy / 2), sx, sy, **style)
+                p2 = Rectangle((cz - sz / 2, cx - sx / 2), sz, sx, **style)
+            a1.add_patch(p1); a2.add_patch(p2)
+            legend.setdefault(name, Rectangle((0, 0), 1, 1, **{k: x for k, x in style.items() if k != "zorder"}))
+            front.append((cx - sx / 2, cx + sx / 2, cy - sy / 2, cy + sy / 2))
+            top.append((cz - sz / 2, cz + sz / 2, cx - sx / 2, cx + sx / 2))
         h = FIELD_MM / 2
-        a1.add_patch(Rectangle((-h, -h), FIELD_MM, FIELD_MM, fill=False, ec="#2A7D6F", lw=2, ls="--",
-                               label="field of view (14 mm)"))
-        a1.set(title="seen by the neutrons (beam's eye view)", xlabel="x [mm]", ylabel="y [mm]", aspect="equal")
-        handles, labels = a1.get_legend_handles_labels()
-        uniq = dict(zip(labels, handles))
-        a1.legend(uniq.values(), uniq.keys(), fontsize=8, loc="upper right")
-        a2.annotate("", xy=(0, 0), xytext=(-25, 0), arrowprops=dict(arrowstyle="->", color="#B4562B", lw=2))
-        a2.text(-24, 1.5, "neutrons", color="#B4562B", fontsize=9)
-        a2.set(title="seen from above (thickness along the beam)", xlabel="z, along the beam [mm]", ylabel="x [mm]",
-               aspect="equal")
+        a1.add_patch(Rectangle((-h, -h), FIELD_MM, FIELD_MM, fill=False, ec="#2A7D6F", lw=1.8, ls=(0, (5, 3)), zorder=4))
+        legend["field of view of the camera (14 mm)"] = Rectangle((0, 0), 1, 1, fill=False, ec="#2A7D6F", lw=1.8,
+                                                                ls=(0, (5, 3)))
+        # frames: the same mm per inch in both views, around what is drawn
+        e1 = np.array(front + [(-h, h, -h, h)]); e2 = np.array(top or [(-1, 1, -1, 1)])
+        f1 = [e1[:, 0].min() - 1.5, e1[:, 1].max() + 1.5, e1[:, 2].min() - 1.5, e1[:, 3].max() + 1.5]
+        z0 = e2[:, 0].min() - 9.0                                         # room for the arrow of the beam
+        f2 = [z0, e2[:, 1].max() + 2.0, e2[:, 2].min() - 1.5, e2[:, 3].max() + 1.5]
+        a2.annotate("", xy=(e2[:, 0].min() - 0.8, 0), xytext=(z0 + 0.5, 0),
+                    arrowprops=dict(arrowstyle="-|>", color=beam, lw=2), zorder=5)
+        a2.text(z0 + 0.6, 0.6, "neutrons", color=beam, fontsize=9, va="bottom", zorder=5)
+        a1.plot([0], [0], marker="o", ms=7, mfc="none", mec=beam, mew=1.5, zorder=6)
+        a1.plot([0], [0], marker=".", ms=4, color=beam, zorder=6)
+        from matplotlib.lines import Line2D
+        legend["beam axis (toward you)"] = Line2D([], [], marker="o", ms=7, mfc="none", mec=beam, mew=1.5, ls="none")
+        for ax, f, title, xl, yl in ((a1, f1, "Seen by the neutrons (beam's eye view)", "x [mm]", "y [mm]"),
+                                     (a2, f2, "Seen from above", "z, along the beam [mm]", "x [mm]")):
+            ax.set_xlim(f[0], f[1]); ax.set_ylim(f[2], f[3]); ax.set_aspect("equal")
+            ax.set_title(title, fontsize=11, color=ink, loc="left", fontweight="bold")
+            ax.set_xlabel(xl, color=mute, fontsize=9); ax.set_ylabel(yl, color=mute, fontsize=9)
+            ax.tick_params(colors=mute, labelsize=8)
+            for s_ in ax.spines.values():
+                s_.set_color("#CBD2DC")
+            ax.grid(alpha=0.25, lw=0.6)
+            ax.set_facecolor("#FBFCFD")
         if "thickness" in hidden:
-            a2.text(0.5, 0.02, "thickness: ?", transform=a2.transAxes, ha="center")
-        for a, lim in ((a1, 12), (a2, 14)):
-            a.autoscale_view(); a.set_xlim(min(a.get_xlim()[0], -lim), max(a.get_xlim()[1], lim))
-            a.set_ylim(min(a.get_ylim()[0], -lim), max(a.get_ylim()[1], lim)); a.grid(alpha=0.3)
-        a2.set_xlim(-27, max(a2.get_xlim()[1], 10))
+            a2.text(0.98, 0.04, "thickness: ?", transform=a2.transAxes, ha="right", color=ink, fontsize=9)
+        if "inclusions" in hidden:
+            a1.text(0.98, 0.03, "inclusions inside: to be found", transform=a1.transAxes, ha="right", color=mute,
+                    fontsize=8.5, style="italic")
+        # a sample of many cells of different compositions (a map): one entry for all of them
+        kinds = [k for k in legend if not k.startswith(("holder", "field of view", "beam axis"))]
+        if len(kinds) > 6:
+            first = legend[kinds[0]]
+            for k in kinds:
+                legend.pop(k)
+            legend = {f"the sample ({len(kinds)} compositions)": first, **legend}
+        rows = -(-len(legend) // 3)
+        fig.legend(legend.values(), legend.keys(), loc="lower center", ncol=min(3, len(legend)), frameon=False,
+                   fontsize=9, handlelength=1.6, bbox_to_anchor=(0.5, 0.0))
+        fig.subplots_adjust(bottom=0.16 + 0.075 * rows, top=0.9, left=0.07, right=0.98)
     else:
         ax = fig.add_subplot(1, 1, 1)
         ax.set_axis_off(); ax.set_xlim(0, 10); ax.set_ylim(0, 4.2)

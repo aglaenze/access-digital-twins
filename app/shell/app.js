@@ -716,6 +716,14 @@ function openTab(url, kind, label, { clean = false } = {}) {
               const m = c.model.getMetadata ? c.model.getMetadata("twin") : (c.model.metadata || {}).twin;
               return m && m.run_at_open === "stop";
             });
+            // the widgets saved with the notebook (buttons, panels, pictures in an output area) cannot be drawn
+            // again without the kernel that made them: they would show "Loading widget..." forever. Their outputs
+            // are cleared; the cells run again (at opening, or with "Analyze my files") draw them anew.
+            for (const c of cells) {
+              if (c.model.type !== "code" || !c.model.outputs) continue;
+              const outs = c.model.outputs.toJSON();
+              if (outs.some((o) => o.data && o.data["application/vnd.jupyter.widget-view+json"])) c.model.outputs.clear();
+            }
             if (stop > 0) {
               w.content.activeCellIndex = stop;
               await a.commands.execute("notebook:run-all-above");
