@@ -22,6 +22,7 @@ import base64
 import hashlib
 import html
 import json
+import math
 import os
 import random
 import time
@@ -40,6 +41,7 @@ GREEN, RED, GREY = "#E3F1EC", "#F8E5E1", "#F2F2F2"
 CSS = """<style>
 .twq {border: 1px solid #D9DDE5; border-radius: 10px; padding: 10px 16px; margin: 10px 0; background: #FBFBFD}
 .twq-q {font-weight: 600; margin-bottom: 4px}
+.twq-fmt {font-size: 92%; color: #4A5568; margin: 6px 0 2px}
 .twq-fb {border-radius: 8px; padding: 8px 12px; margin-top: 6px; line-height: 1.45}
 .twq-ok {background: #E3F1EC; border-left: 4px solid #2A7D6F}
 .twq-no {background: #F8E5E1; border-left: 4px solid #B4562B}
@@ -62,6 +64,24 @@ def _md(text):
         return mistune.html(text)
     except Exception:
         return "<p>" + html.escape(text) + "</p>"
+
+
+def _sig_figures(value, tol):
+    """Significant figures of a value given down to the digit of its tolerance (2.027 ± 0.03: 3, as in 2.03)."""
+    if not value or not tol or tol <= 0:
+        return 3
+    n = math.floor(math.log10(abs(value))) - math.floor(math.log10(tol)) + 1
+    return max(1, min(n, 6))
+
+
+def _round(value, sig):
+    """The value with sig significant figures, never in powers of ten (600 with 2: "600"; 0.0634 with 2: "0.063")."""
+    if not value:
+        return "0"
+    from decimal import Decimal, ROUND_HALF_UP
+    decimals = max(0, sig - 1 - math.floor(math.log10(abs(value))))
+    q = Decimal(repr(float(value))).quantize(Decimal(1).scaleb(-decimals), rounding=ROUND_HALF_UP)   # 2.8665: 2.867
+    return f"{q:.{decimals}f}"
 
 
 def _box(kind, text):
@@ -253,12 +273,19 @@ class Quiz:
             reveal.layout.display = ""
         display(w.VBox([head, picker, w.HBox([check, reveal]), fb]).add_class("twq"))
 
-    def number(self, text, value, tol, unit="", mistakes=(), hints=(), explanation="", rel=False, title=None):
+    def number(self, text, value, tol, unit="", mistakes=(), hints=(), explanation="", rel=False, title=None,
+               sig=None):
         """A value to compute. tol: accepted distance to value (relative if rel). mistakes: [(value of a typical
-        wrong answer, what went wrong)], recognized within the same tolerance. hints: given one by one, try after try."""
+        wrong answer, what went wrong)], recognized within the same tolerance. hints: given one by one, try after try.
+        The question says how many significant figures to give (sig; by default those down to the digit of the
+        tolerance) and the tolerance accepted, without giving the value; the right answer is shown with them too."""
         _css()
         item = self._new("number", text)
-        head = w.HTMLMath(f'<div class="twq-q">{html.escape(title or item["id"])}</div>{_md(text)}')
+        sig = sig or _sig_figures(value, tol * abs(value) if rel else tol)
+        u = f" {unit}" if unit else ""
+        rule = (f'<div class="twq-fmt">Give your answer with <b>{sig} significant figure{"s" if sig > 1 else ""}</b>'
+                + (f" (accepted within ±{tol * 100:g} %)." if rel else f" (accepted within ±{tol:g}{u}).") + "</div>")
+        head = w.HTMLMath(f'<div class="twq-q">{html.escape(title or item["id"])}</div>{_md(text)}{rule}')
         box = w.Text(placeholder="your value", layout=w.Layout(width="140px"))     # empty at first; 4,05 = 4.05
         check = w.Button(description="Check", button_style="primary", icon="check")
         reveal = w.Button(description="Show the answer", icon="eye", layout=w.Layout(display="none"))
@@ -274,7 +301,7 @@ class Quiz:
             ok = close(x, value)
             self._record(item, x, ok)
             if ok:
-                fb.value = _box("ok", f"**Right** ({value:.4g} {unit}). " + explanation)
+                fb.value = _box("ok", f"**Right** ({_round(value, sig)} {unit}). " + explanation)
                 reveal.layout.display = "none"
                 return
             known = next((txt for v, txt in mistakes if close(x, v)), None)
@@ -284,7 +311,7 @@ class Quiz:
             reveal.layout.display = ""
 
         def show_answer():
-            fb.value = _box("ans", f"Answer: **{value:.4g} {unit}**. {explanation}")
+            fb.value = _box("ans", f"Answer: **{_round(value, sig)} {unit}**. {explanation}")
             reveal.layout.display = "none"
 
         def on_reveal(_):
@@ -296,7 +323,7 @@ class Quiz:
         b = self.before.get(item["id"])
         if item["state"] == "right":            # answered right in an earlier session
             box.value = f"{b['answer']:g}" if isinstance(b["answer"], (int, float)) else ""
-            fb.value = _box("ok", f"**Right** ({value:.4g} {unit}, answered earlier). " + explanation)
+            fb.value = _box("ok", f"**Right** ({_round(value, sig)} {unit}, answered earlier). " + explanation)
         elif item["state"] == "revealed":
             show_answer()
         elif b and b["tries"]:
