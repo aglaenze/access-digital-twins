@@ -30,6 +30,6 @@ mounted on the rotation stage of ODIN (its 2 mm thickness along the beam at 0°)
 
 ## How to
 
-1. Click **Open NICOS** (in your starter notebook). Tab *Experiment*: **Find my proposal**, **1250**, **Apply**.
+1. Click **Open NICOS** (in your starter notebook). Tab *Experiment*: **Find my proposal**, **1250**, **Apply**. Nothing is mounted yet: your first command mounts a sample of the proposal, e.g. `move(sample_holder, 'meteorite_nwa7034')`.
 2. Measure; your files go to `data/odin/<year>/1250/raw`.
 3. Analyze them with the **starter notebook**. The tools are there; the decisions are yours.

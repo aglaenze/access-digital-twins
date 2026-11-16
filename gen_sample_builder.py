@@ -62,40 +62,88 @@ code(r"""
 small = lambda d, v: w.FloatText(value=v, description=d, layout=w.Layout(width="118px"), style={"description_width": "52px"})
 
 # ---------------------------------------------------------------- ODIN: blocks, cylinders, spheres
-MATS = list(sl.ODIN_MATERIALS.items())
+# Each volume: one crystal, or a mixture of crystals and minerals (a rock, a wet material) whose components are shown
+# and can be changed (start from a model, e.g. a Martian rock); and its density, in % of that of the compact material
+# (pores: less than 100 %).
+MIX = "__mixture__"
+MATS = [(k, v) for k, v in sl.ODIN_MATERIALS.items()] + [("Mixture of minerals…", MIX)]
+PARTS = list(sl.MIX_PARTS)
 odin_items = w.VBox()
 SIZES = {"box": (("width", 10.0), ("height", 10.0), ("thick", 5.0)),
          "cylinder": (("diameter", 4.0), ("height", 10.0)),
          "sphere": (("diameter", 4.0),)}
 LABEL = {"box": "Block", "cylinder": "Cylinder", "sphere": "Sphere"}
 
+def part_row(box, label=PARTS[0], pct=50.0):
+    m = w.Dropdown(options=PARTS, value=label, layout=w.Layout(width="270px"))
+    f = w.BoundedFloatText(value=pct, min=0, max=100, step=1, description="%", layout=w.Layout(width="120px"),
+                           style={"description_width": "20px"})
+    rm = w.Button(description="", icon="trash", tooltip="remove this component", layout=w.Layout(width="44px"))
+    r = w.HBox([m, f, rm])
+    r.part, r.pct = m, f
+    rm.on_click(lambda _: setattr(box, "children", tuple(x for x in box.children if x is not r)))
+    box.children = box.children + (r,)
+
 def add_odin(shape):
-    mat = w.Dropdown(options=MATS, value=MATS[0][1], layout=w.Layout(width="170px"))
+    mat = w.Dropdown(options=MATS, value=MATS[0][1], layout=w.Layout(width="190px"))
+    dens = w.BoundedFloatText(value=100.0, min=5, max=100, step=1, description="density %", layout=w.Layout(width="150px"),
+                              style={"description_width": "70px"})
     pos = [small(d, 0.0) for d in ("x [mm]", "y [mm]", "z [mm]")]
     size = [small(d, v) for d, v in SIZES[shape]]
     rm = w.Button(description="", icon="trash", tooltip="remove", layout=w.Layout(width="44px"))
-    row = w.HBox([w.HTML(f"<b style='display:inline-block;width:64px'>{LABEL[shape]}</b>"), mat] + pos + size + [rm],
-                 layout=w.Layout(flex_flow="row wrap", align_items="center"))
-    row.shape, row.mat, row.pos, row.size = shape, mat, pos, size
+    line = w.HBox([w.HTML(f"<b style='display:inline-block;width:64px'>{LABEL[shape]}</b>"), mat, dens] + pos + size + [rm],
+                  layout=w.Layout(flex_flow="row wrap", align_items="center"))
+    # the mixture: its components (shown when "Mixture of minerals…" is chosen)
+    parts = w.VBox()
+    model = w.Dropdown(options=[("— start from a model —", "")] + [(k, k) for k in sl.MIX_MODELS], value="",
+                       layout=w.Layout(width="270px"))
+    more = w.Button(description="Add a component", icon="plus", layout=w.Layout(width="auto"))
+    more.on_click(lambda _: part_row(parts))
+
+    def from_model(c):
+        if c["new"]:
+            parts.children = ()
+            for k, f in sl.MIX_MODELS[c["new"]]:
+                part_row(parts, k, f)
+    model.observe(from_model, "value")
+    mix = w.VBox([w.HTML("<i>Mixture: the volume fraction of each component (they must add up to 100 %).</i>"),
+                  model, parts, more], layout=w.Layout(margin="2px 0 8px 72px", display="none"))
+    mat.observe(lambda c: setattr(mix.layout, "display", "" if c["new"] == MIX else "none"), "value")
+    row = w.VBox([line, mix])
+    row.shape, row.mat, row.dens, row.pos, row.size, row.parts = shape, mat, dens, pos, size, parts
     rm.on_click(lambda _: setattr(odin_items, "children", tuple(r for r in odin_items.children if r is not row)))
     odin_items.children = odin_items.children + (row,)
 
 def odin_spec():
-    vols = []
-    for r in odin_items.children:
+    vols, named = [], {}
+    for k, r in enumerate(odin_items.children):
         s = [v.value for v in r.size]
         size = s if r.shape == "box" else [s[0], s[1], s[0]] if r.shape == "cylinder" else [s[0]] * 3
-        vols.append(dict(material=r.mat.value, center_mm=[p.value for p in r.pos], size_mm=size,
+        if r.mat.value == MIX:
+            parts = [(x.part.value, x.pct.value) for x in r.parts.children]
+            if not parts or sum(p for _, p in parts) <= 0:
+                material = "phases<>"                           # (reported by the check: no component)
+            else:
+                material = f"mixture {k + 1}"
+                named[material] = sl.odin_mixture(parts, r.dens.value) if abs(sum(p for _, p in parts) - 100) < 0.5 \
+                    else "phases<" + "&".join(f"{p / 100:.4g}*{sl.MIX_PARTS[n]}" for n, p in parts) + ">"
+        else:
+            material = sl.odin_material(r.mat.value, r.dens.value)
+        vols.append(dict(material=material, center_mm=[p.value for p in r.pos], size_mm=size,
                          **({"shape": r.shape} if r.shape != "box" else {})))
-    return dict(name=title.value or name.value, description=description.value, volumes=vols)
+    return dict(name=title.value or name.value, description=description.value, volumes=vols,
+                **({"materials": named} if named else {}))
 
 add_odin("box")
 odin_buttons = [w.Button(description=f"Add a {LABEL[s].lower()}", icon="plus", layout=w.Layout(width="auto")) for s in SIZES]
 for b, s in zip(odin_buttons, SIZES):
     b.on_click(lambda _, s=s: add_odin(s))
-odin_box = w.VBox([w.HTML("As many volumes as you want, each of one crystalline material; they must not overlap. "
-                          "x is horizontal, y vertical (mm, from the center of the beam), z along the beam; cylinders "
-                          "stand vertically (the axis of the rotation stage). The camera sees 14 mm × 14 mm."),
+odin_box = w.VBox([w.HTML("As many volumes as you want, each of one crystalline material or of a mixture (a rock, a "
+                          "wet material: choose <i>Mixture of minerals…</i>, start from a model and change its "
+                          "components); the density is in % of that of the compact material (less with pores). The "
+                          "volumes must not overlap. x is horizontal, y vertical (mm, from the center of the beam), z "
+                          "along the beam; cylinders stand vertically (the axis of the rotation stage). The camera sees "
+                          "14 mm × 14 mm."),
                    odin_items, w.HBox(odin_buttons)])
 
 # ---------------------------------------------------------------- LoKI: kinds of particles in a solvent

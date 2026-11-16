@@ -22,6 +22,76 @@ from IPython.display import clear_output, display
 ROOT = os.path.dirname(os.path.abspath(__file__))
 HIDE_NICOS = "<style>.jp-Cell:has(.twin-nicos), .jp-Notebook-cell:has(.twin-nicos) { display: none !important; }</style>"
 
+# the look of the panel: cards of settings, the detectors with their buttons, the colors of the app
+PANEL_CSS = """<style>
+.tw-panel {gap: 14px; margin-top: 6px}
+.tw-intro {color: #3B4658; line-height: 1.5}
+.tw-grid {display: grid !important; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; width: 100%;
+  overflow: visible !important}
+.tw-card {background: #fff; border: 1px solid #E2E7EE; border-radius: 12px; padding: 12px 14px 14px; gap: 6px;
+  box-shadow: 0 1px 3px rgba(11, 22, 38, .05); min-width: 0; overflow: visible !important}
+.tw-card .widget-inline-hbox {width: auto !important; max-width: 100%; min-width: 0}
+.tw-card .widget-inline-hbox input, .tw-card .widget-inline-hbox select {min-width: 0}
+.tw-card .widget-toggle-buttons {display: flex !important; flex-direction: row !important; flex-wrap: nowrap !important;
+  align-items: center}
+.tw-card .widget-toggle-buttons > .widget-label {display: block !important; text-align: right; flex: 0 0 auto;
+  width: var(--tw-label, 110px); margin-right: 8px}
+.tw-card .widget-toggle-buttons > div {display: flex; flex: 1 1 auto; flex-wrap: nowrap; min-width: 0}
+.tw-card .widget-toggle-buttons .widget-toggle-button {width: auto; min-width: 72px; padding: 0 12px}
+.tw-card.tw-act {border-top: 3px solid #0E7C70}
+.tw-h {font-weight: 700; font-size: 12px; letter-spacing: .6px; text-transform: uppercase; color: #0E7C70}
+.tw-note {font-size: 12.5px; color: #5B6779; line-height: 1.45; margin-top: 2px}
+.tw-panel .widget-label {color: #3B4658}
+.tw-panel input, .tw-panel select {border: 1px solid #CBD3DE !important; border-radius: 8px !important; background: #fff}
+.tw-panel .widget-toggle-buttons .widget-toggle-button {border: 1px solid #CBD3DE; background: #fff; color: #5B6779;
+  font-weight: 600; border-radius: 8px; box-shadow: none; margin-right: 6px}
+.tw-panel .widget-toggle-buttons .widget-toggle-button.mod-active {background: #E7F5F3; border-color: #0E7C70;
+  color: #0A5F56; box-shadow: inset 0 -2px 0 #0E7C70}
+.tw-panel .jupyter-button:not(.widget-toggle-button) {height: 40px; border-radius: 10px; font-weight: 600; padding: 0 16px;
+  border: 1px solid #CBD3DE; background: #fff; color: #142033; box-shadow: none}
+.tw-panel .jupyter-button.mod-primary {background: #0E7C70; border-color: #0E7C70; color: #fff}
+.tw-panel .jupyter-button:disabled {opacity: .55}
+.tw-panel .progress-bar {background-color: #0E7C70 !important}
+.tw-row {gap: 10px; align-items: center; flex-wrap: wrap}
+.tw-out {background: #F5F7FA; border-left: 4px solid #0E7C70; border-radius: 8px; padding: 2px 12px}
+.tw-loading {padding: 18px; text-align: center; color: #5B6779; font-weight: 600}
+</style>"""
+
+
+def _card(title, *children, note="", action=False):
+    """A card of the panel: its title, an optional short text, its widgets."""
+    head = [w.HTML(f'<div class="tw-h">{title}</div>' + (f'<div class="tw-note">{note}</div>' if note else ""))]
+    box = w.VBox(head + list(children))
+    box.add_class("tw-card")
+    if action:
+        box.add_class("tw-act")
+    return box
+
+
+def _fit(*widgets, label=110):
+    """Widgets of a card: as wide as the card, their labels aligned."""
+    for x in widgets:
+        x.style.description_width = f"{label}px"
+    return list(widgets)
+
+
+def _row(*widgets):
+    r = w.HBox(list(widgets))
+    r.add_class("tw-row")
+    return r
+
+
+def _grid(*cards):
+    g = w.Box(list(cards))
+    g.add_class("tw-grid")
+    return g
+
+
+def _layout(intro, *parts):
+    v = w.VBox([w.HTML(PANEL_CSS + f'<div class="tw-intro">{intro}</div>'), *parts])
+    v.add_class("tw-panel")
+    return v
+
 
 def _run_root():
     return os.environ.get("TWIN_RUN_ROOT", os.path.join(os.path.expanduser("~"), "McStas_runs", "twin"))
@@ -87,7 +157,9 @@ class Panel:
                 nb_tools.nicos(self.instrument)
             self.box.children = [w.HTML("Follow the steps below, in the window of NICOS."), out]
         else:
+            # the button of NICOS gone at once, a word while the panel is built (the instrument takes a few seconds)
             self.style.value = HIDE_NICOS
+            self.box.children = [w.HTML('<div class="tw-loading">Loading the panel of the instrument…</div>')]
             panel = {"odin": self._odin_panel, "loki": self._loki_panel}.get(self.instrument)
             self.box.children = [panel() if panel else w.HTML(f"No panel for {self.instrument}: measure in NICOS.")]
 
@@ -103,11 +175,14 @@ class Panel:
             self.odin.use_folder(self.folder)
         odin = self.odin
         st = odin.status()
-        samples = self.samples or [st["sample"]]
-        if st["sample"] not in samples:
-            odin.move(sample=samples[0])
+        # nothing mounted for the student: mounting the sample is the first step (a sample of another exercise
+        # still on the stage is taken off)
+        samples = self.samples or [n for n in odin.samples() if n != "none"]
+        if st["sample"] not in samples and st["sample"] != "none":
+            odin.move(sample="none")
             st = odin.status()
-        sample = w.Dropdown(options=samples, value=st["sample"], description="Sample")
+        sample = w.Dropdown(options=[("— none (nothing mounted) —", "none")] + [(n, n) for n in samples],
+                            value=st["sample"], description="Sample")
         shutter = w.ToggleButtons(options=["closed", "open"], value=st["shutter"], description="Shutter")
         stage = w.BoundedFloatText(value=st["stage_x"] * 1000, min=-500, max=500, step=1, description="Stage x (mm)")
         choppers = w.Dropdown(options=[("WFM", "wfm"), ("natural (band-pass + T0)", "natural"), ("white (none)", "white")],
@@ -118,7 +193,7 @@ class Panel:
         lib = sl.load("odin")
         max_kN = max((float((lib.get(n) or {}).get("load", {}).get("max_kN", 0)) for n in samples), default=0)
         load = w.FloatSlider(value=float(st.get("load") or 0), min=0, max=max_kN or 1, step=1, readout_format=".0f",
-                             description="Load (kN)", continuous_update=False, layout=w.Layout(width="420px"))
+                             description="Load (kN)", continuous_update=False)
         t = w.BoundedFloatText(value=30, min=1, max=3600, step=1, description="Time (s)")
         title = w.Text(placeholder="e.g. open beam", description="Title")
         go = w.Button(description="Count", button_style="primary", icon="play", layout=w.Layout(width="auto"))
@@ -143,13 +218,13 @@ class Panel:
 
         go.on_click(count)
         # the integrating camera (white-beam radiography, tomography): as radiograph() and tomography() in NICOS
-        cam = w.Button(description="Camera image", icon="camera", layout=w.Layout(width="auto"))
-        cam_px = w.ToggleButtons(options=[("standard (128 px, 110 µm)", 128), ("high resolution (512 px, 27.5 µm)", 512)],
-                                 value=128, description="Camera", style={"button_width": "230px"})
+        cam = w.Button(description="Camera image", icon="camera", button_style="primary", layout=w.Layout(width="auto"))
+        cam_px = w.Dropdown(options=[("standard (128 px, 110 µm)", 128), ("high resolution (512 px, 27.5 µm)", 512)],
+                            value=128, description="Resolution")
         step = w.Dropdown(options=[("12° (15 images)", 12.0), ("6° (30 images)", 6.0), ("3° (60 images)", 3.0)],
-                          value=6.0, description="Tomography", layout=w.Layout(width="300px"))
+                          value=6.0, description="Tomography", layout=w.Layout(width="250px"))
         tomo = w.Button(description="Run the tomography", icon="sync", layout=w.Layout(width="auto"))
-        bar = w.IntProgress(value=0, min=0, max=1, layout=w.Layout(width="300px"))
+        bar = w.IntProgress(value=0, min=0, max=1, layout=w.Layout(width="160px", display="none"))
 
         def settings():
             odin.move(sample=sample.value, shutter=shutter.value, stage_x=stage.value / 1000, choppers=choppers.value,
@@ -177,7 +252,7 @@ class Panel:
                 try:
                     settings()
                     angles = [k * step.value for k in range(int(round(180 / step.value)))]
-                    bar.max, bar.value = len(angles), 0
+                    bar.max, bar.value, bar.layout.display = len(angles), 0, ""
                     files = odin.tomography(angles, float(t.value), title=title.value or "tomography",
                                             progress=lambda k, n, f: setattr(bar, "value", k), pixels=cam_px.value)
                     odin.move(stage_rot=0.0)
@@ -214,9 +289,9 @@ class Panel:
             cyc = w.BoundedFloatText(value=float(st.get("cycle_time", 0.0)), min=0, max=55, step=0.5,
                                      description="Cycle time (h)")
             every = w.Dropdown(options=[("every 5 h", 5.0), ("every 2.5 h", 2.5), ("every hour", 1.0)], value=2.5,
-                               description="Film", layout=w.Layout(width="300px"))
+                               description="Film", layout=w.Layout(width="250px"))
             film = w.Button(description="Film the cycle (camera)", icon="film", layout=w.Layout(width="auto"))
-            fbar = w.IntProgress(value=0, min=0, max=1, layout=w.Layout(width="300px"))
+            fbar = w.IntProgress(value=0, min=0, max=1, layout=w.Layout(width="160px", display="none"))
 
             def film_cycle(_):
                 film.disabled = True
@@ -225,7 +300,7 @@ class Panel:
                     try:
                         settings()
                         times = [round(k * every.value, 2) for k in range(int(55 / every.value + 1e-9) + 1)]
-                        fbar.max, fbar.value = len(times), 0
+                        fbar.max, fbar.value, fbar.layout.display = len(times), 0, ""
                         for tc in times:
                             odin.move(cycle_time=float(tc))
                             odin.camera(float(t.value), title=f"{title.value or 'cell'} {tc:g} h", pixels=cam_px.value)
@@ -238,9 +313,9 @@ class Panel:
 
             film.on_click(film_cycle)
             cyc.observe(lambda c: odin.move(cycle_time=float(c["new"])), "value")
-            op_box = [w.HTML("<b>Battery cycler</b>: the time since the start of the cycle (the state of the cell), "
-                             "and a film of the cycle: one camera image of the time set above at each step."),
-                      cyc, w.HBox([every, film, fbar])]
+            op_box = [_card("Battery cycler", *_fit(cyc), _row(every, film, fbar),
+                            note="The time since the start of the cycle (the state of the cell), and a film of the "
+                                 "cycle: one camera image of the time set above at each step.")]
         # polarized imaging (samples with a field map): as polarimetry() and polarization_matrix() in NICOS
         magnetic = [n for n in samples if (lib.get(n) or {}).get("field")]
         pol_box = []
@@ -251,7 +326,7 @@ class Panel:
             s_out = w.Dropdown(options=["x", "y", "z"], value=st["spin_out"], description="Analyzer")
             one = w.Button(description="Polarized image", icon="compass", layout=w.Layout(width="auto"))
             full = w.Button(description="Polarization matrix (18 images)", icon="th", layout=w.Layout(width="auto"))
-            pbar = w.IntProgress(value=0, min=0, max=18, layout=w.Layout(width="300px"))
+            pbar = w.IntProgress(value=0, min=0, max=18, layout=w.Layout(width="160px", display="none"))
 
             def pol_settings():
                 settings()
@@ -276,6 +351,7 @@ class Panel:
                     clear_output()
                     try:
                         polz.value = "in"
+                        pbar.value, pbar.layout.display = 0, ""
                         pol_settings()
                         files = odin.polarization_matrix(float(t.value), title=title.value or "",
                                                          progress=lambda k, n, f: setattr(pbar, "value", k))
@@ -287,16 +363,23 @@ class Panel:
 
             one.on_click(pol_one)
             full.on_click(pol_full)
-            pol_box = [w.HTML("<b>Polarized imaging</b> (Timepix3, counts per wavelength): polarizer and analyzer, "
-                              "the spin in and the direction analyzed; <i>Polarization matrix</i> takes the 18 images "
-                              "(spin in ±x, ±y, ±z; analyzer x, y, z), each of the time set above."),
-                       rot, polz, s_in, s_out, w.HBox([one, full, pbar])]
-        return w.VBox([w.HTML("The instrument, as in NICOS: set the devices, then <i>Count</i> (the event camera, "
-                              "Timepix3: time of flight) or <i>Camera image</i> (the integrating camera of white-beam "
-                              "imaging); one file each, with its title. <i>Run the tomography</i> takes a camera image "
-                              "at each angle over 180°, of the time set above."),
-                       sample, shutter, stage, choppers, delta, pinhole, *([load] if max_kN else []), t, title,
-                       w.HBox([go, cam, hist]), cam_px, w.HBox([step, tomo, bar]), *op_box, *pol_box, out])
+            one.button_style = "primary"
+            pol_box = [_card("Polarized imaging", *_fit(rot, polz, s_in, s_out), _row(one, full, pbar), action=True,
+                             note="Timepix3, counts per wavelength. <i>Polarization matrix</i> takes the 18 images "
+                                  "(spin in ±x, ±y, ±z; analyzer x, y, z), each of the time set above.")]
+        settings_cards = _grid(
+            _card("Sample", *_fit(sample, stage, *([load] if max_kN else []))),
+            _card("Beam", *_fit(shutter, choppers, delta, pinhole)),
+            _card("Each measurement", *_fit(t, title), note="One file per measurement, with its title."))
+        detector_cards = _grid(
+            _card("Timepix3 · time of flight", _row(go, hist), action=True,
+                  note="<i>Count</i>: every neutron with its time of flight (Bragg edges, wavelengths). "
+                       "<i>Histogram image</i>: long exposures, counts per wavelength bin."),
+            _card("Camera · white beam", *_fit(cam_px), _row(cam), _row(step, tomo, bar), action=True,
+                  note="Images of all the wavelengths together (radiography); the tomography takes one image at "
+                       "each angle over 180°."))
+        return _layout("The instrument, as in NICOS: set the devices, then measure. Your files go to the folder of "
+                       f"proposal {self.proposal}.", settings_cards, detector_cards, *op_box, *pol_box, out)
 
     # ------------------------------------------------------------------ LoKI
     def _loki_panel(self):
@@ -310,8 +393,10 @@ class Panel:
         loki = self.loki
         st, ch = loki.state, loki.choices
         samples = self.samples or list(ch["sample"])
+        if "empty_beam" not in samples:            # nothing in the beam: the start, and the empty-beam measurement
+            samples = ["empty_beam"] + samples
         if st["sample"] not in samples:
-            loki.move(sample=samples[0])
+            loki.move(sample="empty_beam")
             st = loki.state
         widgets = {
             "sample": w.Dropdown(options=samples, value=st["sample"], description="Sample"),
@@ -324,8 +409,7 @@ class Panel:
             "detector_distance": w.Dropdown(options=list(ch["detector_distance"]), value=st["detector_distance"],
                                             description="Detector (m)"),
         }
-        for x in widgets.values():
-            x.style = {"description_width": "110px"}
+        _fit(*widgets.values(), label=120)
         t = w.BoundedFloatText(value=60, min=1, max=3600, step=1, description="Time (s)")
         title = w.Text(placeholder="e.g. empty cell", description="Title")
         go = w.Button(description="Count", button_style="primary", icon="play", layout=w.Layout(width="auto"))
@@ -347,5 +431,13 @@ class Panel:
             go.disabled = False
 
         go.on_click(count)
-        return w.VBox([w.HTML("The instrument, as in NICOS: set the devices, then <i>Count</i> (one file per count, "
-                              "with its title)."), *widgets.values(), t, title, go, out])
+        k = list(widgets)
+        return _layout(
+            f"The instrument, as in NICOS: set the devices, then count. Your files go to the folder of proposal "
+            f"{self.proposal}.",
+            _grid(_card("Sample and beam", *[widgets[n] for n in k if n in ("sample", "heavy_shutter", "shutter")]),
+                  _card("Collimation and detector", *[widgets[n] for n in k if n not in ("sample", "heavy_shutter",
+                                                                                       "shutter")]),
+                  _card("Each measurement", *_fit(t, title, label=120), _row(go), action=True,
+                        note="One file per count, with its title.")),
+            out)

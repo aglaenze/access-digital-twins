@@ -30,6 +30,6 @@ The committee asks for:
 
 ## How to
 
-1. Click **Open NICOS** (in your starter notebook). Tab *Experiment*: **Find my proposal**, **1260**, **Apply**.
+1. Click **Open NICOS** (in your starter notebook). Tab *Experiment*: **Find my proposal**, **1260**, **Apply**. Nothing is mounted yet: your first command mounts a sample of the proposal, e.g. `move(sample_holder, 'battery_graphite')`.
 2. Measure; your files go to `data/odin/<year>/1260/raw`.
 3. Analyze them with the **starter notebook**. The tools are there; the decisions are yours.

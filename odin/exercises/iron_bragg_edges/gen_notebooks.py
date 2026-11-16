@@ -292,8 +292,8 @@ samples, and the files go to its folder. The proposal of this exercise is **1234
 
 In NICOS, tab **Experiment**, click **Find my proposal**. NICOS asks the user office for your proposals. If you have
 only one, NICOS fills in the form at once (number 1234, title, users, sample); if you have several, it lets you choose.
-Check that the number is 1234, then click **Apply**: the proposal becomes the current experiment, and its sample, the
-iron plate, is mounted on the sample changer.
+Check that the number is 1234, then click **Apply**: the proposal becomes the current experiment. Nothing is mounted
+yet: NICOS lists the sample of the proposal, the iron plate, and mounting it is your first step (below).
 
 Then go to the tab **Instrument interaction**. Type each command below in the command line at the top, then press
 *Enter*, one at a time; the *Output* tab shows what NICOS does.
@@ -301,9 +301,11 @@ Then go to the tab **Instrument interaction**. Type each command below in the co
 ### Step 2. The instrument
 
 ```
+move(sample_holder, 'iron_plate')
 sample_info()
 ```
-describes the sample mounted on the instrument: an iron plate of 10 mm × 10 mm, 5 mm thick. Check it before measuring.
+mounts the sample of your proposal on the sample changer, then describes it: an iron plate of 10 mm × 10 mm, 5 mm
+thick. Check it before measuring.
 
 ```
 move(choppers, 'wfm')
@@ -542,7 +544,7 @@ bt[1:1] = [md('**Your proposal** (click to open it):'),
            code('import sys, os' + chr(10) + 'sys.path.insert(0, os.path.abspath("../../.."))' + chr(10) + 'import nb_tools' + chr(10) + 'nb_tools.proposal("odin/exercises/iron_bragg_edges/beamtime.md")'),
            md("## 1. Your sample\n\nThe sample changer of ODIN holds the samples of the library (in NICOS, `sample_info()` describes the one mounted). For your own question, design a sample with the sample builder: blocks, cylinders and spheres of the materials you choose, as many as you want. It is saved with your proposal and appears on the sample changer of NICOS: `move(sample_holder, 'its_name')`."),
            code('nb_tools.sample_builder("odin", "1234")'),
-           md("## 2. Your measurements, in NICOS\n\n1. Tab *Experiment*: **Find my proposal**, choose your proposal, then **Apply** (first: as at ESS its number, title, users and samples are filled in and its first sample is mounted; your own samples are kept with your proposal, NICOS finds them only then).\n2. **Mount your sample** (tab *Instrument interaction*, command line): `move(sample_holder, 'its_name')`, the short name of a sample of the library (e.g. `iron_plate`) or of the one you made in part 1. `sample_info()` describes the sample mounted; for a name NICOS does not know, it lists the samples available. Every count measures the sample mounted at that moment.\n3. **Record**: `with nexusfile_open('my title'): count(t=60)`; your files go to the folder of your proposal (below). The measurements and their counting times are your decisions: your budget is in your proposal."),
+           md("## 2. Your measurements, in NICOS\n\n1. Tab *Experiment*: **Find my proposal**, choose your proposal, then **Apply** (first: as at ESS its number, title, users and samples are filled in; nothing is mounted yet; your own samples are kept with your proposal, NICOS finds them only then).\n2. **Mount your sample** (tab *Instrument interaction*, command line): `move(sample_holder, 'its_name')`, the short name of a sample of the library (e.g. `iron_plate`) or of the one you made in part 1. `sample_info()` describes the sample mounted; for a name NICOS does not know, it lists the samples available. Every count measures the sample mounted at that moment.\n3. **Record**: `with nexusfile_open('my title'): count(t=60)`; your files go to the folder of your proposal (below). The measurements and their counting times are your decisions: your budget is in your proposal."),
            code('nb_tools.nicos("odin")')]
 bt += [md("## Submit your work\n\nWhen you are done: save this notebook (*Save*), then submit. The file for your teacher is made from your measurements and your notebook."),
        code("import submit\n_ = submit.Submit(\"odin/exercises/iron_bragg_edges\", \"beamtime\")")]

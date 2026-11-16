@@ -33,7 +33,7 @@ your proposal and appears on the sample changer.
 
 1. Click **Open NICOS** (at the top of your starter notebook): the NICOS window of LoKI opens, ready.
 2. Tab *Experiment*: **Find my proposal**, choose proposal **3001**, then **Apply**. As at ESS, its number, title, users and
-   samples are filled in, and the silica spheres are mounted (you may mount another sample).
+   samples are filled in; nothing is in the beam yet: mount each sample in turn, `move(sample_holder, 'silica_spheres')`.
 3. Record data with `nexusfile_open`, e.g. `with nexusfile_open('silica 3m'): count(t=600)`.
    Your files go to `data/loki/2026/3001/raw`.
 4. Analyze them with the **starter notebook** (button *Starter notebook* of the catalogue).

@@ -234,8 +234,9 @@ Answer `1` (ODIN). After ~30 s the NICOS window of ESS opens. Log in with user *
 (server `localhost:1301`).
 
 1. Tab **Experiment**: **Find my proposal**, choose your proposal, then **Apply**. As at ESS, NICOS asks the user office for
-   your proposals (here the twin's: the proposals of the exercises and your free beamtimes), and fills in the number, title, users and samples; the first sample is mounted on the sample changer
-   (mount another one with `move(sample_holder, 'its_name')`). Without a proposal NICOS refuses to record data, as at
+   your proposals (here the twin's: the proposals of the exercises and your free beamtimes), and fills in the number, title, users and samples. Nothing is mounted: the sample of the previous experiment is
+   taken off, NICOS lists the samples of the proposal (an error if it has none), and mounting one is your first step,
+   `move(sample_holder, 'its_name')`. Without a proposal NICOS refuses to record data, as at
    ESS. (`start_nicos.py --no-proposals`: any number can be typed in instead, as when the proposal system is down.)
 2. Tab **Instrument interaction**: type in the command line (one line, then Enter; or several lines in the tab
    **Scripting**, then Run):

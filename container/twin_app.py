@@ -120,6 +120,8 @@ class Catalogue(Base):
         for f in sorted(glob.glob(os.path.join(self.root, "*", "exercises", "*", "exercise.yml"))):
             with open(f, encoding="utf-8") as fh:
                 e = yaml.safe_load(fh)
+            if e.get("hidden"):              # an exercise kept in the repository but no longer offered (hidden: true)
+                continue
             e["dir"] = os.path.relpath(os.path.dirname(f), self.root).replace(os.sep, "/")
             for key, m in (e.get("modes") or {}).items():
                 if m.get("file", "").endswith(".md"):            # the proposal sheet of a beamtime, as HTML

@@ -3,6 +3,8 @@ title: Unknown metals (game)
 short: Unlabeled plates               # the name of its node on the map of the catalogue
 number: "0 bis"              # the challenge that goes with exercise 0
 instrument: odin
+# not offered in the catalogue any more (2026-11-16); to be removed with its pages and notebooks
+hidden: true
 # its place in the story (STORY.md): the thread (column of the catalogue) and the client
 story: {thread: energy, client: "Fyrø · Circularity, then your own team"}
 technique: Wavelength-resolved imaging (Bragg edges)

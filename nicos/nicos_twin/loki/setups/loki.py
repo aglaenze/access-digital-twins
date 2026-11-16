@@ -30,6 +30,7 @@ devices = dict(
         twinurl = URL, twindevice = 'detector_distance', states = [5.0, 10.0], unit = 'm',
     ),
     sample_holder = device('nicos_twin.devices.TwinSampleChanger',
+        empty = 'empty_beam',
         description = 'sample changer: built-in samples and your own (sample builder); sample_info() describes it',
         twinurl = URL, twindevice = 'sample',
     ),

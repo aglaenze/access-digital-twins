@@ -115,6 +115,9 @@ class TwinSampleChanger(TwinSwitch):
     """The sample changer: its list of samples comes from the twin (built-in samples, then the student's own samples
     of the current proposal, made with the sample builder), so a new sample can be mounted at once."""
     parameter_overrides = {"states": Override(mandatory=False, default=[])}
+    parameters = {
+        "empty": Param("the position of the sample changer with nothing in the beam", type=str, default="none"),
+    }
 
     def _sync(self):
         exp = session.experiment
@@ -354,7 +357,8 @@ class TwinExperiment(EssExperiment):
     Proposals: as at ESS, from the twin's user office (user_office.py, written to the proposal cache cache_filepath
     by start_nicos.py): "Find my proposal" in the Experiment tab lists the proposals of the exercises and the student's own (free
     beamtimes, imported proposals) and fills in the number, title, users and samples. On a new proposal, its first
-    sample is mounted on the sample changer (the student may mount another one). With start_nicos.py --no-proposals,
+    sample changer is emptied: mounting the sample is the first step of the experiment; the samples of the proposal
+    are listed, and a proposal without any sample is reported as an error. With start_nicos.py --no-proposals,
     any number can be typed in, as when the proposal system is unreachable at ESS. NewExperiment in a script accepts
     any number in both cases, as at ESS."""
 
@@ -369,23 +373,32 @@ class TwinExperiment(EssExperiment):
         EssExperiment.new(self, proposal, title, localcontact, user, **kwds)
         if self._client is None:
             return
-        try:                               # the first sample of the proposal, mounted by default
+        # a new experiment starts with nothing in the beam: the sample of the previous one is taken off, and
+        # mounting the sample of this proposal is the student's first step (nothing is mounted for them)
+        try:
             found = [p for p in self._client.all_proposals() if str(p.id) == str(proposal)]
             names = [s.name for s in found[0].samples] if found else []
-            changer = session.getDevice("sample_holder") if names else None
+            changer = session.getDevice("sample_holder")
         except Exception:                  # noqa: BLE001 (no proposal, or no sample changer in this setup)
             return
-        if changer is not None:
-            try:
-                if changer.isAllowed(names[0])[0]:
-                    changer.maw(names[0])
-                    self.log.info("sample %r of proposal %s mounted (sample_holder); mount another one with "
-                                  "move(sample_holder, '<name>')", names[0], proposal)
-                else:
-                    self.log.info("the samples of proposal %s are not on the sample changer yet: build them with "
-                                  "the sample builder (same short names: %s)", proposal, ", ".join(names))
-            except Exception as e:         # noqa: BLE001
-                self.log.warning("sample %r not mounted: %s", names[0], e)
+        try:
+            if changer.read(0) != changer.empty:
+                changer.maw(changer.empty)
+        except Exception as e:             # noqa: BLE001
+            self.log.warning("the sample changer could not be emptied: %s", e)
+        if not names:
+            self.log.error("proposal %s has no sample: nothing can be measured. Describe your sample in the proposal "
+                           "(the sample builder, button of your starter notebook, with its short name), then apply "
+                           "the proposal again.", proposal)
+            return
+        ready = [n for n in names if changer.isAllowed(n)[0]]
+        self.log.info("proposal %s: nothing is mounted yet. Its sample%s: %s. First step: mount it, "
+                      "move(sample_holder, '%s')", proposal, "s" if len(names) > 1 else "", ", ".join(names),
+                      (ready or names)[0])
+        missing = [n for n in names if n not in ready]
+        if missing:
+            self.log.warning("not on the sample changer yet: %s; build %s with the sample builder (same short "
+                             "name)", ", ".join(missing), "them" if len(missing) > 1 else "it")
 
     def _canQueryProposals(self):
         return self._client is not None

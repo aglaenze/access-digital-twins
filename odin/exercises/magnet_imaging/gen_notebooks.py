@@ -370,8 +370,13 @@ Either way your files go to the folder of proposal {PROPOSAL}.
         nicos_step(md(f"""
 ### Step 1. Your proposal
 
-In NICOS, tab **Experiment**, **Find my proposal**, choose **{PROPOSAL}**, then **Apply**; tab **Sample**: mount
-`{V['sample']}`. Then tab **Instrument interaction**, one command at a time.
+In NICOS, tab **Experiment**, **Find my proposal**, choose **{PROPOSAL}**, then **Apply**: nothing is mounted yet.
+Then tab **Instrument interaction**, one command at a time; the first one mounts your sample:
+
+```
+move(sample_holder, '{V['sample']}')
+sample_info()
+```
 """)), nicos_step(md(f"""
 ### Step 2. Without the sample, then the sample
 

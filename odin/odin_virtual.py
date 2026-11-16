@@ -133,6 +133,11 @@ FAULTS = {
     "beam_outages": "frequent beam outages (proton charge drops to zero)",
 }
 REFERENCE_SAMPLE = "iron_plate"    # McStas instrument used for the open-beam simulations of the hybrid model
+# Nothing on the sample stage: the state of the instrument at its start, and after a new proposal is applied in NICOS
+# (mounting the sample is the student's first step). A measurement then sees the beam alone: the same physics as a
+# sample moved out of the beam (the open beam of the reference sample).
+EMPTY = "none"
+EMPTY_NAME = "No sample (empty sample holder)"
 
 def _odin_sample(spec):
     out = dict(volumes=sl.odin_volumes(spec), name=spec.get("name", spec["id"]), formula=spec.get("formula", ""))
@@ -233,7 +238,8 @@ class VirtualOdin:
                    help="horizontal sample translation; |x| > 2 cm: out of the field of view"),
             Device("stage_rot", 0.0, "deg", limits=(-180, 180), nexus="spst1_rot_y",
                    help="sample rotation about the vertical axis"),
-            Device("sample", "iron_plate", choices=tuple(SAMPLES), help="sample mounted on the stage"),
+            Device("sample", EMPTY, choices=(EMPTY,) + tuple(SAMPLES),
+                   help="sample mounted on the stage ('none': nothing mounted)"),
             Device("load", 0.0, "kN", limits=(0.0, MAX_LOAD),
                    help="tensile force of the load frame on the sample (samples that can be loaded only)"),
             Device("cycle_time", 0.0, "h", limits=(0.0, 55.0),
@@ -258,12 +264,26 @@ class VirtualOdin:
         for n, spec in sl.load("odin", self.folder).items():
             if spec["source"] == "student" and n not in out and not sl.validate("odin", spec):
                 out[n] = _odin_sample(spec)
-        self.devices["sample"].choices = tuple(out)
+        self.devices["sample"].choices = (EMPTY,) + tuple(out)
         return out
+
+    def _physical(self, state):
+        """The state as the physics sees it: with no sample mounted, the reference sample out of the beam (the beam
+        alone). The files still tell that no sample was mounted (_sample_name, _stage_x)."""
+        if state["sample"] != EMPTY:
+            return state
+        return dict(state, sample=REFERENCE_SAMPLE, stage_x=0.5, _empty=True, _stage_x=state["stage_x"])
+
+    def _sample_name(self, state):
+        return EMPTY_NAME if state.get("_empty") else self.samples()[state["sample"]]["name"]
 
     def sample_spec(self, name=None):
         """The description of a sample (sample_library format), for display."""
         name = name or self.devices["sample"].value
+        if name == EMPTY:
+            return dict(id=EMPTY, name=EMPTY_NAME, volumes=[],
+                        description="Nothing is mounted on the sample stage: mount a sample first "
+                                    "(NICOS: move(sample_holder, '<name>'))")
         lib = sl.load("odin", self.folder)
         if name in lib:
             return lib[name]
@@ -286,6 +306,8 @@ class VirtualOdin:
         if "sample" in settings and "load" not in settings and self.devices["load"].value:
             settings = dict(settings, load=0.0)
         if settings.get("load"):
+            if settings.get("sample", self.devices["sample"].value) == EMPTY:
+                raise ValueError("load: no sample is mounted (mount one first)")
             smp = self.samples()[settings.get("sample", self.devices["sample"].value)]
             if not smp.get("strain_per_kN"):
                 raise ValueError(f"load: the sample {smp['name']!r} is not in a load frame (it cannot be loaded)")
@@ -302,7 +324,9 @@ class VirtualOdin:
     def strains(self, state=None):
         """Lattice strain along the beam of each volume of the sample at the present load (zeros without load);
         None: the sample is not in a load frame."""
-        state = state or self.status()
+        state = self._physical(state or self.status())
+        if state.get("_empty"):
+            return None
         smp = self.samples()[state["sample"]]
         if not smp.get("strain_per_kN"):
             return None
@@ -364,7 +388,7 @@ class VirtualOdin:
         if not 0 < t <= 3600:
             raise ValueError("counting time between 0 and 3600 s")
         t0 = time.time()
-        state = self.status()
+        state = self._physical(self.status())
         if self.budget_s is not None and state["shutter"] == "open" and self.beam_used() + t > self.budget_s + 1e-9:
             raise ValueError(f"beamtime exhausted: {self.budget_s - self.beam_used():.0f} s left of {self.budget_s:.0f} s")
         if "stage_offset" in self.faults:          # the stage is not where it says it is (hidden from the files)
@@ -414,7 +438,7 @@ class VirtualOdin:
         self.number += 1
         out_file = f"{self.folder}/odin_{self.number:06d}.nxs"
         r = nx.write_nexus(counts, out_file, t, title=title or f"run {self.number}",
-                           sample_name=self.samples()[state["sample"]]["name"], det_dist=tw.DET_DIST, charge=charge,
+                           sample_name=self._sample_name(state), det_dist=tw.DET_DIST, charge=charge,
                            pulses_per_frame=ppf,
                            settings=self._nexus_settings() | nx.chopper_settings(state["choppers"], state["wfm_delta"]))
         self.last_n_counts = r["n_counts"]
@@ -442,7 +466,7 @@ class VirtualOdin:
         if not 0 < t <= 3600:
             raise ValueError("camera exposure between 0 and 3600 s")
         t0 = time.time()
-        state = self.status()
+        state = self._physical(self.status())
         if self.budget_s is not None and state["shutter"] == "open" and self.beam_used() + t > self.budget_s + 1e-9:
             raise ValueError(f"beamtime exhausted: {self.budget_s - self.beam_used():.0f} s left of {self.budget_s:.0f} s")
         ppf = nx.PULSES_PER_FRAME[state["choppers"]]
@@ -470,9 +494,9 @@ class VirtualOdin:
                 e["title"] = title or f"run {self.number}"
                 e["start_time"] = _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="seconds")
                 e["duration"] = float(t)
-                e["sample/name"] = self.samples()[state["sample"]]["name"]
+                e["sample/name"] = self._sample_name(state)
                 e["sample/rotation_angle"] = float(state["stage_rot"])
-                e["sample/x_translation"] = float(state["stage_x"])
+                e["sample/x_translation"] = float(state.get("_stage_x", state["stage_x"]))
                 cam = e.create_group("instrument/camera")
                 cam.attrs["NX_class"] = "NXdetector"
                 for k in ("shutter", "choppers", "diffuser"):        # the state of the instrument during the image
@@ -502,7 +526,7 @@ class VirtualOdin:
         if not 0 < t <= 3600 * 4:
             raise ValueError("exposure between 0 and 4 hours")
         t0 = time.time()
-        state = self.status()
+        state = self._physical(self.status())
         if self.budget_s is not None and state["shutter"] == "open" and self.beam_used() + t > self.budget_s + 1e-9:
             raise ValueError(f"beamtime exhausted: {self.budget_s - self.beam_used():.0f} s left of {self.budget_s:.0f} s")
         if self.mode != "hybrid":
@@ -540,7 +564,7 @@ class VirtualOdin:
                 e["duration"] = float(t)
                 e["sample/name"] = smp["name"]
                 e["sample/rotation_angle"] = float(state["stage_rot"])
-                e["sample/x_translation"] = float(state["stage_x"])
+                e["sample/x_translation"] = float(state.get("_stage_x", state["stage_x"]))
                 cam = e.create_group("instrument/camera")
                 cam.attrs["NX_class"] = "NXdetector"
                 for k in ("shutter", "choppers", "diffuser", "polarizer", "spin_in", "spin_out"):
@@ -571,7 +595,7 @@ class VirtualOdin:
         if not 0 < t <= 4 * 3600:
             raise ValueError("exposure between 0 and 4 hours")
         t0 = time.time()
-        state = self.status()
+        state = self._physical(self.status())
         if state["choppers"] not in ("wfm", "natural"):
             raise ValueError("histogram mode: choppers 'wfm' or 'natural' (a white beam has no time of flight)")
         if self.budget_s is not None and state["shutter"] == "open" and self.beam_used() + t > self.budget_s + 1e-9:
@@ -607,7 +631,7 @@ class VirtualOdin:
                 e["duration"] = float(t)
                 e["sample/name"] = smp["name"]
                 e["sample/rotation_angle"] = float(state["stage_rot"])
-                e["sample/x_translation"] = float(state["stage_x"])
+                e["sample/x_translation"] = float(state.get("_stage_x", state["stage_x"]))
                 cam = e.create_group("instrument/camera")
                 cam.attrs["NX_class"] = "NXdetector"
                 cam.attrs["mode"] = "tof histogram"

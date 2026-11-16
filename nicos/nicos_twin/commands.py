@@ -153,7 +153,8 @@ def sample_info():
               "φ": "phi"}                        # the NICOS log of a Windows console cannot write them
     for line in r["text"].splitlines():
         session.log.info("".join(ascii_.get(c, c) for c in line))
-    session.log.info("drawing of the sample: %s (open it in JupyterLab)", r["png"])
+    if r.get("png"):
+        session.log.info("drawing of the sample: %s (open it in JupyterLab)", r["png"])
 
 
 # --------------------------------------------------------------------------- ODIN: the camera of white-beam imaging

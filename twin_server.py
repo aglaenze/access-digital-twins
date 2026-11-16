@@ -351,6 +351,9 @@ class Handler(BaseHTTPRequestHandler):
             matplotlib.use("Agg")
             import sample_library as sl
             spec = INSTR.sample_spec()
+            if spec.get("empty") or (INSTR_NAME == "odin" and not spec.get("volumes")):     # nothing mounted
+                return self._reply(200, dict(name=spec["id"], text=f"{spec['name']}: mount a sample first, "
+                                             "move(sample_holder, '<name>')", png=""))
             text = sl.describe(INSTR_NAME, spec)
             folder = sl.user_folder(INSTR.folder)
             os.makedirs(folder, exist_ok=True)

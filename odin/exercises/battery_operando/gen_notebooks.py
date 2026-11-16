@@ -217,8 +217,14 @@ Choose how: **in NICOS** (the commands below), or **here, with a panel** (*Camer
         nicos_step(md(f"""
 ### Step 1. Your proposal
 
-In NICOS, tab **Experiment**, **Find my proposal**, choose **{PROPOSAL}**, then **Apply**. Then tab **Instrument
-interaction**.
+In NICOS, tab **Experiment**, **Find my proposal**, choose **{PROPOSAL}**, then **Apply**: the proposal becomes the
+current experiment, and nothing is mounted yet. Then tab **Instrument interaction**: your first command mounts the cell
+on its cycler, and `sample_info()` describes it:
+
+```
+move(sample_holder, 'battery_graphite')
+sample_info()
+```
 """)), nicos_step(md(r"""
 ### Step 2. Dark, open beam, the film of the cycle
 

@@ -54,13 +54,15 @@ each step or not.
 
 The order of the catalogue is kept (introduction, then 0, 0 bis, 1, 2...). The numbers below are those of the
 exercises (the themes of ODIN), seen only in the teacher's view; the student's map numbers the chapters along each
-thread (Energy 1 to 5, Planets 1 to 3, the instrument 1 and 2), in this order. Each line gives the client, the request,
+thread (Energy 1 to 3, Planets 1 to 3, the instrument 1 and 2), in this order. Each line gives the client, the request,
 and the short mission of the catalogue card at each level. ★ = differs from the current text.
 
 ### ODIN
 
 **Introduction to ODIN: your first day.** ★ Maja shows you ODIN, from the source to the camera, before the first
 requests arrive. (Same page; only its first paragraph is new: the welcome into the team.)
+
+*Chapters 0 and 0 bis are hidden from the catalogue since 2026-11-16 (to be removed); Energy starts with the battery.*
 
 **0. How far apart are the atoms in iron?** Thread: Energy (Fyrø *Structures*).
 - Request ★: Fyrø's steel supplier has delivered plates for the foundations of the turbines, sold as ferritic steel

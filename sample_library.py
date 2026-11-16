@@ -51,11 +51,97 @@ ODIN_MATERIALS = {   # label shown to students: NCrystal file
     "tungsten": "W_sg229.ncmat", "lead": "Pb_sg225.ncmat", "silicon": "Si_sg227.ncmat", "zirconium": "Zr_sg194.ncmat",
     "magnesium": "Mg_sg194.ncmat", "zinc": "Zn_sg194.ncmat", "tin": "Sn_sg141.ncmat", "silver": "Ag_sg225.ncmat",
     "gold": "Au_sg225.ncmat",
-    # rocks (models made of the minerals NCrystal provides; odin/samples/meteorite_nwa7034.yml)
-    "Martian rock (model)": "phases<0.5*SiO2-alpha_sg154_AlphaQuartz.ncmat&0.3*Mg2SiO4_sg62_MagnesiumSilicate.ncmat&0.2*Al2O3_sg167_Corundum.ncmat>",
-    "rock with 6 % water (model)": "phases<0.8*SiO2-alpha_sg154_AlphaQuartz.ncmat&0.2*MgO2H2_sg164_MagnesiumHydroxide.ncmat>",
     "void": "void.ncmat",
 }
+# minerals and liquids for the mixtures of the sample builder (a rock, a wet material), besides the crystals above
+MINERALS = {
+    "quartz (SiO2)": "SiO2-alpha_sg154_AlphaQuartz.ncmat",
+    "forsterite (olivine, Mg2SiO4)": "Mg2SiO4_sg62_MagnesiumSilicate.ncmat",
+    "corundum (Al2O3)": "Al2O3_sg167_Corundum.ncmat",
+    "brucite (Mg(OH)2: holds water)": "MgO2H2_sg164_MagnesiumHydroxide.ncmat",
+    "portlandite (Ca(OH)2: holds water)": "CaO2H2_sg164_CalciumHydroxide.ncmat",
+    "magnesite (MgCO3)": "MgCO3_sg167_MagnesiumCarbonate.ncmat",
+    "liquid water (H2O)": "LiquidWaterH2O_T293.6K.ncmat",
+    "liquid heavy water (D2O)": "LiquidHeavyWaterD2O_T293.6K.ncmat",
+}
+MIX_PARTS = {**{k: v for k, v in ODIN_MATERIALS.items() if v != "void.ncmat"}, **MINERALS}
+# models to start a mixture from (volume fractions in %): its components then shown, each one can be changed
+MIX_MODELS = {
+    "Martian rock (model)": [("quartz (SiO2)", 50), ("forsterite (olivine, Mg2SiO4)", 30), ("corundum (Al2O3)", 20)],
+    "rock with 6 % water (model)": [("quartz (SiO2)", 80), ("brucite (Mg(OH)2: holds water)", 20)],
+}
+# the two rocks of the first versions of the builder: still accepted in samples saved with them
+LEGACY = {
+    "Martian rock (model)": "phases<0.5*SiO2-alpha_sg154_AlphaQuartz.ncmat&0.3*Mg2SiO4_sg62_MagnesiumSilicate.ncmat&0.2*Al2O3_sg167_Corundum.ncmat>",
+    "rock with 6 % water (model)": "phases<0.8*SiO2-alpha_sg154_AlphaQuartz.ncmat&0.2*MgO2H2_sg164_MagnesiumHydroxide.ncmat>",
+}
+
+
+def odin_material(base, density=100.0):
+    """NCrystal configuration of a crystal with a density in % of the crystal's (pores: less than 100 %)."""
+    d = float(density)
+    return base if abs(d - 100) < 1e-9 else f"{base};density={d / 100:g}x"
+
+
+def odin_mixture(parts, density=100.0):
+    """NCrystal configuration of a mixture: parts [(label of MIX_PARTS, volume fraction in %)], normalized to 100 %;
+    density in % of that of the compact mixture."""
+    tot = sum(float(f) for _, f in parts)
+    body = "&".join(f"{float(f) / tot:.4g}*{MIX_PARTS[k]}" for k, f in parts)
+    return odin_material(f"phases<{body}>", density)
+
+
+def _split_density(cfg):
+    m = re.match(r"^(.*?)(?:;density=([0-9.eE+-]+)x)?$", cfg)
+    return m.group(1), (float(m.group(2)) * 100 if m.group(2) else 100.0)
+
+
+def odin_material_problem(cfg):
+    """What is wrong with the material of a student's volume (None: fine): a crystal of the list, or a mixture of the
+    crystals and minerals of the builder, with an optional density factor."""
+    if cfg in ODIN_MATERIALS.values() or cfg in LEGACY.values():
+        return None
+    base, dens = _split_density(cfg)
+    if not 5 <= dens <= 100:
+        return f"density {dens:g} %: between 5 and 100 % of that of the crystal"
+    if base in ODIN_MATERIALS.values() and base != "void.ncmat":
+        return None
+    m = re.match(r"^phases<(.*)>$", base)
+    if not m:
+        return f"unknown material {cfg!r}"
+    if not m.group(1):
+        return "a mixture needs at least one component"
+    fracs = []
+    for part in m.group(1).split("&"):
+        f, _, mat = part.partition("*")
+        if mat not in MIX_PARTS.values():
+            return f"unknown component {mat!r} in a mixture"
+        try:
+            fracs.append(float(f))
+        except ValueError:
+            return f"fraction {f!r} in a mixture"
+    if min(fracs) <= 0 or abs(sum(fracs) - 1) > 0.01:
+        return "the fractions of a mixture must be positive and add up to 100 %"
+    return None
+
+
+def odin_material_label(spec, name):
+    """What a student reads for the material of a volume: the crystal, or the composition of a mixture."""
+    named = spec.get("materials") or {}
+    cfg = named.get(name, name)
+    labels = {v: k for k, v in {**ODIN_MATERIALS, **MINERALS, **LEGACY}.items()}
+    if cfg in labels:
+        return labels[cfg]
+    base, dens = _split_density(cfg)
+    m = re.match(r"^phases<(.*)>$", base)
+    if base in labels:
+        txt = labels[base]
+    elif m and all(p.partition("*")[2] in labels for p in m.group(1).split("&")):
+        txt = "mixture of " + ", ".join(f"{100 * float(p.partition('*')[0]):.3g} % {labels[p.partition('*')[2]].split(' (')[0]}"
+                                         for p in m.group(1).split("&"))
+    else:
+        return name                     # a material named in the sample (a rock of a built-in sample)
+    return txt + (f", {dens:.3g} % of its density" if abs(dens - 100) > 1e-9 else "")
 ODIN_COLORS = {"Fe_sg229_Iron-alpha.ncmat": "#6B7280", "Fe_sg225_Iron-gamma.ncmat": "#9CA3AF",
                "Al_sg225.ncmat": "#C7D2FE", "Cu_sg225.ncmat": "#C2410C", "Ni_sg225.ncmat": "#A3A380",
                "Pb_sg225.ncmat": "#475569", "W_sg229.ncmat": "#334155", "Au_sg225.ncmat": "#EAB308",
@@ -155,8 +241,9 @@ def validate(instrument, spec):
             what = f"{shape if shape != 'box' else 'block'} {k + 1}"
             if shape not in ODIN_SHAPES:
                 errors.append(f"{what}: unknown shape (box, sphere or cylinder)")
-            if v.get("material") not in ODIN_MATERIALS.values():
-                errors.append(f"{what}: unknown material {v.get('material')!r}")
+            problem = odin_material_problem((spec.get("materials") or {}).get(v.get("material"), v.get("material") or ""))
+            if problem:
+                errors.append(f"{what}: {problem}")
             size = np.asarray(v.get("size_mm", [0, 0, 0]), float)
             if len(size) != 3 or (size <= 0).any() or (size > 100).any():
                 errors.append(f"{what}: sizes must be between 0 and 100 mm")
@@ -333,13 +420,12 @@ def describe(instrument, spec, hidden=()):
     if spec.get("description"):
         lines.append(spec["description"])
     if instrument == "odin":
-        label = {v: k for k, v in ODIN_MATERIALS.items()}
         n_inc = 0
         for k, v in enumerate(spec.get("volumes", [])):
             if "inside" in v and "inclusions" in hidden:          # inclusions to be found: not described
                 n_inc += 1
                 continue
-            mat = q("material", label.get(v["material"], v["material"]))
+            mat = q("material", odin_material_label(spec, v["material"]))
             sx, sy, sz = (list(v["size_mm"]) * 3)[:3] if len(v["size_mm"]) == 1 else (list(v["size_mm"]) + [0, 0])[:3]
             cx, cy, cz = v.get("center_mm", (0, 0, 0))
             at = f"centered at x = {cx:g} mm, y = {cy:g} mm" + (f", z = {cz:g} mm" if cz else "")
@@ -394,7 +480,6 @@ def draw(instrument, spec, hidden=(), fig=None):
     fig = fig or plt.figure(figsize=(10, 4.2))
     fig.clf()
     if instrument == "odin":
-        label = {v: k for k, v in ODIN_MATERIALS.items()}
         a1, a2 = fig.add_subplot(1, 2, 1), fig.add_subplot(1, 2, 2)
         for v in spec.get("volumes", []):
             if "inside" in v and "inclusions" in hidden:      # inclusions to be found: not drawn
@@ -402,8 +487,10 @@ def draw(instrument, spec, hidden=(), fig=None):
             sz_ = list(v["size_mm"])
             (sx, sy, sz) = (sz_ * 3)[:3] if len(sz_) == 1 else (sz_ + [0, 0])[:3]
             (cx, cy, cz) = v.get("center_mm", (0, 0, 0))
-            col = "#9CA3AF" if "material" in hidden else ODIN_COLORS.get(v["material"], "#A8A29E")
-            name = "?" if "material" in hidden else label.get(v["material"], v["material"])
+            cfg = (spec.get("materials") or {}).get(v["material"], v["material"])
+            col = "#9CA3AF" if "material" in hidden else ODIN_COLORS.get(_split_density(cfg)[0],
+                                                                        "#7C6A58" if "phases<" in cfg else "#A8A29E")
+            name = "?" if "material" in hidden else odin_material_label(spec, v["material"])
             shape = v.get("shape", "box")
             if shape == "sphere":                      # a disk in both views
                 a1.add_patch(Circle((cx, cy), sx / 2, fc=col, ec="k", alpha=0.85, label=name))

@@ -241,8 +241,10 @@ to the folder of proposal {PROPOSAL}.
         nicos_step(md(f"""
 ### Step 1. Your proposal
 
-In NICOS, tab **Experiment**, **Find my proposal**, choose **{PROPOSAL}**, then **Apply**. Then tab **Instrument
-interaction**.
+In NICOS, tab **Experiment**, **Find my proposal**, choose **{PROPOSAL}**, then **Apply**: the proposal becomes the
+current experiment, and nothing is mounted yet (NICOS lists its samples, the three holders). Then tab **Instrument
+interaction**: you mount each holder in turn (`move(sample_holder, ...)` below); `sample_info()` describes the one
+mounted.
 """)), nicos_step(md(r"""
 ### Step 2. Dark, open beam, the three holders
 

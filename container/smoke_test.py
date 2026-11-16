@@ -63,7 +63,8 @@ import NCrystal as NC                                 # noqa: E402
 import odin_virtual as ov                             # noqa: E402
 import odin_reduction as red                          # noqa: E402
 odin = ov.VirtualOdin(session="ci_smoke_test", mpi=int(os.environ.get("TWIN_MPI", "4")))
-odin.move(choppers="wfm", wfm_delta=0.10)
+check(odin.status()["sample"] == "none", "the twin starts with nothing on the sample stage (sample 'none')")
+odin.move(choppers="wfm", wfm_delta=0.10, sample="iron_plate")
 dark = odin.count(5, title="dark")
 odin.move(shutter="open", stage_x=0.5)
 ob = odin.count(20, title="open beam")
@@ -319,6 +320,7 @@ else:
     # ODIN: dark, open beam, iron plate, one job each (as at ESS: one file per job)
     ready, out = nicos_session("odin", "ci_fw_odin",
                                "NewExperiment(1235, 'file-writer test')\n"
+                               "move(sample_holder, 'iron_plate')\n"
                                "move(choppers, 'wfm', wfm_delta, 0.1); move(shutter, 'closed')\n"
                                "with nexusfile_open('dark'):\n    count(t=5)\n"
                                "move(shutter, 'open', stage_x, 500)\n"
@@ -414,7 +416,8 @@ fw_here = fw_service.available()[0]
 ESS["t0"], ESS["mem0"] = time.time(), mem_used_mb()
 ready, out = nicos_session("odin", "ci_ess",
                            "NewExperiment(1241, 'data chain of the app')\n"
-                           "move(choppers, 'wfm', wfm_delta, 0.1); move(shutter, 'closed')\n"
+                           "move(sample_holder, 'iron_plate')\n"
+                               "move(choppers, 'wfm', wfm_delta, 0.1); move(shutter, 'closed')\n"
                            "with nexusfile_open('dark'):\n    count(t=10)\n"
                            "move(shutter, 'open', stage_x, 500)\n"
                            "with nexusfile_open('open beam'):\n    count(t=30)\n"
@@ -705,10 +708,10 @@ check(any(x.startswith("1234 | Lattice spacing") and "['iron_plate']" in x for x
       and len(props) == 3,
       f"user office: Find my proposal lists the proposal of the exercise (1234, its sample), the student's free beamtime "
       f"({free['id']}, no sample) and imported proposal (2025123, its sample to build)")
-check("experiment 1234, mounted iron_plate" in out,
-      "user office: applying the proposal of the exercise mounts its sample (the student may mount another)")
-check(f"experiment {free['id']}, mounted iron_plate" in out,
-      "user office: a free beamtime imposes no sample (the one mounted stays)")
+check("experiment 1234, mounted none" in out and "First step: mount it, move(sample_holder, 'iron_plate')" in out,
+      "user office: applying the proposal of the exercise takes the previous sample off and tells which one to mount")
+check(f"experiment {free['id']}, mounted none" in out and f"proposal {free['id']} has no sample" in out,
+      "user office: a proposal without any sample is reported as an error, and nothing is mounted")
 if f"experiment {free['id']}" not in out:
     show_logs()
 

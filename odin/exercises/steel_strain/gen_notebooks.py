@@ -93,8 +93,13 @@ Either way your files go to the folder of proposal 1240, and the rest of the not
 ### Step 1. Your proposal
 
 In NICOS, tab **Experiment**, **Find my proposal**, choose **1240** (*Lattice strain of a steel specimen under load*),
-then **Apply**: the specimen is mounted in the load frame. Then tab **Instrument interaction**: type each command
-below in the command line, then *Enter*.
+then **Apply**: nothing is mounted yet. Then tab **Instrument interaction**: type each command below in the command
+line, then *Enter*; the first one mounts the specimen in the load frame:
+
+```
+move(sample_holder, 'steel_tensile')
+sample_info()
+```
 """)), nicos_step(md(r"""
 ### Step 2. The beam
 

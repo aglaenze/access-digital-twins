@@ -118,7 +118,13 @@ proposal 1250.
 ### Step 1. Your proposal
 
 In NICOS, tab **Experiment**, **Find my proposal**, choose **1250** (*Water in a Martian meteorite*), then **Apply**:
-the piece is mounted on the rotation stage. Then tab **Instrument interaction**, one command at a time.
+nothing is mounted yet. Then tab **Instrument interaction**, one command at a time; the first one mounts the piece on
+the rotation stage:
+
+```
+move(sample_holder, 'meteorite_nwa7034')
+sample_info()
+```
 """)), nicos_step(md(r"""
 ### Step 2. White beam, high resolution: dark, open beam, radiograph
 

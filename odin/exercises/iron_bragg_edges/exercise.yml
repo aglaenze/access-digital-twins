@@ -4,6 +4,8 @@ title: How far apart are the atoms in iron?
 short: Steel for the foundations               # the name of its node on the map of the catalogue
 number: "0"                  # place in the catalogue: 0 = the first exercise (a simple sample: the iron plate)
 instrument: odin
+# not offered in the catalogue any more (2026-11-16); to be removed with its pages and notebooks
+hidden: true
 # its place in the story (STORY.md): the thread (column of the catalogue) and the client
 story: {thread: energy, client: "Fyrø · Structures"}
 technique: Wavelength-resolved imaging (Bragg edges)

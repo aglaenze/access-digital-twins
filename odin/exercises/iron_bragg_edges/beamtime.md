@@ -28,7 +28,7 @@ the plane spacing *d* of a reference: a **5 mm iron plate**. The beamtime commit
 
 1. Click **Open NICOS** (at the top of your starter notebook): the NICOS window of ODIN opens, ready.
 2. Tab *Experiment*: **Find my proposal**, choose proposal **1234**, then **Apply**. As at ESS, its number, title, users and
-   sample are filled in, and the iron plate is mounted (you may mount another sample). Without a proposal NICOS
+   sample are filled in; nothing is mounted yet: mount the sample first, `move(sample_holder, 'iron_plate')`. Without a proposal NICOS
    does not record data, as at ESS.
 3. Record data with `nexusfile_open`, e.g. `with nexusfile_open('my title'): count(t=60)`.
    Your files go to `data/odin/2026/1234/raw`.

@@ -272,8 +272,8 @@ samples, and the files go to its folder. The proposal of this exercise is **3001
 
 In NICOS, tab **Experiment**, click **Find my proposal**. NICOS asks the user office for your proposals. If you have
 only one, NICOS fills in the form at once (number 3001, title, users, samples); if you have several, it lets you choose.
-Check that the number is 3001, then click **Apply**: the proposal becomes the current experiment, and its samples are
-on the sample changer.
+Check that the number is 3001, then click **Apply**: the proposal becomes the current experiment. Nothing is in the
+beam yet: NICOS lists the samples of the proposal, and you mount each one in turn (below).
 
 Then go to the tab **Instrument interaction**. Type each command below in the command line at the top, then press
 *Enter*, one at a time; the *Output* tab shows what NICOS does.
@@ -477,7 +477,7 @@ bt[1:1] = [md('**Your proposal** (click to open it):'),
            code('import sys, os' + chr(10) + 'sys.path.insert(0, os.path.abspath("../../.."))' + chr(10) + 'import nb_tools' + chr(10) + 'nb_tools.proposal("loki/exercises/silica_spheres/beamtime.md")'),
            md("## 1. Your sample\n\nThe sample changer of LoKI holds the samples of the library (in NICOS, `sample_info()` describes the one mounted). For your own question, design a sample with the sample builder: particles of the kinds you choose (spheres, cylinders, core-shell spheres, as many kinds as you want) in a H2O/D2O solvent. It is saved with your proposal and appears on the sample changer of NICOS: `move(sample_holder, 'its_name')`."),
            code('nb_tools.sample_builder("loki", "3001")'),
-           md("## 2. Your measurements, in NICOS\n\n1. Tab *Experiment*: **Find my proposal**, choose your proposal, then **Apply** (first: as at ESS its number, title, users and samples are filled in and its first sample is mounted; your own samples are kept with your proposal, NICOS finds them only then).\n2. **Mount your sample** (tab *Instrument interaction*, command line): `move(sample_holder, 'its_name')`, the short name of a sample of the library (e.g. `silica_spheres`, `d2o`, `empty_beam`) or of the one you made in part 1. `sample_info()` describes the sample mounted; for a name NICOS does not know, it lists the samples available. Every count measures the sample mounted at that moment.\n3. **Record**: `with nexusfile_open('my title'): count(t=60)`; your files go to the folder of your proposal (below). The measurements and their counting times are your decisions: your budget is in your proposal."),
+           md("## 2. Your measurements, in NICOS\n\n1. Tab *Experiment*: **Find my proposal**, choose your proposal, then **Apply** (first: as at ESS its number, title, users and samples are filled in; nothing is mounted yet; your own samples are kept with your proposal, NICOS finds them only then).\n2. **Mount your sample** (tab *Instrument interaction*, command line): `move(sample_holder, 'its_name')`, the short name of a sample of the library (e.g. `silica_spheres`, `d2o`, `empty_beam`) or of the one you made in part 1. `sample_info()` describes the sample mounted; for a name NICOS does not know, it lists the samples available. Every count measures the sample mounted at that moment.\n3. **Record**: `with nexusfile_open('my title'): count(t=60)`; your files go to the folder of your proposal (below). The measurements and their counting times are your decisions: your budget is in your proposal."),
            code('nb_tools.nicos("loki")')]
 bt += [md("## Submit your work\n\nWhen you are done: save this notebook (*Save*), then submit. The file for your teacher is made from your measurements and your notebook."),
        code("import submit\n_ = submit.Submit(\"loki/exercises/silica_spheres\", \"beamtime\")")]

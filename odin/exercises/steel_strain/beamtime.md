@@ -31,7 +31,7 @@ The beamtime committee asks for:
 ## How to
 
 1. Click **Open NICOS** (in your starter notebook): the NICOS window of ODIN opens, ready.
-2. Tab *Experiment*: **Find my proposal**, choose **1240**, then **Apply**: the specimen is mounted in its load frame.
+2. Tab *Experiment*: **Find my proposal**, choose **1240**, then **Apply**; nothing is mounted yet: mount the specimen in its load frame first, `move(sample_holder, 'steel_tensile')`.
 3. Record data with `nexusfile_open`, e.g. `move(load, 10.75)` then `with nexusfile_open('steel 10.75 kN'): count(t=60)`.
    Your files go to `data/odin/<year>/1240/raw`; each file holds the force of the frame.
 4. Analyze them with the **starter notebook**. The tools are there; the decisions are yours.

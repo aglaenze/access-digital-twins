@@ -93,7 +93,9 @@ class VirtualLoki:
             Device("pulse_skipping", "off", ("off", "on"),
                    "on: choppers at 7 Hz, one source pulse in two, wavelength band twice as wide (3 m collimation)"),
             Device("detector_distance", 5.0, DETECTOR_DISTANCES, "distance sample -> rear detector bank", unit="m"),
-            Device("sample", "silica_spheres", tuple(sl.load("loki")), "sample in the beam (sample changer)"),
+            # nothing in the beam at the start (and after a new proposal is applied in NICOS): mounting the sample
+            # is the student's first step
+            Device("sample", "empty_beam", tuple(sl.load("loki")), "sample in the beam (sample changer)"),
         ]}
         self.choices = {n: d.choices for n, d in self.devices.items()}
         self.folder = None
