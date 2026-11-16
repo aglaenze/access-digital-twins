@@ -1,7 +1,8 @@
 # Beamtime on ODIN: magnetic fields inside matter
 
-**Your role**: the neutron specialist of a team that needs to see magnetic fields where no probe can go: inside the
-windings of a coil, inside a rock.
+**Your role**: lead scientist of the Neutron Solutions Team of ESS, and author of this proposal. Two requests need to
+see magnetic fields where no probe can go: inside the windings of the new coil of ODIN's polarized setup, built by the
+team's workshop, and inside a fragment of the Mars team's meteorite NWA 7034.
 
 ## Your proposal (accepted)
 

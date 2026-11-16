@@ -1,7 +1,10 @@
 # One exercise of the catalogue of the app (read by container/twin_app.py: no generation needed).
 title: Unknown metals (game)
+short: Unlabeled plates               # the name of its node on the map of the catalogue
 number: "0 bis"              # the challenge that goes with exercise 0
 instrument: odin
+# its place in the story (STORY.md): the thread (column of the catalogue) and the client
+story: {thread: energy, client: "Fyrø · Circularity, then your own team"}
 technique: Wavelength-resolved imaging (Bragg edges)
 sample: Three metal plates labeled A, B, C
 question: >-
@@ -9,7 +12,9 @@ question: >-
   Mission 2: the instrument has a hidden fault; find it from the data.
 learn: Planning a measurement under a budget, identifying a crystal structure from its Bragg edges, troubleshooting.
 mission: >-
-  You are the neutron expert of a metal-recycling company: three plates have lost their labels, and a plate in the wrong furnace ruins a batch of alloy. Identify them without damaging them. Then, as instrument scientist on duty, find the hidden fault of the instrument.
+  Fyrø's recycling yard takes old turbines apart: three plates have lost their labels, and a plate in the wrong
+  furnace ruins a batch of alloy. Identify them on a limited beamtime budget. Then, the same night, Maja is away and you
+  are on duty: find the hidden fault of the instrument before the next user arrives.
 status: ready
 modes:
   bsc:

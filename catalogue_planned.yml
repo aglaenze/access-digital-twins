@@ -5,19 +5,25 @@
 # dark-field and polarized imaging), each with a realistic sample, ideally one already measured.
 - number: "5"
   title: The crystals of an iron meteorite
+  short: Iron-meteorite crystals
   instrument: odin
+  story: {thread: planets, client: "The Mars team · the meteorite collection"}
   technique: Texture and grains (diffraction-complemented imaging)
   sample: Cape York iron meteorite (kamacite plates, taenite)
   question: Find the orientations of the large crystals of an iron meteorite.
   later: true
 - number: "6"
   title: Structures smaller than a pixel
+  short: The dark-field gratings
   instrument: odin
+  story: {thread: instrument, client: "Your own team · the gratings of ODIN"}
   technique: Dark-field imaging (gratings, SEMSANS)
   sample: A material with micrometer-sized structures
   question: See structures far smaller than the resolution of the camera, by the small-angle scattering they cause.
   later: true
 - title: Small structures in a membrane
+  short: Electrolyser membranes
   instrument: loki
+  story: {thread: energy, client: "Fyrø · Hydrogen plant"}
   technique: SANS, contrast variation
   question: Change the H2O/D2O ratio of the solvent to make parts of a sample invisible.

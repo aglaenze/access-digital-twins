@@ -181,8 +181,9 @@ def msc():
     cells = [md(r"""
 # How does lithium enter a battery electrode? (MSc: develop the method)
 
-**Your mission.** You work for a battery maker that tests ultra-thick electrodes. You need a method you can trust to
-measure, inside a working cell, how much lithium is in the electrode at each depth and time, from the raw images to
+**Your mission.** You are a method scientist in the Neutron Solutions Team of ESS. Fyrø Energy Island stores the
+power of its wind farm in batteries, and will compare ultra-thick electrodes from several suppliers. It needs a method
+it can trust to measure, inside a working cell, how much lithium is in the electrode at each depth and time, from the raw images to
 numbers comparable with the charge counted by the cycler; and you find out what biases it. You develop it on the
 half-cell of M. Strobl, M. E. Baur, L. Theil Kuhn *et al.*, Adv. Energy Mater. (2025) (SENJU, J-PARC; the cell of
 M.-E. Lăcătuşu *et al.*, arXiv:2104.03564): a 0.4 mm graphite electrode, a glass-fiber separator and lithium metal,

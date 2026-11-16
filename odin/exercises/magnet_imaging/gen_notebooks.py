@@ -301,8 +301,9 @@ VARIANTS = {
                      field='"solenoid"', px="0.0", py="0.0", title="What is the field inside a coil?",
                      true_title="calculated (Biot–Savart along the wire)", true_label="Biot–Savart",
                      mission=r"""
-**Your mission.** You build the small magnets of neutron instruments, and you need a method you can trust to measure
-the field **inside** a coil without opening it: from the raw files to a map of $\int B\,\mathrm{d}l$ with its
+**Your mission.** You are a method scientist in the Neutron Solutions Team of ESS. The team's workshop builds the
+coils of ODIN's polarized setup, and needs a method it can trust to measure the field **inside** a coil without
+opening it: from the raw files to a map of $\int B\,\mathrm{d}l$ with its
 uncertainty, and you find out what limits it. You develop it on the coil of M. Sales *et al.*, *Three Dimensional
 Polarimetric Neutron Tomography of Magnetic Fields*, Sci. Rep. **8**, 2214 (2018), measured at RADEN (J-PARC): 13.5
 windings of aluminium wire, 15.5 mm long, 11 mm in diameter, 0.6 A, axis along $x$ tilted by 9°. Its field is
@@ -313,8 +314,8 @@ computed by the Biot–Savart law along the wire, so you can check your method a
                       title="A magnet inside a meteorite", true_title="the authors' field (their reconstruction)",
                       true_label="Qvistgaard et al.",
                       mission=r"""
-**Your mission.** Paleomagnetists want to know where the magnetization sits inside a rock, not only its total. You
-develop the analysis of polarized neutron imaging on the fragment of the Martian meteorite NWA 7034 of
+**Your mission.** You are a method scientist in the Neutron Solutions Team of ESS. The Mars team (planetary scientists
+and paleomagnetists) wants to know where the magnetization sits inside a rock, not only its total. You develop the analysis of polarized neutron imaging on the fragment of the Martian meteorite NWA 7034 of
 C. H. Qvistgaard, E. B. Naver *et al.*, Geochem. Geophys. Geosyst. **27**, e2025GC012641 (2026), measured at RADEN
 (J-PARC): 2 × 10 × 13 mm³, magnetized with a small whiteboard magnet. The twin uses the field they reconstructed from
 33 angles (DTU Data, doi:10.11583/DTU.30775208, CC BY 4.0), and you compare your images with their measured ones.""",

@@ -43,13 +43,23 @@ class Panel:
         self.folder = proposal_folder(instrument, proposal)
         self.style = w.HTML()
         self.how = w.ToggleButtons(options=[("In NICOS (as at ESS)", "nicos"), ("Here, with a panel", "panel")],
-                                   value=self._pref(), style={"button_width": "190px"})
+                                   value=self._pref(), style={"button_width": "260px", "font_weight": "600"})
+        self.how.add_class("twin-how")
         self.box = w.VBox()
         self.how.observe(lambda c: self._show(), "value")
-        display(w.VBox([w.HTML("<b>How do you measure?</b> Either way, your files go to the folder of proposal "
+        # the two choices side by side, large, in the middle of the page (as the button that opens NICOS below them)
+        css = ("<style>.twin-how .widget-toggle-buttons, .twin-how.widget-toggle-buttons {flex-wrap: nowrap}"
+               ".twin-how button.widget-toggle-button {height: 46px; font-size: 15px; border-radius: 10px; margin: 0 6px}"
+               "</style>")
+        display(w.VBox([w.HTML(css + "<b>How do you measure?</b> Either way, your files go to the folder of proposal "
                                f"{self.proposal}, and the rest of the notebook reads them."),
-                        self.how, self.style, self.box]))
+                        w.HBox([self.how], layout=w.Layout(justify_content="center", margin="8px 0 4px 0")),
+                        self.style, self.box]))
         self._show()
+
+    def _ipython_display_(self):
+        # the panel shows itself when made: nothing more when it is the last line of a cell (no "<Panel at 0x...>")
+        pass
 
     def _pref(self):
         try:

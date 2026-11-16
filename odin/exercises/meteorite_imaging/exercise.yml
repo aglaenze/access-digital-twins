@@ -1,8 +1,11 @@
 # One exercise of the catalogue of the app (read by container/twin_app.py: no generation needed).
 # Paths are relative to the root of the repository.
 title: What is hidden inside a Martian meteorite?
+short: Water from early Mars               # the name of its node on the map of the catalogue
 number: "1"                  # theme 1 of ODIN: white-beam radiography and tomography
 instrument: odin
+# its place in the story (STORY.md): the thread (column of the catalogue) and the client
+story: {thread: planets, client: "The Mars team"}
 technique: White-beam radiography and tomography (high resolution)
 sample: Martian meteorite NWA 7034, the piece of Naver et al. 2026 (12 × 8 × 2 mm, H-rich clasts)
 question: >-
@@ -10,8 +13,8 @@ question: >-
   how much water they hold, as Naver et al. (2026) did at ICON.
 learn: Transmission and attenuation, resolution (L/D, pixels), radiography, tomography (filtered back-projection), hydrogen contrast.
 mission: >-
-  You work for a team of planetary scientists. The Martian meteorite NWA 7034 holds water from early Mars: where is it,
-  and how much? A gram of it is worth more than gold: find the richest clast without cutting the meteorite, so that the
+  The Mars team, planetary scientists with a collection of meteorites, brings a request: the Martian meteorite NWA 7034
+  holds water from early Mars. Where is it, and how much? A gram of it is worth more than gold: find the richest clast without cutting the meteorite, so that the
   team can drill it out.
 status: ready
 samples:
@@ -20,18 +23,27 @@ modes:
   bsc:
     label: Guided web page
     what: Settings given, images and a tomography, slices to explore and questions.
+    mission: >-
+      The Mars team wants to drill the richest clast out of NWA 7034 without cutting it. Maja has set up ODIN: images
+      and a tomography, find the clasts and their water.
     duration: 2 hours
     open: voila
     file: odin/exercises/meteorite_imaging/ODIN_meteorite.ipynb
   msc:
     label: Notebook with method choices
     what: Choose how to reconstruct, find the clasts in 3D, estimate the water.
+    mission: >-
+      The Mars team will bring more precious pieces: build a method to find the water in 3D, with its uncertainty, on
+      NWA 7034.
     duration: 3 hours
     open: lab
     file: odin/exercises/meteorite_imaging/ODIN_meteorite_msc.ipynb
   beamtime:
     label: Beamtime with NICOS
     what: Drive ODIN in NICOS, choose your own measurements, analyze your files.
+    mission: >-
+      Your proposal was accepted: plan and run the tomography of NWA 7034 yourself, and tell the Mars team where the
+      water is and how much.
     duration: 1 day
     open: lab
     file: odin/exercises/meteorite_imaging/beamtime.md

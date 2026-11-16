@@ -91,6 +91,32 @@ class Accounts {
     return { user: this.public(u) };
   }
 
+  // The teacher view (all exercises at all levels on one page): an account becomes a teacher's with the teacher code.
+  // Only a salted hash of the code is in the app (teacher_code.json; set it with: node set_teacher_code.js <code>);
+  // TWIN_TEACHER_CODE overrides it. Like the accounts, a convenience, not a protection.
+  static teacherCodeOk(code) {
+    const clean = String(code || "").trim();
+    if (!clean) return false;
+    if (process.env.TWIN_TEACHER_CODE) return clean === process.env.TWIN_TEACHER_CODE;
+    try {
+      const t = JSON.parse(fs.readFileSync(path.join(__dirname, "teacher_code.json"), "utf-8"));
+      const h = Accounts.hash(clean, t.salt);
+      return crypto.timingSafeEqual(Buffer.from(h, "hex"), Buffer.from(t.hash, "hex"));
+    } catch {
+      return false;
+    }
+  }
+
+  setTeacher(id, code, on = true) {
+    const db = this.load();
+    const u = db.users[id];
+    if (!u) return { error: "Sign in first." };
+    if (on && !Accounts.teacherCodeOk(code)) return { error: "This teacher code is not right." };
+    u.teacher = !!on;
+    this.save(db);
+    return { user: this.public(u) };
+  }
+
   get(id) {
     const u = this.load().users[id];
     return u ? this.public(u) : null;
@@ -102,7 +128,7 @@ class Accounts {
   }
 
   public(u) {
-    return { id: u.id, name: u.name, email: u.email };
+    return { id: u.id, name: u.name, email: u.email, teacher: !!u.teacher };
   }
 }
 

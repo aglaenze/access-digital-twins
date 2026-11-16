@@ -37,8 +37,19 @@ function startBackend() {
   ready.catch(() => {});
 }
 
+// The title bar of the system is hidden: the header of the app is the title bar (it moves the window), and the
+// buttons to minimize, maximize and close are drawn over it (Windows, Linux), in the colors of the screen shown: the
+// sign-in screen (light) or the app (dark, as tall as its header). macOS: its three buttons on the left of the header.
+const OVERLAY = {
+  light: { color: "#F5F7FA", symbolColor: "#142033", height: 40 },
+  dark: { color: "#0B1626", symbolColor: "#E8EEF6", height: 60 },
+};
+const FRAME = process.platform === "darwin" ? { titleBarStyle: "hiddenInset" }
+  : { titleBarStyle: "hidden", titleBarOverlay: OVERLAY.light };
+
 function createWindow() {
   win = new BrowserWindow({
+    ...FRAME,
     width: 1400, height: 900, minWidth: 960, minHeight: 640, backgroundColor: "#0B1626", show: false,
     title: "ESS digital twins", icon: path.join(__dirname, "icon.png"), autoHideMenuBar: true,
     webPreferences: { preload: path.join(__dirname, "preload.js"), webviewTag: true, contextIsolation: true,
@@ -107,6 +118,15 @@ ipcMain.handle("reset-password", async (_e, form) => {
 ipcMain.handle("sign-in", async (_e, form) => {
   const r = accounts().signIn(form);
   return r.error ? r : signedIn(r.user);
+});
+ipcMain.handle("titlebar", (_e, theme) => {
+  if (process.platform !== "darwin" && win && OVERLAY[theme]) win.setTitleBarOverlay(OVERLAY[theme]);
+});
+ipcMain.handle("teacher", async (_e, code, on) => {
+  if (!current) return { error: "Sign in first." };
+  const r = accounts().setTeacher(current.id, code, on);
+  if (!r.error) current = r.user;
+  return r;
 });
 ipcMain.handle("sign-out", async () => { current = null; fs.rmSync(sessionFile(), { force: true }); return true; });
 
@@ -185,6 +205,11 @@ async function selftest(out) {
     check("the introduction of the instrument is the first card of the catalogue",
       await js(`(() => { const c = document.querySelector(".ex"); return !!c && c.classList.contains("intro-card")
         && !!c.querySelector('[data-act="open"][data-mode="all"]'); })()`), Date.now());
+    // a new student chooses a role first (the level): no request before
+    check("no request before a role is chosen", await js(`!document.querySelector('[data-act="open"][data-mode="bsc"]') && !!document.querySelector(".pick-role")`), Date.now());
+    await js(`document.querySelector('.role[data-level="bsc"]').click(); true`);
+    check("the trainee (BSc) role shows the requests by thread", await wait(`document.querySelectorAll(".lane .node").length > 0 && !!document.querySelector("#brief [data-act]") && !document.querySelector('[data-mode="msc"]')`, 20), Date.now());
+    await shot("2b_catalogue_bsc");
     const t1 = Date.now();
     await js(`document.querySelector('[data-act="open"][data-mode="bsc"]').click(); true`);
     check("page loaded", await wait(`document.querySelectorAll(".pane .loading").length === 0 && document.querySelectorAll(".pane webview").length === 1`, 300), t1);
@@ -219,6 +244,8 @@ async function selftest(out) {
     check(`Submit my work: the file to save is offered at once (${zips.join(", ") || "nothing downloaded"})`, zips.length > 0, Date.now());
     await js(`document.querySelector("#tab-cat").click(); true`);
     await new Promise((r) => setTimeout(r, 1500));
+    await js(`document.querySelector('.role[data-level="msc"]').click(); true`);
+    await wait(`!!document.querySelector('[data-act="open"][data-mode="msc"]')`, 20);
     const t2 = Date.now();
     await js(`document.querySelector('[data-act="open"][data-mode="msc"]').click(); true`);
     check("notebook loaded", await wait(`document.querySelectorAll(".pane .loading").length === 0 && document.querySelectorAll(".pane webview").length === 2`, 300), t2);
@@ -304,14 +331,19 @@ async function selftest(out) {
     await new Promise((r) => setTimeout(r, 2500));
     await shot("4_catalogue_again");
     log("progress: " + await js(`[...document.querySelectorAll(".prog .row span")].slice(0, 3).map(s => s.textContent).join(" | ")`));
-    // Start again: the BSc (submitted) and the MSc (a notebook copy): back to "Not started"
+    // Start again: the MSc (a notebook copy) and the BSc (submitted), each in its role: back to "Not started"
+    // (the briefing shows the chapter opened last at that level)
     await js(`window.confirm = () => true; true`);
-    for (const mode of ["bsc", "msc"]) {
+    const states = [];
+    for (const mode of ["msc", "bsc"]) {
+      await js(`document.querySelector('.role[data-level="${mode}"]').click(); true`);
+      await wait(`!!document.querySelector("#brief [data-act]")`, 20);
       const ok = await js(`(() => { const b = document.querySelector('.again[data-mode="${mode}"]'); if (b) b.click(); return !!b; })()`);
       await new Promise((r) => setTimeout(r, 4000));
       log(`start again ${mode}: button ${ok}`);
+      states.push(await js(`(document.querySelector("#brief .prog .row span") || {}).textContent || ""`));
     }
-    const after = await js(`[...document.querySelectorAll(".prog .row span")].slice(0, 2).map(s => s.textContent).join(" | ")`);
+    const after = states.join(" | ");
     check("started again (" + after + ")", after === "Not started | Not started", Date.now());
     await shot("7_started_again");
     // the free beamtime: a new proposal each time (user office of the twin), then an imported proposal

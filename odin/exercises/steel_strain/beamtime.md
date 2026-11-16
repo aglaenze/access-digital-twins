@@ -1,7 +1,8 @@
 # Beamtime on ODIN: lattice strain of a steel specimen under load
 
-**Your role**: the engineer of a team that designs steel parts for a wind turbine. The team needs to know how the
-crystal lattice of its steel is strained under load, inside the part, and how well ODIN can measure it.
+**Your role**: lead scientist of the Neutron Solutions Team of ESS, and author of this proposal. The structures
+department of Fyrø Energy Island designs the steel parts of its wind turbines: it needs to know how the crystal
+lattice of its steel is strained under load, inside the part, and how well ODIN can measure it.
 
 ## Your proposal (accepted)
 

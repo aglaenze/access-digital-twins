@@ -46,6 +46,15 @@ INSTRUMENTS = {
     "dream": dict(name="DREAM", kind="Powder diffraction", text="Not available yet: no official McStas model"),
     "bifrost": dict(name="BIFROST", kind="Spectroscopy", text="Not available yet: no official McStas model"),
 }
+# the threads of the story of the exercises (STORY.md): the columns of the catalogue of a student
+THREADS = {
+    "energy": dict(name="Energy", client="Fyrø Energy Island",
+                   text="Wind power, hydrogen, batteries and recycling: the requests of an energy island"),
+    "planets": dict(name="Planets", client="The Mars team",
+                    text="What Martian rocks tell about the water and the magnetic field of early Mars"),
+    "instrument": dict(name="The instrument", client="Your own team",
+                       text="What an instrument scientist does every day: new equipment, faults to find"),
+}
 QUIZ = {  # the quiz (quiz.Quiz name) of each way into an exercise, for the progress shown in the catalogue
     ("odin/exercises/introduction", "all"): "odin_intro",
     ("loki/exercises/introduction", "all"): "loki_intro",
@@ -121,6 +130,9 @@ class Catalogue(Base):
                     except Exception:
                         m["sheet"] = ""
                 m["progress"] = self.mode_progress(e["dir"], key)
+                if m.get("variants"):                  # each sample of the choice: its own progress
+                    for n, v in enumerate(m["variants"]):
+                        v["progress"] = self.mode_progress(e["dir"], key, variant=n)
             ex.append(e)
         planned = os.path.join(self.root, "catalogue_planned.yml")
         if os.path.isfile(planned):
@@ -134,17 +146,21 @@ class Catalogue(Base):
             for p in user_office.proposals(owner=user()):
                 if p["kind"] != "exercise":
                     mine.setdefault(p["instrument"], []).append(p)
-        self.finish(json.dumps(dict(instruments=INSTRUMENTS, exercises=ex, free=free, proposals=mine, user=user(),
+        self.finish(json.dumps(dict(instruments=INSTRUMENTS, threads=THREADS, exercises=ex, free=free, proposals=mine, user=user(),
                                     local=bool(os.environ.get("TWIN_APP_LOCAL")))))
 
-    def mode_progress(self, d, mode):
-        """{"status": "new" | "started" | "done", "text": ..., "pct": 0-100}"""
+    def mode_progress(self, d, mode, variant=None):
+        """{"status": "new" | "started" | "done", "text": ..., "pct": 0-100, "total", "right", "first", "revealed",
+        "submitted"}: the questions answered (right at the first try, answers shown) and the submission.
+        variant: one sample of an exercise with a choice of samples (its own quiz); None: the furthest one."""
         out = dict(status="new", text="Not started", pct=0)
         when = self.opened().get(f"{d}:{mode}")
         if when:
             out.update(status="started", text=f"Started {when[:10]}", pct=5)
         qs, p = QUIZ.get((d, mode)), self.progress()
         qs = (qs,) if isinstance(qs, str) else (qs or ())
+        if variant is not None:
+            qs = qs[variant:variant + 1]
         sub = {}
         try:
             with open(os.path.join(p, "submitted.json"), encoding="utf-8") as f:
@@ -158,16 +174,20 @@ class Catalogue(Base):
                 with open(os.path.join(p, q + ".meta.json"), encoding="utf-8") as f:
                     total = json.load(f).get("questions", 0)
                 import quiz
-                done = sum(1 for s in quiz._previous(os.path.join(p, q + ".jsonl")).values()
-                           if s["right"] or s["revealed"])
+                log = quiz._previous(os.path.join(p, q + ".jsonl")).values()
+                done = sum(1 for s in log if s["right"] or s["revealed"])
                 if total and round(100 * done / total) >= out["pct"]:
                     pct = round(100 * done / total)
                     out.update(status="done" if done >= total else "started", pct=pct,
-                               text=f"Questions: {done} of {total}")
+                               text=f"Questions: {done} of {total}", total=total,
+                               right=sum(1 for s in log if s["right"]),
+                               first=sum(1 for s in log if s["right"] and s["tries"] == 1),
+                               revealed=sum(1 for s in log if s["revealed"] and not s["right"]))
             except (OSError, ValueError, ImportError):
                 pass
         if sub.get(f"{d}:{mode}"):
-            out.update(status="done", pct=100, text=f"Submitted {sub[f'{d}:{mode}'][:10]}")
+            out.update(status="done", pct=100, text=f"Submitted {sub[f'{d}:{mode}'][:10]}",
+                       submitted=sub[f"{d}:{mode}"][:10])
         return out
 
 

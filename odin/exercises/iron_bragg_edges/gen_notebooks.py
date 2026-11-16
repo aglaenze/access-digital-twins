@@ -103,10 +103,11 @@ i1, i6 = section(src, "## 1."), section(src, "## 6.")
 msc = [md(r"""
 # How far apart are the atoms in iron? (MSc)
 
-**Your mission.** You are a materials engineer. A supplier has delivered steel plates sold as *ferritic* steel
-(α-iron, body-centered cubic); a mix-up with *austenitic* steel (γ-iron, face-centered cubic: not magnetic, expands
-more when heated) would matter for the parts you build, and you may not cut the plates. The Bragg edges of the
-neutron transmission reveal the crystal structure through centimeters of steel. You measure a plate with ODIN,
+**Your mission.** You are a method scientist in the Neutron Solutions Team of ESS. Fyrø Energy Island receives steel
+plates for the foundations of its wind turbines, sold as *ferritic* steel (α-iron, body-centered cubic); a mix-up with
+*austenitic* steel (γ-iron, face-centered cubic: not magnetic, expands more when heated) would matter, and the plates
+may not be cut. Fyrø will check every delivery: it needs a method it can trust and repeat. The Bragg edges of the
+neutron transmission reveal the crystal structure through centimeters of steel. You measure a first plate with ODIN,
 develop the analysis, and give your verdict with its uncertainty (end of part 6).
 
 You will measure the **Bragg edges** of an iron plate with the virtual ODIN and deduce the spacing of its atomic planes.
@@ -176,7 +177,7 @@ q.number("With your edge, what is the lattice parameter $a$ of the plate, in Å?
          explanation="a = λ_edge/√2 ≈ 4.06/1.414 = 2.87 Å; its uncertainty is that of λ_edge divided by √2.",
          title="Lattice parameter")
 """), md(r"""
-**Your verdict for the supplier.**
+**Your verdict for Fyrø.**
 """), code(r"""
 q.choice("γ-iron (face-centered cubic, a = 3.59 Å) would have its (111) edge at 4.15 Å and a (200) edge at 3.59 Å. "
          "Your plate has its last edge at about 4.06 Å and a lattice parameter of about 2.87 Å. What do you write?",

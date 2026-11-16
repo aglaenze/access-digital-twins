@@ -1,10 +1,14 @@
 # Beamtime on LoKI: how big are these nanoparticles?
 
+**Your role**: lead scientist of the Neutron Solutions Team of ESS, and author of this proposal. Fyrø Energy Island
+toughens the epoxy of its turbine blades with silica nanoparticles; each batch must have the right size.
+
 ## Your proposal (accepted)
 
-**Proposal 3001**: *"Size of silica nanoparticles for a new polishing slurry"*
+**Proposal 3001**: *"Size of silica nanoparticles for toughened turbine-blade epoxy"*
 
-A company makes silica nanoparticles that should all have the same size. Your group must measure it with
+The nanoparticles of a new batch should all have the same size, between 4.5 and 5.5 nm in radius. You must measure it
+with
 small-angle neutron scattering (SANS). The particles are dispersed in heavy water (D₂O), 1 % by volume. The beamtime
 committee asks for:
 

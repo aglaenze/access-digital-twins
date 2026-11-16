@@ -1,8 +1,9 @@
 # Beamtime on ODIN: water in a Martian meteorite
 
-**Your role**: the neutron specialist of a team of planetary scientists. The Martian meteorite NWA 7034 holds water
-from early Mars (about 6000 ppm), bound in its minerals. The team wants to know where it is and how much of it the
-richest regions hold, without cutting the meteorite.
+**Your role**: lead scientist of the Neutron Solutions Team of ESS, and author of this proposal, for the Mars team
+(planetary scientists). The Martian meteorite NWA 7034 holds water from early Mars (about 6000 ppm), bound in its
+minerals. The Mars team wants to know where it is and how much of it the richest regions hold, without cutting the
+meteorite.
 
 ## Your proposal (accepted)
 

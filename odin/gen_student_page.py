@@ -20,13 +20,15 @@ You are operating the ODIN imaging instrument at ESS. Behind this page, a McStas
 your measurements. The files are in the ESS NeXus format, and the reduction uses the official `essimaging` code, the
 same one that will be used for real ODIN data.
 
-**Your mission.** You are a materials engineer at a company that builds parts for research facilities. A supplier
-has delivered steel plates sold as *ferritic* steel: α-iron, whose atoms sit on a body-centered cubic lattice. A mix-up
-with *austenitic* steel (γ-iron, face-centered cubic) would matter: austenitic steel is not magnetic and expands more
-when heated. You may not cut the plates. Neutrons go through centimeters of steel, and the wavelengths at which the
-transmission jumps, the **Bragg edges**, are set by the distances between the planes of atoms: they reveal the
-crystal structure. Your job: measure the transmission of a plate as a function of the neutron wavelength λ, find its
-Bragg edges, and give your verdict to the supplier (part 4): α-iron or not, and with which lattice parameter?
+**Your mission.** You are a trainee in the Neutron Solutions Team of ESS, and here is your first request. Fyrø
+Energy Island, which builds an offshore wind farm, has received steel plates for the foundations of its turbines,
+sold as *ferritic* steel: α-iron, whose atoms sit on a body-centered cubic lattice. A mix-up with *austenitic* steel
+(γ-iron, face-centered cubic) would matter: austenitic steel is not magnetic and expands more when heated. The plates
+may not be cut. Neutrons go through centimeters of steel, and the wavelengths at which the transmission jumps, the
+**Bragg edges**, are set by the distances between the planes of atoms: they reveal the crystal structure. Maja, the
+instrument scientist of ODIN, has prepared the settings. Your job: measure the transmission of a plate as a function
+of the neutron wavelength λ, find its Bragg edges, and give your verdict to Fyrø (part 4): α-iron or not, and with
+which lattice parameter?
 
 **You need three measurements**:
 1. the **dark** run: shutter closed. The detector still records a few counts (gamma rays, fast neutrons): the background;
@@ -289,7 +291,7 @@ q.number("In a cubic lattice the (110) planes are $d_{110} = a/\\sqrt{2}$ apart.
          explanation="$a = d_{110}\\sqrt{2}$ = 2.867 Å: the lattice parameter of α-iron (2.8665 Å).",
          hints=['Start from d_110 = a/√2 and solve for a.', 'a = d_110 × √2, with the d of question 2 (about 2.03 Å).'],
          title="Q3. The lattice parameter")
-q.choice("**Your verdict for the supplier.** α-iron (body-centered cubic, a = 2.87 Å) has its edges at 4.05, 2.87 and "
+q.choice("**Your verdict for Fyrø.** α-iron (body-centered cubic, a = 2.87 Å) has its edges at 4.05, 2.87 and "
          "2.34 Å; γ-iron (face-centered cubic, a = 3.59 Å) would have its last edges at 4.15 and 3.59 Å. What do you "
          "write?", ["The plates are α-iron (ferritic): edges at 4.05, 2.87 and 2.34 Å, a = 2.87 Å.",
                     "The plates are γ-iron (austenitic).",
@@ -299,7 +301,7 @@ q.choice("**Your verdict for the supplier.** α-iron (body-centered cubic, a = 2
                         2: "The atoms are the same, but not their arrangement: the edges come from the distances "
                            "between the planes, which differ between the two structures.",
                         3: "No need: the neutrons went through 5 mm of steel, the measurement is non-destructive."},
-         explanation="The edges of your plate are those of a body-centered cubic lattice with a = 2.87 Å: the supplier "
+         explanation="The edges of your plate are those of a body-centered cubic lattice with a = 2.87 Å: Fyrø's supplier "
                      "delivered ferritic steel, as ordered. Neutrons saw it without cutting the plate.",
          hints=['Compare the edges you measured with the two lists given in the question.', 'Your last edge is at 4.05 Å, not 4.15 Å; do you see an edge at 3.59 Å?'],
          title="Q4. The verdict")

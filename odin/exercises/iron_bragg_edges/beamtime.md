@@ -1,14 +1,15 @@
 # Beamtime on ODIN: the atomic spacing of iron
 
-**Your role**: the materials engineer of your company. Your steel supplier delivers plates sold as ferritic steel;
-before your group checks real components, you must show that ODIN measures the plane spacing of steel reliably.
+**Your role**: lead scientist of the Neutron Solutions Team of ESS, and author of this proposal. Fyrø Energy Island
+receives steel plates for the foundations of its wind turbines, sold as ferritic steel; before its components are
+measured, you must show that ODIN measures the plane spacing of steel reliably.
 
 ## Your proposal (accepted)
 
 **Proposal 1234**: *"Lattice spacing of a ferritic steel component by Bragg-edge imaging"*
 
 Steel parts are made of iron crystals. The distance between their atomic planes changes slightly when the part is
-strained, or when the steel changes phase. Before measuring real components, your group must show that it can measure
+strained, or when the steel changes phase. Before measuring Fyrø's components, you must show that ODIN can measure
 the plane spacing *d* of a reference: a **5 mm iron plate**. The beamtime committee asks for:
 
 1. the wavelength of the (110) Bragg edge, and *d*₁₁₀, with their uncertainties;

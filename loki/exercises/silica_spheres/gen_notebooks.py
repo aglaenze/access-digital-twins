@@ -98,9 +98,9 @@ i1, i5 = section(src, "## 1."), section(src, "## 5.")
 msc = [md(r"""
 # How big are these nanoparticles? (MSc)
 
-**Your mission.** You work in a laboratory that makes silica nanoparticles for medical imaging. A new batch must
-have a radius between 4.5 and 5.5 nm: the size decides how long the particles stay in the blood and where they end
-up. An electron microscope shows a few hundred dried particles; small-angle neutron scattering gives the average over
+**Your mission.** You are a method scientist in the Neutron Solutions Team of ESS. Fyrø Energy Island toughens the
+epoxy of its turbine blades with silica nanoparticles, and will check every batch: a new batch must have a radius
+between 4.5 and 5.5 nm (the size decides how well they spread in the resin and how much they toughen it). An electron microscope shows a few hundred dried particles; small-angle neutron scattering gives the average over
 the billions of particles of the batch, in the liquid. You measure the batch on LoKI, develop the analysis, and
 decide whether the batch can be released (end of part 6).
 

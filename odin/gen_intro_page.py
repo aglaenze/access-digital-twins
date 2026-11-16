@@ -26,6 +26,10 @@ fig = lambda name, caption: cells.append(figure_cell(name, caption))
 md(r"""
 # Introduction to ODIN
 
+**Welcome to the Neutron Solutions Team of ESS.** This is your first day. Requests will soon arrive from Fyrø Energy
+Island, from the Mars team and from the team itself; before that, Maja, the instrument scientist of ODIN, shows you
+the instrument.
+
 ODIN is the **neutron imaging** instrument of the European Spallation Source (ESS). It takes pictures *through*
 objects, as an X-ray machine does, but with neutrons. This page explains how it works and what it is used for, before
 you measure with it. There is nothing to compute by hand and no code: read, try the pictures, answer the questions.

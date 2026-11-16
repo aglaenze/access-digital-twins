@@ -17,17 +17,20 @@ code = lambda s: cells.append(nbf.v4.new_code_cell(s.strip()))
 md(r"""
 # ODIN beamtime challenge
 
-You have been awarded beamtime on **ODIN**, the imaging instrument of the European Spallation Source (here its
-digital twin: a McStas simulation of the instrument, files in the ESS NeXus format, official ESS reduction).
+A night of beamtime on **ODIN**, the imaging instrument of the European Spallation Source (here its digital twin: a
+McStas simulation of the instrument, files in the ESS NeXus format, official ESS reduction), for you and the Neutron
+Solutions Team.
 
-**Mission 1, "Unknown metals"**: you are the neutron expert of a metal-recycling company. Three plates have arrived
-with their labels lost (only A, B, C are left); sent to the wrong furnace, a plate ruins a whole batch of alloy.
+**Mission 1, "Unknown metals"**: a request from Fyrø Energy Island. Its recycling yard takes old wind turbines apart,
+and three plates have arrived with their labels lost (only A, B, C are left); sent to the wrong furnace, a plate ruins
+a whole batch of alloy.
 Chemical tests would damage them: identify each metal and measure its lattice parameter with the Bragg edges of
 its transmission spectrum, which neutrons see through the whole plate. Beamtime is precious: you have a
 **limited budget**, and unused beamtime gives bonus points.
 
-**Mission 2, "Something is wrong"**: you are the instrument scientist on duty. A user complains that their data
-look strange: the instrument has a hidden fault. Find it from your data before the next user arrives.
+**Mission 2, "Something is wrong"**: the same night, Maja, the instrument scientist of ODIN, is away, and you are on
+duty. A user complains that their data look strange: the instrument has a hidden fault. Find it from your data before
+the next user arrives.
 """)
 
 code(r"""

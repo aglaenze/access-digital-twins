@@ -1,8 +1,25 @@
 # One exercise of the catalogue of the app (read by container/twin_app.py: no generation needed).
 # Paths are relative to the root of the repository. Two samples: the student chooses on the card (variants).
 title: Seeing a magnetic field with neutrons
+short: Magnetic fields               # the name of its node on the map of the catalogue
 number: "7"                  # theme 7 of ODIN: polarized neutron imaging
 instrument: odin
+# its place in the story (STORY.md): the thread (column of the catalogue) and the client
+story: 
+  - thread: instrument
+    client: "Your own team · the workshop"
+    variant: 0
+    short: The new coil
+    mission: >-
+      The polarized setup of ODIN needs a new coil, built by the team's workshop. Maja asks you to measure the field
+      inside it without opening it.
+  - thread: planets
+    client: "The Mars team"
+    variant: 1
+    short: A magnetized meteorite
+    mission: >-
+      The Mars team comes back: can neutrons show where the magnetic field sits inside a fragment of NWA 7034? Test it
+      on a fragment magnetized on purpose.
 technique: Polarized neutron imaging
 sample: >-
   Your choice: the coil of Sales et al. (RADEN, 2018), or the magnetized fragment of the Martian meteorite NWA 7034 of
@@ -12,8 +29,8 @@ question: >-
   and the strength of the field inside it.
 learn: Spin and Larmor precession, polarizer and analyzer, the polarization matrix, rotation angle and axis, ∫B dl.
 mission: >-
-  The coil: you build the magnets of a neutron instrument; measure the field inside a new coil without opening it.
-  The meteorite: you work with paleomagnetists; find out whether neutrons can show where the field sits inside a rock.
+  The coil: ODIN's polarized setup needs a new coil from the team's workshop; measure the field inside it without
+  opening it. The meteorite: the Mars team asks whether neutrons can show where the field sits inside a rock.
 status: ready
 samples:
   magnet_solenoid: {}
@@ -40,6 +57,9 @@ modes:
   beamtime:
     label: Beamtime with NICOS
     what: Drive ODIN and its polarizer in NICOS, choose your measurements, analyze your files.
+    mission: >-
+      Your proposal was accepted: the workshop's coil and the Mars team's fragment on the sample changer. Plan and run
+      the polarized beamtime yourself.
     duration: 1 day
     open: lab
     file: odin/exercises/magnet_imaging/beamtime.md

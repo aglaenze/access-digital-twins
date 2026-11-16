@@ -68,6 +68,12 @@ ODIN BSc page (answers a question), the MSc notebook, and saves screenshots:
 
     TWIN_RUN_ROOT=<empty folder> TWIN_APP_DATA=<empty folder> TWIN_APP_SELFTEST=<folder for the screenshots> electron .
 
+## The window
+
+No title bar of the system: the dark header of the app is the title bar (drag it to move the window, double-click to
+maximize), and the buttons to minimize, maximize and close are drawn over its right end (`titleBarOverlay`, Windows and
+Linux; light on the sign-in screen, dark in the app; macOS: its three buttons on the left of the header).
+
 ## The notebooks of the exercises
 
 - **MSc**: the student measures first, in NICOS, as at ESS: part 0 of the notebook gives the button *Open NICOS*
@@ -84,6 +90,23 @@ ODIN BSc page (answers a question), the MSc notebook, and saves screenshots:
 - The code of the questions and of the solutions (the answers are in it) is hidden; only their widgets show.
 - The students' copies (`work/<account>/...`) find the twin through `TWIN_ROOT` (set by the server of the app): no path
   of one computer in them.
+
+## The catalogue: roles, the story, the teacher view
+
+A student first chooses an instrument, sees its introduction, then chooses a **role in the team** (the level):
+*Trainee* (BSc), *Method scientist* (MSc, with or without code) or *Lead scientist* (on their own: beamtime with NICOS,
+free beamtime). The choice is kept for the account. The requests of that level are then shown as a **map**, as in the
+level screen of a game: a bar with the grade and the record (requests answered, questions right at the first try), one
+lane per thread of the story of `../STORY.md` (`story:` in each `exercise.yml`; the threads are `THREADS` in
+`container/twin_app.py`) with its chapters as nodes on a path (a ring that fills with the progress, a check once
+submitted, the next request marked), and the **briefing** of the chosen chapter (client, mission of this level, format,
+progress, buttons). A node's name is `short:` in `exercise.yml`; the chapters are numbered along their thread (1, 2, 3...), the numbers
+of the exercises (`number:`, the themes of ODIN) appear only in the teacher view. The content of the catalogue follows the width of the
+window.
+
+**Teacher view** (every exercise at every level on one page): menu of the account, *Teacher view…*, then the teacher
+code. Only a salted hash of the code is shipped (`teacher_code.json`); change it with `node set_teacher_code.js <code>`
+(or set `TWIN_TEACHER_CODE`). As for the accounts, a convenience, not a protection.
 
 ## For the teacher: collecting the work
 

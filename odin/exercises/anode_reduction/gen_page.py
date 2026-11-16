@@ -25,13 +25,15 @@ You are operating the ODIN imaging instrument at ESS. Behind this page, a simula
 measurements; the files are in the ESS NeXus format, and the wavelength of each neutron is computed with the official
 ESS software.
 
-**Your mission.** You work for a company that builds stacks of solid-oxide cells: they turn hydrogen into electricity
-(fuel cells) or electricity into hydrogen (electrolysis). Each cell sits on a porous plate, the **anode support**, made
+**Your mission.** You are a trainee in the Neutron Solutions Team of ESS. The request comes from the hydrogen plant
+of Fyrø Energy Island, which turns wind power into hydrogen with stacks of solid-oxide cells (the same cells turn
+hydrogen into electricity as fuel cells, or electricity into hydrogen by electrolysis); its stack supplier has sent
+the bars. Each cell sits on a porous plate, the **anode support**, made
 of nickel oxide (NiO) and zirconia (YSZ). Before the stack runs for the first time, hydrogen turns the NiO into metallic
 nickel, which conducts the electrons: the **reduction**, NiO + H₂ → Ni + H₂O. It happens inside the stack, where the
 cells are pressed and bent. If some parts reduce faster than others, the support shrinks unevenly and the cells may
-crack. The team wants to know: **does a load make the reduction faster, and where?** Map the reduction inside the
-supports, without cutting them, and tell the team (the last questions).
+crack. Fyrø wants to know: **does a load make the reduction faster, and where?** Map the reduction inside the
+supports, without cutting them, and tell Fyrø (the last questions).
 
 **The samples are real.** M. G. Makowska, M. Strobl, L. Theil Kuhn *et al.* (DTU) did exactly this: *Phase Transition
 Mapping by Means of Neutron Imaging in SOFC Anode Supports During Reduction Under Applied Stress*, ECS Trans. **68**,
@@ -437,7 +439,7 @@ q.choice("The map shows the strongest reduction near the clamp. Why there?",
                         3: "It is seen in all the cells near the clamp, far above the noise."},
          explanation="For a cantilever loaded at one point, M(x) ∝ (x_load − x): largest at the clamp.",
          hints=["Where does a cantilever bend most?"], title="Q7. Near the clamp")
-q.choice("**Your report to the team.**",
+q.choice("**Your report to Fyrø.**",
          ["A load speeds up the reduction where it creates stress (39 % against 28 % in 5 min at 700 °C), both in "
           "tension and in compression: the reduction of a stack under load will be uneven, which must be planned "
           "for (load, temperature, time).",

@@ -26,12 +26,12 @@ You are operating the ODIN imaging instrument at ESS. Behind this page, a simula
 measurements; the files are in the ESS NeXus format, and the wavelength of each neutron is computed with the official
 ESS software.
 
-**Your mission.** You are an engineer in a team that designs steel parts for a wind turbine. A part carries a large
-force: where, inside the steel, is the material strained, and by how much? A strain gauge glued on the surface only
+**Your mission.** You are a trainee in the Neutron Solutions Team of ESS. The structures department of Fyrø Energy
+Island comes back (after its steel plates): a stainless steel part of its wind turbines carries a large force: where, inside the steel, is the material strained, and by how much? A strain gauge glued on the surface only
 tells what happens at the surface. Neutrons go through the steel, and the wavelength of a **Bragg edge** is set by the
 distance between planes of atoms: if the load changes this distance by one part in ten thousand, the edge moves by one
 part in ten thousand. Your job: measure a steel specimen in a load frame, without load and under load, deduce the
-strain of its crystal lattice in its narrow middle and in its wide ends, and tell the team whether the steel behaves
+strain of its crystal lattice in its narrow middle and in its wide ends, and tell Fyrø whether the steel behaves
 as designed (the last questions).
 
 **The specimen is real.** In September 2018, a tensile specimen of austenitic stainless steel was measured exactly this
@@ -479,7 +479,7 @@ q.number("Which Poisson's ratio ν do your measurements give (part 5)?", value=0
          hints=["Part 5 prints it: ν = −slope × E.", "For steel it is close to 0.3; your uncertainty is large."],
          explanation="ν ≈ 0.29 for this steel. With one load and three regions your value is uncertain by about ± 0.1: "
                      "more loads and longer counts would tighten it.", title="Q10. Poisson's ratio")
-q.choice("**Your verdict for the team.** What do your measurements show?",
+q.choice("**Your verdict for Fyrø.** What do your measurements show?",
          ["Under 600 MPa the lattice contracts across the specimen by about 10⁻³ in the middle, less in the wide ends: "
           "the strain follows the stress, as elasticity predicts with ν ≈ 0.3.",
           "The middle has yielded: its strain is larger than that of the ends.",

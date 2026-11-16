@@ -27,6 +27,9 @@ fig = lambda name, caption: cells.append(figure_cell(name, caption))
 md(r"""
 # Introduction to LoKI
 
+**Your first day on LoKI.** Before its first request arrives, Tomas, the instrument scientist of LoKI, shows you the
+instrument of the Neutron Solutions Team that measures sizes far too small for a picture.
+
 LoKI is a **small-angle neutron scattering** (SANS) instrument of the European Spallation Source (ESS). It measures
 the size and the shape of objects of 1 to 100 nm: nanoparticles, proteins, polymers, the pores of a membrane. These
 objects are far too small for a microscope picture of a whole sample, and LoKI does not take a picture: it measures

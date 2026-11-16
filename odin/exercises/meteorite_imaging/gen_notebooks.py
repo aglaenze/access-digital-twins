@@ -71,8 +71,9 @@ print(f"high resolution: dark {name(DARK)}, open beam {name(OPEN)}, radiograph {
 msc = [md(r"""
 # What is hidden inside a Martian meteorite? (MSc: develop the method)
 
-**Your mission.** The team of planetary scientists wants a method it can trust to find water inside precious
-meteorites without cutting them: where it is (3D), and how much. You develop it on the piece of the Martian meteorite
+**Your mission.** You are a method scientist in the Neutron Solutions Team of ESS. The Mars team, planetary
+scientists with a collection of meteorites, will bring more precious pieces: it wants a method it can trust to find
+water inside them without cutting them: where it is (3D), and how much. You develop it on the piece of the Martian meteorite
 NWA 7034 imaged by E. B. Naver, K. W. Nikolajsen *et al.*, *Direct detection of hydrogen reveals a new macroscopic
 crustal water reservoir on early Mars*, arXiv:2601.08390 (2026): 12 × 8 × 2 mm³, with hydrogen-rich clasts of 0.1 to
 0.4 mm (0.4 % of the volume). The twin's model of the piece follows their numbers (sizes, amounts, the neutron

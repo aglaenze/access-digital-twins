@@ -1,6 +1,7 @@
 // The shell of the app: sign in, the catalogue (GET /twin/catalogue), the open exercises as tabs (<webview>).
 const T = window.twins;
 const $ = (s) => document.querySelector(s);
+if (T && T.platform === "darwin") document.documentElement.classList.add("mac");   // room for its window buttons
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 let server = null;          // {base, token}
 let user = null;
@@ -114,16 +115,43 @@ function enterApp() {
   // straight into the app (no fade: its timers and animation frames could hold the sign-in screen, 2026-11-10)
   $("#login").classList.add("hidden");
   $("#app").classList.remove("hidden");
+  if (T.titlebar) T.titlebar("dark");
   const initials = user.name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join("");
   $("#avatar").textContent = initials;
   $("#me-name").textContent = user.name;
   $("#menu-email").textContent = user.email;
+  teacherMenu();
   activate("cat");
   loadCatalogue();
 }
 
 $("#me").onclick = (e) => { e.stopPropagation(); $("#menu").classList.toggle("hidden"); };
 document.addEventListener("click", () => $("#menu").classList.add("hidden"));
+// the teacher view: entered with the teacher code (menu of the account), left from the same menu
+$("#teach").onclick = async () => {
+  if (user.teacher) {
+    const r = await T.teacher("", false);
+    if (r.user) { user = r.user; if (pref("level") === "all") pref("level", "bsc"); }
+    teacherMenu(); renderCatalogue(); toast("You see the catalogue as a student again.");
+    return;
+  }
+  $("#t-code").value = ""; $("#t-error").textContent = "";
+  $("#teacher").showModal();
+};
+$("#t-cancel").onclick = () => $("#teacher").close();
+$("#t-form").onsubmit = async (ev) => {
+  ev.preventDefault();
+  const r = await T.teacher($("#t-code").value, true);
+  if (r.error) { $("#t-error").textContent = r.error; return; }
+  user = r.user;
+  pref("level", "all");
+  $("#teacher").close();
+  teacherMenu(); renderCatalogue();
+  toast("Teacher view: every exercise at every level. Choose a role to see the catalogue as a student does.", 8000);
+};
+function teacherMenu() {
+  $("#teach").textContent = user && user.teacher ? "Leave the teacher view" : "Teacher view…";
+}
 $("#signout").onclick = async () => {
   saveAll();
   for (const key of [...tabs.keys()]) closeTab(key);
@@ -131,6 +159,7 @@ $("#signout").onclick = async () => {
   user = null;
   $("#app").classList.add("hidden");
   $("#login").classList.remove("hidden");
+  if (T.titlebar) T.titlebar("light");
   $("#auth").reset();
   $("#auth").classList.remove("hidden");
   setMode(false);
@@ -164,6 +193,28 @@ function byPlace(a, b) {
          ((a.status === "planned") - (b.status === "planned"));
 }
 
+// The level of the student = their grade in the team of the story (STORY.md), chosen with the instrument and kept
+// (per account, on this computer). A teacher (teacher code) also has "All levels": every exercise at every level.
+const ROLES = {
+  bsc: { grade: "Trainee", chip: "BSc", text: "The instrument is set up for you: measure, then answer the client. Guided pages, no code." },
+  msc: { grade: "Method scientist", chip: "MSc", text: "The client needs a method they can trust: you choose and justify each step." },
+  beamtime: { grade: "Lead scientist", chip: "On your own", text: "Your proposal was accepted: plan and run the beamtime in NICOS, then analyze your files." },
+  all: { grade: "All levels", chip: "Teacher", text: "Every exercise at every level, on one page." },
+};
+function pref(k, v) {               // a choice of this student, kept on this computer
+  const key = `${k}:${user ? user.id : ""}`;
+  try {
+    if (v === undefined) return localStorage.getItem(key);
+    localStorage.setItem(key, v);
+  } catch { /* no storage: the choice lasts until the page is closed */ }
+  return v;
+}
+function currentLevel() {
+  const l = pref("level");
+  if (l === "all" && !(user && user.teacher)) return null;
+  return ROLES[l] ? l : null;
+}
+
 function renderCatalogue() {
   const c = catalogue;
   // the introduction of an instrument (kind: introduction) is shown first and is not counted as an exercise
@@ -178,10 +229,215 @@ function renderCatalogue() {
   $("#instruments").querySelectorAll(".instr").forEach((b) => b.onclick = () => {
     instr = b.dataset.k; localStorage.setItem("instr", instr); renderCatalogue();
   });
+  const lvl = currentLevel();
   const I = c.instruments[instr];
-  $("#ex-title").textContent = `Exercises on ${I.name}`;
   const ex = c.exercises.filter((e) => e.instrument === instr);
   ex.sort(byPlace);
+  // the introduction of the instrument comes first, before the role: it is the same for every level
+  $("#intro").innerHTML = ex.filter((e) => e.kind === "introduction").map((e, i) => introCard(e, i)).join("");
+  renderRoles();
+  const rest = ex.filter((e) => e.kind !== "introduction");
+  $("#ex-title").textContent = lvl === "all" ? `Exercises on ${I.name}` : "";
+  $("#ex-title").classList.toggle("hidden", lvl !== "all");
+  if (lvl === "all") renderAll(rest);
+  else renderStory(rest, lvl);
+  for (const box of ["#intro", "#exercises"]) {
+    $(box).querySelectorAll("[data-act]").forEach((b) => b.onclick = () => {
+      const pick = b.closest(".level, .ex") && b.closest(".level, .ex").querySelector(".variant-pick");
+      act(pick ? { ...b.dataset, variant: pick.value } : b.dataset);
+    });
+  }
+  renderFree(lvl);
+}
+
+// the choice of the role (the level), after the introduction; MSc: with or without code
+function renderRoles() {
+  const lvl = currentLevel();
+  const keys = ["bsc", "msc", "beamtime"].concat(user && user.teacher ? ["all"] : []);
+  const view = pref("mscview") === "clean" ? "clean" : "code";
+  $("#roles").innerHTML = `<div class="roles-head"><h2>Your role in the team</h2>
+      <p>${lvl ? "You can change it at any time: your work at each level is kept." :
+        "Choose it first: the requests, and the way you work on them, follow from it."}</p></div>
+    <div class="role-grid n${keys.length}">${keys.map((k) => `<button class="role ${k}${k === lvl ? " on" : ""}" data-level="${k}">
+      <span class="top"><span class="grade">${ROLES[k].grade}</span><span class="chip ${k}">${ROLES[k].chip}</span></span>
+      <span class="text">${ROLES[k].text}</span>
+      ${k === "msc" ? `<span class="seg view" role="group" aria-label="Notebooks">
+        <span role="button" data-view="code" class="${view === "code" ? "on" : ""}" title="The code of each step is shown (and locked)">With code</span>
+        <span role="button" data-view="clean" class="${view === "clean" ? "on" : ""}" title="As a guided page: text, widgets and plots, no code">Without code</span></span>` : ""}
+      </button>`).join("")}</div>`;
+  $("#roles").querySelectorAll(".role").forEach((b) => b.onclick = (ev) => {
+    const v = ev.target.closest("[data-view]");
+    if (v) pref("mscview", v.dataset.view);
+    pref("level", b.dataset.level);
+    renderCatalogue();
+  });
+}
+
+// the progress of one chapter: of its sample when the chapter is one sample of an exercise (exercise 7)
+function chapterProgress(s, m) {
+  return (s.variant !== undefined && m.variants ? (m.variants[s.variant] || {}).progress : m.progress) ||
+         { status: "new", text: "Not started", pct: 0 };
+}
+
+// emblems of the threads (the clients of the story) and of the grades
+const EMBLEM = {
+  energy: '<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M24 22v20M19 42h10"/><circle cx="24" cy="20" r="2.6"/><path d="M24 17.4C23 11 23.5 7 24 4c1.6 3.4 2 8 .9 13.6M26.3 21.4c5.6 2.6 8.8 5.2 10.8 7.6-3.8.3-8.2-.7-12.6-4.4M21.6 21.6c-4.9 3.7-8.7 5.1-11.7 5.6 1.7-3.4 5-6.6 10.4-8.4"/></svg>',
+  planets: '<svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="10"/><path d="M14.6 27.6C7.4 31.3 4 34.6 5.2 36.2c2 2.7 12.6-.9 23.6-8.1S44.9 14.5 42.9 11.8c-1.1-1.5-5.3-.6-10.6 1.9"/><circle cx="38" cy="36" r="1.6"/><circle cx="9" cy="12" r="1.2"/></svg>',
+  instrument: '<svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="6"/><path d="M24 6v6M24 36v6M6 24h6M36 24h6M11.3 11.3l4.2 4.2M32.5 32.5l4.2 4.2M11.3 36.7l4.2-4.2M32.5 15.5l4.2-4.2"/></svg>',
+};
+const ICON_CHECK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.2 4.2L19 7"/></svg>';
+const ICON_PLAY = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg>';
+
+let mapCards = [];        // the chapters of the map now shown (for the briefing)
+
+// the student's view: the map of the requests of the chosen level, one lane per thread of the story (STORY.md), and
+// the briefing of the chapter chosen on the map (its mission, its progress, the buttons)
+function renderStory(ex, lvl) {
+  const c = catalogue;
+  if (!lvl) {
+    $("#exercises").innerHTML = `<div class="pick-role">Choose your role above: the requests that wait for you appear here.</div>`;
+    return;
+  }
+  // the chapters: one per exercise, or one per sample when its samples belong to two threads (exercise 7)
+  const cards = [];
+  const loose = [];
+  for (const e of ex) {
+    const m = (e.modes || {})[lvl];
+    let st = Array.isArray(e.story) ? e.story : e.story ? [e.story] : [];
+    // no choice of sample at this level (the beamtime has both samples): one chapter, with the mission of the exercise
+    if (!(m && m.variants)) st = st.filter((x, n) => x.variant === undefined || n === 0)
+      .map((x) => x.variant === undefined ? x : { thread: x.thread, client: x.client });
+    if (!st.length) { loose.push(e); continue; }
+    for (const s of st) {
+      const key = e.dir ? e.dir + (s.variant !== undefined ? "#" + s.variant : "") : "planned:" + e.title;
+      const live = !!m && e.status !== "planned";
+      cards.push({ e, s, m, key, live, p: live ? chapterProgress(s, m) : null });
+    }
+  }
+  mapCards = cards;
+  const threads = Object.keys(c.threads || {}).filter((t) => cards.some((x) => x.s.thread === t));
+  // the chapters are numbered along their thread (1, 2, 3...), in the order of the catalogue; the numbers of the
+  // exercises (the themes of ODIN) are only in the teacher's view
+  for (const t of threads) cards.filter((x) => x.s.thread === t).forEach((x, i) => { x.num = String(i + 1); });
+  // the next request: the one the student opened or started again last, while it is not finished; else the first
+  // started (not submitted), else the first not started
+  const playable = cards.filter((x) => x.live);
+  const open = (x) => !(x.p.submitted || x.p.status === "done");
+  const last = playable.find((x) => x.key === pref(`last:${instr}:${lvl}`));
+  const next = (last && open(last) ? last : null) || playable.find((x) => x.p.status === "started") ||
+               playable.find((x) => x.p.status === "new");
+  let sel = pref(`sel:${instr}:${lvl}`);
+  if (!cards.some((x) => x.key === sel)) sel = (next || playable[0] || cards[0] || {}).key;
+  // the record of the student at this level: requests answered (submitted), questions right at the first try
+  const live = playable.map((x) => x.p);
+  const sum = (k) => live.reduce((a, p) => a + (p[k] || 0), 0);
+  const answered = live.filter((p) => p.submitted).length;
+  const done = sum("right") + sum("revealed");
+  const hud = `<div class="hud"><div class="rank"><span class="rank-badge ${lvl}">${esc(ROLES[lvl].chip)}</span>
+      <span class="rank-txt"><b>${esc(ROLES[lvl].grade)}</b><span>Neutron Solutions Team · ${esc(c.instruments[instr].name)}</span></span></div>
+    <div class="stats"><div class="stat"><span class="v">${answered}<small> / ${live.length}</small></span><span class="k">requests answered</span>
+        <span class="mini"><i style="width:${live.length ? 100 * answered / live.length : 0}%"></i></span></div>
+      ${lvl !== "beamtime" && done ? `<div class="stat"><span class="v">${sum("first")}<small> / ${done}</small></span><span class="k">right at the first try</span>
+        <span class="mini"><i style="width:${done ? 100 * sum("first") / done : 0}%"></i></span></div>` : ""}</div></div>`;
+  const lanes = threads.map((t) => {
+    const T = c.threads[t];
+    const mine = cards.filter((x) => x.s.thread === t);
+    const ok = mine.filter((x) => x.live && x.p.submitted).length;
+    const n = mine.filter((x) => x.live).length;
+    return `<section class="lane ${t}"><div class="lane-head"><span class="emblem">${EMBLEM[t] || ""}</span>
+        <span class="lane-txt"><span class="tname">${esc(T.name)}</span><b>${esc(T.client)}</b>
+        <span class="lane-n">${ok} of ${n} answered</span></span></div>
+      <div class="nodes">${mine.map((x) => node(x, x.key === sel, next && x.key === next.key)).join("")}</div></section>`;
+  }).join("");
+  $("#exercises").innerHTML = `<div class="campaign">${hud}<div class="camp-body"><div class="map">${lanes}
+      ${loose.length ? `<div class="loose"><span class="tech">Also in preparation</span>${loose.map((e) =>
+        `<span>${esc(e.title)}</span>`).join("")}</div>` : ""}</div>
+    <aside class="brief" id="brief"></aside></div></div>`;
+  $("#exercises").querySelectorAll(".node").forEach((b) => b.onclick = () => {
+    pref(`sel:${instr}:${lvl}`, b.dataset.key);
+    $("#exercises").querySelectorAll(".node").forEach((x) => x.classList.toggle("sel", x === b));
+    brief(b.dataset.key, lvl);
+  });
+  brief(sel, lvl);
+}
+
+// one chapter on the map: a ring that fills with the progress, a check when the work is submitted
+function node(x, sel, next) {
+  const { e, s, p } = x;
+  const name = s.short || e.short || e.title;
+  const st = !x.live ? (e.status === "planned" ? "planned" : "off") : p.submitted || p.status === "done" ? "done" : p.status;
+  const inner = st === "done" ? ICON_CHECK : `<span class="n">${esc(x.num)}</span>`;
+  return `<button class="node ${st}${sel ? " sel" : ""}${next ? " next" : ""}" data-key="${esc(x.key)}" style="--p:${x.live ? p.pct || 0 : 0}"
+      title="${esc(e.title)}"><span class="orb">${inner}</span>${next ? `<span class="flag">Next</span>` : ""}
+    <span class="nt">${esc(name)}</span><span class="nsub">${st === "planned" ? (e.later ? "Later" : "In preparation")
+      : st === "off" ? "Guided page only" : st === "done" ? "Answered" : st === "started" ? `${p.pct || 0} %` : "New"}</span></button>`;
+}
+
+// the briefing of the chosen chapter: who asks, what, how far the student is, and the buttons
+function brief(key, lvl) {
+  const x = mapCards.find((y) => y.key === key);
+  const box = $("#brief");
+  if (!x) { box.innerHTML = ""; return; }
+  const { e, s, m } = x;
+  box.className = `brief ${s.thread || ""}`;
+  const num = `${esc((catalogue.threads[s.thread] || {}).name || "")} · Chapter ${esc(x.num)}`;
+  const vlabel = s.variant !== undefined && m && m.variants ? (m.variants[s.variant] || {}).label : "";
+  const head = `<div class="b-kicker"><span>${num}</span><span>${esc(s.client || "")}</span></div>
+    <h3>${esc(e.title)}</h3>${vlabel ? `<span class="b-sample">${esc(vlabel)}</span>` : ""}`;
+  const mission = (m && m.mission) || s.mission || e.mission || e.question;
+  if (e.status === "planned") {
+    box.innerHTML = `${head}<p class="b-mission">${esc(e.question)}</p>
+      <div class="b-intel"><span><i>Technique</i>${esc(e.technique || "")}</span><span><i>Status</i>${e.later ? "Later" : "In preparation"}</span></div>`;
+    return;
+  }
+  if (!m) {          // this request has no version at this level (a game: a guided page only)
+    const other = Object.keys(e.modes || {})[0];
+    const om = (e.modes || {})[other] || {};
+    const label = `${catalogue.instruments[e.instrument].name} · ${short(e.title)} · ${LEVEL[other] || other}`;
+    box.innerHTML = `${head}<p class="b-mission">${esc(mission)}</p>
+      <div class="b-intel"><span><i>Format</i>${esc(om.label || "Guided page")}</span><span><i>Duration</i>${esc(om.duration || "")}</span>
+        <span><i>Level</i>Only as a ${esc(LEVEL[other] || other)} page</span></div>
+      <div class="b-acts"><button class="btn go" data-act="open" data-dir="${esc(e.dir)}" data-mode="${other}" data-label="${esc(label)}">${ICON_PLAY}Open</button></div>`;
+    wire(box, key, lvl);
+    return;
+  }
+  const p = x.p;
+  const short2 = vlabel ? " · " + vlabel.split(" (")[0].replace(/^The /, "") : "";
+  const label = `${catalogue.instruments[e.instrument].name} · ${short(e.title)}${short2} · ${LEVEL[lvl] || lvl}`;
+  const d = `data-dir="${esc(e.dir)}" data-mode="${lvl}" data-label="${esc(label)}"` +
+            (s.variant !== undefined && m.variants ? ` data-variant="${s.variant}"` : "");
+  const go = p.status === "new" ? "Start" : (p.status === "done" ? "Open again" : "Continue");
+  let acts;
+  if (lvl === "bsc") acts = `<button class="btn go" data-act="open" ${d}>${ICON_PLAY}${go}</button>`;
+  else if (lvl === "msc") {
+    const view = pref("mscview") === "clean" ? "clean" : "code";
+    // (with or without code: chosen once on the role card, not repeated on the button)
+    acts = `<button class="btn go" data-act="open" data-view="${view}" ${d}>${ICON_PLAY}${go}</button>`;
+  } else acts = `<button class="btn go" data-act="open" data-what="analysis" ${d}>${ICON_PLAY}Starter notebook</button>
+      <button class="btn" data-act="sheet" data-dir="${esc(e.dir)}" data-k="${lvl}">Your proposal</button>`;
+  const again = p.status === "new" ? "" :
+    `<button class="again" data-act="reset" ${d} data-file="${esc(lvl === "beamtime" ? m.analysis || "" : m.file || "")}"
+       data-page="${m.open === "voila" ? 1 : 0}" title="Your notebook, your answers and the state of this exercise are put aside: you start from the beginning. Your measurements stay.">Start again</button>`;
+  const first = p.total && (p.right || p.revealed) ? `<span><i>First try</i>${p.first || 0} of ${p.total} questions</span>` : "";
+  box.innerHTML = `${head}<p class="b-mission">${esc(mission)}</p>
+    <div class="b-intel"><span><i>Format</i>${esc(m.label || "")}</span><span><i>Duration</i>${esc(m.duration || "")}</span>
+      ${first}${p.submitted ? `<span><i>Submitted</i>${esc(p.submitted)}</span>` : ""}</div>
+    <div class="prog"><div class="row"><span>${esc(p.text)}</span>${again}</div>
+      <div class="track"><div class="fill" style="width:${p.pct}%"></div></div></div>
+    <div class="b-acts">${acts}</div>`;
+  wire(box, key, lvl);
+}
+// the buttons of the briefing; a chapter opened stays the chosen one on the map (when the student comes back)
+function wire(box, key, lvl) {
+  box.querySelectorAll("[data-act]").forEach((b) => b.onclick = () => {
+    // a chapter opened or started again: it stays chosen on the map, and becomes the next request (until submitted)
+    if (b.dataset.act === "open" || b.dataset.act === "reset") { pref(`sel:${instr}:${lvl}`, key); pref(`last:${instr}:${lvl}`, key); }
+    act(b.dataset);
+  });
+}
+
+// the teacher's view: every exercise with all its levels (the catalogue as it was before the roles)
+function renderAll(ex) {
   const num = (e) => e.number !== undefined ? `Exercise ${esc(e.number)} · ` : "";
   $("#exercises").innerHTML = ex.map((e, i) => e.status === "planned"
     ? `<article class="ex planned${e.later ? " later" : ""}"><div><span class="tech">${num(e)}${esc(e.technique)} · ${e.later ? "later" : "in preparation"}</span><h3>${esc(e.title)}</h3></div>
@@ -190,18 +446,20 @@ function renderCatalogue() {
     : `<article class="ex"><div><span class="tech">${num(e)}${esc(e.technique)}</span><h3>${esc(e.title)}</h3></div>
        ${e.mission ? `<div class="mission">${ICON_TARGET}<span><b>Your mission.</b> ${esc(e.mission)}</span></div>` : ""}
        <div class="levels">${Object.entries(e.modes || {}).map(([k, m]) => level(e, k, m, i)).join("")}</div></article>`).join("");
-  $("#exercises").querySelectorAll("[data-act]").forEach((b) => b.onclick = () => {
-    const pick = b.closest(".level, .ex") && b.closest(".level, .ex").querySelector(".variant-pick");
-    act(pick ? { ...b.dataset, variant: pick.value } : b.dataset);
-  });
-  const free = c.free[instr];
+}
+
+// the free beamtime: for the students on their own (and in the teacher's view)
+function renderFree(lvl) {
+  const c = catalogue;
+  const I = c.instruments[instr];
+  const free = (lvl === "beamtime" || lvl === "all") ? c.free[instr] : null;
   // each free beamtime is a new proposal of the twin's user office (user_office.py); a real proposal can be imported
   const mine = (c.proposals || {})[instr] || [];
   const rows = mine.map((p) => `<li><span class="pid">${esc(p.id)}</span><span class="pt">${esc(p.title)}</span>
       <span class="pk">${p.kind === "imported" ? "imported" : "free"} · ${esc((p.created || "").slice(0, 10))}</span>
       <button class="btn" data-act="file" data-file="${esc(free)}" data-kind="notebook" data-proposal="${esc(p.id)}"
         data-label="${esc(I.name)} · ${esc(p.id)}">Continue</button></li>`).join("");
-  $("#free").innerHTML = free ? `<article class="free"><div class="txt"><span class="tech">No exercise · MSc and beyond</span>
+  $("#free").innerHTML = free ? `<article class="free"><div class="txt"><span class="tech">No exercise · your own project</span>
       <h3>Free beamtime on ${esc(I.name)}</h3><p>Your own question, your own samples, your own measurements: as in a real beamtime at ESS.
       Each free beamtime is a new proposal (its own number and data folder), found in NICOS with <i>Find my proposal</i>; no sample
       is imposed. Preparing a real beamtime? Import your proposal and try it on the twin.</p>
@@ -230,7 +488,7 @@ function level(e, k, m, i) {
     acts = `<button class="btn go" data-act="open" data-view="code" ${d} title="${go}: the code of each step is shown (and locked)">With code</button>
       <button class="btn go" data-act="open" data-view="clean" ${d} title="${go}: as a page of the BSc level (text, widgets and plots, no code)">Without code</button>`;
   }
-  else acts = `<button class="btn" data-act="sheet" data-i="${i}" data-k="${k}">Your proposal</button>
+  else acts = `<button class="btn" data-act="sheet" data-dir="${esc(e.dir)}" data-k="${k}">Your proposal</button>
       <button class="btn go" data-act="open" data-what="analysis" ${d}>Starter notebook</button>`;
   const again = p.status === "new" ? "" :
     `<button class="again" data-act="reset" ${d} data-file="${esc(k === "beamtime" ? m.analysis || "" : m.file || "")}"
@@ -298,8 +556,7 @@ async function act(d) {
       toast(r.put_aside && r.put_aside.length ? `Started again. Your previous work is kept in ${r.folder}.` : "Started again.", 8000);
       loadCatalogue();
     } else if (d.act === "sheet") {
-      const e = catalogue.exercises.filter((x) => x.instrument === instr)
-        .sort(byPlace)[+d.i];
+      const e = catalogue.exercises.find((x) => x.dir === d.dir);
       $("#sheet .sheet-body").innerHTML = e.modes[d.k].sheet || "";
       $("#sheet").showModal();
     }
@@ -407,8 +664,12 @@ function openTab(url, kind, label, { clean = false } = {}) {
   $("#tabs").append(btn);
   const t0 = Date.now();
   const tick = setInterval(() => { cover.querySelector("[data-t]").textContent = Math.round((Date.now() - t0) / 1000) + " s"; }, 1000);
-  const done = () => { clearInterval(tick); cover.remove(); btn.querySelector(".dot").classList.remove("loading"); };
-  view.addEventListener("did-stop-loading", done, { once: true });
+  let ready = null;          // (a notebook: the check of its first run)
+  const done = () => { clearInterval(tick); clearInterval(ready); cover.remove(); btn.querySelector(".dot").classList.remove("loading"); };
+  // a page (Voila) comes whole from the server: shown when loaded. A notebook is built in the browser and its first
+  // cells run after: it stays covered until they have run and it is back at its top (no cells appearing one by one)
+  if (kind !== "notebook") view.addEventListener("did-stop-loading", done, { once: true });
+  else setTimeout(done, 240000);          // (never covered for good, whatever happens)
   view.addEventListener("did-fail-load", (e) => { if (e.errorCode !== -3) { done(); toast("The page did not load: " + e.errorDescription); } });
   const path = kind === "notebook" ? decodeURIComponent(key.replace(/^\/notebooks\//, "")) : null;
   const t = { btn, pane, view, kind, path, label, clean };
@@ -438,6 +699,10 @@ function openTab(url, kind, label, { clean = false } = {}) {
           font-size: 11px; color: #7A8190; pointer-events: none; }`).catch(() => {});
       t.running = true;
       if (tabs.get(activeKey) === t) $("#saved").textContent = "Running the notebook…";
+      cover.querySelector("span").textContent = `Preparing ${label}: its first cells are running…`;
+      ready = setInterval(() => {
+        view.executeJavaScript("!!window.__twinReady").then((r) => { if (r) done(); }).catch(() => {});
+      }, 400);
       view.executeJavaScript(`(async () => {
         for (let i = 0; i < 240; i++) {
           const a = window.jupyterapp, w = a && a.shell && a.shell.currentWidget;
@@ -481,6 +746,10 @@ function openTab(url, kind, label, { clean = false } = {}) {
               }
               window.dispatchEvent(new Event("resize"));      // the cells in view drawn again (as on showing the tab)
             };
+            // the first outputs drawn at the top: the notebook is shown (the cover of the app is removed)
+            await top();
+            await new Promise((r) => setTimeout(r, 800));
+            window.__twinReady = true;
             for (let k = 0; k < 16 && !touched; k++) {
               await top();
               await new Promise((r) => setTimeout(r, 500));
@@ -491,6 +760,7 @@ function openTab(url, kind, label, { clean = false } = {}) {
         }
         return "no notebook";
       })()`).catch(() => "error").then(() => {
+        done();
         t.running = false;
         if (tabs.get(activeKey) === t) $("#saved").textContent = t.savedAt ? `Saved ${t.savedAt}` : "Ready";
       });

@@ -1,7 +1,8 @@
 # Beamtime on ODIN: lithium in a thick battery electrode
 
-**Your role**: the neutron specialist of a battery maker that tests ultra-thick electrodes: do they fill up across
-their whole thickness, and how much lithium is lost in the first cycle?
+**Your role**: lead scientist of the Neutron Solutions Team of ESS, and author of this proposal. Fyrø Energy Island
+stores the power of its wind farm in batteries and tests ultra-thick electrodes: do they fill up across their whole
+thickness, and how much lithium is lost in the first cycle?
 
 ## Your proposal (accepted)
 

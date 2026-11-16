@@ -210,7 +210,9 @@ def write_cache(instrument, path, owner=None):
     owner = signed_in() if owner is None else owner
     library = _library().load(instrument)
     out = {}
-    for k, p in enumerate(proposals(instrument, owner or None)):
+    # in increasing order of their numbers, as NICOS lists them when the student looks for a proposal
+    num = lambda p: (0, int(p["id"]), "") if str(p["id"]).isdigit() else (1, 0, str(p["id"]))
+    for k, p in enumerate(sorted(proposals(instrument, owner or None), key=num)):
         samples = []
         for s in p["samples"]:
             spec = library.get(s["name"], {})

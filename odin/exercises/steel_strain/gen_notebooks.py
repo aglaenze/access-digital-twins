@@ -40,8 +40,8 @@ for name, hidden in sl.exercise_hidden("exercise.yml").items():
 msc = [md(r"""
 # Where is a loaded steel part strained? (MSc: develop the method)
 
-**Your mission.** You are the engineer of a team that designs steel parts for a wind turbine. The team wants a method
-it can trust to measure, inside the steel, the strain of its crystal lattice under load. You develop it on a tensile
+**Your mission.** You are a method scientist in the Neutron Solutions Team of ESS. The structures department of Fyrø
+Energy Island designs the steel parts of its wind turbines, and wants a method it can trust to measure, inside the steel, the strain of its crystal lattice under load. You develop it on a tensile
 specimen in a load frame: from the raw files to a strain with its uncertainty, in each part of the specimen, then
 Poisson's ratio of the steel; and you find out how large the systematic errors are. The specimen is the tensile
 specimen of austenitic stainless steel measured at V20, the ESS test beamline at HZB, in September 2018 (public data:

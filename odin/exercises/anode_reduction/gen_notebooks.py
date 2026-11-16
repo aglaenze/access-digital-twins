@@ -199,8 +199,9 @@ def msc():
     cells = [md(r"""
 # Where has the fuel-cell anode been reduced? (MSc: develop the method)
 
-**Your mission.** You work for a company that builds stacks of solid-oxide cells. Before a stack runs, hydrogen
-reduces the NiO of the anode supports to Ni, inside the stack, under load. The team needs a method it can trust to map
+**Your mission.** You are a method scientist in the Neutron Solutions Team of ESS. The hydrogen plant of Fyrø Energy
+Island runs stacks of solid-oxide cells. Before a stack runs, hydrogen reduces the NiO of the anode supports to Ni,
+inside the stack, under load. Fyrø's stack supplier will send more supports: Fyrø needs a method it can trust to map
 the reduction degree $r$ inside a support, with its uncertainty, and to know whether a load speeds the reduction up.
 You develop it on the bars of M. G. Makowska *et al.*, ECS Trans. **68**, 1103 (2015) (NOBORU, J-PARC) and J. Appl.
 Cryst. **49**, 1674 (2016) (Engin-X, ISIS): 20 × 6 × 0.9 mm³ bars of NiO-YSZ, standards reduced to 0, 11, 52 and 92 %

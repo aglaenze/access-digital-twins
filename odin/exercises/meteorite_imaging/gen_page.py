@@ -25,7 +25,8 @@ md(r"""
 You are operating the ODIN imaging instrument at ESS. Behind this page, a simulation of the instrument produces your
 measurements, in the formats of the real instrument.
 
-**Your mission.** You work for a team of planetary scientists. The meteorite NWA 7034 ("Black Beauty"), found in the
+**Your mission.** A request for the Neutron Solutions Team of ESS, where you are a trainee: it comes from the Mars
+team, planetary scientists with a collection of meteorites. The meteorite NWA 7034 ("Black Beauty"), found in the
 Sahara in 2011, is a piece of the Martian crust 4.4 billion years old, and it holds more water than any other Martian
 meteorite: about 6 000 ppm, bound in its minerals, a record of the water of early Mars. The team wants to know **where
 the water is**: spread evenly, or concentrated in some of the rock fragments (clasts) that make up the meteorite? A
@@ -535,7 +536,7 @@ q.number("Naver et al. estimate that these clasts hold 635 ppm of water, of the 
          "share is that (%)?", value=10.6, tol=1.0, unit="%",
          hints=["635 / 6000."], explanation="635 / 6000 = 10.6 %, the 11 % of the paper: a macroscopic reservoir, while "
                                             "most of the water is spread in the fine matrix.", title="Q9. Their share")
-q.choice("**Your report to the team.**",
+q.choice("**Your report to the Mars team.**",
          ["The water is concentrated in small clasts (0.1–0.4 mm) grouped in clusters; their attenuation can only be "
           "explained by hydrogen, about 10 % water by mass; the tomography gives their positions for sampling.",
           "The water is spread evenly in the meteorite.",

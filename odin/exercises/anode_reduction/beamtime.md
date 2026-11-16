@@ -1,8 +1,8 @@
 # Beamtime on ODIN: the reduction of SOC anode supports under load
 
-**Your role**: the neutron specialist of a company that builds stacks of solid-oxide cells. Before a stack runs,
-hydrogen turns the NiO of the anode supports into Ni, inside the stack, under load. The team wants to know whether the
-load makes the reduction uneven.
+**Your role**: lead scientist of the Neutron Solutions Team of ESS, and author of this proposal. The hydrogen plant of
+Fyrø Energy Island runs stacks of solid-oxide cells. Before a stack runs, hydrogen turns the NiO of the anode supports
+into Ni, inside the stack, under load. Fyrø wants to know whether the load makes the reduction uneven.
 
 ## Your proposal (accepted)
 

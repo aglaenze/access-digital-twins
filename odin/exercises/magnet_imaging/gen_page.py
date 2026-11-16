@@ -22,11 +22,13 @@ VARIANTS = {
         file="ODIN_magnet_solenoid.ipynb", sample="magnet_solenoid", quiz="odin_magnet_bsc_solenoid",
         title="What is the field inside a coil?",
         mission=r"""
-**Your mission.** You are the engineer who builds the small magnets of a neutron instrument: coils that guide and
-turn the spin of the neutrons. A new coil must make a field of about **half a millitesla along its axis**. A Hall
+**Your mission.** A request from inside the Neutron Solutions Team, where you are a trainee. The polarized setup of
+ODIN needs a new coil, built by the team's workshop: such coils guide and turn the spin of the neutrons. It must make a
+field of about **half a millitesla along its axis**. A Hall
 probe could measure it at a few points, but it cannot go inside the windings without touching them, and the field
-there is what matters. Neutrons cross the windings: **measure the field inside the coil, without opening it**, and
-tell the workshop whether the coil is good (part 6).
+there is what matters. Neutrons cross the windings: Maja asks you to **measure the field inside the coil, without
+opening it**, and to tell the workshop whether the coil is good (part 6). It is also the test of the method before it
+is used on a rock.
 
 **The sample is real.** The coil is the one of M. Sales *et al.*, *Three Dimensional
 Polarimetric Neutron Tomography of Magnetic Fields*, Sci. Rep. **8**, 2214 (2018), measured at RADEN (J-PARC, Japan)
@@ -44,11 +46,12 @@ image. What the neutrons will see is the field.""",
         file="ODIN_magnet_meteorite.ipynb", sample="nwa7034_fragment", quiz="odin_magnet_bsc_meteorite",
         title="A magnet inside a meteorite",
         mission=r"""
-**Your mission.** You work with a team of paleomagnetists. Rocks keep a record of the magnetic field in which they
+**Your mission.** You are a trainee in the Neutron Solutions Team of ESS, and the Mars team comes back (after the
+water of NWA 7034), with its paleomagnetists. Rocks keep a record of the magnetic field in which they
 formed: a Martian meteorite tells whether Mars had a magnetic field 4 billion years ago, and how strong it was. But a
 magnetometer gives only the total magnetization of the whole rock, and in a breccia like NWA 7034 each fragment may
-carry its own. The team wants to know whether neutrons can show **where, inside the rock, the field is**, and how
-strong it is. Test the method on a fragment magnetized on purpose, and tell the team what it can and cannot do
+carry its own. The Mars team wants to know whether neutrons can show **where, inside the rock, the field is**, and how
+strong it is. Test the method on a fragment magnetized on purpose, and tell the Mars team what it can and cannot do
 (part 6).
 
 **The sample is real.** A fragment of the Martian meteorite NWA 7034, 2 mm thick, about 10 mm wide and 13 mm tall,
@@ -566,7 +569,7 @@ q.number("At RADEN each of the 9 components took 2 × 150 s, at each of the 33 a
          "many hours?", value=24.75, tol=0.3, unit="h",
          hints=["33 × 9 × 300 s."], explanation="33 × 9 × 300 s = 89 100 s = 24 h 45 min, as in the paper.",
          title="Q7. Beam time")
-q.choice("**Your report to the paleomagnetists.**",
+q.choice("**Your report to the Mars team.**",
          ["Polarized neutrons show where the field is inside the rock and its strength (a few mT here), without "
           "cutting it; one view adds up opposite fields, a tomography (a day of beam) places them in 3D. A weak "
           "natural remanence (µT) would turn the spin a thousand times less: the method suits strongly magnetized "

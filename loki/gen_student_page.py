@@ -24,9 +24,10 @@ ESS model) produces your measurements. LoKI measures **small-angle neutron scatt
 a few degrees at most by objects of 1 to 100 nm dispersed in the sample. The way the scattered intensity falls with the
 angle tells their **size and shape**.
 
-**Your mission.** You work in a laboratory that makes silica nanoparticles for medical imaging. The particles of a
-new batch must have a radius between 4.5 and 5.5 nm: the size decides how long the particles stay in the blood and
-where they end up in the body. An electron microscope would show a few hundred particles, dried on a grid; you need the
+**Your mission.** You are a trainee in the Neutron Solutions Team of ESS. The request comes from Fyrø Energy Island:
+the blades of its wind turbines are made of glass fibers in an epoxy resin, toughened with silica nanoparticles that
+stop small cracks from growing. The particles of a new batch must have a radius between 4.5 and 5.5 nm: the size decides how well they spread in the resin and how much they toughen it.
+Tomas, the instrument scientist of LoKI, has prepared the settings. An electron microscope would show a few hundred particles, dried on a grid; you need the
 average over the billions of particles of the batch, as they are in the liquid. That is what small-angle neutron
 scattering gives. Your job: measure the batch (particles in heavy water), find the size of the particles, and decide
 (part 4) whether the batch can be released. Then find the instrument configuration that measures it best. Your files

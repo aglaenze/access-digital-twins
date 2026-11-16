@@ -9,6 +9,9 @@ contextBridge.exposeInMainWorld("twins", {
   createAccount: (form) => ipcRenderer.invoke("create-account", form),
   signIn: (form) => ipcRenderer.invoke("sign-in", form),
   resetPassword: (form) => ipcRenderer.invoke("reset-password", form),
+  teacher: (code, on = true) => ipcRenderer.invoke("teacher", code, on),
+  titlebar: (theme) => ipcRenderer.invoke("titlebar", theme),      // "light" (sign-in screen) or "dark" (the app)
+  platform: process.platform,
   signOut: () => ipcRenderer.invoke("sign-out"),
   api: (method, path, body) => ipcRenderer.invoke("api", method, path, body),
   closeNotebook: (path) => ipcRenderer.invoke("close-notebook", path),

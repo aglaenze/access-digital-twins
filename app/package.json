@@ -23,7 +23,7 @@
     "productName": "ESS digital twins",
     "artifactName": "ESS-digital-twins-${version}-${os}-${arch}.${ext}",
     "icon": "icon.png",
-    "files": ["main.js", "backend.js", "accounts.js", "preload.js", "icon.png", "shell/**", "package.json"],
+    "files": ["main.js", "backend.js", "accounts.js", "teacher_code.json", "preload.js", "icon.png", "shell/**", "package.json"],
     "directories": { "output": "dist" },
     "win": { "target": [{ "target": "nsis", "arch": ["x64"] }] },
     "nsis": { "oneClick": true, "perMachine": false, "createDesktopShortcut": true, "shortcutName": "ESS digital twins" },

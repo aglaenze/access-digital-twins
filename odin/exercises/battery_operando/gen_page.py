@@ -24,11 +24,13 @@ md(r"""
 You are operating the ODIN imaging instrument at ESS. Behind this page, a simulation of the instrument produces your
 measurements, in the formats of the real instrument.
 
-**Your mission.** You work for a battery maker. A thicker electrode stores more energy in the same cell, because less
+**Your mission.** You are a trainee in the Neutron Solutions Team of ESS. The request comes from Fyrø Energy Island,
+which stores the power of its wind farm in batteries for the calm days. A thicker electrode stores more energy in the
+same cell, because less
 of the cell is current collectors and separators. But the lithium must travel through the whole thickness: does it
 reach the far side of an electrode **0.4 mm thick**, or does it pile up near the separator? And how much of it stays
 trapped after one charge and discharge, lost for good? Watch the lithium move inside a working cell, image after image,
-and tell the team (the last questions).
+and tell Fyrø (the last questions).
 
 **The sample is real.** A lithium half-cell with an ultra-thick graphite electrode was imaged exactly this way, during
 a whole cycle, by M. Strobl, M. E. Baur, L. Theil Kuhn *et al.*, *Concurrent operando neutron imaging and diffraction
@@ -434,7 +436,7 @@ q.choice("Where does the lithium that stays after the cycle sit?",
                         3: "The change is in the graphite electrode."},
          explanation="The irreversible losses are significantly more pronounced at the separator side (Strobl et al.).",
          hints=["The last profile of part 5."], title="Q7. Where it is lost")
-q.choice("**Your report to the team.**",
+q.choice("**Your report to Fyrø.**",
          ["At C/35 the lithium reaches the whole 0.4 mm electrode (entering from the separator side, homogeneous at the "
           "end); about 0.27 of LiC₆ (100 mAh/g) is lost in the first cycle, mostly near the separator. Faster charging "
           "of thick electrodes must be tested: the gradient would grow.",

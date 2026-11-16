@@ -36,6 +36,10 @@ window.__twinCleanView = function (on) {
       .jp-CodeCell .jp-Cell-inputWrapper { display: none !important; }
       .jp-InputPrompt, .jp-OutputPrompt, .jp-Collapser, .jp-InputCollapser, .jp-OutputCollapser,
       .jp-cell-toolbar, .jp-cell-menu, .jp-Notebook-footer { display: none !important; }
+      /* the strip on the left of the outputs that folds them into a scroll box: without the prompts it lay over the
+         answers of the questions (a click folded the output instead of ticking the answer) */
+      .jp-OutputArea-promptOverlay { display: none !important; }
+      .jp-Cell.jp-mod-outputsScrolled .jp-OutputArea { max-height: none !important; overflow: visible !important; }
       .jp-Notebook .jp-Cell, .jp-Notebook .jp-Cell.jp-mod-selected, .jp-Notebook .jp-Cell.jp-mod-active,
       .jp-Notebook.jp-mod-commandMode .jp-Cell.jp-mod-active.jp-mod-selected,
       .jp-Notebook.jp-mod-editMode .jp-Cell.jp-mod-active { background: transparent !important; box-shadow: none !important;
@@ -62,9 +66,14 @@ window.__twinCleanView = function (on) {
     }, true);
     // no cell selected by a click: outside the outputs (widgets, plots) the notebook never sees the click
     // (the text can still be selected and copied: only the notebook's own handler is skipped)
-    for (const ev of ["mousedown", "dblclick"]) {
+    // In the outputs (the questions, buttons, sliders), the event reaches its widget first, then stops before the
+    // notebook: otherwise the notebook selects the cell and takes the focus, and the answer is not ticked (2026-11-16)
+    for (const ev of ["mousedown", "pointerdown", "dblclick", "focusin"]) {
       window.addEventListener(ev, (e) => {
-        if (window.__twinClean && e.target.closest && e.target.closest(".jp-Notebook") && !e.target.closest(".jp-OutputArea")) e.stopPropagation();
+        if (!window.__twinClean || !e.target.closest || !e.target.closest(".jp-Notebook")) return;
+        const out = e.target.closest(".jp-OutputArea");
+        if (!out) { e.stopPropagation(); return; }
+        out.addEventListener(ev, (e2) => e2.stopPropagation(), { once: true });
       }, true);
     }
   }
