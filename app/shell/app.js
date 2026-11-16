@@ -357,6 +357,7 @@ function renderStory(ex, lvl) {
     pref(`sel:${instr}:${lvl}`, b.dataset.key);
     $("#exercises").querySelectorAll(".node").forEach((x) => x.classList.toggle("sel", x === b));
     brief(b.dataset.key, lvl);
+    $("#brief").classList.add("anim");       // (animated when the student picks a chapter, not at each refresh)
   });
   brief(sel, lvl);
 }
@@ -790,6 +791,9 @@ function closeTab(key, { save: doSave = true } = {}) {
   const t = tabs.get(key);
   if (!t) return;
   if (doSave) save(t);
+  // hidden at once (it stays a moment, out of sight, for its last save): the catalogue shows without it on top
+  t.pane.classList.remove("on");
+  t.pane.style.visibility = "hidden";
   setTimeout(() => {
     t.pane.remove();
     if (t.path) T.closeNotebook(t.path);
