@@ -125,8 +125,20 @@ class Backend {
     this.engine = eng;
     this.onStatus("Starting the container engine…", 0.1);
     if ((await run(eng, ["info"])).code !== 0) {
-      if (/podman/i.test(path.basename(eng))) await run(eng, ["machine", "start"]);
+      if (/podman/i.test(path.basename(eng))) {
+        // Podman installed but never set up (no machine yet): the machine is made here (Windows 10 and 11: in WSL 2)
+        if ((await run(eng, ["machine", "start"])).code !== 0 && !(await run(eng, ["machine", "list", "-q"])).stdout.trim()) {
+          this.onStatus("First start: preparing Podman (a few minutes, once)…", 0.1);
+          await run(eng, ["machine", "init"], { timeout: 30 * 60 * 1000 });
+          await run(eng, ["machine", "start"]);
+        }
+      }
       for (let i = 0; i < 90 && (await run(eng, ["info"])).code !== 0; i++) await new Promise((r) => setTimeout(r, 2000));
+      if ((await run(eng, ["info"])).code !== 0) {
+        throw new Error(`The container engine (${path.basename(eng)}) does not run. Open Podman Desktop (or Docker Desktop) ` +
+          "and start it; on Windows it needs WSL 2 (Windows 10 version 2004 or later, or Windows 11): if it asks to " +
+          "install or enable it, accept and restart the computer. Then open this app again.");
+      }
     }
     const image = process.env.TWIN_IMAGE || this.settings.image || IMAGE;
     if ((await run(eng, ["image", "inspect", image])).code !== 0) {

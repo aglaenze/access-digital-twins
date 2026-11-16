@@ -35,7 +35,8 @@ Expect: 20–60 min for the installation (mostly downloads), a few minutes per m
 ## Students: the app (nothing else to read)
 
 1. Install **Podman Desktop** (https://podman-desktop.io, free) and start it once: it sets itself up. The app runs the
-   instruments in it.
+   instruments in it. Windows 10 (version 2004 or later, 64-bit) and Windows 11 both work: Podman runs in WSL 2,
+   which Podman Desktop offers to install (accept, then restart the computer).
 2. Download the app for your computer from https://github.com/aglaenze/access-digital-twins/releases/tag/app-latest:
    **Windows** the `.exe`, **macOS** the `.dmg` (`arm64` for Apple Silicon M1–M4, `x64` for Intel), **Linux** the
    `.AppImage`. Install it (Windows: double-click; it installs for you only, no administrator rights; macOS: drag it
