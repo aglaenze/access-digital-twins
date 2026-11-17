@@ -933,12 +933,16 @@ def _draw_rock(spec, hidden, fig):
             s_.set_color("#CBD2DC")
         ax.grid(alpha=0.25, lw=0.6)
         ax.set_facecolor("#FBFCFD")
-    if skip:
-        a1.text(0.98, 0.02, "what holds hydrogen: to be found" if any("H" in vols[k]["material"] for k in skip)
-                else "inclusions inside: to be found", transform=a1.transAxes, ha="right", color=mute, fontsize=8.5,
-                style="italic")
+    if skip:                                           # the note in the legend (inside the axes it hid the ticks)
+        legend["what holds hydrogen: to be found" if any("H" in vols[k]["material"] for k in skip)
+               else "inclusions inside: to be found"] = Line2D([], [], ls="none")
     rows = -(-len(legend) // 4)
+    # room for the ticks, the axis labels and the legend under the two pictures, whatever size the caller asked for:
+    # the legend lies below the axis labels, never over them
+    height = 4.4 + 0.28 * rows
+    fig.set_size_inches(10, height)
+    below = (0.6 + 0.28 * rows + 0.1) / height         # ticks + label (0.6 in), legend rows, margin
     fig.legend(legend.values(), legend.keys(), loc="lower center", ncol=min(4, len(legend)), frameon=False, fontsize=9,
-               handlelength=1.6, bbox_to_anchor=(0.5, 0.0))
-    fig.subplots_adjust(bottom=0.08 + 0.045 * rows, top=0.92, left=0.07, right=0.98)
+               handlelength=1.6, bbox_to_anchor=(0.5, 0.02))
+    fig.subplots_adjust(bottom=below, top=0.92, left=0.07, right=0.98)
     return fig

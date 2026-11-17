@@ -19,6 +19,7 @@ opened again, the questions already answered right (or whose answer was shown) a
 Texts may contain $...$ formulas (rendered by MathJax in the app, by Jupyter in notebooks).
 """
 import base64
+import datetime
 import hashlib
 import html
 import json
@@ -141,6 +142,7 @@ class Quiz:
     def _record(self, item, answer, right):
         item["tries"] += 1
         item["answers"].append(answer)
+        item.setdefault("times", []).append(datetime.datetime.now().isoformat(timespec="seconds"))   # (statistics)
         if right and item["state"] == "open":
             item["state"] = "right"
         try:
@@ -154,6 +156,7 @@ class Quiz:
     def _revealed(self, item):
         if item["state"] == "open":
             item["state"] = "revealed"
+            item.setdefault("times", []).append(datetime.datetime.now().isoformat(timespec="seconds"))
             try:
                 os.makedirs(os.path.dirname(self.log), exist_ok=True)
                 with open(self.log, "a", encoding="utf-8") as f:

@@ -6,7 +6,11 @@
   --jp-ui-font-family: Inter, "Segoe UI", system-ui, sans-serif;
   --jp-content-font-family: Inter, "Segoe UI", system-ui, sans-serif;
   --jp-content-font-color1: #142033;
-  --jp-widgets-font-size: 14px;
+  --jp-widgets-font-size: 15px;      /* = --tw-text-size below (the widgets read this variable) */
+  /* ONE size for the text of every page (text, tables, questions and their answers): JupyterLab's own rules read
+     this variable too, so whichever style sheet comes last, the text has this size */
+  --tw-text-size: 15px;
+  --jp-content-font-size1: var(--tw-text-size);
 }
 /* the theme of JupyterLab: its main color becomes the teal of the app (buttons, focus, progress) */
 body {
@@ -18,24 +22,28 @@ body, body.jp-Notebook, .jp-Notebook { background: #F5F7FA !important; color: va
 body { font-family: Inter, "Segoe UI", system-ui, sans-serif; }
 #rendered_cells, .jp-Notebook { max-width: 1120px; margin: 0 auto !important; padding: 18px 28px 64px !important; }
 .jp-Cell { padding: 0 !important; }
-.jp-RenderedHTMLCommon { font-size: 15px; line-height: 1.6; color: var(--tw-text); }
+.jp-RenderedHTMLCommon { font-size: var(--tw-text-size) !important; line-height: 1.6; color: var(--tw-text); }
 .jp-RenderedHTMLCommon h1, .jp-RenderedHTMLCommon h2, .jp-RenderedHTMLCommon h3 {
   font-family: "Space Grotesk", "Segoe UI", system-ui, sans-serif; font-weight: 600; color: var(--tw-text); }
 .jp-RenderedHTMLCommon h1 { font-size: 30px; margin: 18px 0 10px; }
-.jp-RenderedHTMLCommon h2 { font-size: 23px; margin: 34px 0 8px; padding-top: 22px; border-top: 1px solid var(--tw-line); }
-.jp-RenderedHTMLCommon h3 { font-size: 18px; margin: 22px 0 6px; }
+/* a little space under the title of a section */
+.jp-RenderedHTMLCommon h2 { font-size: 23px; margin: 34px 0 16px; padding-top: 22px; border-top: 1px solid var(--tw-line); }
+.jp-RenderedHTMLCommon h3 { font-size: 18px; margin: 24px 0 12px; }
 .jp-RenderedHTMLCommon strong { color: #0B1626; }
 .jp-RenderedHTMLCommon code { background: var(--tw-soft); border-radius: 5px; padding: 1px 5px; }
 .jp-RenderedHTMLCommon a { color: var(--tw-teal); }
-/* tables as large as the text (JupyterLab draws them at 12px) */
-.jp-RenderedHTMLCommon table { border-collapse: collapse; font-size: 15px; line-height: 1.5; }
+/* tables: the size of the text around them (JupyterLab draws them smaller) */
+.jp-RenderedHTMLCommon table { border-collapse: collapse; font-size: inherit !important; line-height: 1.5; }
+/* paragraphs, lists and table cells: exactly the same size, whatever the other style sheets say */
+.jp-RenderedHTMLCommon p, .jp-RenderedHTMLCommon li, .jp-RenderedHTMLCommon td, .jp-RenderedHTMLCommon th {
+  font-size: var(--tw-text-size) !important; }
 .jp-RenderedHTMLCommon td, .jp-RenderedHTMLCommon th { border: 1px solid var(--tw-line); padding: 6px 10px; }
 .jp-OutputArea-output pre { font-size: 13px; line-height: 1.45; color: #2B3648; }
 .jp-OutputArea-output img { max-width: 100%; height: auto; }
 
 /* widgets */
 .jupyter-widgets.widget-button, .jupyter-button {
-  height: 38px; border-radius: 9px; font-family: inherit; font-size: 14px; font-weight: 600; padding: 0 16px;
+  height: 38px; border-radius: 9px; font-family: inherit; font-size: var(--tw-text-size); font-weight: 600; padding: 0 16px;
   background: #fff; color: var(--tw-text); border: 1px solid var(--tw-line2); box-shadow: none; }
 .jupyter-button:hover:enabled { background: var(--tw-soft); box-shadow: none; }
 .jupyter-button.mod-primary, .jupyter-button.mod-success { background: var(--tw-teal) !important; color: #fff !important; border-color: var(--tw-teal) !important; }
@@ -45,9 +53,11 @@ body { font-family: Inter, "Segoe UI", system-ui, sans-serif; }
 .jupyter-button.mod-active, .widget-toggle-button.mod-active { background: var(--tw-teal-l); color: var(--tw-teal-d); border-color: var(--tw-teal); }
 .widget-toggle-buttons .widget-toggle-button { border-radius: 8px; margin-right: 6px; }
 .widget-dropdown select, .widget-text input, .widget-textarea textarea {
-  height: 36px; border-radius: 8px; border: 1px solid var(--tw-line2); font-family: inherit; font-size: 14px; padding: 0 10px; background: #fff; }
+  height: 36px; border-radius: 8px; border: 1px solid var(--tw-line2); font-family: inherit; font-size: var(--tw-text-size); padding: 0 10px; background: #fff; }
 .widget-dropdown select:focus, .widget-text input:focus { outline: 2px solid var(--tw-teal); outline-offset: 1px; }
-.widget-label, .widget-label-basic { font-size: 14px; color: var(--tw-text); }
+/* the labels of the controls (sliders, buttons, boxes), their values and the buttons: the size of the text */
+.widget-label, .widget-label-basic, .widget-readout, .widget-toggle-button, .widget-html-content,
+.widget-htmlmath-content { font-size: var(--tw-text-size) !important; color: var(--tw-text); }
 /* the label of a slider, a box or a list is never cut ("..."): it keeps its width (the controls of a panel stay
    aligned) and grows only when its text is longer */
 .widget-inline-hbox > .widget-label { min-width: max-content !important; max-width: none !important;
@@ -58,13 +68,20 @@ body { font-family: Inter, "Segoe UI", system-ui, sans-serif; }
 
 /* questions (quiz.py) */
 body .twq { background: #fff; border: 1px solid var(--tw-line); border-radius: 14px; padding: 16px 20px; margin: 14px 0; }
-body .twq-q { font-family: "Space Grotesk", "Segoe UI", system-ui, sans-serif; font-size: 13px; font-weight: 700; color: #fff;
+body .twq-q { font-family: "Space Grotesk", "Segoe UI", system-ui, sans-serif; font-size: var(--tw-text-size); font-weight: 700; color: #fff;
   background: var(--tw-teal); display: inline-block; border-radius: 6px; padding: 2px 8px; margin-bottom: 8px; }
 body .twq-fb { border-radius: 10px; border-left: 0; padding: 10px 14px; font-size: 14.5px; }
 body .twq-ok { background: var(--tw-teal-l); color: #0B3B35; }
 body .twq-no { background: var(--tw-red-bg); color: #5A1E14; }
 body .twq-no strong { color: var(--tw-red); }
 body .twq-ans { background: var(--tw-soft); color: var(--tw-text); }
+
+/* the controls of an interactive picture (intro_widgets.py): a card, one aligned row per control */
+.tw-controls { background: #fff; border: 1px solid var(--tw-line); border-radius: 12px; padding: 12px 18px;
+  margin: 6px 0 12px; max-width: 780px; box-sizing: border-box; gap: 8px; }
+.tw-controls .tw-ctl-row { gap: 12px; min-height: 40px; }
+.tw-controls .widget-toggle-buttons .widget-toggle-button { margin: 0 8px 0 0; }
+.tw-controls .widget-inline-hbox > .widget-label:empty { display: none; }
 
 /* the online version: the bar at the top of a page, back to the missions */
 .twin-webbar { position: sticky; top: 0; z-index: 1000; display: flex; align-items: center; gap: 16px;
@@ -82,7 +99,13 @@ body .twq-ans { background: var(--tw-soft); color: var(--tw-text); }
 .twq .widget-htmlmath, .twq .widget-html { height: auto !important; line-height: 1.5 !important; }
 .twq .widget-htmlmath-content, .twq .widget-html-content { line-height: 1.5 !important; white-space: normal; }
 /* the text of a question as large as the text of the page (a widget is 14px by default) */
-.twq .widget-htmlmath-content, .twq .widget-html-content { font-size: 15px; }
+.twq .widget-htmlmath-content, .twq .widget-html-content { font-size: var(--tw-text-size); }
+/* ... and its answers too: the options (radio, checkboxes), the value typed and its unit, the feedback, the comment
+   typed before Submit */
+.twq .widget-radio-box label, .twq .widget-checkbox label, .twq .widget-checkbox .widget-label,
+.twq .widget-label, .twq .widget-label-basic, .twq input[type="text"], .twq textarea, .twq .twq-fb {
+  font-size: var(--tw-text-size) !important; }
+.twq textarea { line-height: 1.5; padding: 8px 10px; }
 /* long options of a question wrap onto several lines without overlapping the next one */
 .widget-radio-box label, .widget-radio-box .widget-label { height: auto !important; min-height: 24px; line-height: 1.45 !important; white-space: normal !important; display: flex; flex-direction: row-reverse; justify-content: flex-end; align-items: flex-start; gap: 8px; margin: 3px 0; }
 .widget-radio-box input { margin-top: 3px; flex-shrink: 0; }

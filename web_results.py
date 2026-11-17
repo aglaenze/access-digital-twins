@@ -4,6 +4,12 @@ On the server (container/start.sh web), every page opened and every "Submit" mak
 
     web_results/<student>/<time>_<kind>.json      kind: "opened" (a page) or "submitted" (answers, times, comment)
 
+A submission keeps (submit.py): when the page was opened and submitted, the minutes in between and the minutes really
+active (gaps longer than 5 min count as 5), the score, right at the first try, revealed; per question the tries, the
+answers, the time of each answer, the minutes from the opening to its first answer and the seconds spent on it; the
+measurements (number, counting time, first one, seconds waited for the server); how much each interactive picture
+was used; the comment.
+
 kept on the server and, if the server has a write token (HF_TOKEN, a secret of the Space) and a dataset
 (TWIN_RESULTS_REPO, e.g. "agrgl/access-twin-results", private), sent there at once: the server of a Space may be
 restarted (its disk is lost then), the dataset keeps everything. One file per event: ten students submitting at the
@@ -81,20 +87,28 @@ def load(source):
 
 def table(events):
     """One row per student and exercise (the last submission; also the students who opened a page without submitting)."""
-    rows, opened = {}, {}
+    rows, opened, opens = {}, {}, {}
     for e in events:
         if e.get("kind") == "opened":
             opened.setdefault((e["student"], e.get("page", "")), e["time"])
+            opens[e["student"]] = opens.get(e["student"], 0) + 1
     for e in events:
         if e.get("kind") != "submitted":
             continue
         row = dict(student=e["student"], exercise=e.get("title", e.get("exercise")), opened=e.get("started"),
-                   submitted=e["time"], minutes=e.get("minutes"), score=e.get("summary"),
-                   right=e.get("right"), questions=e.get("questions"), measurements=e.get("measurements"),
-                   measured_seconds=e.get("measured_seconds"), comment=e.get("comment", ""))
+                   submitted=e["time"], minutes=e.get("minutes"), active_minutes=e.get("active_minutes"),
+                   pages_opened=opens.get(e["student"]), score=e.get("summary"),
+                   right=e.get("right"), right_first_try=e.get("first_try"), revealed=e.get("revealed"),
+                   questions=e.get("questions"), measurements=e.get("measurements"),
+                   measured_seconds=e.get("measured_seconds"), first_measurement=e.get("first_measurement"),
+                   waited_seconds=e.get("waited_seconds"), comment=e.get("comment", ""))
+        for name, u in (e.get("pictures") or {}).items():
+            row[f"picture {name} (changes)"] = u.get("changes")
         for q in e.get("answers", []):
             row[f"{q['id']} state"] = q["state"]
             row[f"{q['id']} tries"] = q["tries"]
+            row[f"{q['id']} first answer (min after opening)"] = q.get("first_min")
+            row[f"{q['id']} time spent (s)"] = q.get("seconds")
             row[f"{q['id']} answers"] = " | ".join(map(str, q["answers"]))
         rows[(e["student"], e.get("exercise"))] = row
     for (s, page), t in opened.items():

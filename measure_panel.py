@@ -40,8 +40,8 @@ PANEL_CSS = """<style>
 .tw-card .widget-toggle-buttons > div {display: flex; flex: 1 1 auto; flex-wrap: nowrap; min-width: 0}
 .tw-card .widget-toggle-buttons .widget-toggle-button {width: auto; min-width: 72px; padding: 0 12px}
 .tw-card.tw-act {border-top: 3px solid #0E7C70}
-.tw-h {font-weight: 700; font-size: 12px; letter-spacing: .6px; text-transform: uppercase; color: #0E7C70}
-.tw-note {font-size: 12.5px; color: #5B6779; line-height: 1.45; margin-top: 2px}
+.tw-h {font-weight: 700; font-size: 14px; letter-spacing: .6px; text-transform: uppercase; color: #0E7C70}
+.tw-note {font-size: 15px; color: #5B6779; line-height: 1.45; margin-top: 2px}
 .tw-panel .widget-label {color: #3B4658}
 .tw-panel input, .tw-panel select {border: 1px solid #CBD3DE !important; border-radius: 8px !important; background: #fff}
 .tw-panel .widget-toggle-buttons .widget-toggle-button {border: 1px solid #CBD3DE; background: #fff; color: #5B6779;

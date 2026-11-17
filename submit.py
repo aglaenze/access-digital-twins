@@ -32,9 +32,10 @@ def _web():
     return os.environ.get("TWIN_WEB") == "1"
 
 
-def _measurements(log):
-    """Number of measurements and their total time (s), from the logbook of the measurements."""
-    n, t = 0, 0.0
+def _measurements(log, detail=False):
+    """Number of measurements and their total time (s), from the logbook of the measurements. detail: also the times
+    of the measurements and the seconds the student waited for the server (computation of each measurement)."""
+    n, t, times, waited = 0, 0.0, [], 0.0
     try:
         with open(log, encoding="utf-8") as f:
             for line in f:
@@ -42,12 +43,49 @@ def _measurements(log):
                     e = json.loads(line)
                 except ValueError:
                     continue
-                if e.get("action") in ("count", "camera"):
+                if e.get("action") in ("count", "camera", "polarimetry"):
                     n += 1
-                    t += float(e.get("details", {}).get("t", 0) or 0)
+                    d = e.get("details", {}) or {}
+                    t += float(d.get("t", 0) or 0)
+                    waited += float(d.get("compute_time", 0) or 0)
+                    if e.get("time"):
+                        times.append(e["time"])
     except OSError:
         pass
-    return n, t
+    return (n, t, times, waited) if detail else (n, t)
+
+
+def _active_minutes(times, gap=300):
+    """The time actually spent: the sum of the gaps between successive actions, a gap longer than `gap` seconds (a
+    pause, another tab) counting as `gap`."""
+    ts = sorted(datetime.datetime.fromisoformat(x) for x in times if x)
+    return round(sum(min((b - a).total_seconds(), gap) for a, b in zip(ts, ts[1:])) / 60, 1)
+
+
+def _question_times(items, started):
+    """For each question: minutes from the opening of the page to its first answer, seconds spent on it (from the
+    previous action on the page to its last answer), and the time of each answer."""
+    out = {}
+    events = sorted((x, i["id"]) for i in items for x in i.get("times", []))
+    prev = started
+    last_of = {}
+    for x, qid in events:
+        last_of[qid] = x
+    for i in items:
+        ts = i.get("times", [])
+        if not ts:
+            continue
+        before = [x for x, q in events if x < ts[0]]
+        start = max(before) if before else prev
+        rec = dict(times=ts)
+        if started:
+            rec["first_min"] = round((datetime.datetime.fromisoformat(ts[0])
+                                      - datetime.datetime.fromisoformat(started)).total_seconds() / 60, 1)
+        if start:
+            rec["seconds"] = round((datetime.datetime.fromisoformat(last_of[i["id"]])
+                                    - datetime.datetime.fromisoformat(start)).total_seconds())
+        out[i["id"]] = rec
+    return out
 
 
 def _who():
@@ -87,8 +125,7 @@ class Submit:
                     + (" Save your notebook first (<i>Save</i> in the app, or Ctrl+S)." if mode != "bsc" else "")
                     + '</p>')
         display(w.VBox([w.HTML('<div class="twq-q">Submit</div>' + text),
-                        w.HTML("<b>Your comments on the exercise</b>"
-                               + (" (anonymous)" if _web() else "")), self.comment,
+                        w.HTML("<b>Your comments on the exercise</b>"), self.comment,
                         w.HBox([btn]), out]).add_class("twq"))      # (in a row: the button keeps its own width)
 
     def _send_web(self, uid, now, summary, comment, rr, instr):
@@ -101,15 +138,29 @@ class Submit:
         minutes = None
         if started:
             minutes = round((now - datetime.datetime.fromisoformat(started)).total_seconds() / 60, 1)
-        n, t = _measurements(os.path.join(rr, instr, os.environ.get(f"{instr.upper()}_SESSION") or uid, "log.jsonl"))
+        n, t, mtimes, waited = _measurements(
+            os.path.join(rr, instr, os.environ.get(f"{instr.upper()}_SESSION") or uid, "log.jsonl"), detail=True)
+        items = self.quiz.items if self.quiz else []
+        qtimes = _question_times(items, started)
+        all_times = [started, now.isoformat(timespec="seconds")] + mtimes + [x for i in items for x in i.get("times", [])]
+        try:
+            import intro_widgets                   # the interactive pictures of the page, if any: how much they were used
+            pictures = dict(intro_widgets.USAGE)
+        except Exception:
+            pictures = {}
         web_results.send("submitted", uid, dict(
             exercise=self.exercise, mode=self.mode, title=self.title, started=started, minutes=minutes,
-            summary=summary, questions=len(qs), right=sum(i["state"] == "right" for i in qs),
-            measurements=n, measured_seconds=t, comment=comment,
+            active_minutes=_active_minutes(all_times), summary=summary, questions=len(qs),
+            right=sum(i["state"] == "right" for i in qs),
+            revealed=sum(i["state"] == "revealed" for i in qs),
+            first_try=sum(i["state"] == "right" and i["tries"] == 1 for i in qs),
+            measurements=n, measured_seconds=t, first_measurement=min(mtimes) if mtimes else None,
+            waited_seconds=round(waited, 1), pictures=pictures, comment=comment,
             answers=[dict(id=i["id"], text=i["text"][:200], state=i["state"], tries=i["tries"],
-                          answers=[str(a)[:80] for a in i["answers"]]) for i in (self.quiz.items if self.quiz else [])]))
+                          answers=[str(a)[:80] for a in i["answers"]], **qtimes.get(i["id"], {}))
+                     for i in items]))
         took = f" You worked on it for {minutes:.0f} minutes." if minutes else ""
-        return (f'<div class="twq-fb twq-ok"><b>Thank you!</b> Your work was sent (anonymously) at {now:%H:%M}. '
+        return (f'<div class="twq-fb twq-ok"><b>Thank you!</b> Your work was sent at {now:%H:%M}. '
                 f'{html.escape(summary)}{took} You may change your answers or your comment and submit again.</div>')
 
     def _title(self):

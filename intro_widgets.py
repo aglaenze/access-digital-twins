@@ -11,6 +11,7 @@ redraw a small figure, to let the student try the relations instead of reading t
 The figures are drawn with matplotlib into an image widget (PNG bytes), not into an Output widget: on the Voila pages
 this needs no output capture (see page_output.py) and redraws without flicker.
 """
+import datetime
 import io
 
 import ipywidgets as w
@@ -30,6 +31,9 @@ LAYOUT = w.Layout(width="560px")
 # LoKI: neutrons per second on the sample and rms divergence (horizontal) of the recorded beams of the twin
 # (official McStas model, measured on loki/front/*/beam_at_sample, 2026-11-11)
 LOKI_BEAMS = {"3 m": (9.4e8, 0.170), "5 m": (1.9e8, 0.073), "8 m": (7.8e7, 0.046)}
+# how much each interactive picture was used on this page: {picture: {"changes": n, "first": time}} (submit.py sends it
+# with the statistics of the class: did the students try the pictures?)
+USAGE = {}
 
 
 def _png(fig):
@@ -41,20 +45,43 @@ def _png(fig):
 
 def _show(controls, draw, text=None, min_lines=0):
     """controls: widgets; draw(): returns (figure, html text). Redrawn at every change. min_lines: room kept for the
-    text (lines of 14.5 px x 1.6), so that what follows on the page does not move when the text gets shorter."""
+    text (lines of 15 px x 1.6), so that what follows on the page does not move when the text gets shorter."""
     img = w.Image(format="png", layout=w.Layout(width="780px"))
-    info = w.HTML(layout=w.Layout(min_height=f"{round(min_lines * 14.5 * 1.6) + 4}px") if min_lines else w.Layout())
+    info = w.HTML(layout=w.Layout(min_height=f"{round(min_lines * 15 * 1.6) + 4}px") if min_lines else w.Layout())
 
     def update(_=None):
         fig, html = draw()
         img.value = _png(fig)
-        info.value = f"<div style='font-size:14.5px;line-height:1.6;color:{INK}'>{html}</div>"
+        info.value = f"<div style='line-height:1.6;color:{INK}'>{html}</div>"      # (the size of the text: twin.css)
 
     import live_view                 # (the figure follows the sliders while they move)
+    name = draw.__qualname__.split(".")[0]          # the picture (odin_pinhole...): for the statistics of the class
+    def used(_):
+        u = USAGE.setdefault(name, {"changes": 0, "first": datetime.datetime.now().isoformat(timespec="seconds")})
+        u["changes"] += 1
     for c in controls:
         c.observe(live_view.throttled(update), names="value")
+        c.observe(used, names="value")
     update()
-    display(w.VBox([*controls, img, info]))
+    display(w.VBox([_panel(controls), img, info]))
+
+
+def _panel(controls):
+    """The controls of a picture, tidy: one row each, the label in a column of fixed width on the left, then the
+    control (the buttons of one row all of the same width, the sliders all of the same length): everything aligned."""
+    rows = []
+    for c in controls:
+        label = c.description
+        c.description = ""
+        c.style.description_width = "0px"
+        if isinstance(c, w.ToggleButtons):
+            longest = max(len(str(o)) for o in c._options_labels)
+            c.style.button_width = f"{max(90, 9 * longest + 28)}px"
+        else:
+            c.layout = w.Layout(width="440px")
+        lab = w.HTML(f"<b>{label}</b>", layout=w.Layout(width="250px", min_width="250px"))
+        rows.append(w.HBox([lab, c], layout=w.Layout(align_items="center")).add_class("tw-ctl-row"))
+    return w.VBox(rows).add_class("tw-controls")
 
 
 # --------------------------------------------------------------------------------------------- ODIN

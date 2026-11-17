@@ -398,7 +398,8 @@ _ = submit.Submit("odin/exercises/introduction", "bsc", quiz=q)
 """)
 
 md(r"""
-**Next.** Close this tab and open your exercise: the first chapter of your thread on the map of the catalogue (online: the start page of the class).
+**Next.** Open your exercise: the first chapter of your thread on the map of the catalogue (online: the button
+*← Missions* at the top of this page).
 """)
 
 nb = nbf.v4.new_notebook()
