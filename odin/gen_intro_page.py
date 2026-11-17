@@ -269,14 +269,23 @@ md(r"""
 
 A neutron has no electric charge: no camera sees it directly. ODIN turns each neutron into a flash of light in a
 **scintillator**, a thin screen containing lithium-6 that absorbs the neutron and glows; a camera, out of the beam
-behind a mirror, films the light. Two consequences you meet in every exercise:
+behind a mirror, films the light.
+""")
+fig("odin_detector.png", "How a neutron becomes a picture: absorbed in the scintillator, it makes a flash of light, "
+    "which a mirror sends to a camera out of the beam. The neutrons that are not absorbed go on to the beam stop.")
+md(r"""
+Two consequences you meet in every exercise:
 
 - **Thick or thin screen.** A thick scintillator stops more neutrons (a bright picture) but the light spreads in it
   (a blurred picture); a thin one is sharp but stops fewer neutrons.
 - **Not every neutron is counted.** The screen stops slow neutrons better than fast ones. In the twin the share of
   neutrons detected is $\varepsilon(\lambda) = 1 - e^{-\lambda / 8\,\text{Å}}$: 22 % at 2 Å, 39 % at 4 Å, 63 % at 8 Å.
   It cancels in a transmission (sample and open beam are detected the same way).
-
+""")
+fig("odin_scintillator.png", "Left: in a thick screen the neutrons are absorbed at different depths and the light of "
+    "each flash spreads on its way out: a larger spot, so a blurred picture; a thin screen keeps the spot small but "
+    "stops fewer neutrons. Right: the share of the neutrons detected in the twin, larger for slow neutrons.")
+md(r"""
 The twin's ODIN has **two cameras**, with the same field of view, **14 mm × 14 mm**, 5 cm behind the sample:
 
 | | Timepix3 camera (event mode) | Integrating camera (scintillator + sCMOS) |
@@ -284,12 +293,24 @@ The twin's ODIN has **two cameras**, with the same field of view, **14 mm × 14 
 | What it records | **each neutron**: where it arrived and when, hence its wavelength (part 4) | the light summed over the exposure: a picture, **no time, no wavelength** |
 | Pixels | positions kept on a grid of 4096 × 4096 (3.4 µm); the pictures are shown in 128 × 128 pixels of 110 µm (64 × 64 of 220 µm if you choose it for the pictures per wavelength, to keep more neutrons per pixel) | **standard**: 128 × 128 pixels of 110 µm, thick scintillator (blur 0.1 mm); **high resolution**: 512 × 512 pixels of 27.5 µm, thin scintillator (blur 0.02 mm), 16 times fewer neutrons per pixel |
 | Used for | Bragg edges, strain, polarized imaging | radiography, tomography, battery |
-
+""")
+fig("odin_cameras.png", "The same neutrons through an iron disc, seen by the two cameras. The Timepix3 camera writes "
+    "one line per neutron; its arrival time gives its wavelength, so the neutrons can be sorted into one picture per "
+    "wavelength. The integrating camera only adds up the light: one picture, all wavelengths mixed.")
+md(r"""
 **How sharp is the picture?** Three blurs add up, and the largest one wins: the pinhole ($l / (L/D)$, part 3), the
-scintillator, and the pixel. Standard setup with the 3 cm pinhole: 0.14 mm, 0.1 mm and 0.11 mm, about **0.2 mm** in
-all. High resolution with the 1 cm pinhole: 0.05 mm, 0.02 mm and 0.03 mm, about **0.06 mm**, but with far fewer
-neutrons per pixel: much longer exposures.
+scintillator, and the pixel. They combine as $\sqrt{a^2 + b^2 + c^2}$. Standard setup with the 3 cm pinhole: 0.14 mm,
+0.1 mm and 0.11 mm, about **0.2 mm** in all. High resolution with the 1 cm pinhole: 0.05 mm, 0.02 mm and 0.03 mm, about
+**0.06 mm**, but with far fewer neutrons per pixel: much longer exposures.
 
+*Try it*: choose the camera and the pinhole, and look at the test pattern. Then choose the high resolution with the
+1 cm pinhole: the 50 µm bars are no longer blurred, but the picture is lost in the noise (3 neutrons per pixel).
+Count 100 times longer: they appear.
+""")
+code(r"""
+iw.odin_resolution()
+""")
+md(r"""
 The pixel size is **your choice** among these settings of the cameras; the field of view, the distance from the
 sample to the camera and the efficiency are **fixed** in the twin. The real ODIN has more detectors and optics to
 choose from (larger fields, other pixels). *Limits of the twin*: a real Timepix3 camera loses neutrons above a few
@@ -305,7 +326,7 @@ q.choice("You want to see details of 0.1 mm in a sample. Which setting do you ch
           "The integrating camera in standard resolution, with the 4 cm pinhole: the most neutrons.",
           "The high-resolution camera with the 4 cm pinhole.",
           "The Timepix3 camera: it keeps positions to 3.4 µm."],
-         answer=0, why={1: "Its pixels (110 µm), its scintillator (0.1 mm) and the pinhole (0.14 mm with 3 cm) add up to about 0.2 mm: larger than the details.",
+         answer=0, why={1: "Its pixels (110 µm), its scintillator (0.1 mm) and the pinhole (0.19 mm with 4 cm) add up to about 0.24 mm: larger than the details.",
                         2: "The pinhole then blurs by 5 cm / 262 = 0.19 mm: the thin scintillator does not help.",
                         3: "The positions are written finely, but the light still spreads by about 0.1 mm in the "
                            "screen: the sharpness is that of the blur, not of the grid."},
@@ -330,27 +351,14 @@ Everything ODIN does combines the three ingredients of this page: a picture (par
 | A sample that changes with time | what happens during operation | How does lithium enter a battery electrode? | **How does lithium enter a battery electrode?** |
 | The spin of the neutrons (**polarized** imaging) | magnetic fields inside matter | What is the field inside this coil? | **Seeing a magnetic field with neutrons** |
 """)
-fig("iron_structures.png", "Bragg edges: two crystal structures of iron told apart by the wavelengths at which the "
-    "transmission jumps.")
-
-code(r"""
-q.choice("A colleague wants to know whether a part is made of ferritic or austenitic steel, without cutting it. "
-         "What should ODIN measure?",
-         ["The transmission as a function of the wavelength: the Bragg edges give the crystal structure.",
-          "One picture with all wavelengths: the two steels have different shades.",
-          "A tomography: the structure is seen in 3D.",
-          "The magnetic field with polarized neutrons."],
-         answer=0, why={1: "Both are iron: they stop about the same number of neutrons, the shades are almost equal.",
-                        2: "A tomography shows the shape of the part, not the arrangement of its atoms.",
-                        3: "Ferritic steel is magnetic and austenitic is not, but this is an indirect and harder way; "
-                           "the Bragg edges answer directly."},
-         explanation="The edges are at λ = 2d, where d is a distance between planes of atoms: each crystal structure "
-                     "has its own. The anode and the steel of the catalogue are measured this way.",
-         hints=["Which line of the table speaks of the crystal structure?"], title="Q11. Which measurement?")
-""")
 
 md(r"""
 ## 8. Summary: everything that sets the instrument
+
+**NICOS** is the program with which the instrument is driven at ESS: from the control room, you type its commands (or
+use its windows) to move the sample, choose the pinhole or the chopper mode, and start a measurement; it also writes
+the data files. The twin's ODIN is driven with the same NICOS; in the guided exercises, a **panel** of buttons on the
+page does the same for you.
 
 What sets a measurement on the twin's ODIN, and who decides: **you** (a setting of NICOS or of the panel), **follows**
 (it follows from another setting), or **fixed** (the instrument as built).
@@ -368,12 +376,12 @@ What sets a measurement on the twin's ODIN, and who decides: **you** (a setting 
 | | distance pinhole → sample L | 10.5 m (L/D from 1050 to 262) | fixed | with D, the blur |
 | | diffuser | in, out | you | a more even beam |
 | Sample | sample mounted | the samples of your proposal; none | you | — |
-| | stage translation x | −500 to +500 mm (beyond 20 mm: out of the field, open beam) | you | sample in or out of the beam |
+| | stage translation x (across the beam) | −500 to +500 mm (beyond 20 mm: out of the field, open beam) | you | sample in or out of the beam |
 | | stage rotation | −180° to +180° | you | the angle (tomography) |
 | | load frame | 0 kN up to the limit of the sample (frame: 50 kN) | you (samples that can be loaded) | strain |
 | | battery cycler | time in the cycle, 0 to 55 h | you (batteries) | state of charge |
 | | polarizer and analyzer | in, out; spin in ±x, ±y, ±z; spin analyzed x, y, z | you | polarized imaging |
-| Detection | distance sample → camera | 5 cm | fixed | with L/D, the blur |
+| Detection | distance sample → camera | 5 cm (the stage moves the sample across the beam, not along it; on a real instrument this distance can be changed) | fixed | with L/D, the blur |
 | | field of view | 14 mm × 14 mm | fixed | the largest object seen at once |
 | | Timepix3 camera | counting time; pictures per wavelength: range, bin (0.01 Å), 128 or 64 pixels | you | wavelength, statistics |
 | | integrating camera | exposure (up to 3600 s); standard (110 µm) or high resolution (27.5 µm) | you | sharpness against neutrons per pixel |
@@ -382,6 +390,11 @@ What sets a measurement on the twin's ODIN, and who decides: **you** (a setting 
 
 code(r"""
 q.report()
+""")
+
+code(r"""
+import submit
+_ = submit.Submit("odin/exercises/introduction", "bsc", quiz=q)
 """)
 
 md(r"""

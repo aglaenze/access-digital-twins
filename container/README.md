@@ -30,6 +30,8 @@ and runs identically on a laptop, a DTU server, UCloud or ESS's VISA.
 | `fetch_fronts.py` | downloads the precomputed McStas upstream parts (release `fronts-v1`) into `$TWIN_RUN_ROOT/odin/front/` |
 | `versions.py`, `UPDATES.md` | the fixed versions and the latest published; the weekly test with the latest (`../.github/workflows/latest.yml`) and how to raise them |
 | `smoke_test.py` | test run after each build: tools, a measurement with the virtual ODIN compared with NCrystal, NICOS services and a measurement recorded through NICOS (`nexusfile_open`, as at ESS) |
+| `kubernetes.yaml` | the online version for a class on a Kubernetes cluster (tested on UCloud's Kubernetes platform, 2026-11-17): volume, the `web` entry point, service, and the public address (Ingress; on UCloud, a public link of the same name) |
+| `class_results.py` | the results of a class served by the cluster: copies `web_results/` from the server (kubectl) and makes the table (`../web_results.py`) |
 | `../.github/workflows/container.yml` | GitHub Actions: build, test, publish to `ghcr.io/aglaenze/access-digital-twins` |
 
 ## Precomputed McStas upstream parts

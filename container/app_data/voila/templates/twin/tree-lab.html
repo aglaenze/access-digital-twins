@@ -149,6 +149,9 @@
         return !!o[page];
       } catch (err) { return false; }
     }
+    // this start page is the "catalogue" tab: each mission opens in its own tab (as the tabs of the app), and the
+    // "Missions" link of a page comes back here (target twin-catalogue)
+    window.name = "twin-catalogue";
     document.querySelectorAll(".card[data-page]").forEach(function (card) {
       var page = card.getAttribute("data-page");
       if (opened(page)) {
@@ -157,7 +160,9 @@
       }
       card.querySelector(".go").addEventListener("click", function () {
         opened(page, true);
-        window.location.href = "{{ base_url }}voila/render/" + page + "?sid=" + sid();
+        var url = "{{ base_url }}voila/render/" + page + "?sid=" + sid();
+        var tab = window.open(url, "twin-" + page.replace(/[^A-Za-z0-9]/g, "-"));   // the same tab if already open
+        if (!tab) window.location.href = url;                                         // tabs blocked: this one
       });
     });
   </script>

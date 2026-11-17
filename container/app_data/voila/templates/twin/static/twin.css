@@ -27,7 +27,8 @@ body { font-family: Inter, "Segoe UI", system-ui, sans-serif; }
 .jp-RenderedHTMLCommon strong { color: #0B1626; }
 .jp-RenderedHTMLCommon code { background: var(--tw-soft); border-radius: 5px; padding: 1px 5px; }
 .jp-RenderedHTMLCommon a { color: var(--tw-teal); }
-.jp-RenderedHTMLCommon table { border-collapse: collapse; }
+/* tables as large as the text (JupyterLab draws them at 12px) */
+.jp-RenderedHTMLCommon table { border-collapse: collapse; font-size: 15px; line-height: 1.5; }
 .jp-RenderedHTMLCommon td, .jp-RenderedHTMLCommon th { border: 1px solid var(--tw-line); padding: 6px 10px; }
 .jp-OutputArea-output pre { font-size: 13px; line-height: 1.45; color: #2B3648; }
 .jp-OutputArea-output img { max-width: 100%; height: auto; }
@@ -65,12 +66,23 @@ body .twq-no { background: var(--tw-red-bg); color: #5A1E14; }
 body .twq-no strong { color: var(--tw-red); }
 body .twq-ans { background: var(--tw-soft); color: var(--tw-text); }
 
+/* the online version: the bar at the top of a page, back to the missions */
+.twin-webbar { position: sticky; top: 0; z-index: 1000; display: flex; align-items: center; gap: 16px;
+  padding: 10px 24px; background: #0F1D31; color: #9FB0C7; font-family: Inter, "Segoe UI", system-ui, sans-serif;
+  font-size: 14px; box-shadow: 0 1px 6px rgba(0,0,0,.25); }
+.twin-webbar a { color: #fff; background: #0E7C70; text-decoration: none; font-weight: 600; padding: 6px 14px;
+  border-radius: 8px; }
+.twin-webbar a:hover { background: #12988A; }
+.twin-webbar span { margin-left: auto; }
+
 /* the loading spinner of Voila */
 #loading { font-family: Inter, "Segoe UI", system-ui, sans-serif; color: var(--tw-muted); }
 .twq .jupyter-button, .twq .widget-button { width: auto !important; min-width: 110px; margin-right: 8px; }
 /* questions: the text box grows with its text (a long question overlapped its options) */
 .twq .widget-htmlmath, .twq .widget-html { height: auto !important; line-height: 1.5 !important; }
 .twq .widget-htmlmath-content, .twq .widget-html-content { line-height: 1.5 !important; white-space: normal; }
+/* the text of a question as large as the text of the page (a widget is 14px by default) */
+.twq .widget-htmlmath-content, .twq .widget-html-content { font-size: 15px; }
 /* long options of a question wrap onto several lines without overlapping the next one */
 .widget-radio-box label, .widget-radio-box .widget-label { height: auto !important; min-height: 24px; line-height: 1.45 !important; white-space: normal !important; display: flex; flex-direction: row-reverse; justify-content: flex-end; align-items: flex-start; gap: 8px; margin: 3px 0; }
 .widget-radio-box input { margin-top: 3px; flex-shrink: 0; }

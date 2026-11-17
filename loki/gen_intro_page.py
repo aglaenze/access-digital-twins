@@ -329,6 +329,11 @@ code(r"""
 q.report()
 """)
 
+code(r"""
+import submit
+_ = submit.Submit("loki/exercises/introduction", "bsc", quiz=q)
+""")
+
 md(r"""
 **Next.** Close this tab and open *How big are these nanoparticles?* in the catalogue.
 """)

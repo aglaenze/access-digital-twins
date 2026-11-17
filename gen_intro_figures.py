@@ -13,6 +13,9 @@ loki_q.png          The scattering angle 2θ, the scattering vector Q = 4π sin 
 loki_tof.png        Time of flight on LoKI: the band 3-11.5 Å fits between two pulses with the rear bank at 5 m,
                     not at 10 m.
 odin_choppers.png   The band choppers (one pulse in two) and the blur of the long pulse.
+odin_detector.png   Side view of the detection: scintillator (lithium-6), mirror at 45°, camera out of the beam.
+odin_scintillator.png  Thick and thin screens (light spread), and the detection efficiency ε(λ) of the twin.
+odin_cameras.png    The two cameras: events (x, y, t) sorted into pictures per wavelength, or one summed picture.
 
 All numbers are computed here from the constants below (the same as odin/odin_mcstas.py and loki/loki_mcstas.py).
 """
@@ -206,6 +209,130 @@ def odin_pinhole():
     plt.close(fig)
 
 
+def odin_detector():
+    """Side view of the detection: the neutron is absorbed in the scintillator (lithium-6), which glows; a mirror at
+    45° sends the light up to the camera, out of the beam; the neutrons go on through the mirror."""
+    fig, ax = plt.subplots(figsize=(13, 4.6))
+    ax.plot([-0.4, 1.0], [0, 0], color=TEAL, lw=6, solid_capstyle="butt")
+    ax.text(0.25, 0.22, "neutrons", ha="center", va="bottom", fontsize=10.5, color=TEAL)
+    ax.add_patch(Rectangle((1.0, -0.45), 0.35, 0.9, color=GREY, ec=INK))
+    ax.text(1.175, -0.6, "sample", ha="center", va="top", fontsize=10.5, color=INK)
+    ax.plot([1.35, 2.5], [0, 0], color=TEAL, lw=4, solid_capstyle="butt", alpha=0.8)
+    ax.add_patch(Rectangle((2.5, -0.8), 0.1, 1.6, color="#7BC8A4", ec=TEAL))     # the scintillator screen
+    ax.text(2.55, 0.95, "scintillator\n(lithium-6)", ha="center", va="bottom", fontsize=10.5, color=TEAL)
+    ax.annotate("", (2.5, -1.05), (1.35, -1.05), arrowprops=dict(arrowstyle="<->", color=INK))
+    ax.text(1.92, -1.13, "5 cm", ha="center", va="top", fontsize=10, color=INK)
+    ax.plot(2.55, 0.12, "*", color="#F2B544", ms=17, mec=ORANGE, zorder=5)       # one flash
+    for dy in (-0.25, 0.0, 0.25):                                                # its light toward the mirror
+        ax.annotate("", (4.0 - 0.05, dy * 0.6), (2.62, 0.12 + dy * 0.2),
+                    arrowprops=dict(arrowstyle="-|>", color="#E0A030", lw=1.3))
+    ax.plot([3.6, 4.4], [-0.6, 0.6], color=INK, lw=3)                             # mirror at 45°
+    ax.text(4.55, -0.55, "mirror at 45°\n(neutrons go\nthrough it)", ha="left", va="top", fontsize=10, color=INK)
+    ax.annotate("", (4.0, 1.75), (4.0, 0.05), arrowprops=dict(arrowstyle="-|>", color="#E0A030", lw=2))
+    ax.add_patch(Rectangle((3.75, 1.75), 0.5, 0.18, color=BLUE))                  # lens
+    ax.add_patch(Rectangle((3.6, 1.95), 0.8, 0.45, color=INK))                    # camera body
+    ax.text(4.5, 2.15, "camera, out of the beam: films the screen", ha="left", va="center", fontsize=10.5, color=INK)
+    ax.plot([2.6, 6.2], [0, 0], color=TEAL, lw=3, alpha=0.5, ls="--", zorder=0)   # the neutrons not absorbed
+    ax.add_patch(Rectangle((6.2, -0.5), 0.3, 1.0, color="#5B6779"))
+    ax.text(6.35, -0.62, "beam stop", ha="center", va="top", fontsize=10, color=INK)
+    ax.text(2.75, 0.32, "1", fontsize=12, fontweight="bold", color=ORANGE)
+    ax.text(3.2, -0.42, "2", fontsize=12, fontweight="bold", color=ORANGE)
+    ax.text(4.12, 1.0, "3", fontsize=12, fontweight="bold", color=ORANGE)
+    steps = ("1  The neutron is absorbed by a lithium-6 nucleus of the screen:\n"
+             "    n + ⁶Li → ³H + ⁴He. The two fast particles make the screen glow:\n"
+             "    a flash of light, at the place where the neutron arrived.\n"
+             "2  The light of the flash leaves the screen…\n"
+             "3  …and the mirror sends it up to the camera. The camera stays out of\n"
+             "    the beam, where the neutrons cannot damage it.")
+    ax.text(7.0, 1.7, steps, ha="left", va="top", fontsize=10.5, color=INK, linespacing=1.45)
+    ax.set_xlim(-0.5, 12.4); ax.set_ylim(-1.5, 2.6); ax.axis("off")
+    fig.tight_layout()
+    fig.savefig(os.path.join(OUT, "odin_detector.png"), dpi=150)
+    plt.close(fig)
+
+
+def odin_scintillator():
+    """Left: a thick and a thin screen; the light of a flash spreads on its way out of the screen. Right: the share of
+    the neutrons detected in the twin, ε(λ) = 1 − exp(−λ / 8 Å)."""
+    fig = plt.figure(figsize=(13, 4.4))
+    rng = np.random.default_rng(3)
+    for k, (x0, thick, title, note) in enumerate((
+            (0.04, 0.6, "Thick screen", "more neutrons stopped (bright)\nlight spreads: blur 0.1 mm"),
+            (0.27, 0.15, "Thin screen", "fewer neutrons stopped\nlittle spread: blur 0.02 mm"))):
+        ax = fig.add_axes([x0, 0.12, 0.2, 0.74])
+        ax.add_patch(Rectangle((0, -1.6), thick, 3.2, color="#BFE5D1", ec=TEAL))
+        for y in np.linspace(-1.1, 1.1, 5):
+            depth = rng.uniform(0.15, 0.85) * thick
+            ax.annotate("", (depth, y), (-0.9, y), arrowprops=dict(arrowstyle="-|>", color=TEAL, lw=1.2))
+            ax.plot(depth, y, "*", color="#F2B544", mec=ORANGE, ms=11, zorder=5)
+            spread = (thick - depth) * 0.45 + 0.03            # half-width of the light spot at the exit face
+            ax.fill([depth, thick, thick], [y, y - spread, y + spread], color="#F2B544", alpha=0.45, lw=0)
+            ax.plot([thick, thick], [y - spread, y + spread], color=ORANGE, lw=3)
+        ax.text(thick + 0.08, 1.75, "light spot\nseen by the camera", ha="left", va="bottom", fontsize=9, color=ORANGE)
+        ax.set_title(title, fontsize=12, fontweight="bold", color=INK)
+        ax.text(0.0, -1.85, note, ha="left", va="top", fontsize=9.5, color=INK)
+        ax.set_xlim(-1.0, 1.6); ax.set_ylim(-2.7, 2.5); ax.axis("off")
+    ax = fig.add_axes([0.6, 0.17, 0.37, 0.7])
+    lam = np.linspace(0.5, 12, 200)
+    ax.plot(lam, 100 * (1 - np.exp(-lam / 8)), color=TEAL, lw=2.2)
+    for l in (2, 4, 8):
+        e = 100 * (1 - np.exp(-l / 8))
+        ax.plot(l, e, "o", color=ORANGE, ms=7, zorder=4)
+        ax.text(l + 0.25, e - 2, f"{l} Å: {e:.0f} %", ha="left", va="top", fontsize=10, color=ORANGE)
+    ax.set_xlabel("wavelength λ (Å)"); ax.set_ylabel("neutrons detected (%)")
+    ax.set_ylim(0, 85); ax.set_xlim(0, 12)
+    ax.set_title("Slow neutrons are caught more easily", fontsize=12, fontweight="bold", color=INK)
+    ax.text(11.8, 6, "ε(λ) = 1 − exp(−λ / 8 Å)\n(the twin)", ha="right", va="bottom", fontsize=10, color=INK)
+    for s in ("top", "right"):
+        ax.spines[s].set_visible(False)
+    fig.savefig(os.path.join(OUT, "odin_scintillator.png"), dpi=150)
+    plt.close(fig)
+
+
+def odin_cameras():
+    """The same neutrons through an iron disc seen by the two cameras: the Timepix3 camera notes each neutron (x, y, t),
+    so the time gives λ and the neutrons can be sorted into pictures per wavelength (the iron lets more through above
+    its Bragg edge at 4.05 Å); the integrating camera adds up the light: one picture, all wavelengths mixed."""
+    fig = plt.figure(figsize=(13, 4.8))
+    rng = np.random.default_rng(7)
+    n = 64
+    yy, xx = np.mgrid[:n, :n]
+    disc = (xx - n / 2) ** 2 + (yy - n / 2) ** 2 < (n * 0.3) ** 2
+
+    def picture(trans, counts):
+        img = np.where(disc, trans, 1.0)
+        return rng.poisson(img * counts) / counts
+
+    fig.text(0.02, 0.93, "Timepix3 camera (event mode): one line per neutron", fontsize=12, fontweight="bold", color=INK)
+    rows = [("x (mm)", "y (mm)", "t (ms)", "→ λ (Å)")]
+    for x, y, t in ((3.21, 9.80, 45.9), (7.04, 6.62, 68.9), (11.56, 2.37, 91.8), (5.48, 12.90, 52.1)):
+        rows.append((f"{x:.2f}", f"{y:.2f}", f"{t:.1f}", f"{H_OVER_M * t * 1e-3 / ODIN_DET:.2f}"))
+    for i, r in enumerate(rows):
+        for j, c in enumerate(r):
+            fig.text(0.03 + j * 0.06, 0.8 - i * 0.065, c, fontsize=10.5, color=ORANGE if j == 3 else INK,
+                     fontweight="bold" if i == 0 else "normal", family="DejaVu Sans Mono")
+    fig.text(0.03, 0.8 - len(rows) * 0.065, "… millions of lines", fontsize=10, color=GREY)
+    fig.text(0.03, 0.27, "λ = 3956 × t / 60.55 m: the time gives\nthe wavelength (part 4), so the neutrons\n"
+             "can be sorted into pictures per wavelength →", fontsize=10.5, color=INK, va="top")
+    for k, (lam, tr) in enumerate(((3.0, 0.45), (4.5, 0.75), (6.0, 0.78))):
+        ax = fig.add_axes([0.30 + k * 0.125, 0.2, 0.115, 0.55])
+        ax.imshow(picture(tr, 150), cmap="gray", vmin=0.2, vmax=1.2)
+        ax.set_xticks([]); ax.set_yticks([])
+        ax.set_title(f"{lam:g} Å", fontsize=11, color=ORANGE)
+    fig.text(0.30, 0.1, "an iron disc: it lets more neutrons through above 4.05 Å\n(its Bragg edge): seen only "
+             "in the pictures per wavelength", fontsize=10, color=INK)
+    fig.add_artist(plt.Line2D([0.705, 0.705], [0.05, 0.95], color="#D9DDE5", lw=1.5))
+    fig.text(0.725, 0.93, "Integrating camera", fontsize=12, fontweight="bold", color=INK)
+    ax = fig.add_axes([0.74, 0.2, 0.18, 0.6])
+    ax.imshow(picture(0.62, 450), cmap="gray", vmin=0.2, vmax=1.2)
+    ax.set_xticks([]); ax.set_yticks([])
+    ax.set_title("all wavelengths added", fontsize=11, color=INK)
+    fig.text(0.725, 0.1, "no time, no λ: one picture, smoother\n(all the neutrons in it), but no Bragg edge",
+             fontsize=10, color=INK)
+    fig.savefig(os.path.join(OUT, "odin_cameras.png"), dpi=150)
+    plt.close(fig)
+
+
 def loki_beamline():
     fig = plt.figure(figsize=(13, 4.0))
     ax = fig.add_axes([0.04, 0.2, 0.52, 0.72])                 # source -> sample
@@ -337,5 +464,6 @@ if __name__ == "__main__":
         print(f"ODIN: {lam} Å reaches the camera ({ODIN_DET} m) after {lam * ODIN_DET / H_OVER_M * 1e3:.1f} ms")
     print(f"ODIN: band between two pulses {H_OVER_M * PERIOD / ODIN_DET:.2f} Å; with one pulse in two "
           f"{2 * H_OVER_M * PERIOD / ODIN_DET:.2f} Å; natural resolution {H_OVER_M * TAU / ODIN_DET:.3f} Å")
-    odin_beamline(); odin_tof(); odin_choppers(); odin_pinhole(); loki_beamline(); loki_q(); loki_tof()
+    odin_beamline(); odin_tof(); odin_choppers(); odin_pinhole(); odin_detector(); odin_scintillator(); odin_cameras()
+    loki_beamline(); loki_q(); loki_tof()
     print("written", OUT)

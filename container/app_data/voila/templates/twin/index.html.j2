@@ -26,4 +26,22 @@ window.MathJax = {
 {#- the look of the app (fonts, colors, buttons, questions): static/twin.css -#}
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap">
 <link rel="stylesheet" href="{{ resources.base_url }}voila/templates/twin/static/twin.css">
+{#- the online version (pages opened from the start page, "?sid=..."): a bar at the top to go back to the missions,
+    as the tabs of the app. In the app (no sid) nothing changes. -#}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  if (!/[?&]sid=/.test(window.location.search)) return;
+  var bar = document.createElement("div");
+  bar.className = "twin-webbar";
+  var back = document.createElement("a");
+  back.href = "{{ resources.base_url }}";
+  back.target = "twin-catalogue";
+  back.textContent = "← Missions";
+  back.title = "Back to the list of missions (this page stays open in its tab)";
+  var name = document.createElement("span");
+  name.textContent = "ESS digital twins";
+  bar.appendChild(back); bar.appendChild(name);
+  document.body.insertBefore(bar, document.body.firstChild);
+});
+</script>
 {%- endblock html_head_js_mathjax -%}

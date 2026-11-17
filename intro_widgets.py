@@ -4,6 +4,7 @@ redraw a small figure, to let the student try the relations instead of reading t
     import intro_widgets as iw
     iw.odin_time_of_flight()      # wavelength -> speed, arrival time at the camera, next pulse
     iw.odin_pinhole()             # pinhole size, sample-camera distance -> blur and noise of a test pattern
+    iw.odin_resolution()          # camera, pinhole, counting time -> the three blurs, combined, and the test pattern
     iw.loki_q()                   # position on the detector, wavelength, distance -> angle, Q, size
     iw.loki_collimation()         # collimation length -> neutrons per second and divergence (recorded beams of the twin)
 
@@ -38,9 +39,11 @@ def _png(fig):
     return buf.getvalue()
 
 
-def _show(controls, draw, text=None):
-    """controls: widgets; draw(): returns (figure, html text). Redrawn at every change."""
-    img, info = w.Image(format="png", layout=w.Layout(width="780px")), w.HTML()
+def _show(controls, draw, text=None, min_lines=0):
+    """controls: widgets; draw(): returns (figure, html text). Redrawn at every change. min_lines: room kept for the
+    text (lines of 14.5 px x 1.6), so that what follows on the page does not move when the text gets shorter."""
+    img = w.Image(format="png", layout=w.Layout(width="780px"))
+    info = w.HTML(layout=w.Layout(min_height=f"{round(min_lines * 14.5 * 1.6) + 4}px") if min_lines else w.Layout())
 
     def update(_=None):
         fig, html = draw()
@@ -152,7 +155,7 @@ def odin_band_choppers():
                     "the band of each pulse reaches the camera before the next one.")
         return fig, txt
 
-    _show([on, t_cam], draw)
+    _show([on, t_cam], draw, min_lines=4)
 
 
 def odin_wfm():
@@ -217,7 +220,7 @@ def odin_wfm():
                    f"Δλ/λ = <b>{100 * dl / l:.1f} %</b>. Choose a WFM setting to sharpen it.")
         return fig, txt
 
-    _show([delta, lam], draw)
+    _show([delta, lam], draw, min_lines=5)
 
 
 def _pattern(blur_um, rel_flux, rng):
@@ -256,6 +259,63 @@ def odin_pinhole():
                      f"{'' if flux == 1 else ' for the same counting time'}.")
 
     _show([d, l], draw)
+
+
+ODIN_CAMERAS = {"standard": (110.0, 100.0), "high resolution": (27.5, 20.0)}   # pixel, scintillator blur (µm)
+
+
+def odin_resolution():
+    """The three blurs of a picture (pinhole l·D/L, scintillator, pixel) and their combination √(a² + b² + c²), with
+    the test pattern seen through them: blurred by the pinhole and the screen, cut into pixels, with the counting
+    noise of the neutrons per pixel (∝ D², ∝ pixel area, ∝ counting time)."""
+    cam = w.ToggleButtons(options=list(ODIN_CAMERAS), value="standard", description="integrating camera",
+                          style={"button_width": "130px", "description_width": "230px"})
+    d = w.ToggleButtons(options=[("1 cm", 0.01), ("2 cm", 0.02), ("3 cm", 0.03), ("4 cm", 0.04)], value=0.03,
+                        description="pinhole D", style={"button_width": "70px", "description_width": "230px"})
+    t = w.ToggleButtons(options=[("1 ×", 1), ("10 ×", 10), ("100 ×", 100)], value=1,
+                        description="counting time", style={"button_width": "70px", "description_width": "230px"})
+
+    def draw():
+        pix, scint = ODIN_CAMERAS[cam.value]
+        pin = 0.05 * d.value / ODIN_L_PINHOLE * 1e6                       # µm, camera 5 cm behind the sample
+        total = float(np.sqrt(pin ** 2 + scint ** 2 + pix ** 2))
+        # the pattern at 2.5 µm per point: blurred by pinhole and screen, then averaged over each pixel
+        step = 2.5
+        row = np.ones(0)
+        for width in (400, 200, 100, 50):
+            n = int(width / step)
+            row = np.r_[row, np.ones(3 * n), np.tile(np.r_[np.full(n, 0.35), np.ones(n)], 4)]
+        row = np.r_[row, np.ones(120)]
+        k = max(int(round(np.hypot(pin, scint) / step)), 1)
+        row = np.convolve(np.pad(row, k, mode="edge"), np.ones(k) / k, mode="same")[k:-k]
+        m = max(int(round(pix / step)), 1)
+        nb = len(row) // m
+        pixels = row[:nb * m].reshape(nb, m).mean(axis=1)
+        counts = 400 * (d.value / 0.03) ** 2 * (pix / 110.0) ** 2 * t.value    # per pixel, open beam
+        rows = max(int(round(700 / pix)), 2)                                  # 0.7 mm high
+        rng = np.random.default_rng(1)
+        img = rng.poisson(np.tile(pixels, (rows, 1)) * counts) / counts
+        fig, (a, b) = plt.subplots(1, 2, figsize=(10.5, 2.8), gridspec_kw=dict(width_ratios=[1, 2.1]))
+        names = ["pinhole", "scintillator", "pixel", "combined"]
+        vals = [pin, scint, pix, total]
+        bars = a.barh(names[::-1], vals[::-1], color=[RED, ORANGE, BLUE, INK])
+        for bar, v in zip(bars, vals[::-1]):
+            a.text(v + 4, bar.get_y() + bar.get_height() / 2, f"{v:.3g} µm", va="center", fontsize=9, color=INK)
+        a.axvline(100, color=GREY, lw=1, ls=":")
+        a.text(100, 3.55, "100 µm", ha="center", va="bottom", fontsize=8.5, color=GREY)
+        a.set_xlim(0, 330); a.set_xlabel("blur (µm)")
+        for s in ("top", "right"):
+            a.spines[s].set_visible(False)
+        b.imshow(img, cmap="gray", vmin=0.0, vmax=1.35, aspect="auto", interpolation="nearest",
+                 extent=(0, nb * pix / 1000, 0, rows * pix / 1000))
+        b.set_yticks([]); b.set_xlabel("position on the camera (mm): bars 400, 200, 100 and 50 µm wide")
+        fig.tight_layout()
+        return fig, (f"Pinhole: 5 cm × {d.value * 100:.0f} cm / 10.5 m = <b>{pin:.0f} µm</b>; scintillator "
+                     f"<b>{scint:.0f} µm</b>; pixel <b>{pix:g} µm</b>. They combine as √(a² + b² + c²) = "
+                     f"<b>{total:.0f} µm</b>: the largest dominates. Neutrons per pixel: <b>{counts:.0f}</b> in the "
+                     f"open beam (the noise is about 1/√{counts:.0f} = {100 / np.sqrt(counts):.0f} %).")
+
+    _show([cam, d, t], draw, min_lines=3)
 
 
 # --------------------------------------------------------------------------------------------- LoKI

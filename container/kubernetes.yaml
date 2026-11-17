@@ -1,0 +1,82 @@
+# The online version for a class (start.sh web, port 7860) on a Kubernetes cluster (tested target: UCloud's
+# Kubernetes platform, k3s). One pod serves the whole class; all its data (upstream McStas parts, results) are on a
+# volume of the cluster, lost when the cluster is deleted.
+#
+#   kubectl create secret generic twin-web --from-literal=password='<class password>'
+#   kubectl apply -f kubernetes.yaml
+#   kubectl logs -f deployment/twin-web          # first start: image (3.7 GB) + upstream parts (1.6 GB)
+#
+# TWIN_HEAVY_SLOTS: heavy operations (count, reading of an event file) run at once; one per student for no waiting
+# (needs about 4 GB of memory each at most, and 4 cores per ODIN count).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: twin-data
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 40Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: twin-web
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate                   # one pod at a time: the volume is ReadWriteOnce
+  selector:
+    matchLabels: {app: twin-web}
+  template:
+    metadata:
+      labels: {app: twin-web}
+    spec:
+      initContainers:
+        - name: data-owner           # a new volume belongs to root; the image runs as mambauser
+          image: ghcr.io/aglaenze/access-digital-twins:latest
+          command: ["sh", "-c", "chown mambauser:mambauser /data"]
+          securityContext: {runAsUser: 0}
+          volumeMounts: [{name: data, mountPath: /data}]
+      containers:
+        - name: twin
+          image: ghcr.io/aglaenze/access-digital-twins:latest
+          args: ["web"]
+          env:
+            - name: TWIN_WEB_PASSWORD
+              valueFrom: {secretKeyRef: {name: twin-web, key: password}}
+            - name: TWIN_HEAVY_SLOTS
+              value: "2"
+          ports: [{containerPort: 7860, name: http}]
+          readinessProbe:
+            tcpSocket: {port: 7860}
+            periodSeconds: 10
+          volumeMounts: [{name: data, mountPath: /data}]
+      volumes:
+        - name: data
+          persistentVolumeClaim: {claimName: twin-data}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: twin-web
+spec:
+  selector: {app: twin-web}
+  ports: [{port: 7860, targetPort: 7860, name: http}]
+---
+# The public address. On UCloud: UCloud's controller in the cluster watches the Ingresses and creates by itself the
+# public link of a host app-<name>.cloud.sdu.dk (nothing to create by hand; the name must be free).
+# Elsewhere: the host name of the server (and its certificate).
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: twin-web
+spec:
+  rules:
+    - host: app-access-twins.cloud.sdu.dk
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service: {name: twin-web, port: {number: 7860}}
