@@ -552,11 +552,11 @@ q.report()
 """)
 
 md(r"""
-### For X-ray experts (optional)
+### Bonus round: for X-ray experts
 
-You know X-ray imaging or diffraction: these questions compare it with what you just did with neutrons, with numbers.
-They count in your score like the others. Values used: neutrons at 1.8 Å (NCrystal, as in the twin), X-rays from the
-NIST tables (XCOM).
+You know X-ray imaging or diffraction? Then this round is for you: every question puts what you just did with neutrons
+next to what you would do with X-rays, with numbers. They count in your score like the others. Values used: neutrons
+from NCrystal, as in the twin; X-rays from the NIST tables (XCOM).
 """)
 
 code(r"""
@@ -609,6 +609,35 @@ q.choice("For X-rays in a white beam, a thick sample **hardens** the beam (the s
          explanation="The attenuation depends on λ: a white-beam Σ is an average over the spectrum that changes with "
                      "the thickness crossed. ODIN can avoid it by selecting the wavelength (time of flight): one Σ per "
                      "wavelength.", title="X4. Beam hardening, for neutrons")
+q.number("**Message from the Mars team:** \"Your clasts are faint. Can you make them stand out more, without a longer "
+         "count?\" ODIN can keep only one slice of wavelengths (time of flight). Σ (cm⁻¹) from NCrystal: matrix 0.40 at 1 Å, "
+         "0.45 at 1.8 Å, 0.62 at 5 Å; H-rich clast 1.37 at 1 Å, 1.90 at 1.8 Å, 3.16 at 5 Å. At **5 Å**, by how much does a "
+         "0.3 mm clast lower the transmission compared with the matrix around (%)? (At 1.8 Å it was 4.3 %, X2.)",
+         value=7.3, tol=0.4, unit="%",
+         mistakes=[(4.3, "that is 1.8 Å (X2); take the values at 5 Å"),
+                   (22.4, "the clast is 0.3 mm = 0.03 cm thick, not 1 mm"),
+                   (2.9, "that is 1 Å: shorter wavelengths give less contrast, not more")],
+         hints=["As in X2: 1 − exp(−ΔΣ × d), with ΔΣ = Σ(clast) − Σ(matrix) at 5 Å and d = 0.03 cm.",
+                "ΔΣ = 3.16 − 0.62 = 2.54 cm⁻¹."],
+         explanation="1 − e^(−2.54 × 0.03) = 7.3 %: almost twice the 4.3 % at 1.8 Å, and 2.5 times the 2.9 % at 1 Å. The "
+                     "scattering by hydrogen grows fast toward long wavelengths, the matrix changes little (0.40 → 0.62). "
+                     "For you it is like turning down the kV of an X-ray tube to gain contrast, but here it is the light "
+                     "element, hydrogen, that gains.", title="X5. Tune the color of your neutrons")
+q.choice("A colleague is thrilled: \"Then let's image at **8 Å** only: the clasts give 9.1 %!\" What is the catch?",
+         ["The pulse holds far fewer neutrons at 8 Å than at a few Å (the cold moderator gives few slow ones), and a thin slice of wavelengths keeps only a "
+          "small part of the beam: for the same noise the count would be many times longer, for a contrast barely higher "
+          "than at 5 Å.",
+          "Neutrons of 8 Å do not cross the meteorite.",
+          "The camera cannot detect neutrons of 8 Å.",
+          "At 8 Å the neutrons are reflected by the surface of the meteorite."],
+         answer=0, why={1: "Σ(matrix, 8 Å) = 0.73 cm⁻¹: 86 % of them cross the 2 mm piece.",
+                        2: "It detects them even better: ε = 1 − e^(−8/8) = 63 %, against 20 % at 1.8 Å (introduction, part 6).",
+                        3: "Reflection only happens at grazing angles on very flat surfaces (a neutron mirror), not here."},
+         hints=["How many neutrons of 8 Å does the cold moderator of ESS give, compared with neutrons of 2 to 5 Å?",
+                "Contrast is not everything: a radiograph also needs neutrons."],
+         explanation="What counts is the contrast compared with the noise, and the noise falls as 1/√N. From 5 to 8 Å the "
+                     "contrast gains 25 %, but the neutrons become rare: the gain is eaten by the noise. The best choice "
+                     "balances both, as you balance kV and flux with X-rays.", title="X6. The catch")
 """)
 
 md(r"""

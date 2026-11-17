@@ -459,7 +459,9 @@ function renderFree(lvl) {
   const rows = mine.map((p) => `<li><span class="pid">${esc(p.id)}</span><span class="pt">${esc(p.title)}</span>
       <span class="pk">${p.kind === "imported" ? "imported" : "free"} · ${esc((p.created || "").slice(0, 10))}</span>
       <button class="btn" data-act="file" data-file="${esc(free)}" data-kind="notebook" data-proposal="${esc(p.id)}"
-        data-label="${esc(I.name)} · ${esc(p.id)}">Continue</button></li>`).join("");
+        data-label="${esc(I.name)} · ${esc(p.id)}">Continue</button>
+      <button class="btn del" data-act="delprop" data-proposal="${esc(p.id)}" data-title="${esc(p.title)}"
+        title="Delete this proposal">Delete</button></li>`).join("");
   $("#free").innerHTML = free ? `<article class="free"><div class="txt"><span class="tech">No exercise · your own project</span>
       <h3>Free beamtime on ${esc(I.name)}</h3><p>Your own question, your own samples, your own measurements: as in a real beamtime at ESS.
       Each free beamtime is a new proposal (its own number and data folder), found in NICOS with <i>Find my proposal</i>; no sample
@@ -537,6 +539,19 @@ async function act(d) {
       toast(`Proposal ${p.id} is in the user office: in NICOS, tab Experiment, Find my proposal, choose it, Apply.`, 9000);
       const r = await T.api("POST", "/twin/open", { file: catalogue.free[instr], kind: "notebook", proposal: p.id });
       openTab(r.url, r.kind, `${I.name} · ${p.id}`);
+      loadCatalogue();
+    } else if (d.act === "delprop") {
+      if (!confirm(`Delete proposal ${d.proposal}, "${d.title}"?
+
+NICOS will no longer list it. Its notebook is put ` +
+                   `aside (kept in a folder, not deleted) and your measured files stay.`)) return;
+      // its tab is closed first, without saving (otherwise the notebook would be written again)
+      const f = catalogue.free[instr];
+      const url = `/notebooks/work/${user.id}/${instr}_free_beamtime_${d.proposal}/${f.split("/").pop()}`;
+      if (tabs.has(url)) closeTab(url, { save: false });
+      await new Promise((r) => setTimeout(r, 800));
+      await T.api("DELETE", `/twin/proposal?id=${encodeURIComponent(d.proposal)}`);
+      toast(`Proposal ${d.proposal} deleted.`, 6000);
       loadCatalogue();
     } else if (d.act === "nicos") {
       const r = await T.api("POST", "/twin/nicos", { instrument: d.instr });

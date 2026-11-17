@@ -17,6 +17,7 @@ central one, shared by a course, is a later step).
 
     exercise_proposals(instrument)                      the proposals of the exercises
     create(instrument, title, owner, ...)               a free beamtime or an imported proposal; returns it
+    delete(proposal_id, owner)                          removes one of the owner's own proposals; returns it
     proposals(instrument=None, owner=None)              exercise proposals + those of the owner (all owners: None)
     get(proposal_id)                                    one proposal, or None
     write_cache(instrument, path, owner=None)           the cache file of NICOS (format of yuos_query)
@@ -172,6 +173,22 @@ def create(instrument, title, owner, kind="free", proposal_id=None, samples=(), 
     p = dict(id=pid, title=title, instrument=instrument, kind=kind, owner=owner, owner_name=owner_name,
              created=datetime.datetime.now().isoformat(timespec="seconds"), samples=samples)
     db["proposals"][pid] = p
+    _save(db)
+    return p
+
+
+def delete(proposal_id, owner):
+    """Removes a free beamtime or an imported proposal of the owner from the user office (NICOS no longer lists it).
+    The proposals of the exercises cannot be removed. Its number is not given again to a new free beamtime (the
+    counter does not go back), as at ESS. Returns the proposal removed."""
+    pid = str(proposal_id or "").strip()
+    if pid in exercise_proposals():
+        raise ValueError(f"{pid} is the proposal of an exercise: it cannot be deleted")
+    db = _load()
+    p = db["proposals"].get(pid)
+    if not p or p["owner"] != owner:
+        raise ValueError(f"you have no proposal {pid}")
+    del db["proposals"][pid]
     _save(db)
     return p
 

@@ -11,6 +11,8 @@ All requests need the token of the server (header "Authorization: token ...").
                                    copy of a notebook, made on first opening) and records that it was opened
                                    ({file, proposal}: the starter notebook of a free beamtime, one copy per proposal)
     POST /twin/proposal {instrument, kind, title, proposal, samples}
+    DELETE /twin/proposal?id=N       removes one's own free beamtime or imported proposal (its notebook put aside in
+                                   progress/<user>/_old, its measured files kept)
                                    the user office of the twin (user_office.py): a new free beamtime (kind "free", a
                                    new number each time) or an imported proposal (kind "imported": its number, title,
                                    samples [{name, formula}]); NICOS finds it in Find my proposal within a minute
@@ -355,12 +357,42 @@ class Proposal(Base):
             self.set_status(400)
             self.finish(json.dumps(dict(error=str(e))))
             return
+        self.nicos_cache(p["instrument"], who)
+        self.finish(json.dumps(p))
+
+    @web.authenticated
+    def delete(self):
+        import shutil
+        import user_office
+        who = user()
+        if not who:
+            raise web.HTTPError(400, "sign in first")
+        pid = self.get_argument("id", "")
+        try:
+            p = user_office.delete(pid, who)
+        except ValueError as e:
+            self.set_status(400)
+            self.finish(json.dumps(dict(error=str(e))))
+            return
+        # its notebook (one copy per proposal, see Open.personal_copy) is put aside, not deleted
+        stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        folder = os.path.join(self.root, "work", who, f"{p['instrument']}_free_beamtime_{p['id']}")
+        put_aside = ""
+        if os.path.isdir(folder):
+            put_aside = os.path.join(run_root(), "progress", who, "_old", f"proposal_{p['id']}_{stamp}")
+            os.makedirs(os.path.dirname(put_aside), exist_ok=True)
+            shutil.move(folder, put_aside)
+        self.nicos_cache(p["instrument"], who)
+        self.finish(json.dumps(dict(deleted=p["id"], put_aside=put_aside)))
+
+    @staticmethod
+    def nicos_cache(instrument, who):
+        import user_office
         try:                                       # NICOS (if open) reads its proposal cache again within a minute
-            user_office.write_cache(p["instrument"], os.path.join(run_root(), "nicos",
-                                                                  f"cached_proposals_{p['instrument']}.json"), who)
+            user_office.write_cache(instrument, os.path.join(run_root(), "nicos", f"cached_proposals_{instrument}.json"),
+                                    who)
         except Exception:                          # noqa: BLE001 (written again when NICOS starts)
             pass
-        self.finish(json.dumps(p))
 
 
 class Nicos(Base):

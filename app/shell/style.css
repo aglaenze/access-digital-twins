@@ -196,6 +196,8 @@ header .right { display: flex; align-items: center; gap: 10px; position: relativ
 .free .props .pt { flex: 1; color: #fff; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .free .props .pk { color: #B8C6D8; font-size: 12.5px; }
 .free .props .btn { height: 32px; background: transparent; color: #fff; border-color: var(--line-dark); }
+.free .props .btn.del { color: #B8C6D8; }
+.free .props .btn.del:hover { color: #fff; border-color: #E5484D; background: rgba(229, 72, 77, 0.18); }
 dialog form.prop-form { display: block; padding: 0; }
 .prop-form .field { margin-bottom: 14px; }
 .prop-form textarea { border: 1px solid var(--line2); border-radius: 9px; padding: 8px 12px; font: inherit; font-size: 15px; resize: vertical; }

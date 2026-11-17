@@ -498,11 +498,11 @@ q.report()
 """)
 
 md(r"""
-### For X-ray experts (optional)
+### Bonus round: for X-ray experts
 
-You know X-ray imaging or diffraction: these questions compare it with what you just did with neutrons, with numbers.
-They count in your score like the others. Values used: neutrons at 1.8 Å (NCrystal, as in the twin), X-rays from the
-NIST tables (XCOM).
+You know X-ray imaging or diffraction? Then this round is for you: every question puts what you just did with neutrons
+next to what you would do with X-rays, with numbers. They count in your score like the others. Values used: neutrons
+from NCrystal, as in the twin; X-rays from the NIST tables (XCOM).
 """)
 
 code(r"""
@@ -545,6 +545,19 @@ q.choice("Your strain map gives one value per pixel. What exactly is it, compare
                      "averaged along the beam. For a plate pulled in its plane, as here, that average is what matters; "
                      "for a strain that varies through the thickness, diffraction or strain tomography is needed.",
          title="X3. What a pixel measures")
+q.number("**Stopwatch challenge.** An X-ray diffractometer measures d with an angle; ODIN measures it with a clock. The "
+         "(111) edge (4.163 Å) arrives at the camera, 60.55 m from the source, 63.7 ms after the pulse. Under 600 MPa you "
+         "found a strain of about −8.8 × 10⁻⁴. By how much **earlier** do the edge neutrons arrive (µs)?",
+         value=56, tol=4, unit="µs",
+         mistakes=[(0.056, "that is in ms; the answer is asked in µs"),
+                   (63700, "that is the whole time of flight; the question asks for its change")],
+         hints=["The time of flight is t = L λ / 3956: it is proportional to λ, so Δt / t = Δλ / λ = ε.",
+                "63.7 ms × 8.8 × 10⁻⁴."],
+         explanation="63.7 ms × 8.8 × 10⁻⁴ = 56 µs. The ESS pulse lasts 2.86 ms, 50 times longer: without WFM the edge "
+                     "would be smeared over 0.19 Å (introduction, part 5). The WFM choppers cut the time spread to about "
+                     "0.2 % of the flight time, about 130 µs, and the fit of the whole edge (Q7) finds a 56 µs shift in it. "
+                     "Energy-dispersive X-ray diffraction does the same with the energy of the photons, at a fixed angle.",
+         title="X4. Stopwatch challenge")
 """)
 
 md(r"""
