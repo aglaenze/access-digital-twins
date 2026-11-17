@@ -15,9 +15,18 @@ sys.path.insert(0, ROOT)
 from nbfig import figure_cell, insert_after_mission  # noqa: E402
 from nbgen import distribute  # noqa: E402
 
+# where the largest H-Fe-ox clast of the sample is (odin/samples/gen_nwa7034.py draws it at random): the sliders start
+# at its height, the texts say where to look (@Y1@: its height in mm, @WHERE@: "near the top"...)
+import yaml  # noqa: E402
+with open(os.path.join(HERE, "..", "..", "samples", "meteorite_nwa7034.yml"), encoding="utf-8") as _f:
+    _Y1 = next(v["center_mm"][1] for v in yaml.safe_load(_f)["volumes"] if v["material"] == "H-Fe-ox clast 1")
+Y1S = f"{round(_Y1 / 0.0275) * 0.0275:.2f}"
+WHERE = "near the top" if _Y1 > 2 else ("in the lower part" if _Y1 < -2 else "around the middle")
+_sub = lambda s: s.replace("@Y1@", Y1S).replace("@WHERE@", WHERE)
+
 cells = []
-md = lambda s: cells.append(nbf.v4.new_markdown_cell(s.strip()))
-code = lambda s: cells.append(nbf.v4.new_code_cell(s.strip()))
+md = lambda s: cells.append(nbf.v4.new_markdown_cell(_sub(s).strip()))
+code = lambda s: cells.append(nbf.v4.new_code_cell(_sub(s).strip()))
 
 md(r"""
 # What is hidden inside a Martian meteorite?
@@ -36,7 +45,7 @@ water the richest regions hold (part 6).
 **The sample is real.** A piece of NWA 7034 of 12 × 8 × 2 mm³ was imaged with neutrons at the ICON instrument (PSI)
 and with X-rays at the ESRF by E. B. Naver, K. W. Nikolajsen *et al.*, *Direct detection of hydrogen reveals a new
 macroscopic crustal water reservoir on early Mars*, arXiv:2601.08390 (2026). The twin uses a model of that piece
-built from their numbers: its size, its four kinds of material, their sizes and amounts, and the neutron attenuations
+built from their numbers: its size, its kinds of material, their sizes and amounts, and the neutron attenuations
 they measured. You will redo their measurement on ODIN, and compare.
 
 **Why neutrons.** X-rays are stopped by heavy atoms (iron, titanium) and hardly see hydrogen. Neutrons do the
@@ -85,15 +94,22 @@ SETUPS = {"standard": (128, 0.03), "high resolution": (512, 0.01)}     # camera 
 md(r"""
 ## 0. Your sample
 
-A flat piece **12 mm high, 8 mm wide and 2 mm thick**, standing on the rotation stage of ODIN: at 0° the beam crosses
-its 2 mm thickness. Naver *et al.* found four kinds of material in it:
+A sawn piece **12 mm high, 8 mm wide and 2 mm thick**, its edges slightly irregular and one corner broken, glued on
+an aluminium pin on the rotation stage of ODIN: at 0° the beam crosses its 2 mm thickness. NWA 7034 is a **breccia**:
+fragments of rocks and minerals cemented in a fine-grained matrix. What is in it:
 
 | Material | What it is | Size |
 |---|---|---|
 | matrix | fine grains (pyroxene, plagioclase, Fe oxides, phosphate), mixed below the resolution | — |
-| feldspar | elongated grains | up to 0.1 × 0.44 × 0.15 mm |
+| plagioclase, pyroxene | mineral clasts (light and green on the drawing) | 0.1 to 0.5 mm, about 5 % of the volume each |
+| basaltic clast | a fragment of lava: pyroxene with laths of plagioclase | about 1 mm |
 | Fe-Ti oxides | grains of magnetite and ilmenite | 3 % of the volume, mostly very fine |
-| H-rich Fe-oxyhydroxides | inside lithic clasts of 0.12 to 0.38 mm | 0.4 % of the volume, in clusters |
+| apatite, pyrite | a few small grains | below 0.1 mm |
+| pores, a crack | empty | up to 0.1 mm; the crack 1 mm long |
+| H-rich Fe-oxyhydroxides | inside small clasts of 0.1 to 0.4 mm | 0.4 % of the volume, in clusters: **to be found** |
+
+The amounts, sizes and attenuations of the clasts that hold hydrogen are those measured on this piece by Naver *et
+al.*; the other phases follow what is published on NWA 7034.
 
 The camera is just behind the sample and looks along the beam: horizontal axis $x$, vertical axis $y$, field 14 mm.
 """)
@@ -240,7 +256,7 @@ setup of the images to compare. The profile follows one horizontal line of pixel
 """)
 
 code(r"""
-height = w.FloatSlider(value=4.6, min=-6.5, max=6.5, step=0.05, description="Line y (mm)", continuous_update=True,
+height = w.FloatSlider(value=@Y1@, min=-6.5, max=6.5, step=0.05, description="Line y (mm)", continuous_update=True,
                        layout=w.Layout(width="420px"))
 button_T = w.Button(description="Show the transmission", button_style="success", icon="image", layout=w.Layout(width="auto"))
 out_T = w.Output()
@@ -291,7 +307,7 @@ appear, but a radiograph adds up the whole 2 mm: a speck can be one grain or sev
 ## 4. The tomography
 
 *Run the tomography* turns the sample in steps of 3° over 180° and takes one high-resolution image of 300 s at each
-angle: 60 images, **5 hours of beam** (the twin computes them in about two minutes). Then, for each horizontal row of
+angle: 60 images, **5 hours of beam** (the twin computes them in a few minutes). Then, for each horizontal row of
 pixels, the projections $-\ln T$ at all the angles are **filtered** and **smeared back** along the direction they were
 taken in (filtered back-projection): this gives $\Sigma$ at each point of the slice. For comparison, Naver *et al.*
 took 1125 images of 4 minutes at ICON (75 hours), with pixels of 6.2 µm.
@@ -337,11 +353,11 @@ md(r"""
 **Look inside.** Left: a **horizontal slice** at the height $y$ you choose, seen from above ($x$ across, $z$ the depth
 along the beam at 0°). Right: a **vertical slice** at the depth $z$ you choose (as a radiograph, but only that slice).
 The color is $\Sigma$ in cm⁻¹. The rings centered on the rotation axis are an artifact: the noise of the open beam,
-the same in every projection. Move the sliders through the piece; the largest clasts are near the top.
+the same in every projection. Move the sliders through the piece; the largest clasts are @WHERE@.
 """)
 
 code(r"""
-ys = w.FloatSlider(value=4.6, min=-6.0, max=6.0, step=0.0275, description="Height y (mm)", continuous_update=True,
+ys = w.FloatSlider(value=@Y1@, min=-6.0, max=6.0, step=0.0275, description="Height y (mm)", continuous_update=True,
                    readout_format=".2f", layout=w.Layout(width="460px"))
 zs = w.FloatSlider(value=0.0, min=-1.0, max=1.0, step=0.0275, description="Depth z (mm)", continuous_update=True,
                    readout_format=".2f", layout=w.Layout(width="460px"))
@@ -426,8 +442,8 @@ pixels, 0.0275 mm): the value in the middle of a small spot is lower than the tr
 ## 6. How much water?
 
 Naver *et al.* "assume that all excess measured neutron attenuation results from the presence of hydrogen". The
-parts of the clasts without hydrogen show $\Sigma_\text{clast}$ = 0.57 cm⁻¹ at ICON, that is **0.69 cm⁻¹** in ODIN's
-beam (the same minerals, computed with the spectrum of the twin), and liquid water **4.9 cm⁻¹**. The fraction of the
+parts of the clasts without hydrogen show $\Sigma_\text{clast}$ = 0.57 cm⁻¹ at ICON, that is **0.71 cm⁻¹** in ODIN's
+beam (the same minerals, computed with the spectrum of the twin), and liquid water **5.4 cm⁻¹**. The fraction of the
 volume of the spot that water would fill is then
 
 $$f = \frac{\Sigma_\text{spot} - \Sigma_\text{clast}}{\Sigma_\text{water}}$$
@@ -438,7 +454,7 @@ and, with the density of the region (about 3.0 g/cm³), the water by mass is $f 
 code(r"""
 button_w = w.Button(description="Water in the spot", button_style="success", icon="tint", layout=w.Layout(width="auto"))
 out_w = w.Output()
-SIG_CLAST, SIG_WATER, RHO = 0.69, 4.9, 3.0
+SIG_CLAST, SIG_WATER, RHO = 0.71, 5.4, 3.0     # effective_sigma in the camera spectrum
 
 def water(_=None):
     with out_w:
@@ -455,9 +471,11 @@ display(w.VBox([button_w, out_w]))
 """)
 
 md(r"""
-**Limits of the twin.** The piece is a model: its size, the kinds of material, their amounts, sizes and attenuations
-are those published by Naver *et al.*; the positions, shapes (ellipsoids) and number of the clasts are drawn at random,
-and the hydrogen is represented by an equivalent amount of water (NCrystal). The minerals are mixed at the scale of
+**Limits of the twin.** The piece is a model: its size, the amounts, sizes and attenuations of its H-rich clasts
+(each of the three largest with its own measured Σ) are those published by Naver *et al.*; their tomograms are not
+public yet, so where the clusters and clasts are is drawn at random (fixed), as are the lumpy shapes of the grains.
+The other phases (mineral and basaltic clasts, pores, a crack) follow the literature on NWA 7034. The hydrogen is
+represented by an equivalent amount of water (NCrystal). The minerals are mixed at the scale of
 each region (no crystal, no Bragg edge). The camera is modeled by its mean signal, its noise and its blur.
 
 ## 7. Your results
@@ -499,9 +517,9 @@ q.choice("Why must the **open beam** be measured much longer than each image of 
                      "same in all the images (the open beam's, a dead pixel) does not: it draws circles. Long open beams "
                      "(or several) are the standard remedy.", hints=["What do all the projections have in common?"],
          title="Q3. The rings")
-q.number("Σ of the **matrix** in the slices (cm⁻¹, in ODIN's white beam):", value=0.55, tol=0.08, unit="cm⁻¹",
+q.number("Σ of the **matrix** in the slices (cm⁻¹, in ODIN's white beam):", value=0.53, tol=0.08, unit="cm⁻¹",
          hints=["Part 5 prints it around the cross; or read the color of the slices far from the bright spots."],
-         explanation="About 0.53–0.56 cm⁻¹ in ODIN's beam (0.45 cm⁻¹ measured at ICON, whose beam is warmer).",
+         explanation="About 0.51–0.55 cm⁻¹ in ODIN's beam (0.45 cm⁻¹ measured at ICON, whose beam is warmer).",
          title="Q4. The matrix")
 q.choice("Where is the hydrogen?",
          ["In small bright regions (0.1–0.4 mm) grouped in clusters, not spread evenly.",
@@ -514,23 +532,24 @@ q.choice("Where is the hydrogen?",
          explanation="Naver et al. found the H-rich phases in localised macroscopic clusters, 0.4 % of the volume: a "
                      "new kind of water reservoir in the Martian crust.", hints=["Move the height slider through the piece."],
          title="Q5. Where?")
-q.number("The ratio Σ(spot) / Σ(matrix) of the brightest spot you found:", value=4.0, tol=1.6,
-         hints=["Put the cross on the brightest spot of the largest clast (near y = 4.6 mm), then Measure Σ."],
-         explanation="About 4 to 5 in the middle of a large H-rich region (Naver et al.: 1.9 / 0.45 = 4.2 at ICON); a "
-                     "smaller spot gives less (the blur mixes it with its surroundings).", title="Q6. The ratio")
-q.choice("Which material can attenuate **4 times** more than the matrix?",
+q.number("The ratio Σ(spot) / Σ(matrix) of the brightest spot you found:", value=3.5, tol=1.5,
+         hints=["Put the cross on the brightest spot of the largest clast (near y = @Y1@ mm), then Measure Σ."],
+         explanation="About 3.5 in the middle of the largest H-rich region; its true value is 1.9 / 0.45 = 4.2 (Naver "
+                     "et al., ICON), but the region is only 0.12 mm thin in one direction and the blur mixes it with "
+                     "its surroundings; a smaller spot gives less.", title="Q6. The ratio")
+q.choice("Which material can attenuate **3 to 4 times** more than the matrix?",
          ["Only a hydrogen-bearing one: no anhydrous mineral of the table reaches twice the matrix.",
           "Magnetite: it is the densest.",
           "Feldspar.",
           "Any mineral, if the grain is large enough."],
-         answer=0, why={1: "Magnetite is at 1.8 times the matrix, not 4.",
+         answer=0, why={1: "Magnetite is at 1.8 times the matrix, not 3 or 4.",
                         2: "Feldspar attenuates less than the matrix (0.6 times).",
                         3: "Σ does not depend on the size of the grain: it is a property of the material."},
          explanation="This is the argument of Naver et al.: the measured attenuation of the H-rich regions (1.9 cm⁻¹) "
                      "exceeds the theoretical value of their minerals without hydrogen (0.61 cm⁻¹); only hydrogen can "
                      "explain the difference.", hints=["Compare your ratio with the last column of the table of part 5."],
          title="Q7. Which element?")
-q.number("The water by mass in the brightest spot (part 6, %):", value=10, tol=6, unit="%",
+q.number("The water by mass in the brightest spot (part 6, %):", value=8, tol=6, unit="%",
          hints=["Part 6 computes it from your Σ of part 5."],
          explanation="The model holds about 14 % (Naver et al.: up to 15 wt% OH). The blur lowers Σ in the middle of a "
                      "small region, so the estimate is lower: a few % to about 12 %.", title="Q8. How much water?")

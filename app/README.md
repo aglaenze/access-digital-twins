@@ -41,9 +41,14 @@ account the app shows a **recovery code** (once; only its hash is kept); *Forgot
 sets a new password with the email and this code. A student who did not sign out is signed in again at the next start.
 
 **The sample builder** (`../gen_sample_builder.py`) opens from the beamtime notebooks for their instrument and proposal
-(nothing to choose): ODIN, as many blocks, spheres and vertical cylinders as wanted (`sample_library`: shapes, overlap
-check; the twin: McStas `Union_sphere`/`Union_cylinder`, path lengths of the hybrid mode); LoKI, as many kinds of
-particles as wanted (their scattering adds up: dilute).
+(nothing to choose). ODIN: a recipe (`rock_builder.build_sample`): a piece of any shape (block, vertical cylinder,
+sphere, ellipsoid or lumpy pebble turned in 3D, sawn piece with irregular edges), objects placed by hand (inclusions,
+inclusions in inclusions), populations of grains placed at random without overlapping (an amount, sizes, a grain shape,
+lumps, clusters), holders; materials: crystals, rock-forming minerals (`rock_builder.ROCK_MINERALS`, NCrystal
+`solid::`), mixtures; a preview (two cuts, a radiograph, Σ of each material). Start from an example
+(`odin/templates/`, written by `gen_templates.py`), a model saved by a user (*Save as a model*:
+`TWIN_RUN_ROOT/templates/<instrument>/`), or a library sample with few volumes. Samples with lumpy or sawn shapes are
+for the hybrid mode only. LoKI, as many kinds of particles as wanted (their scattering adds up: dilute).
 
 **Where things are.** Logbooks: `TWIN_RUN_ROOT/progress/<account>/`; measurements of the pages:
 `TWIN_RUN_ROOT/<instrument>/<account>/`; notebooks: `work/<account>/`. NICOS data stay in the proposal folders

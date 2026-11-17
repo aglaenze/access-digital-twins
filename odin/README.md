@@ -380,6 +380,21 @@ transmission (Beer–Lambert, NCrystal cross-sections, mean over the region), 2.
 The Bragg edges are where they must be (copper (111) 4.17 Å, α-iron (110) 4.05 Å). The mcstas points scatter a little
 more than their error bars: the statistics of the simulated neutrons over 10 s (the twin warns, `mc_factor`).
 
+**9.9 Natural samples: lumpy grains and sawn pieces** (2026-11-17; `../rock_shapes.py`, `../rock_builder.py`). A rock
+is thousands of volumes (the meteorite NWA 7034, `samples/gen_nwa7034.py`: 9 660): grains and clasts are "blobs"
+(ellipsoids turned in 3D, their surface ρ = 1 + w·f(u), f six plane waves on the sphere), the piece a "slab" (wavy
+sides, rounded edges, a corner broken off). Path lengths: without lumps the exact chord of the ellipsoid; with lumps the
+entry and exit points by damped fixed-point iteration on ρ(t) = k(u(t)); against a dense sampling (4 000 points per
+ray, 50 grains): median of the largest error 1.6 µm, volume within 0.3 % (a few rays through a hollow of the surface:
+up to 35 µm on that ray). All the blobs at once (one vectorized call): 2.7 s per angle for the meteorite, its
+thickness maps (20 µm grid) kept on disk per sample and angle (`MAP_CACHE`, 1.4 MB): 0.5 s when read again (a class
+measures the same angles). Placing: each object held as an oriented ellipsoid, put where it touches nothing of the
+same host and stays 40 µm inside it, largest first; the overlap check of `sample_library.validate` (grid of the common
+bounding box, hosts of hosts excepted) finds none in the meteorite. Sample files are parsed once (C parser, cache):
+a 300 s image of the meteorite went from about 40 s to 4 s. The tomography of the exercise (60 angles, 300 s,
+high resolution): 4.5 min; Σ of the matrix 0.51–0.55 cm⁻¹ in ODIN's beam, the brightest spot of the largest clast 3.4
+times the matrix (1.9 / 0.45 = 4.2 in the model, lowered by the blur on a region 0.12 mm thin).
+
 ## 10. NICOS
 NICOS drives the twin since 2026-11-03 (Windows, and Linux in the container), organized as at ESS since 2026-11-04:
 the setup package `nicos_twin.odin` is built on `nicos_ess.odin` (the NICOS of the real ODIN), with the same GUI,

@@ -28,6 +28,7 @@ import numpy as np
 
 import odin_paths  # noqa: F401  (sets sys.path)
 import odin_mcstas as tw
+import rock_shapes                # irregular shapes of natural samples: "blob" (grains, clasts), "slab" (a sawn piece)
 
 H_OVER_M = 3956.034            # m·Å/s
 Z_DET = tw.Z_SAMPLE + tw.DET_DIST
@@ -160,11 +161,19 @@ def _path(shape, x, y, center, dims, stage_rot):
         return cylinder_path_length(x, y, center, dims[0], dims[1])
     if shape == "ellipsoid":
         return ellipsoid_path_length(x, y, center, dims, stage_rot + own)
+    if shape == "blob":
+        return rock_shapes.blob_path_length(x, y, center, dims, stage_rot)
+    if shape == "slab":
+        return rock_shapes.slab_path_length(x, y, center, dims, stage_rot)
     return box_path_length(x, y, center, dims, stage_rot + own)
 
 
 MAP_STEP = 20e-6           # [m] grid of the thickness maps of a sample made of many volumes (below the blurs)
 MAP_HALF = 7.2e-3          # [m] half-width of that grid (the field of view of the cameras, ±7.05 mm)
+MAP_CACHE = f"{odin_paths.RUN_ROOT}/hybrid/maps"     # thickness maps of large samples, by sample and position
+MAP_CACHE_MIN = 200        # volumes: below, computing the maps is faster than reading them
+MAP_CACHE_FILES = 600      # files kept (a tomography: 60 angles; the oldest go first)
+MAP_CACHE_VERSION = 1      # to change when the computation of the maps changes
 
 
 _SIGMA = {}
@@ -210,7 +219,7 @@ def volumes_transmission(volumes, stage_x, stage_rot, lam_grid=np.linspace(0.3, 
         vols.append((sig, center, dims, v[3] if len(v) > 3 else "box"))
         epss.append(eps)
 
-    if len(vols) > 20:
+    if len(vols) > 20 or any(v[3] in ("blob", "slab") for v in vols):     # irregular shapes: always on maps
         return _mapped_transmission(volumes, vols, stage_rot, lam_grid, epss)
 
     def T(x, y, lam):
@@ -231,11 +240,103 @@ def _mapped_transmission(volumes, vols, stage_rot, lam_grid, epss=None):
     n = int(round(2 * MAP_HALF / MAP_STEP)) + 1
     g = -MAP_HALF + np.arange(n) * MAP_STEP
     maps, sigs = {}, {}
+    keys = []
     for k, (v, (sig, center, dims, shape)) in enumerate(zip(volumes, vols)):
         key = (v[0], v[4] if len(v) > 4 else None, round(float(epss[k]), 9) if epss else 0.0)
         sigs[key] = sig
-        r = 0.5 * float(np.sqrt(dims[0] ** 2 + dims[2] ** 2)) if shape in ("box", "ellipsoid") else 0.5 * dims[0]
-        hy = 0.5 * (dims[1] if shape != "sphere" else dims[0])
+        keys.append(key)
+    cached = _map_cache_file(vols, keys) if len(vols) >= MAP_CACHE_MIN else None
+    if cached and os.path.exists(cached):
+        try:
+            maps = _read_maps(cached, n)
+        except Exception:                              # a file being written by another kernel, or damaged
+            maps = {}
+    if not maps:
+        maps = _compute_maps(vols, keys, g, n, stage_rot)
+        if cached:
+            _write_maps(cached, maps)
+    return _transmission_from_maps(maps, sigs, n, lam_grid)
+
+
+def _map_cache_file(vols, keys):
+    """The file of the thickness maps of this sample in this position (a class measures the same rock at the same
+    angles: the first student computes them, the others read them)."""
+    import hashlib
+    h = hashlib.sha1(repr((MAP_CACHE_VERSION, MAP_STEP, MAP_HALF,
+                           [(key, tuple(np.round(np.asarray(v[1], float), 12)), tuple(np.ravel(v[2]).tolist()), v[3])
+                            for key, v in zip(keys, vols)])).encode()).hexdigest()[:24]
+    return os.path.join(MAP_CACHE, f"{h}.npz")
+
+
+def _read_maps(path, n):
+    import json
+    with np.load(path) as f:
+        meta = json.loads(str(f["meta"]))
+        maps = {}
+        for i, (key, (y0, y1, x0, x1)) in enumerate(meta):
+            m = np.zeros((n, n), np.float32)
+            m[y0:y1, x0:x1] = f[f"m{i}"]
+            maps[tuple(key)] = m
+    return maps
+
+
+def _write_maps(path, maps):
+    """Each map cropped to where it is not zero, compressed; written to a temporary file then renamed (other kernels
+    may read it at the same time). The oldest files go when there are more than MAP_CACHE_FILES."""
+    import json
+    os.makedirs(MAP_CACHE, exist_ok=True)
+    meta, arrays = [], {}
+    for i, (key, m) in enumerate(maps.items()):
+        ys, xs = np.nonzero(m.any(axis=1))[0], np.nonzero(m.any(axis=0))[0]
+        box = (int(ys[0]), int(ys[-1]) + 1, int(xs[0]), int(xs[-1]) + 1) if len(ys) else (0, 0, 0, 0)
+        meta.append((list(key), box))
+        arrays[f"m{i}"] = m[box[0]:box[1], box[2]:box[3]]
+    tmp = f"{path}.{os.getpid()}.tmp"
+    try:
+        with open(tmp, "wb") as fh:
+            np.savez_compressed(fh, meta=np.array(json.dumps(meta)), **arrays)
+        os.replace(tmp, path)
+        files = sorted((os.path.join(MAP_CACHE, f) for f in os.listdir(MAP_CACHE) if f.endswith(".npz")),
+                       key=os.path.getmtime)
+        for f in files[:max(0, len(files) - MAP_CACHE_FILES)]:
+            os.remove(f)
+    except OSError:
+        pass                                           # no cache: computed again next time
+
+
+def _compute_maps(vols, keys, g, n, stage_rot):
+    """{key: thickness map [m]} of the volumes of each material (and host, strain)."""
+    maps = {}
+    # the blobs (a rock: thousands of grains), all at once: the pixels of the map around each one, one ray each
+    bl = [k for k, v in enumerate(vols) if v[3] == "blob"]
+    if bl:
+        key_id = {key: i for i, key in enumerate(dict.fromkeys(keys[k] for k in bl))}
+        cen = np.array([vols[k][1] for k in bl], float)
+        rad = np.array([rock_shapes.blob_bound(vols[k][2]) for k in bl])
+        x0 = np.searchsorted(g, cen[:, 0] - rad - MAP_STEP); x1 = np.searchsorted(g, cen[:, 0] + rad + MAP_STEP, "right")
+        y0 = np.searchsorted(g, cen[:, 1] - rad - MAP_STEP); y1 = np.searchsorted(g, cen[:, 1] + rad + MAP_STEP, "right")
+        nx, ny = np.clip(x1 - x0, 0, None), np.clip(y1 - y0, 0, None)
+        cnt = nx * ny
+        idx = np.repeat(np.arange(len(bl)), cnt)
+        loc = np.arange(cnt.sum()) - np.repeat(np.cumsum(cnt) - cnt, cnt)       # position within each patch
+        jx = np.repeat(x0, cnt) + loc % np.repeat(np.maximum(nx, 1), cnt)
+        jy = np.repeat(y0, cnt) + loc // np.repeat(np.maximum(nx, 1), cnt)
+        L = rock_shapes.blobs_path_length(g[jx], g[jy], idx, cen, [vols[k][2] for k in bl], stage_rot)
+        kid = np.array([key_id[keys[k]] for k in bl])[idx]
+        flat = jy * n + jx
+        for key, i in key_id.items():
+            s = kid == i
+            m = maps.setdefault(key, np.zeros((n, n), np.float32))
+            m += np.bincount(flat[s], weights=L[s], minlength=n * n).reshape(n, n).astype(np.float32)
+    for k, (sig, center, dims, shape) in enumerate(vols):
+        key = keys[k]
+        if shape == "blob":
+            continue
+        elif shape == "slab":
+            r, hy = rock_shapes.slab_bound(dims)
+        else:
+            r = 0.5 * float(np.sqrt(dims[0] ** 2 + dims[2] ** 2)) if shape in ("box", "ellipsoid") else 0.5 * dims[0]
+            hy = 0.5 * (dims[1] if shape != "sphere" else dims[0])
         ix = np.where((g >= center[0] - r - MAP_STEP) & (g <= center[0] + r + MAP_STEP))[0]
         iy = np.where((g >= center[1] - hy - MAP_STEP) & (g <= center[1] + hy + MAP_STEP))[0]
         if not len(ix) or not len(iy):
@@ -244,6 +345,11 @@ def _mapped_transmission(volumes, vols, stage_rot, lam_grid, epss=None):
         L = _path(shape, X.ravel(), Y.ravel(), center, dims, stage_rot).reshape(X.shape)
         m = maps.setdefault(key, np.zeros((n, n), np.float32))
         m[iy[0]:iy[-1] + 1, ix[0]:ix[-1] + 1] += L.astype(np.float32)
+    return maps
+
+
+def _transmission_from_maps(maps, sigs, n, lam_grid):
+    """T(x, y, λ) = exp(−Σ_m Σ_m(λ) L_m(x, y)), with T.thickness and T.sigma (images: maps read once per pixel)."""
 
     def thickness(x, y):
         """{material: thickness crossed [m]} at (x, y) (for images: read once, combined at each wavelength)."""

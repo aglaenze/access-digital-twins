@@ -16,6 +16,13 @@ as wanted: boxes, spheres and cylinders (vertical axis, the axis of the rotation
       - {material: Al_sg225.ncmat, shape: cylinder, center_mm: [-4, 0, 0], size_mm: [2, 8, 2]}          # d 2, h 8
   x horizontal, y vertical, z along the beam (size_mm: the bounding box, size_mm[2] the thickness), centers relative to
   the stage axis. Without "shape": a box.
+  Natural samples (rocks, meteorites) also use irregular shapes (rock_shapes.py):
+      - {material: matrix, shape: slab, center_mm: [0, 0, 0], size_mm: [8, 12, 2], seed: 11}    # a sawn piece
+      - {material: feldspar, shape: blob, inside: 0, center_mm: [1, 2, 0], size_mm: [0.3, 0.4, 0.2],
+         angles_deg: [20, 40, 10], wobble: 0.12, seed: 5}                                       # a lumpy grain
+  an ellipsoid turned in 3D (angles about z, x, then y) with lumps (wobble 0: a plain ellipsoid); "inside: k" makes
+  a volume an inclusion of volume k (it replaces its material); "secret: true" marks what an exercise hides (drawn
+  and described as the material around it when the exercise hides its "inclusions").
 
 LoKI (SANS): particles dispersed in a solvent (a mixture of H2O and D2O), in a cell of given thickness:
     name: Silica spheres in D2O
@@ -96,15 +103,24 @@ def _split_density(cfg):
     return m.group(1), (float(m.group(2)) * 100 if m.group(2) else 100.0)
 
 
+SOLID = re.compile(r"^solid::(?:[A-Z][a-z]?\d+)+/\d+(?:\.\d+)?gcm3$")   # NCrystal: a composition at a density
+
+
+def _mix_part_ok(mat):
+    """A component of a mixture: a crystal or mineral of the builder, or a composition (solid::, no Bragg edges:
+    a fine-grained mineral)."""
+    return mat in MIX_PARTS.values() or mat.removeprefix("stdlib::") in MIX_PARTS.values() or bool(SOLID.match(mat))
+
+
 def odin_material_problem(cfg):
-    """What is wrong with the material of a student's volume (None: fine): a crystal of the list, or a mixture of the
-    crystals and minerals of the builder, with an optional density factor."""
+    """What is wrong with the material of a student's volume (None: fine): a crystal of the list, a composition
+    (solid::), or a mixture of them and of the minerals of the builder, with an optional density factor."""
     if cfg in ODIN_MATERIALS.values() or cfg in LEGACY.values():
         return None
     base, dens = _split_density(cfg)
     if not 5 <= dens <= 100:
         return f"density {dens:g} %: between 5 and 100 % of that of the crystal"
-    if base in ODIN_MATERIALS.values() and base != "void.ncmat":
+    if (base in ODIN_MATERIALS.values() and base != "void.ncmat") or SOLID.match(base):
         return None
     m = re.match(r"^phases<(.*)>$", base)
     if not m:
@@ -114,7 +130,7 @@ def odin_material_problem(cfg):
     fracs = []
     for part in m.group(1).split("&"):
         f, _, mat = part.partition("*")
-        if mat not in MIX_PARTS.values():
+        if not _mix_part_ok(mat):
             return f"unknown component {mat!r} in a mixture"
         try:
             fracs.append(float(f))
@@ -166,15 +182,38 @@ QUARTZ_REMOVAL, QUARTZ_ABS = 23.4, 0.38          # 1/m
 LOKI_MODELS = {"none": [], "sphere": ["radius"], "cylinder": ["radius", "length"],
                "core_shell_sphere": ["radius", "thickness"]}
 UNITS = {"radius": "Å", "length": "Å", "thickness": "Å"}
-ODIN_SHAPES = ("box", "sphere", "cylinder")
+ODIN_SHAPES = ("box", "sphere", "cylinder", "ellipsoid", "blob", "slab")
+
+
+def shape_dims(v):
+    """dims [m] (and angles, lumps, seed) of a volume for odin_hybrid and rock_shapes."""
+    size = [float(s) * 1e-3 for s in v["size_mm"]]
+    if len(size) > 3:                                   # the 4th item of a box or an ellipsoid: its own angle [deg]
+        size[3] = float(v["size_mm"][3])
+    shape = v.get("shape", "box")
+    if shape == "blob":
+        size = size[:3] + [float(a) for a in (v.get("angles_deg") or (0, 0, 0))] + [float(v.get("wobble", 0.0)),
+                                                                                    int(v.get("seed", 0))]
+    elif shape == "slab":
+        size = size[:3] + [int(v.get("seed", 0))]
+    return tuple(size)
 
 
 def odin_inside(v, pts):
     """Which points [n, 3] (mm) are inside the volume v (shape, center_mm, size_mm)."""
     c = np.asarray(v.get("center_mm", (0, 0, 0)), float)
-    sx, sy, sz = (float(a) for a in v["size_mm"])
     d = np.asarray(pts, float) - c
     shape = v.get("shape", "box")
+    if shape in ("blob", "slab"):
+        import rock_shapes
+        return rock_shapes.inside(shape, shape_dims(v), d * 1e-3)
+    sx, sy, sz = (float(a) for a in v["size_mm"][:3])
+    if shape in ("box", "ellipsoid") and len(v["size_mm"]) > 3 and float(v["size_mm"][3]):
+        t = np.radians(float(v["size_mm"][3]))         # its own angle about y: back to its frame
+        c_, s_ = np.cos(t), np.sin(t)
+        d = np.c_[c_ * d[:, 0] - s_ * d[:, 2], d[:, 1], s_ * d[:, 0] + c_ * d[:, 2]]
+    if shape == "ellipsoid":
+        return ((d / (np.array([sx, sy, sz]) / 2)) ** 2).sum(axis=1) <= 1
     if shape == "sphere":
         return (d ** 2).sum(axis=1) <= (sx / 2) ** 2
     if shape == "cylinder":                           # vertical axis (y)
@@ -229,11 +268,26 @@ def load(instrument, data_folder=None):
             name = os.path.splitext(os.path.basename(f))[0]
             if name in out:
                 continue                              # a student's sample never replaces a built-in one
-            with open(f, encoding="utf-8") as fh:
-                spec = yaml.safe_load(fh) or {}
+            spec = _read_yml(f)
             spec.update(id=name, source=source, file=f.replace(os.sep, "/"))
             out[name] = spec
     return out
+
+
+_YML = {}                  # {file: (modification time, size, spec)}: a rock has thousands of volumes, read once
+
+
+def _read_yml(f):
+    """The spec of a sample file, parsed once (C parser of libyaml if present) and kept until the file changes; a
+    copy is returned (the caller may change it)."""
+    import copy
+    st = os.stat(f)
+    hit = _YML.get(f)
+    if hit is None or hit[:2] != (st.st_mtime_ns, st.st_size):
+        with open(f, encoding="utf-8") as fh:
+            spec = yaml.load(fh, Loader=getattr(yaml, "CSafeLoader", yaml.SafeLoader)) or {}
+        _YML[f] = hit = (st.st_mtime_ns, st.st_size, spec)
+    return copy.deepcopy(hit[2])
 
 
 def validate(instrument, spec):
@@ -252,7 +306,7 @@ def validate(instrument, spec):
             problem = odin_material_problem((spec.get("materials") or {}).get(v.get("material"), v.get("material") or ""))
             if problem:
                 errors.append(f"{what}: {problem}")
-            size = np.asarray(v.get("size_mm", [0, 0, 0]), float)
+            size = np.asarray(v.get("size_mm", [0, 0, 0]), float)[:3]
             if len(size) != 3 or (size <= 0).any() or (size > 100).any():
                 errors.append(f"{what}: sizes must be between 0 and 100 mm")
             elif shape == "sphere" and not np.allclose(size, size[0]):
@@ -260,13 +314,30 @@ def validate(instrument, spec):
             elif shape == "cylinder" and not np.isclose(size[0], size[2]):
                 errors.append(f"{what}: a cylinder has the same size in x and z (its diameter)")
             c = np.asarray(v.get("center_mm", [0, 0, 0]), float)
-            boxes.append((c - size / 2, c + size / 2))
+            if shape == "blob":                       # turned in 3D, its lumps out to 1 + wobble
+                half = np.full(3, size.max() / 2 * (1 + abs(float(v.get("wobble", 0)))))
+            elif shape == "slab":
+                half = size / 2 + 0.3
+            elif shape in ("box", "ellipsoid") and len(v.get("size_mm", [])) > 3:
+                half = np.full(3, float(np.linalg.norm(size)) / 2)        # turned about y
+            else:
+                half = size / 2
+            boxes.append((c - half, c + half))
         if not errors:
+            def hosts(k):                             # the volumes around volume k (an inclusion in an inclusion...)
+                out = set()
+                while "inside" in vols[k] and vols[k]["inside"] not in out:
+                    k = vols[k]["inside"]
+                    out.add(k)
+                return out
+            up = [hosts(k) for k in range(len(vols))]
+            LO = np.array([b[0] for b in boxes]).reshape(-1, 3); HI = np.array([b[1] for b in boxes]).reshape(-1, 3)
             for i in range(len(boxes)):
-                for j in range(i + 1, len(boxes)):
+                meet = (np.minimum(HI[i], HI[i + 1:]) - np.maximum(LO[i], LO[i + 1:]) > 1e-9).all(axis=1)
+                for j in i + 1 + np.flatnonzero(meet):            # only pairs whose bounding boxes meet
+                    if i in up[j] or j in up[i]:
+                        continue                      # an inclusion and a volume around it
                     lo = np.maximum(boxes[i][0], boxes[j][0]); hi = np.minimum(boxes[i][1], boxes[j][1])
-                    if not (hi - lo > 1e-9).all():
-                        continue                      # the bounding boxes do not even meet
                     g = [np.linspace(a, b, 15)[1:-1] for a, b in zip(lo, hi)]     # points inside the common box
                     pts = np.stack(np.meshgrid(*g, indexing="ij"), axis=-1).reshape(-1, 3)
                     if (odin_inside(vols[i], pts) & odin_inside(vols[j], pts)).any():
@@ -312,7 +383,7 @@ def save(instrument, spec, data_folder, name):
     keep = {k: v for k, v in spec.items() if k not in ("id", "source", "file")}
     path = os.path.join(folder, name + ".yml")
     with open(path, "w", encoding="utf-8") as fh:
-        yaml.safe_dump(keep, fh, sort_keys=False, allow_unicode=True)
+        yaml.safe_dump(keep, fh, sort_keys=False, allow_unicode=True, default_flow_style=None)   # [x, y, z] inline
     return path.replace(os.sep, "/")
 
 
@@ -326,10 +397,7 @@ def odin_volumes(spec):
     named = spec.get("materials") or {}                 # a sample may name its materials (a rock: long mixtures)
     mat = lambda name: named.get(name, name)
     for v in spec["volumes"]:
-        size = [float(s) * 1e-3 for s in v["size_mm"]]
-        if len(size) > 3:                               # the 4th item of a box or an ellipsoid: its own angle [deg]
-            size[3] = float(v["size_mm"][3])
-        t = (mat(v["material"]), tuple(float(c) * 1e-3 for c in v.get("center_mm", (0, 0, 0))), tuple(size))
+        t = (mat(v["material"]), tuple(float(c) * 1e-3 for c in v.get("center_mm", (0, 0, 0))), shape_dims(v))
         if "inside" in v:
             out.append(t + (v.get("shape", "box"), mat(spec["volumes"][int(v["inside"])]["material"])))
         else:
@@ -447,7 +515,9 @@ def describe(instrument, spec, hidden=()):
     lines = [f"{spec.get('name', spec.get('id'))}" + (f"  ({spec['source']} sample)" if spec.get("source") else "")]
     if spec.get("description"):
         lines.append(spec["description"])
-    if instrument == "odin":
+    if instrument == "odin" and any(v.get("shape") in ("blob", "slab") for v in spec.get("volumes", [])):
+        lines += _describe_rock(spec, hidden)
+    elif instrument == "odin":
         n_inc = 0
         for k, v in enumerate(spec.get("volumes", [])):
             if "inside" in v and "inclusions" in hidden:          # inclusions to be found: not described
@@ -493,6 +563,56 @@ def describe(instrument, spec, hidden=()):
     return "\n".join(lines)
 
 
+def _describe_rock(spec, hidden):
+    """A rock: its outline, then each phase (how many grains, how large), the hidden ones left out."""
+    vols = spec.get("volumes", [])
+    has_secret = any(v.get("secret") for v in vols)
+    skip = set()
+    if "inclusions" in hidden:
+        skip = {k for k, v in enumerate(vols) if (v.get("secret") if has_secret else "inside" in v)}
+        while True:
+            n = len(skip)
+            skip |= {k for k, v in enumerate(vols) if v.get("inside") in skip}
+            if len(skip) == n:
+                break
+    lines, groups = [], {}
+    named = spec.get("materials") or {}
+    is_void = lambda n: _split_density(named.get(n, n))[0] == "void.ncmat"
+    what_shape = {"box": "a block", "cylinder": "a cylinder", "sphere": "a sphere", "ellipsoid": "an ellipsoid",
+                  "slab": "a sawn piece (irregular edges)"}
+    for k, v in enumerate(vols):
+        if k in skip:
+            continue
+        sx, sy, sz = (float(a) for a in v["size_mm"][:3])
+        shape = v.get("shape", "box")
+        label = _rock_label(spec, v["material"])
+        if v.get("holder"):
+            dims = (f"diameter {sx:g} mm, height {sy:g} mm" if shape == "cylinder" else
+                    f"{sx:g} × {sy:g} mm, {sz:g} mm thick")
+            lines.append(f"  holder ({'cylinder' if shape == 'cylinder' else 'block'}): {label}, {dims}, centered at "
+                         f"y = {v['center_mm'][1]:g} mm")
+        elif "inside" not in v:
+            kind = what_shape.get(shape, "a lumpy piece" if v.get("wobble") else "an ellipsoid")
+            dims = (f"{sx:g} mm across" if shape == "sphere" else
+                    f"diameter {sx:g} mm, height {sy:g} mm" if shape == "cylinder" else
+                    f"{sx:g} × {sy:g} × {sz:g} mm")
+            lines.append(f"  {kind} of {label}, {dims}")
+        else:
+            groups.setdefault(v["material"], []).append(max(sx, sy, sz))
+    for name, sizes in groups.items():
+        sizes = np.array(sizes) * 1e3
+        label = _rock_label(spec, name)
+        if is_void(name):
+            lines.append(f"  {len(sizes)} pores, {sizes.min():.0f} to {sizes.max():.0f} µm" if len(sizes) > 1 else
+                         f"  1 pore, {sizes[0]:.0f} µm")
+        else:
+            lines.append(f"  {len(sizes)} grains of {label}, {sizes.min():.0f} to {sizes.max():.0f} µm"
+                         if len(sizes) > 1 else f"  1 inclusion of {label}, {sizes[0]:.0f} µm")
+    if skip:
+        lines.append("  what holds the hydrogen: ? (where, how many, how much: to be found)")
+    return lines
+
+
 def show(fig=None):
     """Shows a figure in Jupyter at twice the resolution (sharp on all screens), at its normal size. Used instead of
     plt.show() after draw(): the global "retina" setting of matplotlib could block Voila pages."""
@@ -518,6 +638,8 @@ def draw(instrument, spec, hidden=(), fig=None):
         hidden.add("material")
     fig = fig or plt.figure(figsize=(10, 4.2))
     fig.clf()
+    if instrument == "odin" and any(v.get("shape") in ("blob", "slab") for v in spec.get("volumes", [])):
+        return _draw_rock(spec, hidden, fig)
     if instrument == "odin":
         # two views at the same scale, framed on the sample (and the field of view of the camera); the holder hatched
         # and behind; the legend under the views
@@ -632,4 +754,191 @@ def draw(instrument, spec, hidden=(), fig=None):
         if model != "none":
             ax.text(4.1, 0.6, "(schematic: particles enlarged ~10⁷ times)", fontsize=9, color="#6B7280")
     fig.tight_layout()
+    return fig
+
+
+# colors of the phases of a rock (by the name of the material in the sample), as they look on a polished face
+ROCK_COLORS = {"matrix": "#4A423C", "plagioclase": "#E9E3D2", "feldspar": "#E9E3D2", "pyroxene": "#6E7F55",
+               "Fe-Ti oxide": "#B9C2CC", "apatite": "#D9C38B", "pyrite": "#D4AF37", "void": "#FFFFFF",
+               "H-Fe-ox clast": "#A0522D", "H-rich region": "#2563EB", "olivine": "#8DB255", "quartz": "#F2EFE6",
+               "calcite": "#EFE3C8", "hematite": "#8B2E1F", "goethite": "#C9782C", "serpentine": "#2F8F6B",
+               "gypsum": "#FBFAF4", "clay": "#C9A57A", "basalt": "#3F3D3B"}
+# for the materials that have no color of their own: distinct colors, in turn
+OTHER_COLORS = ["#0F766E", "#B45309", "#7C3AED", "#BE123C", "#0369A1", "#4D7C0F", "#A21CAF", "#92400E"]
+
+
+def _rock_color(name):
+    for k, c in ROCK_COLORS.items():
+        if name == k or name.startswith(k) or k in name:
+            return c
+    return "#8C857E"
+
+
+def _rock_colors(spec, names):
+    """{name: color} of the materials of a rock drawing: the color of the mineral (ROCK_COLORS), of the crystal
+    (ODIN_COLORS), or a distinct one."""
+    named = spec.get("materials") or {}
+    out, k = {}, 0
+    for n in names:
+        c = _rock_color(n)
+        if c == "#8C857E":
+            c = ODIN_COLORS.get(_split_density(named.get(n, n))[0])
+        if c is None:
+            c = OTHER_COLORS[k % len(OTHER_COLORS)]
+            k += 1
+        out[n] = c
+    return out
+
+
+def _rock_label(spec, name):
+    """What the legend says for a material: its name, or the label of its crystal or mixture."""
+    named = spec.get("materials") or {}
+    if name in named and not name.endswith(".ncmat"):
+        return re.sub(r" \d+$", "", name)
+    return odin_material_label(spec, name)
+
+
+def _draw_rock(spec, hidden, fig):
+    """A natural sample (a rock): its face toward the neutrons and a horizontal cut through its middle, as phase maps
+    computed from the volumes (every grain, clast and pore at its real size and shape). What an exercise hides (its
+    "secret" inclusions) is drawn as the material around it."""
+    from matplotlib.colors import to_rgb
+    from matplotlib.lines import Line2D
+    from matplotlib.patches import Circle, Rectangle
+    ink, mute, beam = "#1F2A3C", "#6B7689", "#B4562B"
+    vols = spec.get("volumes", [])
+    has_secret = any(v.get("secret") for v in vols)
+    skip = set()
+    if "inclusions" in hidden:
+        skip = {k for k, v in enumerate(vols) if (v.get("secret") if has_secret else "inside" in v)}
+        while True:                                    # what is inside a hidden volume is hidden too
+            n = len(skip)
+            skip |= {k for k, v in enumerate(vols) if v.get("inside") in skip}
+            if len(skip) == n:
+                break
+    body = [k for k, v in enumerate(vols) if not v.get("holder") and "inside" not in v]
+    ext = []
+    for k in body:
+        c = np.asarray(vols[k].get("center_mm", (0, 0, 0)), float)
+        s_ = np.asarray(vols[k]["size_mm"][:3], float)
+        ext.append(np.r_[c - s_ / 2 - 0.3, c + s_ / 2 + 0.3])
+    ext = np.array(ext)
+    lo, hi = ext[:, :3].min(axis=0), ext[:, 3:].max(axis=0)
+    step = max(0.01, float(max(hi[0] - lo[0], hi[1] - lo[1])) / 700)
+    z_face = float(0.5 * (lo[2] + hi[2]))              # a cut parallel to the face, through its middle (beam along z)
+    gx = np.arange(lo[0], hi[0], step)
+    gy = np.arange(lo[1], hi[1], step)
+    gz = np.arange(lo[2], hi[2], step / 2)
+    names = []
+
+    def phase_map(axes_pts, shape):
+        lab = np.full(shape, -1, np.int32)
+        for k, v in enumerate(vols):
+            if k in skip or v.get("holder"):
+                continue
+            c = np.asarray(v.get("center_mm", (0, 0, 0)), float)
+            if v.get("shape") == "slab":
+                r = 0.5 * float(np.linalg.norm(v["size_mm"][:3])) + 0.3
+            elif v.get("shape") == "blob":
+                r = 0.5 * max(v["size_mm"][:3]) * (1 + abs(float(v.get("wobble", 0))))
+            else:
+                r = 0.5 * float(np.linalg.norm(np.asarray(v["size_mm"][:3], float)))
+            sel, pts, shp = axes_pts(c, r)
+            if sel is None:
+                continue
+            ins = odin_inside(v, pts).reshape(shp)
+            if not ins.any():
+                continue
+            name = v["material"]
+            if name not in names:
+                names.append(name)
+            lab[sel] = np.where(ins, names.index(name), lab[sel])
+        return lab
+
+    def face(c, r):                                    # plane z = z_face, grid (y, x)
+        if abs(c[2] - z_face) > r:
+            return None, None, None
+        ix = np.where(np.abs(gx - c[0]) <= r)[0]
+        iy = np.where(np.abs(gy - c[1]) <= r)[0]
+        if not len(ix) or not len(iy):
+            return None, None, None
+        X, Y = np.meshgrid(gx[ix], gy[iy])
+        return ((slice(iy[0], iy[-1] + 1), slice(ix[0], ix[-1] + 1)),
+                np.c_[X.ravel(), Y.ravel(), np.full(X.size, z_face)], X.shape)
+
+    def cut(c, r):                                     # plane y = 0, grid (x, z)
+        if abs(c[1]) > r:
+            return None, None, None
+        ix = np.where(np.abs(gx - c[0]) <= r)[0]
+        iz = np.where(np.abs(gz - c[2]) <= r)[0]
+        if not len(ix) or not len(iz):
+            return None, None, None
+        Z, X = np.meshgrid(gz[iz], gx[ix])
+        return ((slice(ix[0], ix[-1] + 1), slice(iz[0], iz[-1] + 1)),
+                np.c_[X.ravel(), np.zeros(X.size), Z.ravel()], X.shape)
+
+    m1 = phase_map(face, (len(gy), len(gx)))
+    m2 = phase_map(cut, (len(gx), len(gz)))
+    colors = _rock_colors(spec, names)
+    pal = np.array([to_rgb(colors[n]) for n in names] + [to_rgb("#FBFCFD")])
+
+    def rgba(m):
+        img = pal[np.where(m < 0, len(names), m)]
+        return np.dstack([img, np.where(m < 0, 0.0, 1.0)])
+
+    a1, a2 = fig.subplots(1, 2, gridspec_kw=dict(wspace=0.25))
+    a1.imshow(rgba(m1), extent=(gx[0], gx[-1] + step, gy[0], gy[-1] + step), origin="lower",
+              interpolation="nearest", zorder=3)
+    a2.imshow(rgba(m2), extent=(gz[0], gz[-1] + step / 2, gx[0], gx[-1] + step), origin="lower",
+              interpolation="nearest", zorder=3)
+    legend = {}
+    for v in vols:                                     # the holder, hatched and behind
+        if not v.get("holder"):
+            continue
+        c = v.get("center_mm", (0, 0, 0))
+        s_ = v["size_mm"]
+        style = dict(fc="#EEF1F5", ec="#8A94A6", lw=1.0, hatch="////", zorder=1)
+        a1.add_patch(Rectangle((c[0] - s_[0] / 2, c[1] - s_[1] / 2), s_[0], s_[1], **style))
+        if v.get("shape") == "cylinder" and abs(c[1]) <= s_[1] / 2:      # only if the cut (y = 0) goes through it
+            a2.add_patch(Circle((c[2], c[0]), s_[0] / 2, **style))
+        legend["holder: " + (v["material"] if v["material"] in (spec.get("materials") or {})
+                             else odin_material_label(spec, v["material"]))] = Rectangle(
+            (0, 0), 1, 1, **{k_: x for k_, x in style.items() if k_ != "zorder"})
+    for n in names:                                    # "H-rich region 1" and "H-rich region": one entry
+        legend[_rock_label(spec, n)] = Rectangle((0, 0), 1, 1, fc=colors[n], ec="#8A94A6", lw=0.5)
+    h = FIELD_MM / 2
+    a1.add_patch(Rectangle((-h, -h), FIELD_MM, FIELD_MM, fill=False, ec="#2A7D6F", lw=1.8, ls=(0, (5, 3)), zorder=4))
+    legend["field of view of the camera (14 mm)"] = Rectangle((0, 0), 1, 1, fill=False, ec="#2A7D6F", lw=1.8,
+                                                            ls=(0, (5, 3)))
+    a1.plot([0], [0], marker="o", ms=7, mfc="none", mec=beam, mew=1.5, zorder=6)
+    legend["beam axis (toward you)"] = Line2D([], [], marker="o", ms=7, mfc="none", mec=beam, mew=1.5, ls="none")
+    hold = [v for v in vols if v.get("holder")]
+    ylo = min([lo[1]] + [v["center_mm"][1] - v["size_mm"][1] / 2 for v in hold])
+    f1 = [min(lo[0], -h) - 1.0, max(hi[0], h) + 1.0, min(ylo, -h) - 1.0, max(hi[1], h) + 1.0]
+    z0 = lo[2] - 3.5
+    f2 = [z0, hi[2] + 0.8, lo[0] - 0.5, hi[0] + 0.5]
+    a2.annotate("", xy=(lo[2] - 0.1, 0), xytext=(z0 + 0.2, 0), arrowprops=dict(arrowstyle="-|>", color=beam, lw=2),
+                zorder=5)
+    a2.text(z0 + 0.2, 0.3, "neutrons", color=beam, fontsize=9, va="bottom", zorder=5)
+    for ax, f, title, xl, yl in ((a1, f1, "Facing the neutrons: cut through its middle", "x [mm]", "y [mm]"),
+                                 (a2, f2, "Cut through its middle, from above", "z, along the beam [mm]", "x [mm]")):
+        ax.set_xlim(f[0], f[1])
+        ax.set_ylim(f[2], f[3])
+        ax.set_aspect("equal")
+        ax.set_title(title, fontsize=11, color=ink, loc="left", fontweight="bold")
+        ax.set_xlabel(xl, color=mute, fontsize=9)
+        ax.set_ylabel(yl, color=mute, fontsize=9)
+        ax.tick_params(colors=mute, labelsize=8)
+        for s_ in ax.spines.values():
+            s_.set_color("#CBD2DC")
+        ax.grid(alpha=0.25, lw=0.6)
+        ax.set_facecolor("#FBFCFD")
+    if skip:
+        a1.text(0.98, 0.02, "what holds hydrogen: to be found" if any("H" in vols[k]["material"] for k in skip)
+                else "inclusions inside: to be found", transform=a1.transAxes, ha="right", color=mute, fontsize=8.5,
+                style="italic")
+    rows = -(-len(legend) // 4)
+    fig.legend(legend.values(), legend.keys(), loc="lower center", ncol=min(4, len(legend)), frameon=False, fontsize=9,
+               handlelength=1.6, bbox_to_anchor=(0.5, 0.0))
+    fig.subplots_adjust(bottom=0.08 + 0.045 * rows, top=0.92, left=0.07, right=0.98)
     return fig

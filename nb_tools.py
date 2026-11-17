@@ -44,7 +44,8 @@ def sample_builder(instr, proposal=""):
     """The button Sample builder (centered), for this instrument and proposal: nothing to choose on the page."""
     _centered(_button("Sample builder", f"/voila/render/Sample_builder.ipynb?instrument={instr}&proposal={proposal}",
                       main=True),
-              "Design your sample (as many blocks, cylinders, spheres or kinds of particles as you want), then save it "
+              "Design your sample (a piece of any shape, objects in it, grains placed at random; or kinds of particles), "
+              "start from an example or a model, then save it "
               "with your proposal: it appears on the sample changer of NICOS.")
 
 
