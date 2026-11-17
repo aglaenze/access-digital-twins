@@ -81,6 +81,10 @@ class Device:
         self.name, self.value, self.choices, self.help, self.unit, self.limits = name, value, choices, help, unit, limits
 
 
+class Cancelled(Exception):
+    """A count stopped by the user (VirtualLoki.cancel): nothing was written, nothing logged."""
+
+
 class VirtualLoki:
     def __init__(self, session="test", mpi=None, seed=None, mode="mcstas"):
         """mpi: number of McStas processes (default: variable TWIN_MPI, else 8)."""
@@ -101,6 +105,8 @@ class VirtualLoki:
         self.folder = None
         self.use_folder(f"{paths.RUN_ROOT}/{session}")
         self.rng = np.random.default_rng(seed)
+        import threading
+        self._stop = threading.Event()          # cancel(): the count under way stops, nothing is recorded
         self._det = {}
         self._real_det = {}                 # real LoKI pixels (NeXus files), per detector distance
         self.last_image = np.zeros(self.image_shape(), dtype=np.uint32)
@@ -257,14 +263,35 @@ class VirtualLoki:
     def beam_on(self):
         return self.state["heavy_shutter"] == "open" and self.state["shutter"] == "open"
 
+    # ------------------------------------------------------------------ stopping, renaming (as VirtualOdin)
+    def cancel(self):
+        """Stops the count under way (from another thread: the Stop button of a page); it ends once its simulation
+        is done, before anything is written or logged."""
+        self._stop.set()
+
+    def reset_cancel(self):
+        self._stop.clear()
+
+    def _check(self):
+        if self._stop.is_set():
+            raise Cancelled("measurement stopped: nothing was recorded")
+
+    def rename(self, file, title):
+        """Changes the title of a measurement already taken (logbook and NeXus file); nothing else."""
+        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        import twin_files
+        twin_files.rename(self.folder, self.log_file, file, title)
+
     def count(self, t, title="", write=True):
         """Measures for t seconds; returns the path of the NeXus event file written (format of the real LoKI,
         loki_nexus.py; reduced with the ESS software, loki_reduction.py).
         write=False: the live detector image only, no file (a count outside a file-writing job at ESS); returns None."""
         if not 0 < t <= 24 * 3600:
             raise ValueError("counting time between 0 and 24 h")
+        self._check()
         start = datetime.datetime.now(datetime.timezone.utc)
         sim = self.simulate() if self.beam_on() else None
+        self._check()                                   # stopped during the simulation: nothing recorded
         self._live_image(sim, t)
         self._last_sim, self._last_t = sim, t          # for the live stream (stream_pulses)
         if not write:

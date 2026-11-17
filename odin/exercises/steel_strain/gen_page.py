@@ -28,12 +28,19 @@ measurements; the files are in the ESS NeXus format, and the wavelength of each 
 ESS software.
 
 **Your mission.** You are a trainee in the Neutron Solutions Team of ESS. The structures department of Fyrø Energy
-Island comes back (after its steel plates): a stainless steel part of its wind turbines carries a large force: where, inside the steel, is the material strained, and by how much? A strain gauge glued on the surface only
-tells what happens at the surface. Neutrons go through the steel, and the wavelength of a **Bragg edge** is set by the
-distance between planes of atoms: if the load changes this distance by one part in ten thousand, the edge moves by one
-part in ten thousand. Your job: measure a steel specimen in a load frame, without load and under load, deduce the
-strain of its crystal lattice in its narrow middle and in its wide ends, and tell Fyrø whether the steel behaves
-as designed (the last questions).
+Island comes back (after its steel plates). Steel parts of its wind turbines (bolts, flanges, welded joints) carry
+large forces for 25 years, and a part fails where its material is the most strained, which is often **inside**: where
+the section of the part changes, around a weld, or where the making of the part left stresses locked in the metal
+(residual stresses). The engineers compute these strains with models before building; what they need is a way to
+**check the models inside the metal**. A strain gauge glued on the part only sees its surface, and cutting the part to
+look inside releases the very stresses one wants to measure.
+
+Neutrons go through centimeters of steel, and the wavelength of a **Bragg edge** is set by the distance between planes
+of atoms: if the load changes this distance by one part in ten thousand, the edge moves by one part in ten thousand.
+Before trusting the method on their own parts, Fyrø wants it tested on a case whose answer is known: a steel
+specimen pulled by a known force, for which Hooke's law (part 0) predicts the strain. Your job: measure it without load
+and under load, deduce the strain of its crystal lattice in its narrow middle and in its wide ends, and tell Fyrø
+whether the measurement agrees with the prediction (the last questions).
 
 **The specimen is real.** In September 2018, a tensile specimen of austenitic stainless steel was measured exactly this
 way at V20, the test beamline of ESS at the HZB research reactor in Berlin (R. Woracek *et al.*, Nucl. Instrum.
@@ -62,7 +69,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import ipywidgets as w
 from IPython.display import display, clear_output
-from odin_virtual import VirtualOdin
+from odin_virtual import VirtualOdin, Cancelled
+import measure_control as mc
+import live_view
 import odin_viz as viz, odin_strain as strain
 import sample_library as sl
 from page_output import into
@@ -84,7 +93,7 @@ md(r"""
 A flat **tensile specimen** of austenitic stainless steel (type 304: iron with 19 % chromium and 11 % nickel; its
 crystal is face-centered cubic), **2.8 mm thick**, held in a load frame that pulls it along $x$ (horizontal on the
 camera) with a force $F$ that you choose. It is **9.8 mm wide**, narrowed in its middle to **6.4 mm** by two circular
-arcs. The drawing shows it as the neutrons see it (left: the 14 mm field of view of the camera, dashed) and from above.
+arcs.
 
 The same force crosses every section of the specimen. The **stress** is the force per unit of cross-section,
 $\sigma = F / A$ (in MPa = N/mm²):
@@ -94,8 +103,37 @@ $\sigma = F / A$ (in MPa = N/mm²):
 | middle (narrowest) | 6.4 mm × 2.8 mm | 17.9 mm² | 600 MPa |
 | ends (wide) | 9.8 mm × 2.8 mm | 27.4 mm² | 392 MPa |
 
-Below its elastic limit, steel comes back to its shape when the load is removed, and the strain is proportional to
-the stress (Hooke's law): $\varepsilon_\text{load} = \sigma / E$ along the force, with $E$ ≈ 195 GPa for this steel.
+**Hooke's law.** Pull on a spring: it gets longer, in proportion to the force. A piece of metal does the same, on a
+much smaller scale. Its **strain** $\varepsilon$ is its relative change of length, $\varepsilon = \Delta L / L$ (a
+number without unit: $10^{-3}$ means 1 mm per meter). As long as the load stays below the **elastic limit** of the
+material (the metal comes back to its shape when the load is removed), the strain is proportional to the stress:
+
+$$\sigma = E\,\varepsilon \qquad\text{so}\qquad \varepsilon_\text{load} = \frac{\sigma}{E} \quad\text{along the force}$$
+
+$E$, **Young's modulus**, is the stiffness of the material: the stress that would double its length if the law held
+that far. For this steel $E$ ≈ 195 GPa = 195 000 MPa: at 600 MPa, $\varepsilon_\text{load}$ = 600 / 195 000 =
+3.1 × 10⁻³ (the middle gets 0.3 % longer).
+
+**Poisson's effect.** Stretched along the force, the metal gets thinner across it, by a fixed fraction of the strain
+along the force, **Poisson's ratio** $\nu$ (about 0.29 for this steel):
+
+$$\varepsilon_\text{across} = -\nu\,\varepsilon_\text{load} = -\nu\,\frac{\sigma}{E}$$
+
+At 600 MPa: −0.29 × 3.1 × 10⁻³ = −0.9 × 10⁻³. The atoms follow: the distance between neighboring atoms grows along the
+force and shrinks across it. The neutrons cross the specimen **across** the force (through its 2.8 mm thickness), and
+the Bragg edge is set by the planes of atoms facing the beam: it measures $\varepsilon_\text{across}$, a negative strain,
+although the specimen is pulled.
+""")
+
+cells.append(figure_cell(
+    "steel_lattice.png", "The atoms of the steel seen from above, without load and under load (simplified to a square "
+    "grid; the deformation is drawn about 65 times larger than at 600 MPa). Along the force (x) the atoms move apart, "
+    "across it they move closer (Poisson). The neutrons come along z: the planes facing them (teal) set the Bragg edge, "
+    "λ = 2d; their spacing d shrinks, so the edge moves to a shorter wavelength."))
+
+md(r"""
+The drawing below shows the specimen as the neutrons see it (left: the 14 mm field of view of the camera, dashed) and
+from above.
 """)
 
 code(r"""
@@ -143,30 +181,55 @@ load = w.Dropdown(options=[("0 kN (no load)", 0.0), ("5.38 kN (300 MPa in the mi
 ttime = w.Dropdown(options=[30, 60], value=60, description="Time (s)")
 title = w.Text(value="", placeholder="e.g. steel 0 kN", description="Title")
 button = w.Button(description="Count", button_style="primary", icon="play", layout=w.Layout(width="auto"))
-out = w.Output()
+live_label = w.Label()
+live_img = live_view.FigureImage()          # the image and the spectrum fill up during the count
+LIVE = {"last": 0.0}
+
+def live_update(image, toa, t_done, t_total, step):
+    # (called from the thread of the count: a Label and a FigureImage can be updated from there)
+    import time
+    live_label.value = ("Counting... (the first count of a session prepares the instrument: a few seconds)"
+                        if step == "preparing" else f"Counted {t_total:.0f} s: writing the file..." if step == "writing"
+                        else f"Counting... {t_done:.0f} s / {t_total:.0f} s")
+    if step == "counting" and t_done < t_total and time.time() - LIVE["last"] < 0.8:
+        return
+    LIVE["last"] = time.time()
+    with live_img:
+        fig, ax = plt.subplots(1, 2, figsize=(11, 4.2), gridspec_kw=dict(width_ratios=[1, 1.4]))
+        im = ax[0].imshow(image, origin="lower", extent=[-7.05, 7.05, -7.05, 7.05], cmap="inferno", vmin=0,
+                          vmax=max(float(np.max(image)), 1.0))
+        ax[0].set(xlabel="x (mm)", ylabel="y (mm)",
+                  title=f"Detector after {t_done:.1f} s ({float(np.sum(image)):,.0f} neutrons)")
+        fig.colorbar(im, ax=ax[0], label="counts per pixel")
+        edges = np.linspace(0, 1000 / 14, len(toa) + 1)
+        ax[1].step(0.5 * (edges[1:] + edges[:-1]), toa, where="mid", color="tab:blue")
+        ax[1].set(xlabel="time since the last pulse (ms)", ylabel="counts",
+                  ylim=(0, max(float(np.max(toa)), 1) * 1.05), title="Arrival times (raw data, before reduction)")
+        ax[1].grid(alpha=0.3)
+        plt.tight_layout()
 
 def do_count(_):
-    button.disabled = True
-    with out:
-        clear_output()
-        try:
-            odin.move(choppers="wfm", wfm_delta=0.30, pinhole=0.03, diffuser="in", shutter=shut.value,
-                      stage_x=stage.value / 1000, sample=SAMPLE, load=float(load.value))
-            live = viz.LiveCount()                  # the image and the spectrum fill up during the count
-            f = odin.count(ttime.value, title=title.value or default_title(), progress=live.update)
-            live.done(f)
-        except Exception as e:
-            print("Error:", e)
-    button.disabled = False
+    # runs in a thread (measure_control): what is printed goes to the status box under the button
+    try:
+        odin.move(choppers="wfm", wfm_delta=0.30, pinhole=0.03, diffuser="in", shutter=shut.value,
+                  stage_x=stage.value / 1000, sample=SAMPLE, load=float(load.value))
+        f = odin.count(ttime.value, title=title.value or default_title(), progress=live_update)
+        live_label.value = f"File written: {os.path.basename(f)} ({title.value or default_title()})"
+    except Cancelled:
+        live_label.value = ""                  # (measure_control says that nothing was recorded)
+    except Exception as e:
+        print("Error:", e)
     refresh_list()
+    update_rename()
 
 def default_title():
     if shut.value == "closed":
         return "dark"
     return "open beam" if abs(stage.value) > 20 else f"steel {load.value:g} kN"
 
-button.on_click(do_count)
-display(w.VBox([shut, stage, load, ttime, title, button, out]))
+ctl = mc.Control(odin, button, lock=[shut, stage, load, ttime, title])
+ctl.on_click(do_count)
+display(w.VBox([shut, stage, load, ttime, title, w.HBox([button, ctl.stop]), ctl.status, live_label, live_img]))
 """)
 
 md(r"""
@@ -218,22 +281,93 @@ def refresh_list():
                   + ", ".join(f"{k:g} kN × {len(v)}" for k, v in sorted(by.items())))
 
 refresh_list()
-display(listing)
+rename, update_rename = mc.rename_box(odin, refresh=refresh_list)
+display(w.VBox([listing, rename]))
 """)
 
 md(r"""
 ## 3. The edge, without and with load
 
-For each wavelength, the transmission of a region of the specimen is $T = (I - D)/(O - D)$ (part 1), with $I$, $O$
-and $D$ the counts of the specimen, open-beam and dark runs in that region (all the repeated counts added; the dark is
-scaled to the duration of each measurement, and each measurement is divided by the proton charge received by the
-target).
+**How the transmission is computed, as at ESS.** Each count writes a NeXus file, the format of ESS: the list of the
+detected neutrons, one line each (its pixel and its arrival time after the pulse), with the state of the instrument
+during the count (choppers, pinhole, sample stage, proton charge on the target). The twin reads it with the official
+ESS software, unmodified:
+- `essimaging`, the ESS package for neutron imaging (its workflow for ODIN, `OdinBraggEdgeWorkflow`), turns each
+  arrival time into a wavelength, from the speeds and phases of the choppers and the distances read in the file (a
+  time-to-wavelength table computed by `essreduce`, which models the ESS pulse with the package `tof`);
+- `scipp`, on which these packages are built, holds the data with their units and their uncertainties.
 
-*Fit the edge* draws the transmission of a region without load and under the largest load, around the last Bragg edge
-of this steel, that of the (111) planes, near 4.16 Å. The edge is not a sharp step: the wavelength resolution of the
-instrument smooths it over about 0.02 Å. Its position is found by **fitting** a smoothed step to all the points of
-the edge: this is how a shift ten times smaller than the width of the edge can be measured. The first time a file is
-used, reading its millions of neutrons takes about 20 s.
+The twin then adds what the workflow does not do yet for this measurement: in each region, the neutrons are counted
+in wavelength bins of 0.01 Å (all the repeated counts added), the dark is subtracted (scaled to the duration of each
+measurement), each measurement is divided by the proton charge received by the target, and the specimen is divided by
+the open beam:
+
+$$T(\lambda) = \frac{I - D}{O - D} \quad\text{(part 1), for each wavelength bin}$$
+
+**The three regions.** A shift of $10^{-4}$ needs many neutrons: the edge is fitted on a whole region of the specimen,
+not pixel by pixel. The three regions are drawn below: the **middle** (narrowest section, the largest stress) and the
+two **ends** (wide sections). *Show the transmission image* draws them on your own measurement.
+""")
+
+code(r"""
+import analysis_chain        # folded: the raw data, step by step, and a look inside your own files
+analysis_chain.section("odin_events", odin, title="Under the hood: the raw data in your files, step by step (click to open)")
+""")
+
+code(r"""
+reg_out, img_out = w.Output(), w.Output()
+REG_COLORS = {"middle": "tab:red", "left end": "tab:blue", "right end": "tab:green"}
+
+def draw_regions(ax):
+    for r, (x0, x1, y0, y1) in strain.REGIONS.items():
+        ax.add_patch(plt.Rectangle((x0, y0), x1 - x0, y1 - y0, fill=False, ec=REG_COLORS[r], lw=2.2))
+        ax.text(0.5 * (x0 + x1), 0, r, color=REG_COLORS[r], ha="center", va="center", fontsize=10.5,
+                fontweight="bold", rotation=90, bbox=dict(fc="white", ec="none", alpha=0.85, pad=1.5))
+
+with into(reg_out):                    # the regions on the outline of the specimen (no measurement needed)
+    fig, ax = plt.subplots(figsize=(6.4, 4.2))
+    xx = np.linspace(-9.5, 9.5, 400)
+    half = np.where(np.abs(xx) < 4, 3.2 + (5.56 - np.sqrt(np.clip(5.56 ** 2 - xx ** 2, 0, None))), 4.9)
+    ax.fill_between(xx, -half, half, color="#D8E1EC", ec="#142033", lw=1.0)
+    ax.add_patch(plt.Rectangle((-7.05, -7.05), 14.1, 14.1, fill=False, ec="#8A94A6", ls="--", lw=1))
+    draw_regions(ax)
+    ax.set(xlim=(-10, 10), ylim=(-7.6, 7.6), aspect="equal", xlabel="x (mm), along the force", ylabel="y (mm)",
+           title="The three regions (dashed: field of view)")
+    plt.tight_layout(); sl.show(fig)
+
+button_img = w.Button(description="Show the transmission image", button_style="success", icon="image",
+                      layout=w.Layout(width="auto"))
+
+def show_image(_):
+    with img_out:
+        clear_output()
+        try:
+            dk, ob, by = groups()
+            if not (ob and 0.0 in by):
+                raise ValueError("Measure first the open beam and the specimen without load (part 1).")
+            print("Reading the files...")
+            im = strain.transmission_image(by[0.0], ob)
+            clear_output()
+            fig, ax = plt.subplots(figsize=(6.4, 5.0))
+            m = ax.pcolormesh(im.coords["x"].values, im.coords["y"].values, im.values, vmin=0, vmax=1.2, cmap="gray")
+            fig.colorbar(m, ax=ax, label="transmission (3.75 to 4.55 Å)")
+            draw_regions(ax)
+            ax.set(aspect="equal", xlabel="x (mm)", ylabel="y (mm)", title="Your specimen without load, and the regions")
+            plt.tight_layout(); plt.show()
+        except Exception as err:
+            clear_output()
+            print("Not possible yet:", err)
+
+button_img.on_click(show_image)
+display(w.VBox([reg_out, button_img, img_out]))
+""")
+
+md(r"""
+*Fit the edge* draws the transmission of the region you choose, without load and under the largest load, around the
+last Bragg edge of this steel, that of the (111) planes, near 4.16 Å. The edge is not a sharp step: the wavelength
+resolution of the instrument smooths it over about 0.02 Å. Its position is found by **fitting** a smoothed step to all
+the points of the edge (`scipy`, least squares): this is how a shift ten times smaller than the width of the edge can
+be measured. The first time a file is used, reading its millions of neutrons takes about 20 s.
 """)
 
 code(r"""
@@ -281,8 +415,8 @@ display(w.VBox([region, button_fit, out_fit]))
 md(r"""
 **Reading the result.** The edge under load is at a *shorter* wavelength: the strain along the beam is **negative**,
 although the specimen is pulled. Pulled along the force, the steel gets longer, and thinner across it: this is the
-Poisson effect, $\varepsilon_\text{across} = -\nu\,\varepsilon_\text{load}$, with $\nu$ (Poisson's ratio) about 0.3
-for steel. The beam crosses the specimen *across* the force: the planes facing the beam move closer.
+Poisson effect of part 0, $\varepsilon_\text{across} = -\nu\,\varepsilon_\text{load}$, with $\nu$ about 0.29 for this
+steel. The beam crosses the specimen *across* the force: the planes facing the beam move closer.
 
 ## 4. The strain map
 

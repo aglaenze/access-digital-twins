@@ -214,6 +214,75 @@ class LiveCount:
 
 
 
+class LiveView:
+    """As LiveCount, for a count run in a thread (measure_control.Control: the page keeps receiving the Stop click):
+    made once, in the cell, and shown there (box); each count: reset(), then progress=live.update, then done(file).
+    Drawn into an image widget (live_view.FigureImage), which works from a thread; after the count, Play and a slider
+    replay it (as show_live)."""
+
+    def __init__(self, field_mm=7.05, n_frames=16):
+        import ipywidgets as w
+        import live_view
+        self.extent = [-field_mm, field_mm, -field_mm, field_mm]
+        self.n_frames = n_frames
+        self.status = w.Label("")
+        self.img = live_view.FigureImage()
+        self.play = w.Play(min=0, max=n_frames - 1, step=1, interval=300, value=0)
+        self.slider = w.IntSlider(min=0, max=n_frames - 1, value=0, description="frame")
+        w.jslink((self.play, "value"), (self.slider, "value"))
+        self.replay = w.HBox([self.play, self.slider], layout=w.Layout(display="none"))
+        self.box = w.VBox([self.status, self.replay, self.img])
+        self._last, self._fr = 0.0, None
+        self.slider.observe(lambda ch: self._frame(ch["new"]), names="value")
+
+    def reset(self):
+        self.replay.layout.display = "none"
+        self._fr = None
+        self.status.value = "Counting..."
+
+    def _draw(self, image, toa, toa_edges, t_done, toa_max):
+        import matplotlib.pyplot as plt
+        with self.img:
+            fig, ax = plt.subplots(1, 2, figsize=(11, 4.2), gridspec_kw=dict(width_ratios=[1, 1.4]))
+            im = ax[0].imshow(image, origin="lower", extent=self.extent, cmap="inferno", vmin=0,
+                              vmax=max(float(np.max(image)), 1.0))
+            ax[0].set(xlabel="x (mm)", ylabel="y (mm)",
+                      title=f"Detector after {t_done:.1f} s ({float(np.sum(image)):,.0f} neutrons)")
+            fig.colorbar(im, ax=ax[0], label="counts per pixel")
+            ax[1].step(0.5 * (toa_edges[1:] + toa_edges[:-1]), toa, where="mid", color="tab:blue")
+            ax[1].set(xlabel="time since the last pulse (ms)", ylabel="counts", ylim=(0, max(toa_max, 1) * 1.05),
+                      title="Arrival times (raw data, before reduction)")
+            ax[1].grid(alpha=0.3)
+            plt.tight_layout()
+
+    def update(self, image, toa, t_done, t_total, step):
+        import time
+        if step == "preparing":
+            self.status.value = "Counting... (the first count of a session prepares the instrument: a few seconds)"
+        elif step == "writing":
+            self.status.value = f"Counted {t_total:.0f} s: writing the file..."
+        else:
+            self.status.value = f"Counting... {t_done:.0f} s / {t_total:.0f} s"
+        if step == "counting" and t_done < t_total and time.time() - self._last < 0.8:
+            return
+        self._last = time.time()
+        self._draw(image, toa, np.linspace(0, PULSE_MS, len(toa) + 1), t_done, float(np.max(toa)))
+
+    def _frame(self, k):
+        fr = self._fr
+        if fr is None:
+            return
+        self._draw(fr["images"][k], fr["toa"][k], fr["toa_edges"], fr["times"][k], float(fr["toa"][-1].max()))
+
+    def done(self, nexus_file):
+        import os
+        self._fr = live_frames(nexus_file, n_frames=self.n_frames)
+        self.slider.value = self.play.value = self.n_frames - 1
+        self._frame(self.n_frames - 1)
+        self.replay.layout.display = None
+        self.status.value = f"File written: {os.path.basename(nexus_file)}  (Play or the slider: replay the count)"
+
+
 def show_live(nexus_file, n_frames=24, autoplay=True, fill_s=None, status=None, start="first", into=None):
     """Animated replay of a measurement in a notebook / Voilà page (Play button + slider); autoplay: it starts by
     itself, as the detector image of a real instrument fills up during the count.

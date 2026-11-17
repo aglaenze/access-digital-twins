@@ -54,7 +54,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import ipywidgets as w
 from IPython.display import display, clear_output
-from odin_virtual import VirtualOdin
+from odin_virtual import VirtualOdin, Cancelled
+import measure_control as mc
 import odin_radiography as tomo, odin_mcstas as tw
 import sample_library as sl
 import live_view
@@ -184,45 +185,48 @@ def show(title):
 def settings(**kw):
     odin.move(sample=SAMPLE, choppers="white", pinhole=0.01, diffuser="in", **kw)
 
+# the two measurements run in a thread (measure_control): what they print goes to the status box under their button
 def take(_):
-    button1.disabled = True
-    with out:
-        clear_output()
-        try:
-            settings(shutter=shut.value, stage_x=inout.value)
-            kind = "dark" if shut.value == "closed" else ("open beam" if inout.value > 0.02 else
-                                                          f"cell {odin.status()['cycle_time']:g} h")
-            f = odin.camera(60.0, title=kind, pixels=512)
-            print(f"{os.path.basename(f)}: {kind}")
-            show(kind)
-        except Exception as e:
-            print("Error:", e)
-    button1.disabled = False
+    try:
+        settings(shutter=shut.value, stage_x=inout.value)
+        kind = "dark" if shut.value == "closed" else ("open beam" if inout.value > 0.02 else
+                                                      f"cell {odin.status()['cycle_time']:g} h")
+        f = odin.camera(60.0, title=kind, pixels=512)
+        print(f"{os.path.basename(f)}: {kind}")
+        show(kind)
+    except Cancelled:
+        pass                                   # (measure_control says that nothing was recorded)
+    except Exception as e:
+        print("Error:", e)
     refresh_list()
+    update_rename()
 
 def film(_):
-    button2.disabled = True
-    with out:
-        clear_output()
-        try:
-            times = np.round(np.arange(0, 55.0 + 1e-9, step.value), 2)
-            bar.max, bar.value = len(times), 0
-            settings(shutter="open", stage_x=0.0)
-            for t in times:
-                odin.move(cycle_time=float(t))
-                odin.camera(60.0, title=f"cell {t:g} h", pixels=512)
-                show(f"cell at {t:g} h of the cycle")
-                bar.value += 1
-            print(f"{len(times)} images, from 0 to 55 h. Parts 5 and 6 now use them.")
-            draw_profile()
-        except Exception as e:
-            print("Error:", e)
-    button2.disabled = False
+    try:
+        times = np.round(np.arange(0, 55.0 + 1e-9, step.value), 2)
+        bar.max, bar.value = len(times), 0
+        settings(shutter="open", stage_x=0.0)
+        for t in times:
+            odin.move(cycle_time=float(t))
+            odin.camera(60.0, title=f"cell {t:g} h", pixels=512)      # Stop: Cancelled before the next image
+            show(f"cell at {t:g} h of the cycle")
+            bar.value += 1
+        print(f"{len(times)} images, from 0 to 55 h. Parts 5 and 6 now use them.")
+        draw_profile()
+    except Cancelled:
+        pass
+    except Exception as e:
+        print("Error:", e)
     refresh_list()
+    update_rename()
 
-button1.on_click(take)
-button2.on_click(film)
-display(w.VBox([shut, inout, button1, step, w.HBox([button2, bar]), out, img_live]))
+ctl1 = mc.Control(odin, button1, lock=[shut, inout, button2, step])
+ctl2 = mc.Control(odin, button2, lock=[shut, inout, button1, step],
+                  stopped="Film stopped: the images already taken stay, the next ones were not taken.")
+ctl1.on_click(take)
+ctl2.on_click(film)
+display(w.VBox([shut, inout, w.HBox([button1, ctl1.stop]), ctl1.status, step,
+                w.HBox([button2, bar, ctl2.stop]), ctl2.status, img_live]))
 """)
 
 md(r"""
@@ -266,7 +270,8 @@ def refresh_list():
             print("The pristine cell (0 h) is needed: it is the reference of all the others.")
 
 refresh_list()
-display(listing)
+rename, update_rename = mc.rename_box(odin, refresh=refresh_list)
+display(w.VBox([listing, rename]))
 """)
 
 md(r"""
@@ -280,6 +285,11 @@ $$\Delta\mu(y, t) = -\frac{1}{L}\,\ln\frac{T(y, t)}{T(y, 0)}, \qquad L = 1.6\ \t
 
 ($T = (I - D)/(O - D)$: the transmission of part 3): the change of the attenuation coefficient, the
 lithium that came in. Move the slider through the times you measured.
+""")
+
+code(r"""
+import analysis_chain
+analysis_chain.section("odin_camera", odin)       # folded: the raw data in your files, the analysis chain
 """)
 
 code(r"""

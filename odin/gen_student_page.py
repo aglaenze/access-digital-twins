@@ -57,8 +57,11 @@ import matplotlib.pyplot as plt
 import ipywidgets as w
 from IPython.display import display, clear_output
 sys.path.insert(0, os.path.abspath("."))
-from odin_virtual import VirtualOdin, LAM_RANGE
+sys.path.insert(1, os.path.abspath(".."))      # twin/
+from odin_virtual import VirtualOdin, LAM_RANGE, Cancelled
 import odin_reduction as red, odin_viz as viz, odin_games as games
+import measure_control as mc          # Stop button, settings locked during a measurement, renaming a file
+import analysis_chain                 # the folded "Under the hood" section
 
 odin = VirtualOdin(session=os.environ.get("ODIN_SESSION", "student"))
 """)
@@ -139,26 +142,27 @@ stage = w.BoundedFloatText(value=st["stage_x"] * 1000, min=-500, max=500, step=1
 ttime = w.Dropdown(options=[2, 5, 10, 30, 60, 90], value=30, description="Time (s)")
 title = w.Text(value="", placeholder="e.g. open beam", description="Title")
 button = w.Button(description="Count", button_style="primary", icon="play", layout=w.Layout(width="auto"))
-out = w.Output()
+live = viz.LiveView()                       # the image and the spectrum fill up during the count
 
 def do_count(_):
-    button.disabled = True
-    with out:
-        clear_output()
-        try:
-            mode, delta = chop.value
-            odin.move(choppers=mode, wfm_delta=delta, shutter=shut.value, pinhole=pinh.value, diffuser=diff.value,
-                      stage_x=stage.value / 1000, sample=smp.value)
-            live = viz.LiveCount()                  # the image and the spectrum fill up during the count
-            f = odin.count(ttime.value, title=title.value, progress=live.update)
-            live.done(f)
-        except Exception as e:
-            print("Error:", e)
-    button.disabled = False
+    # runs in a thread (measure_control): the settings are locked meanwhile, Stop cancels; prints go to ctl.status
+    try:
+        mode, delta = chop.value
+        odin.move(choppers=mode, wfm_delta=delta, shutter=shut.value, pinhole=pinh.value, diffuser=diff.value,
+                  stage_x=stage.value / 1000, sample=smp.value)
+        live.reset()
+        f = odin.count(ttime.value, title=title.value, progress=live.update)
+        live.done(f)
+    except Cancelled:
+        live.status.value = ""                  # Control says it: nothing was recorded
+    except Exception as e:
+        print("Error:", e)
     refresh_list()
+    rename_update()
 
-button.on_click(do_count)
-display(w.VBox([chop, shut, pinh, diff, stage, ttime, title, button, out]))
+ctl = mc.Control(odin, button, lock=[chop, shut, pinh, diff, stage, ttime, title, smp])
+ctl.on_click(do_count)
+display(w.VBox([chop, shut, pinh, diff, stage, ttime, title, w.HBox([button, ctl.stop]), ctl.status, live.box]))
 """)
 
 md(r"""
@@ -215,7 +219,8 @@ pick_E = w.Dropdown(description="Sample", layout=w.Layout(width="480px"))
 pick_O = w.Dropdown(description="Open beam", layout=w.Layout(width="480px"))
 pick_N = w.Dropdown(description="Dark", layout=w.Layout(width="480px"))
 refresh_list()
-display(w.VBox([listing, review_button, review_out]))
+rename, rename_update = mc.rename_box(odin, refresh=refresh_list)
+display(w.VBox([listing, rename, review_button, review_out]))
 """)
 
 md(r"""
@@ -267,6 +272,15 @@ def reduce_runs(_):
 
 button_red.on_click(reduce_runs)
 display(w.VBox([pick_E, pick_O, pick_N, button_red, out_red]))
+""")
+
+md(r"""
+Curious about what your files really contain, and how the ESS software computes the transmission from them? Open the
+section below.
+""")
+
+code(r"""
+analysis_chain.section("odin_events", odin)
 """)
 
 md(r"""
@@ -391,7 +405,7 @@ _ = submit.Submit("odin/exercises/iron_bragg_edges", "bsc", quiz=q)
 from nbfig import figure_cell, insert_after_mission
 from nbgen import distribute
 distribute(cells, [
-    ("button.on_click(do_count)", [8, 9]),                      # time of flight, frame overlap
+    ("ctl.on_click(do_count)", [8, 9]),                      # time of flight, frame overlap
     ("review_button.on_click(do_review)", [5]),                 # a forgotten shutter
     ("button_red.on_click(reduce_runs)", [1, 2, 3, 6, 7, 4]),   # the edges, the lattice, counting, resolution, verdict
 ])

@@ -58,7 +58,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import ipywidgets as w
 from IPython.display import display, clear_output
-from odin_virtual import VirtualOdin
+from odin_virtual import VirtualOdin, Cancelled
+import measure_control as mc
 import odin_viz as viz, odin_phases as ph, odin_mcstas as tw
 import sample_library as sl
 import live_view
@@ -196,27 +197,28 @@ def default_title():
     return "open beam" if abs(stage.value) > 20 else holder.label
 
 def do_count(_):
-    button.disabled = True
-    with out:
-        clear_output()
-        try:
-            odin.move(choppers="wfm", wfm_delta=0.30, pinhole=0.03, diffuser="in", shutter=shut.value,
-                      stage_x=stage.value / 1000, sample=holder.value)
-            f = odin.tof_image(float(ttime.value), title=default_title())
-            print(f"{os.path.basename(f)}: {default_title()}, {ttime.label}, {odin.last_n_counts:,} neutrons")
-            with img_m:
-                fig, ax = plt.subplots(figsize=(5.4, 4.4))
-                im = ax.imshow(odin.last_image, origin="lower", extent=(-7.05, 7.05, -7.05, 7.05), cmap="gray")
-                fig.colorbar(im, ax=ax, label="counts (2.7 to 4.5 Å)")
-                ax.set(xlabel="x (mm)", ylabel="y (mm)", title=default_title()); plt.tight_layout()
-        except Exception as e:
-            print("Error:", e)
-    button.disabled = False
+    # runs in a thread (measure_control): what is printed goes to the status box under the button
+    try:
+        odin.move(choppers="wfm", wfm_delta=0.30, pinhole=0.03, diffuser="in", shutter=shut.value,
+                  stage_x=stage.value / 1000, sample=holder.value)
+        f = odin.tof_image(float(ttime.value), title=default_title())
+        print(f"{os.path.basename(f)}: {default_title()}, {ttime.label}, {odin.last_n_counts:,} neutrons")
+        with img_m:
+            fig, ax = plt.subplots(figsize=(5.4, 4.4))
+            im = ax.imshow(odin.last_image, origin="lower", extent=(-7.05, 7.05, -7.05, 7.05), cmap="gray")
+            fig.colorbar(im, ax=ax, label="counts (2.7 to 4.5 Å)")
+            ax.set(xlabel="x (mm)", ylabel="y (mm)", title=default_title()); plt.tight_layout()
+    except Cancelled:
+        pass                                   # (measure_control says that nothing was recorded)
+    except Exception as e:
+        print("Error:", e)
     refresh_list()
+    update_rename()
 
-button.on_click(do_count)
+ctl = mc.Control(odin, button, lock=[holder, shut, stage, ttime])
+ctl.on_click(do_count)
 img_m = live_view.FigureImage()
-display(w.VBox([holder, shut, stage, ttime, button, out, img_m]))
+display(w.VBox([holder, shut, stage, ttime, w.HBox([button, ctl.stop]), ctl.status, img_m]))
 """)
 
 md(r"""
@@ -266,7 +268,8 @@ def refresh_list():
                   + "; ".join(f"{k}: {len(v)} files" for k, v in by.items()))
 
 refresh_list()
-display(listing)
+rename, update_rename = mc.rename_box(odin, refresh=refresh_list)
+display(w.VBox([listing, rename]))
 """)
 
 md(r"""
@@ -281,6 +284,11 @@ below the edge minus its mean just above (the shaded bands).
 Since $\Sigma$ is the sum of the contributions of NiO (in proportion to $1 - r$), Ni (to $r$) and zirconia (constant),
 each height is a **straight line** in $r$: the four standards give the line of each edge (Makowska *et al.*, their
 figure 4). Then any height measured on another bar gives its $r$.
+""")
+
+code(r"""
+import analysis_chain
+analysis_chain.section("odin_events", odin)       # folded: the raw data in your files, the analysis chain of ESS
 """)
 
 code(r"""

@@ -93,6 +93,10 @@ def _union_boxes(volumes):
             enable_refraction=0, enable_reflection=0)
     return f
 
+class Cancelled(Exception):
+    """A measurement stopped by the user (VirtualOdin.cancel): nothing was written, nothing logged."""
+
+
 def _slot(waiting):
     """A slot for a heavy operation on a server for a class (twin_slots.py, in twin/); no limit without it."""
     import contextlib
@@ -223,6 +227,8 @@ class VirtualOdin:
         # actual number of copies of each upstream neutron (cf. MCPL_input.comp)
         self.copies = -(-repeat // mpi) * mpi
         self.rng = np.random.default_rng(seed)
+        import threading
+        self._stop = threading.Event()          # cancel(): the measurement under way stops, nothing is recorded
         self.log_file = os.path.join(self.folder, "log.jsonl")
         # Devices. The NeXus names are those of the real ODIN file (template).
         self.devices = {d.name: d for d in [
@@ -375,6 +381,27 @@ class VirtualOdin:
             self.number = self._last_number()
             self.samples()
 
+    # ------------------------------------------------------------------ stopping a measurement
+    def cancel(self):
+        """Stops the measurement under way (called from another thread, e.g. the Stop button of a page): it ends at
+        its next step (a slice of a count, an image of a series) with Cancelled; nothing is written or logged for it
+        (the images of a series already taken stay)."""
+        self._stop.set()
+
+    def reset_cancel(self):
+        """Before a new measurement (measure_control.py does it)."""
+        self._stop.clear()
+
+    def _check(self):
+        if self._stop.is_set():
+            raise Cancelled("measurement stopped: nothing was recorded")
+
+    def rename(self, file, title):
+        """Changes the title of a measurement already taken (a wrong name typed): in the logbook and in the NeXus file
+        (entry/title). Only the title: the settings and the data of a measurement cannot be changed."""
+        import twin_files
+        twin_files.rename(self.folder, self.log_file, file, title)
+
     def count(self, t, title="", write=True, progress=None):
         """Measures for t seconds; returns the path of the NeXus file written (see _count). On a server for a class
         (TWIN_HEAVY_SLOTS), waits for a free slot first: a count takes about a gigabyte of memory."""
@@ -425,6 +452,7 @@ class VirtualOdin:
         else:
             counts = nx.counts_from_mcpl(self.simulate(state), t, field=FIELD, rng=self.rng,
                                          beam_factor=beam_factor, copies=self.copies)
+        self._check()                               # stopped while counting: no file, no log
         counts = self._apply_faults(counts, t)
         if counts["mc_factor"] > 1.2:
             print(f"Warning: counting time too long for the statistics of the simulation; the Poisson error bars are "
@@ -472,6 +500,7 @@ class VirtualOdin:
         the field of the Timepix3 camera), or None with write=False (the image is in last_image).
         pixels: 128 (110 µm pixels, a thick bright scintillator) or 512 (27.5 µm, the high-resolution setup: a thin
         scintillator, 20 µm of blur: 16 times fewer neutrons per pixel, so longer exposures)."""
+        self._check()
         if pixels not in (128, 256, 512):
             raise ValueError("camera pixels: 128, 256 or 512")
         if not 0 < t <= 3600:
@@ -532,6 +561,7 @@ class VirtualOdin:
         (odin_polarized.measurement). Returns the file (NeXus, entry/instrument/camera/data: counts (n_lam, y, x),
         with entry/instrument/camera/wavelength [Å]), or None with write=False (counts in last_cube)."""
         import odin_polarized as pol
+        self._check()
         if pixels not in (64, 128):
             raise ValueError("polarimetry pixels: 64 or 128")
         if not 0 < t <= 3600 * 4:
@@ -601,6 +631,7 @@ class VirtualOdin:
         exposures stay fast. The wavelength resolution is that of the chopper mode (WFM: about 0.2 % for discs 0.30 m
         apart; natural: about 2 %). Returns the file (NeXus, entry/instrument/camera/data: counts (wavelength, y, x),
         entry/instrument/camera/wavelength: the bin edges [Å])."""
+        self._check()
         if pixels not in (64, 128):
             raise ValueError("histogram mode pixels: 64 or 128")
         if not 0 < t <= 4 * 3600:
@@ -719,8 +750,11 @@ class VirtualOdin:
         parts, image, toa = [], np.zeros((128, 128)), np.zeros(TOA_BINS)
         t0 = time.time()
         for k in range(n):
+            self._check()
             c = draw(t / n)
-            time.sleep(max(0.0, t0 + t * (k + 1) / n - time.time()))    # in real time, as on the instrument
+            # in real time, as on the instrument; a Stop (cancel) ends the wait at once
+            self._stop.wait(max(0.0, t0 + t * (k + 1) / n - time.time()))
+            self._check()
             parts.append(c)
             image += self._image(c)
             toa += self._toa(c)

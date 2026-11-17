@@ -7,8 +7,10 @@ iron_structures.png  ODIN, "How far apart are the atoms in iron?": the two struc
                      Bragg edges each structure gives (lambda_edge = 2 d_hkl): what the measurement has to decide.
 sans_particles.png   LoKI, "How big are these nanoparticles?": particles in heavy water, the small-angle scattering on
                      the detector, and how the size sets the curve I(Q) (sphere form factor, two sizes as examples).
-steel_strain.png     ODIN, "Where is a loaded steel part strained?": the specimen in its load frame, the lattice
-                     planes facing the beam moving closer under load (Poisson contraction), and the edge that moves.
+steel_strain.png     ODIN, "Where is a loaded steel part strained?": the specimen in its load frame (camera view) and the
+                     (111) edge that moves under load.
+steel_lattice.png    the crystal without load and under load (square grid, exaggerated): spacing along the force grows,
+                     along the beam shrinks (Poisson); the planes facing the beam set the edge.
 meteorite_tomography.png  ODIN, "What is hidden inside a Martian meteorite?": a radiograph adds up the clasts along the
                      beam, turning the sample separates them, back-projection finds them (top view of one slice).
 """
@@ -171,73 +173,104 @@ def steel_strain():
     frame as the camera sees it, what the load does to the lattice planes the neutrons see (seen from above), and the
     (111) edge that moves."""
     from scipy.special import erfc
-    fig = plt.figure(figsize=(14, 4.9))
-    gs = fig.add_gridspec(1, 3, width_ratios=[1.05, 1.1, 1.15], left=0.02, right=0.985, bottom=0.13, top=0.86, wspace=0.32)
+    # drawn at the width it is shown (10.6 in ≈ the width of the page): every text at 11 pt or more stays readable
+    fig = plt.figure(figsize=(10.6, 4.6))
+    gs = fig.add_gridspec(1, 2, width_ratios=[1.0, 1.15], left=0.02, right=0.98, bottom=0.15, top=0.88, wspace=0.18)
 
     # (1) front view: what the camera sees (x horizontal, the force along x)
     ax = fig.add_subplot(gs[0])
-    ax.add_patch(plt.Rectangle((-7.05, -7.05), 14.1, 14.1, fill=False, ec=GREY, ls="--", lw=1))
-    R, h_half, d = 5.56, 4.9, 1.7
+    ax.add_patch(plt.Rectangle((-7.05, -7.05), 14.1, 14.1, fill=False, ec=GREY, ls="--", lw=1.2))
+    R, h_half = 5.56, 4.9
     x = np.linspace(-9.5, 9.5, 400)
     half = np.where(np.abs(x) < 4, 3.2 + (R - np.sqrt(np.clip(R ** 2 - x ** 2, 0, None))), h_half)
     ax.fill_between(x, -half, half, color="#9FB3CC", ec=INK, lw=1.2)
     for xs, dx in ((-9.6, -2.2), (9.6, 2.2)):
         ax.annotate("", xy=(xs + dx, 0), xytext=(xs, 0), arrowprops=dict(arrowstyle="-|>", color=RED, lw=2.5))
-    ax.text(-10.8, 1.0, "F", color=RED, fontsize=12, fontweight="bold", ha="center")
-    ax.text(10.8, 1.0, "F", color=RED, fontsize=12, fontweight="bold", ha="center")
-    ax.annotate("", xy=(0, 3.2), xytext=(0, -3.2), arrowprops=dict(arrowstyle="<->", color=INK, lw=1))
-    ax.text(-0.3, 0, "6.4 mm", fontsize=9, color=INK, va="center", ha="right")
-    ax.annotate("", xy=(5.3, 4.9), xytext=(5.3, -4.9), arrowprops=dict(arrowstyle="<->", color=INK, lw=1))
-    ax.text(5.55, 0, "9.8 mm", fontsize=9, color=INK, va="center", ha="left")
-    ax.text(0, -8.4, "field of view, 14 mm × 14 mm (dashed)", ha="center", fontsize=8.5, color="#5B6779")
-    ax.set(xlim=(-12, 12), ylim=(-9.5, 9.5), aspect="equal")
+    ax.text(-10.8, 1.0, "F", color=RED, fontsize=14, fontweight="bold", ha="center")
+    ax.text(10.8, 1.0, "F", color=RED, fontsize=14, fontweight="bold", ha="center")
+    ax.annotate("", xy=(0, 3.2), xytext=(0, -3.2), arrowprops=dict(arrowstyle="<->", color=INK, lw=1.2))
+    ax.text(-0.3, 0, "6.4 mm", fontsize=11, color=INK, va="center", ha="right")
+    ax.annotate("", xy=(5.3, 4.9), xytext=(5.3, -4.9), arrowprops=dict(arrowstyle="<->", color=INK, lw=1.2))
+    ax.text(5.55, 0, "9.8 mm", fontsize=11, color=INK, va="center", ha="left")
+    ax.text(0, -8.5, "dashed: field of view, 14 mm", ha="center", fontsize=11, color="#5B6779")
+    ax.set(xlim=(-12, 12), ylim=(-9.6, 8.6), aspect="equal")
     ax.axis("off")
-    ax.set_title("Seen by the camera", color=INK, fontsize=13, fontweight="bold")
+    ax.set_title("Seen by the camera", color=INK, fontsize=14, fontweight="bold")
 
-    # (2) seen from above: x along the force, z along the beam; the planes facing the beam (exaggerated)
+    # (2) the (111) edge moves
     ax = fig.add_subplot(gs[1])
-    for y0, L, t, title, col in ((2.2, 6.0, 2.8, "without load", GREY), (-3.4, 7.0, 2.2, "with load", RED)):
-        x0 = -L / 2
-        ax.add_patch(plt.Rectangle((x0, y0), L, t, fc="#E4EAF2", ec=INK, lw=1.2))
-        n = 4
-        for k in range(n):
-            yy = y0 + t * (k + 0.5) / n
-            ax.plot([x0 + 0.15, x0 + L - 0.15], [yy, yy], color=TEAL, lw=1.6)
-        ya, yb = y0 + t * 1.5 / n, y0 + t * 2.5 / n
-        ax.annotate("", xy=(x0 + L + 0.35, yb), xytext=(x0 + L + 0.35, ya),
-                    arrowprops=dict(arrowstyle="<->", color=TEAL, lw=1.2, mutation_scale=7, shrinkA=0, shrinkB=0))
-        ax.text(x0 + L + 0.6, 0.5 * (ya + yb), "d" if col == GREY else "d (1 + ε), ε < 0", va="center", color=TEAL,
-                fontsize=10.5, fontweight="bold")
-        ax.text(x0 - 0.3, y0 + t / 2, title, ha="right", va="center", color=INK, fontsize=10.5, fontweight="bold")
-    for xs, dx in ((-1.2, -2.2), (1.2, 2.2)):
-        ax.annotate("", xy=(xs + dx, -4.1), xytext=(xs, -4.1), arrowprops=dict(arrowstyle="-|>", color=RED, lw=2.2))
-    ax.text(0, -4.1, "F", color=RED, fontsize=11, fontweight="bold", ha="center", va="center")
-    ax.annotate("", xy=(-6.2, 4.6), xytext=(-6.2, -4.4), arrowprops=dict(arrowstyle="-|>", color=ORANGE, lw=2.5))
-    ax.text(-6.6, 0, "neutrons", color=ORANGE, fontsize=10.5, fontweight="bold", ha="right", va="center", rotation=90)
-    ax.text(0.5, -4.9, "Pulled along the force, the steel gets longer, and thinner\nacross it (Poisson): the planes "
-            "facing the beam move closer.", ha="center", va="top", fontsize=9.5, color="#5B6779")
-    ax.set(xlim=(-8.0, 8.2), ylim=(-6.6, 5.6), aspect="equal")
-    ax.axis("off")
-    ax.set_title("Seen from above", color=INK, fontsize=13, fontweight="bold")
-
-    # (3) the (111) edge moves
-    ax = fig.add_subplot(gs[2])
     e0 = 4.164
     lam = np.linspace(4.0, 4.3, 600)
     edge = lambda l0: 0.66 + 0.14 * 0.5 * erfc(-(lam - l0) / (np.sqrt(2) * 0.009))
     shift = 0.026                                   # drawn 7 times larger than at 600 MPa (0.0037 Å)
-    ax.plot(lam, edge(e0), color=GREY, lw=2.2, label="without load: λ₀ = 2d₁₁₁")
-    ax.plot(lam, edge(e0 - shift), color=RED, lw=2.2, label="with load: λ = 2d₁₁₁ (1 + ε)")
-    ax.annotate("", xy=(e0 - shift, 0.735), xytext=(e0, 0.735), arrowprops=dict(arrowstyle="-|>", color=INK, lw=1.4))
-    ax.text(e0 - shift / 2, 0.742, "the edge moves", ha="center", va="bottom", fontsize=9.5, color=INK)
-    ax.text(0.97, 0.06, "ε = (λ − λ₀) / λ₀\n(shift drawn 7× larger\nthan at 600 MPa)", transform=ax.transAxes,
-            ha="right", va="bottom", fontsize=9.5, color="#5B6779")
+    ax.plot(lam, edge(e0), color=GREY, lw=2.4, label="without load: λ₀ = 2d")
+    ax.plot(lam, edge(e0 - shift), color=RED, lw=2.4, label="under load: λ = 2d (1 + ε)")
+    ax.annotate("", xy=(e0 - shift, 0.735), xytext=(e0, 0.735), arrowprops=dict(arrowstyle="-|>", color=INK, lw=1.5))
+    ax.text(e0 - shift / 2, 0.744, "the edge moves", ha="center", va="bottom", fontsize=11, color=INK)
+    ax.text(0.97, 0.05, "ε = (λ − λ₀) / λ₀\nshift drawn 7× larger", transform=ax.transAxes,
+            ha="right", va="bottom", fontsize=11, color="#5B6779")
     ax.set(xlabel="neutron wavelength λ (Å)", ylabel="transmission", ylim=(0.6, 0.85), xlim=(4.0, 4.3))
-    ax.legend(loc="upper left", fontsize=9.5, frameon=False)
-    ax.set_title("The (111) Bragg edge moves", color=INK, fontsize=13, fontweight="bold")
+    ax.xaxis.label.set_size(12); ax.yaxis.label.set_size(12)
+    ax.tick_params(labelsize=11)
+    ax.legend(loc="upper left", fontsize=11, frameon=False)
+    ax.set_title("The (111) Bragg edge moves", color=INK, fontsize=14, fontweight="bold")
     for s_ in ("top", "right"):
         ax.spines[s_].set_visible(False)
     _save(fig, "steel_strain.png")
+    plt.close(fig)
+
+
+def steel_lattice():
+    """ODIN, steel exercise: the crystal without load and under load, seen from above (x along the force, z along the
+    beam). A simplified picture: a square grid of atoms (the steel is face-centered cubic; its edge is that of the
+    (111) planes). Under load the spacing along the force grows by ε = σ/E, the spacing across it shrinks by ν σ/E
+    (Poisson). The edge measured is set by the planes facing the beam (λ = 2d, back-scattering): their spacing is the
+    one along the beam, so the edge moves to a SHORTER wavelength. Deformation drawn 65 times larger than at 600 MPa
+    (ε_force = 600/195 000 = 3.1e-3 drawn as 0.20; ε_beam = -0.29 × 3.1e-3 = -0.9e-3 drawn as -0.06)."""
+    fig, axs = plt.subplots(1, 2, figsize=(10.6, 5.4))
+    n = 5
+    for ax, (sx, sz, title) in zip(axs, ((1.0, 1.0, "Without load"), (1.20, 0.94, "Under load (exaggerated)"))):
+        xs = (np.arange(n) - (n - 1) / 2) * sx
+        zs = (np.arange(n) - (n - 1) / 2) * sz
+        for z in zs:                                         # the planes facing the beam (perpendicular to z)
+            ax.plot([xs[0] - 0.35, xs[-1] + 0.35], [z, z], color=TEAL, lw=1.6, alpha=0.7, zorder=1)
+        X, Z = np.meshgrid(xs, zs)
+        ax.scatter(X, Z, s=260, color="#9FB3CC", edgecolor=INK, linewidth=1.0, zorder=3)
+        # the spacing along the beam (z): d
+        xa = xs[-1] + 0.75
+        ax.annotate("", xy=(xa, zs[3]), xytext=(xa, zs[2]),
+                    arrowprops=dict(arrowstyle="<->", color=TEAL, lw=1.6, shrinkA=0, shrinkB=0))
+        ax.text(xa + 0.15, 0.5 * (zs[2] + zs[3]), "d" if sz == 1.0 else "d\nsmaller", color=TEAL, fontsize=13,
+                fontweight="bold", va="center", ha="left")
+        # the spacing along the force (x)
+        za = zs[0] - 0.75
+        ax.annotate("", xy=(xs[3], za), xytext=(xs[2], za),
+                    arrowprops=dict(arrowstyle="<->", color=RED, lw=1.6, shrinkA=0, shrinkB=0))
+        ax.text(0.5 * (xs[2] + xs[3]), za - 0.2, "larger" if sx > 1 else "", color=RED, fontsize=12, ha="center",
+                va="top")
+        zf = zs[-1] + 0.75                                   # the force, pulling above the grid
+        if sx > 1:
+            for x0, dx in ((xs[0], -1.0), (xs[-1], 1.0)):
+                ax.annotate("", xy=(x0 + dx, zf), xytext=(x0, zf), arrowprops=dict(arrowstyle="-|>", color=RED, lw=2.6))
+                ax.text(x0 + dx * 0.5, zf + 0.15, "F", color=RED, fontsize=14, fontweight="bold", ha="center",
+                        va="bottom")
+        else:
+            ax.text(0, zf, "no force", color=GREY, fontsize=12, ha="center", va="center")
+        # the beam, from below, on the left of the grid
+        xb = xs[0] - 1.3
+        ax.annotate("", xy=(xb, 2.3), xytext=(xb, -2.3), arrowprops=dict(arrowstyle="-|>", color=ORANGE, lw=2.6))
+        ax.text(xb - 0.3, 0, "neutrons", color=ORANGE, fontsize=12, fontweight="bold", rotation=90, ha="right",
+                va="center")
+        ax.set_title(title, color=INK, fontsize=14, fontweight="bold")
+        ax.set(xlim=(-4.9, 5.0), ylim=(-3.9, 3.3), aspect="equal")
+        ax.axis("off")
+    axs[0].text(-0.2, -3.75, "teal lines: the planes facing the beam", ha="center", fontsize=11, color=TEAL)
+    axs[1].text(0, -3.75, "longer along the force, thinner across it", ha="center", fontsize=11, color=INK)
+    fig.text(0.5, 0.025, "Seen from above, the force along x, the beam along z. The edge λ = 2d is set by the planes "
+             "facing the beam:\ntheir spacing d shrinks, the edge moves to a shorter wavelength. Deformation drawn "
+             "about 65 times larger than at 600 MPa.", ha="center", va="bottom", fontsize=11, color="#5B6779")
+    fig.subplots_adjust(left=0.01, right=0.99, top=0.92, bottom=0.14, wspace=0.05)
+    _save(fig, "steel_lattice.png")
     plt.close(fig)
 
 
@@ -325,5 +358,6 @@ if __name__ == "__main__":
     iron()
     sans()
     steel_strain()
+    steel_lattice()
     meteorite_tomography()
     print("written", OUT)

@@ -50,7 +50,10 @@ import matplotlib.pyplot as plt
 import ipywidgets as w
 from IPython.display import display, clear_output
 sys.path.insert(0, os.path.abspath("."))
-from virtual_loki import VirtualLoki
+sys.path.insert(1, os.path.abspath(".."))      # twin/
+from virtual_loki import VirtualLoki, Cancelled
+import measure_control as mc          # Stop button, settings locked during a measurement, renaming a file
+import analysis_chain                 # the folded "Under the hood" section
 import loki_reduction as red
 import loki_analysis as la
 
@@ -125,42 +128,44 @@ show_sample()
 ttime = w.Dropdown(options=[10, 30, 60, 120, 300, 600, 1800], value=60, description="Time (s)")
 title = w.Text(value="", placeholder="e.g. silica 3m", description="Title")
 button = w.Button(description="Count", button_style="primary", icon="play", layout=w.Layout(width="auto"))
-info = w.Output()
-out = w.Output()
+info = w.HTML()
+import live_view
+img_count = live_view.FigureImage()
 
 def show_readings():
-    with into(info):
-        r = loki.readings()
-        print(f"Choppers: {r['ch1_speed']:g} Hz, wavelength band {r['wavelength_band']}; "
-              f"bandwidth chopper opens {r['ch1a_delay']:.1f} ms after the pulse, "
-              f"frame-overlap chopper {r['ch2a_delay']:.1f} ms")
+    r = loki.readings()
+    info.value = (f"<pre class='tw-status'>Choppers: {r['ch1_speed']:g} Hz, wavelength band {r['wavelength_band']}; "
+                  f"bandwidth chopper opens {r['ch1a_delay']:.1f} ms after the pulse, "
+                  f"frame-overlap chopper {r['ch2a_delay']:.1f} ms</pre>")
 
 def do_count(_):
-    button.disabled = True
-    with out:
-        clear_output()
-        try:
-            loki.move(heavy_shutter=heavy.value, shutter=fast.value, collimation=coll.value,
-                      pulse_skipping=skip.value, detector_distance=dist.value, sample=smp.value)
-            show_readings()
-            print("Measuring (the first count of a configuration takes about 1 minute)...")
-            f = loki.count(ttime.value, title=title.value)
-            clear_output()
-            print(f"File written: {os.path.basename(f)}  ({loki.last_n_counts:,} neutrons on the detectors)")
+    # runs in a thread (measure_control): the settings are locked meanwhile, Stop cancels; prints go to ctl.status
+    try:
+        loki.move(heavy_shutter=heavy.value, shutter=fast.value, collimation=coll.value,
+                  pulse_skipping=skip.value, detector_distance=dist.value, sample=smp.value)
+        show_readings()
+        print("Measuring (the first count of a configuration takes about 1 minute)...")
+        f = loki.count(ttime.value, title=title.value)
+        ctl.clear()
+        print(f"File written: {os.path.basename(f)}  ({loki.last_n_counts:,} neutrons on the detectors)")
+        with img_count:
             fig, ax = plt.subplots(figsize=(6, 5))
             m = ax.imshow(np.log10(loki.last_image + 1), origin="lower", cmap="viridis", aspect="auto")
             fig.colorbar(m, ax=ax, label="log10(counts + 1)")
             ax.set(title="Rear detector panel", xlabel="tube / pixel", ylabel="pixel / tube")
-            plt.show()
-        except Exception as e:
-            clear_output()
-            print("Refused:", e)
-    button.disabled = False
+    except Cancelled:
+        pass                                  # Control says it: nothing was recorded
+    except Exception as e:
+        ctl.clear()
+        print("Refused:", e)
     refresh_list()
+    rename_update()
 
-button.on_click(do_count)
+ctl = mc.Control(loki, button, lock=[smp, heavy, fast, coll, skip, dist, ttime, title])
+ctl.on_click(do_count)
 show_readings()
-display(w.VBox([smp, smp_out, heavy, fast, coll, skip, dist, ttime, title, button, info, out]))
+display(w.VBox([smp, smp_out, heavy, fast, coll, skip, dist, ttime, title, w.HBox([button, ctl.stop]), info,
+                ctl.status, img_count]))
 """)
 
 md(r"""
@@ -201,7 +206,8 @@ def refresh_list():
 
 pick = w.Dropdown(description="Sample file", layout=w.Layout(width="480px"))
 refresh_list()
-display(listing)
+rename, rename_update = mc.rename_box(loki, refresh=refresh_list)
+display(w.VBox([listing, rename]))
 """)
 
 md(r"""
@@ -296,6 +302,15 @@ def analyze(_):
 
 button_an.on_click(analyze)
 display(w.VBox([pick, button_an, out_an]))
+""")
+
+md(r"""
+Curious about what your files really contain, and how the ESS software computes $I(Q)$ from them? Open the section
+below.
+""")
+
+code(r"""
+analysis_chain.section("loki", loki)
 """)
 
 md(r"""
@@ -416,7 +431,7 @@ _ = submit.Submit("loki/exercises/silica_spheres", "bsc", quiz=q)
 from nbfig import figure_cell, insert_after_mission
 from nbgen import distribute
 distribute(cells, [
-    ("button.on_click(do_count)", [6, 7, 8]),          # collimation, frame overlap, pulse skipping
+    ("ctl.on_click(do_count)", [6, 7, 8]),          # collimation, frame overlap, pulse skipping
     ("button_an.on_click(analyze)", [1, 2, 3, 5, 4]),  # Guinier, the radius, the shape, counting time, the verdict
 ])
 insert_after_mission(cells, figure_cell('sans_particles.png', 'What you measure: the particles in the liquid scatter at small angles, and their size sets the shape of the curve I(Q).'))

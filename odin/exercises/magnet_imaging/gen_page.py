@@ -208,43 +208,47 @@ button0 = w.Button(description="Measure without the sample (2 images)", button_s
                    layout=w.Layout(width="auto"))
 button1 = w.Button(description="Measure the polarization matrix of the sample (18 images)", button_style="primary",
                    icon="play", layout=w.Layout(width="auto"))
-out_m = w.Output()
+import measure_control as mc
+from odin_virtual import Cancelled
+import odin_viz
+# Stop: the measurement ends at its next image; the settings and the other button are locked while it runs
+SERIES_STOPPED = "Stopped: the images already taken stay (they are complete images); the others were not taken."
+ctl0 = mc.Control(odin, button0, lock=[expo, rot, button1], stopped=SERIES_STOPPED)
+ctl1 = mc.Control(odin, button1, lock=[expo, rot, button0], stopped=SERIES_STOPPED)
+prog = odin_viz.Progress(18, "images")              # images done, time elapsed, time left
+prog.box.layout.display = "none"
 
 def _prepare(stage_x, r):
     odin.move(sample=SAMPLE, choppers="natural", pinhole=0.02, diffuser="in", shutter="open", stage_x=stage_x,
               stage_rot=r, polarizer="in")
 
 def measure_empty(_):
-    button0.disabled = button1.disabled = True
-    with out_m:
-        clear_output()
-        try:
-            _prepare(0.5, 0.0)
-            for s in ("+y", "-y"):
-                odin.move(spin_in=s, spin_out="y")
-                f = odin.polarimetry(float(expo.value), title=f"no sample {s} y")
-                print(f"{os.path.basename(f)}: spin in {s}, analyzer y, {expo.value} s")
-            show_P0()
-        except Exception as e:
-            print("Error:", e)
-    button0.disabled = button1.disabled = False
+    try:
+        _prepare(0.5, 0.0)
+        for s in ("+y", "-y"):
+            odin.move(spin_in=s, spin_out="y")
+            f = odin.polarimetry(float(expo.value), title=f"no sample {s} y")
+            print(f"{os.path.basename(f)}: spin in {s}, analyzer y, {expo.value} s")
+        show_P0()
+    except Cancelled:
+        pass                                         # (Control writes what happened)
+    except Exception as e:
+        print("Error:", e)
+    update_renames()
 
 def measure_matrix(_):
-    button0.disabled = button1.disabled = True
-    with out_m:
-        clear_output()
-        try:
-            _prepare(0.0, rot.value)
-            import odin_viz
-            prog = odin_viz.Progress(18, "images")      # images done, time elapsed, time left
-            display(prog.box)
-            odin.polarization_matrix(float(expo.value), title=f"{SAMPLE} {rot.value:g} deg",
-                                     progress=prog.update)
-            print(f"18 images of {expo.value} s: {18 * expo.value / 60:.0f} minutes of beam. Parts 3 to 5 now use them.")
-            refresh_all()
-        except Exception as e:
-            print("Error:", e)
-    button0.disabled = button1.disabled = False
+    try:
+        _prepare(0.0, rot.value)
+        prog.t0 = None
+        prog.box.layout.display = None
+        odin.polarization_matrix(float(expo.value), title=f"{SAMPLE} {rot.value:g} deg", progress=prog.update)
+        print(f"18 images of {expo.value} s: {18 * expo.value / 60:.0f} minutes of beam. Parts 3 to 5 now use them.")
+        refresh_all()
+    except Cancelled:
+        pass
+    except Exception as e:
+        print("Error:", e)
+    update_renames()
 
 def runs():
     out = []
@@ -285,9 +289,17 @@ def show_P0():
         else:
             print(f"Polarization without the sample (2 to 5 Å, mean over the field): P0 = {P0:.3f} ± {dP0:.3f}")
 
-button0.on_click(measure_empty)
-button1.on_click(measure_matrix)
-display(w.VBox([expo, button0, rot, button1, out_m]))
+rename, update_renames = mc.rename_box(odin)
+ctl0.on_click(measure_empty)
+ctl1.on_click(measure_matrix)
+display(w.VBox([expo, w.HBox([button0, ctl0.stop]), ctl0.status, rot, w.HBox([button1, ctl1.stop]), prog.box,
+                ctl1.status]))
+"""
+
+RENAME_CELL = r"""
+display(rename)
+import analysis_chain
+analysis_chain.section("odin_polarized", odin)
 """
 
 P0_CELL = r"""
@@ -660,6 +672,12 @@ the buttons):
 """)
     code(MEASURE)
     code(P0_CELL)
+    md(r"""
+**Your files.** Each image is one numbered file, with the title the page gives it. You may correct a title below
+(only the title: the settings and the data of a measurement cannot be changed). The folded section after it shows what
+a file holds and how the page turns the images into the polarization matrix.
+""")
+    code(RENAME_CELL)
     md(r"""
 ## 3. The polarization matrix
 

@@ -83,6 +83,10 @@ body .twq-ans { background: var(--tw-soft); color: var(--tw-text); }
 .tw-controls .widget-toggle-buttons .widget-toggle-button { margin: 0 8px 0 0; }
 .tw-controls .widget-inline-hbox > .widget-label:empty { display: none; }
 
+/* the messages of a measurement (measure_control.py) and the content of a file (analysis_chain.py) */
+.tw-status { font-family: Consolas, "Courier New", monospace; font-size: 13.5px; line-height: 1.45; white-space: pre-wrap;
+  background: var(--tw-soft); border-radius: 8px; padding: 8px 12px; margin: 6px 0; color: var(--tw-text); }
+
 /* a folded section (page_output.collapsed: the bonus rounds), opened by a click on its title */
 .twin-collapsed .jupyter-widget-Collapse-header, .twin-collapsed .p-Collapse-header, .twin-collapsed .lm-Collapse-header {
   font-size: var(--tw-text-size); font-weight: 700; color: var(--tw-teal-d); background: var(--tw-teal-l);

@@ -198,26 +198,53 @@ class Panel:
         t = w.BoundedFloatText(value=30, min=1, max=3600, step=1, description="Time (s)")
         title = w.Text(placeholder="e.g. open beam", description="Title")
         go = w.Button(description="Count", button_style="primary", icon="play", layout=w.Layout(width="auto"))
-        out = w.Output()
+        # every measurement runs through measure_control (a Stop button, the settings locked while it runs; it runs
+        # in a thread: what it prints goes to `status`, the live image to a FigureImage, not to an Output)
+        import live_view
+        from odin_virtual import Cancelled
+        status = w.HTML()
+        live_lab = w.HTML()
+        live_img = live_view.FigureImage()
+        out = w.VBox([status, live_lab, live_img]).add_class("tw-out")
+        last_draw = [0.0]
+
+        def live_update(image, toa, t_done, t_total, step):
+            """The detector image and the arrival times filling up during a count (as odin_viz.LiveCount)."""
+            import matplotlib.pyplot as plt
+            import numpy as np
+            if step == "preparing":
+                live_lab.value = "Counting... (the first count of a session prepares the instrument: a few seconds)"
+            elif step == "writing":
+                live_lab.value = f"Counted {t_total:.0f} s: writing the file..."
+            else:
+                live_lab.value = f"Counting... {t_done:.0f} s / {t_total:.0f} s"
+            if step == "counting" and t_done < t_total and time.time() - last_draw[0] < 0.8:
+                return
+            last_draw[0] = time.time()
+            with live_img:
+                fig, ax = plt.subplots(1, 2, figsize=(11, 4.2), gridspec_kw=dict(width_ratios=[1, 1.4]))
+                im = ax[0].imshow(image, origin="lower", extent=[-7.05, 7.05, -7.05, 7.05], cmap="inferno", vmin=0,
+                                  vmax=max(float(np.max(image)), 1.0))
+                ax[0].set(xlabel="x (mm)", ylabel="y (mm)",
+                          title=f"Detector after {t_done:.1f} s ({float(np.sum(image)):,.0f} neutrons)")
+                fig.colorbar(im, ax=ax[0], label="counts per pixel")
+                edges = np.linspace(0, viz.PULSE_MS, len(toa) + 1)
+                ax[1].step(0.5 * (edges[1:] + edges[:-1]), toa, where="mid", color="tab:blue")
+                ax[1].set(xlabel="time since the last pulse (ms)", ylabel="counts",
+                          ylim=(0, max(float(np.max(toa)), 1) * 1.05), title="Arrival times (raw data, before reduction)")
+                ax[1].grid(alpha=0.3)
+                plt.tight_layout()
 
         def count(_):
-            go.disabled = True
-            with out:
-                clear_output()
-                try:
-                    odin.move(sample=sample.value, shutter=shutter.value, stage_x=stage.value / 1000,
-                              choppers=choppers.value, wfm_delta=delta.value, pinhole=pinhole.value)
-                    if max_kN:
-                        odin.move(load=float(load.value))
-                    live = viz.LiveCount()
-                    f = odin.count(float(t.value), title=title.value or "", progress=live.update)
-                    live.done(f)
-                    print(f"written in the folder of proposal {self.proposal}: {os.path.basename(f)}")
-                except Exception as e:
-                    print("Error:", e)
-            go.disabled = False
-
-        go.on_click(count)
+            try:
+                settings()
+                f = odin.count(float(t.value), title=title.value or "", progress=live_update)
+                live_lab.value = f"File written: {os.path.basename(f)}"
+                print(f"written in the folder of proposal {self.proposal}: {os.path.basename(f)}")
+            except Cancelled:
+                live_lab.value = ""
+            except Exception as e:
+                print("Error:", e)
         # the integrating camera (white-beam radiography, tomography): as radiograph() and tomography() in NICOS
         cam = w.Button(description="Camera image", icon="camera", button_style="primary", layout=w.Layout(width="auto"))
         cam_px = w.Dropdown(options=[("standard (128 px, 110 µm)", 128), ("high resolution (512 px, 27.5 µm)", 512)],
@@ -234,63 +261,60 @@ class Panel:
                 odin.move(load=float(load.value))
 
         def image(_):
-            cam.disabled = True
-            with out:
-                clear_output()
-                try:
-                    settings()
-                    f = odin.camera(float(t.value), title=title.value or "", pixels=cam_px.value)
-                    print(f"camera image written in the folder of proposal {self.proposal}: {os.path.basename(f)} "
-                          f"({odin.last_n_counts:,} counts)")
-                except Exception as e:
-                    print("Error:", e)
-            cam.disabled = False
+            try:
+                settings()
+                f = odin.camera(float(t.value), title=title.value or "", pixels=cam_px.value)
+                print(f"camera image written in the folder of proposal {self.proposal}: {os.path.basename(f)} "
+                      f"({odin.last_n_counts:,} counts)")
+            except Cancelled:
+                pass
+            except Exception as e:
+                print("Error:", e)
 
         def tomography(_):
-            tomo.disabled = True
-            with out:
-                clear_output()
-                try:
-                    settings()
-                    angles = [k * step.value for k in range(int(round(180 / step.value)))]
-                    bar.max, bar.value, bar.layout.display = len(angles), 0, ""
-                    bar.style.description_width = "initial"
-                    t_start = time.time()
+            angles = [k * step.value for k in range(int(round(180 / step.value)))]
+            done = []
+            try:
+                settings()
+                bar.max, bar.value, bar.layout.display = len(angles), 0, ""
+                bar.style.description_width = "initial"
+                t_start = time.time()
 
-                    def advance(k, n, f):
-                        bar.value = k
-                        el = time.time() - t_start
-                        fmt = lambda s: f"{int(s // 60)} min {int(s % 60):02d} s" if s >= 60 else f"{int(s)} s"
-                        bar.description = f"{k}/{n}" + (f" · {fmt(el / k * (n - k))} left" if 0 < k < n else "")
+                def advance(k, n, f):
+                    done.append(f)
+                    bar.value = k
+                    el = time.time() - t_start
+                    fmt = lambda s: f"{int(s // 60)} min {int(s % 60):02d} s" if s >= 60 else f"{int(s)} s"
+                    bar.description = f"{k}/{n}" + (f" · {fmt(el / k * (n - k))} left" if 0 < k < n else "")
+                try:
                     files = odin.tomography(angles, float(t.value), title=title.value or "tomography",
                                             progress=advance, pixels=cam_px.value)
+                finally:
                     odin.move(stage_rot=0.0)
-                    print(f"{len(files)} images of {float(t.value):g} s written ({os.path.basename(files[0])} to "
-                          f"{os.path.basename(files[-1])})")
-                except Exception as e:
-                    print("Error:", e)
-            tomo.disabled = False
+                print(f"{len(files)} images of {float(t.value):g} s written ({os.path.basename(files[0])} to "
+                      f"{os.path.basename(files[-1])})")
+            except Cancelled:
+                print(f"Tomography stopped after {len(done)} of {len(angles)} images (those stay in the folder).")
+            except Exception as e:
+                print("Error:", e)
 
         # the Timepix3 in histogram mode (long exposures: counts per wavelength bin), as tof_histogram() in NICOS
         hist = w.Button(description="Histogram image (Timepix3)", icon="th-large", layout=w.Layout(width="auto"))
 
         def histogram(_):
-            hist.disabled = True
-            with out:
-                clear_output()
-                try:
-                    settings()
-                    f = odin.tof_image(float(t.value), title=title.value or "")
-                    print(f"histogram image written in the folder of proposal {self.proposal}: {os.path.basename(f)} "
-                          f"({odin.last_n_counts:,} counts)")
-                except Exception as e:
-                    print("Error:", e)
-            hist.disabled = False
+            try:
+                settings()
+                f = odin.tof_image(float(t.value), title=title.value or "")
+                print(f"histogram image written in the folder of proposal {self.proposal}: {os.path.basename(f)} "
+                      f"({odin.last_n_counts:,} counts)")
+            except Cancelled:
+                pass
+            except Exception as e:
+                print("Error:", e)
 
-        hist.on_click(histogram)
         t.max = 4 * 3600
-        cam.on_click(image)
-        tomo.on_click(tomography)
+        actions = [(go, count), (hist, histogram), (cam, image), (tomo, tomography)]     # Control: further down
+        locked = [sample, shutter, stage, choppers, delta, pinhole, *([load] if max_kN else []), t, title, cam_px, step]
         # operando samples (a battery on its cycler): the time of the cycle, and a film of the cycle with the camera
         operando = [n for n in samples if (lib.get(n) or {}).get("operando")]
         op_box = []
@@ -303,24 +327,23 @@ class Panel:
             fbar = w.IntProgress(value=0, min=0, max=1, layout=w.Layout(width="160px", display="none"))
 
             def film_cycle(_):
-                film.disabled = True
-                with out:
-                    clear_output()
-                    try:
-                        settings()
-                        times = [round(k * every.value, 2) for k in range(int(55 / every.value + 1e-9) + 1)]
-                        fbar.max, fbar.value, fbar.layout.display = len(times), 0, ""
-                        for tc in times:
-                            odin.move(cycle_time=float(tc))
-                            odin.camera(float(t.value), title=f"{title.value or 'cell'} {tc:g} h", pixels=cam_px.value)
-                            fbar.value += 1
-                        cyc.value = times[-1]
-                        print(f"{len(times)} camera images of {float(t.value):g} s, from 0 to {times[-1]:g} h of the cycle")
-                    except Exception as e:
-                        print("Error:", e)
-                film.disabled = False
+                try:
+                    settings()
+                    times = [round(k * every.value, 2) for k in range(int(55 / every.value + 1e-9) + 1)]
+                    fbar.max, fbar.value, fbar.layout.display = len(times), 0, ""
+                    for tc in times:
+                        odin.move(cycle_time=float(tc))
+                        odin.camera(float(t.value), title=f"{title.value or 'cell'} {tc:g} h", pixels=cam_px.value)
+                        fbar.value += 1
+                    cyc.value = times[-1]
+                    print(f"{len(times)} camera images of {float(t.value):g} s, from 0 to {times[-1]:g} h of the cycle")
+                except Cancelled:
+                    print(f"Film stopped after {fbar.value} images (those stay in the folder).")
+                except Exception as e:
+                    print("Error:", e)
 
-            film.on_click(film_cycle)
+            actions.append((film, film_cycle))
+            locked += [cyc, every]
             cyc.observe(lambda c: odin.move(cycle_time=float(c["new"])), "value")
             op_box = [_card("Battery cycler", *_fit(cyc), _row(every, film, fbar),
                             note="The time since the start of the cycle (the state of the cell), and a film of the "
@@ -342,40 +365,49 @@ class Panel:
                 odin.move(stage_rot=float(rot.value), polarizer=polz.value, spin_in=s_in.value, spin_out=s_out.value)
 
             def pol_one(_):
-                one.disabled = True
-                with out:
-                    clear_output()
-                    try:
-                        pol_settings()
-                        f = odin.polarimetry(float(t.value), title=title.value or "")
-                        print(f"polarized image written in the folder of proposal {self.proposal}: {os.path.basename(f)} "
-                              f"(spin in {s_in.value}, analyzer {s_out.value}, {odin.last_n_counts:,} counts)")
-                    except Exception as e:
-                        print("Error:", e)
-                one.disabled = False
+                try:
+                    pol_settings()
+                    f = odin.polarimetry(float(t.value), title=title.value or "")
+                    print(f"polarized image written in the folder of proposal {self.proposal}: {os.path.basename(f)} "
+                          f"(spin in {s_in.value}, analyzer {s_out.value}, {odin.last_n_counts:,} counts)")
+                except Cancelled:
+                    pass
+                except Exception as e:
+                    print("Error:", e)
 
             def pol_full(_):
-                full.disabled = True
-                with out:
-                    clear_output()
-                    try:
-                        polz.value = "in"
-                        pbar.value, pbar.layout.display = 0, ""
-                        pol_settings()
-                        files = odin.polarization_matrix(float(t.value), title=title.value or "",
-                                                         progress=lambda k, n, f: setattr(pbar, "value", k))
-                        print(f"18 polarized images of {float(t.value):g} s written "
-                              f"({os.path.basename(files[('+x', 'x')])} to {os.path.basename(files[('-z', 'z')])})")
-                    except Exception as e:
-                        print("Error:", e)
-                full.disabled = False
+                try:
+                    polz.value = "in"
+                    pbar.value, pbar.layout.display = 0, ""
+                    pol_settings()
+                    files = odin.polarization_matrix(float(t.value), title=title.value or "",
+                                                     progress=lambda k, n, f: setattr(pbar, "value", k))
+                    print(f"18 polarized images of {float(t.value):g} s written "
+                          f"({os.path.basename(files[('+x', 'x')])} to {os.path.basename(files[('-z', 'z')])})")
+                except Cancelled:
+                    print(f"Matrix stopped after {pbar.value} of 18 images (those stay in the folder).")
+                except Exception as e:
+                    print("Error:", e)
 
-            one.on_click(pol_one)
-            full.on_click(pol_full)
+            actions += [(one, pol_one), (full, pol_full)]
+            locked += [rot, polz, s_in, s_out]
             one.button_style = "primary"
             pol_box = [_card("Polarized imaging", *_fit(rot, polz, s_in, s_out), _row(one, full, pbar), action=True,
                              note="Timepix3, counts per wavelength. <i>Polarization matrix</i> takes the 18 images "
                                   "(spin in ±x, ±y, ±z; analyzer x, y, z), each of the time set above.")]
+        # Stop and locked settings: each button through measure_control (one status box for all, the Stop button of
+        # the measurement under way next to the box)
+        import measure_control as mc
+        buttons = [b for b, _ in actions]
+        stops = []
+        for b, fn in actions:
+            ctl = mc.Control(odin, b, lock=locked + [x for x in buttons if x is not b],
+                             stopped=None if fn.__name__ in ("tomography", "film_cycle", "pol_full")   # (they say it)
+                             else "Measurement stopped: nothing of it was recorded.")
+            ctl.status = status
+            ctl.on_click(fn)
+            stops.append(ctl.stop)
+        out.children = [w.HBox(stops), *out.children]
         settings_cards = _grid(
             _card("Sample", *_fit(sample, stage, *([load] if max_kN else []))),
             _card("Beam", *_fit(shutter, choppers, delta, pinhole)),
@@ -422,24 +454,25 @@ class Panel:
         t = w.BoundedFloatText(value=60, min=1, max=3600, step=1, description="Time (s)")
         title = w.Text(placeholder="e.g. empty cell", description="Title")
         go = w.Button(description="Count", button_style="primary", icon="play", layout=w.Layout(width="auto"))
-        out = w.Output()
+        import measure_control as mc
+        from virtual_loki import Cancelled
+        # Stop and locked settings (measure_control): the count stops once its simulation is done, before writing
+        ctl = mc.Control(loki, go, lock=[*widgets.values(), t, title])
+        out = w.VBox([ctl.stop, ctl.status]).add_class("tw-out")
 
         def count(_):
-            go.disabled = True
-            with out:
-                clear_output()
-                try:
-                    loki.move(**{k: x.value for k, x in widgets.items()})
-                    print("Counting (the first count of a new setting is simulated first: a few minutes)...")
-                    f = loki.count(float(t.value), title=title.value or "")
-                    clear_output()
-                    print(f"written in the folder of proposal {self.proposal}: {os.path.basename(f)} "
-                          f"({loki.last_n_counts:,} neutrons)")
-                except Exception as e:
-                    print("Error:", e)
-            go.disabled = False
+            try:
+                loki.move(**{k: x.value for k, x in widgets.items()})
+                print("Counting (the first count of a new setting is simulated first: a few minutes)...")
+                f = loki.count(float(t.value), title=title.value or "")
+                print(f"written in the folder of proposal {self.proposal}: {os.path.basename(f)} "
+                      f"({loki.last_n_counts:,} neutrons)")
+            except Cancelled:
+                pass
+            except Exception as e:
+                print("Error:", e)
 
-        go.on_click(count)
+        ctl.on_click(count)
         k = list(widgets)
         return _layout(
             f"The instrument, as in NICOS: set the devices, then count. Your files go to the folder of proposal "

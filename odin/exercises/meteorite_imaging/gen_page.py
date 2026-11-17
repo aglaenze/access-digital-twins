@@ -81,7 +81,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import ipywidgets as w
 from IPython.display import display, clear_output
-from odin_virtual import VirtualOdin
+from odin_virtual import VirtualOdin, Cancelled
+import measure_control as mc          # Stop button, settings locked during a measurement, renaming a file
+import analysis_chain                 # the folded "Under the hood" section
 import odin_radiography as tomo
 import odin_viz as viz
 import live_view
@@ -181,29 +183,31 @@ def default_title():
     return f"open beam ({setup.value})" if inout.value > 0.02 else f"meteorite 0° ({setup.value})"
 
 def take(_):
-    button.disabled = True
-    with out:
-        clear_output()
-        try:
-            px, D = SETUPS[setup.value]
-            odin.move(choppers="white", pinhole=D, diffuser="in", shutter=shut.value, stage_x=inout.value,
-                      stage_rot=0.0, sample=SAMPLE)
-            print("Taking the image (the first one takes a few seconds: the beam is prepared)...")
-            f = odin.camera(float(expo.value), title=title.value or default_title(), pixels=px)
-            clear_output()
-            with img_take:
-                fig, ax = plt.subplots(figsize=(5.2, 4.4))
-                im = ax.imshow(odin.last_image, origin="lower", extent=EXT, cmap="gray")
-                fig.colorbar(im, ax=ax, label="counts per pixel")
-                ax.set(xlabel="x (mm)", ylabel="y (mm)", title=f"{os.path.basename(f)}: {title.value or default_title()}")
-                plt.tight_layout()
-        except Exception as e:
-            print("Error:", e)
-    button.disabled = False
+    # runs in a thread (measure_control): the settings are locked meanwhile, Stop cancels; prints go to ctl.status
+    try:
+        px, D = SETUPS[setup.value]
+        odin.move(choppers="white", pinhole=D, diffuser="in", shutter=shut.value, stage_x=inout.value,
+                  stage_rot=0.0, sample=SAMPLE)
+        print("Taking the image (the first one takes a few seconds: the beam is prepared)...")
+        f = odin.camera(float(expo.value), title=title.value or default_title(), pixels=px)
+        ctl.clear()
+        print(f"Written: {os.path.basename(f)} ({title.value or default_title()}).")
+        with img_take:
+            fig, ax = plt.subplots(figsize=(5.2, 4.4))
+            im = ax.imshow(odin.last_image, origin="lower", extent=EXT, cmap="gray")
+            fig.colorbar(im, ax=ax, label="counts per pixel")
+            ax.set(xlabel="x (mm)", ylabel="y (mm)", title=f"{os.path.basename(f)}: {title.value or default_title()}")
+            plt.tight_layout()
+    except Cancelled:
+        pass                                  # Control says it: nothing was recorded
+    except Exception as e:
+        print("Error:", e)
     refresh_list()
+    rename_update()
 
-button.on_click(take)
-display(w.VBox([setup, shut, inout, expo, title, button, out, img_take]))
+ctl = mc.Control(odin, button, lock=[setup, shut, inout, expo, title])
+ctl.on_click(take)
+display(w.VBox([setup, shut, inout, expo, title, w.HBox([button, ctl.stop]), ctl.status, img_take]))
 """)
 
 md(r"""
@@ -262,7 +266,8 @@ pick_O = w.Dropdown(description="Open beam", layout=wide)
 pick_D = w.Dropdown(description="Dark", layout=wide)
 show_setup.observe(lambda c: refresh_list(), "value")
 refresh_list()
-display(listing)
+rename, rename_update = mc.rename_box(odin, refresh=refresh_list)
+display(w.VBox([listing, rename]))
 """)
 
 md(r"""
@@ -316,6 +321,14 @@ display(w.VBox([show_setup, pick_S, pick_O, pick_D, w.HBox([button_T, height]), 
 """)
 
 md(r"""
+Curious about what your files really contain, and how the transmission is computed from them? Open the section below.
+""")
+
+code(r"""
+analysis_chain.section("odin_camera", odin)
+""")
+
+md(r"""
 **Reading the radiograph.** About 89 % of the neutrons cross the 2 mm of rock: rocks are almost transparent to
 neutrons. With the standard setup the piece looks uniform: the clasts are as small as the blur and the pixels, and
 their contrast (a few %) is hidden in the noise. With the high-resolution setup small darker and brighter specks
@@ -337,33 +350,34 @@ out_tomo = w.Output()
 REC = {}
 
 def run_tomo(_):
-    button_tomo.disabled = True
-    with out_tomo:
-        clear_output()
-        try:
-            show_setup.value = "high resolution"
-            refresh_list()
-            _, O, D = chosen()
-            angles = np.arange(0, 180, 3.0)
-            bar.start(len(angles))
-            px, Dp = SETUPS["high resolution"]
-            odin.move(choppers="white", pinhole=Dp, diffuser="in", shutter="open", stage_x=0.0, sample=SAMPLE)
-            files = odin.tomography(angles, 300.0, title="tomography", pixels=px,
-                                    progress=bar.update)
-            odin.move(stage_rot=0.0)
-            print("Filtering the projections...")
-            REC["rec"] = tomo.Reconstruction(files, O, D)
-            clear_output()
-            print(f"{len(angles)} images reconstructed. Explore the slices below.")
-            show_slices()
-        except Exception as err:
-            clear_output()
-            print("Not possible yet:", err)
-    button_tomo.disabled = False
+    # runs in a thread (measure_control): Stop ends the series after the image under way (the images taken stay)
+    try:
+        show_setup.value = "high resolution"
+        refresh_list()
+        _, O, D = chosen()
+        angles = np.arange(0, 180, 3.0)
+        bar.start(len(angles))
+        px, Dp = SETUPS["high resolution"]
+        odin.move(choppers="white", pinhole=Dp, diffuser="in", shutter="open", stage_x=0.0, sample=SAMPLE)
+        files = odin.tomography(angles, 300.0, title="tomography", pixels=px,
+                                progress=bar.update)
+        print("Filtering the projections...")
+        REC["rec"] = tomo.Reconstruction(files, O, D)
+        ctl_tomo.clear()
+        print(f"{len(angles)} images reconstructed. Explore the slices below.")
+        show_slices()
+    except Cancelled:
+        print("Tomography stopped: the images already taken stay in your files, but there is no reconstruction.")
+    except Exception as err:
+        print("Not possible yet:", err)
+    finally:
+        odin.move(stage_rot=0.0)
     refresh_list()
+    rename_update()
 
-button_tomo.on_click(run_tomo)
-display(w.VBox([button_tomo, bar.box, out_tomo]))
+ctl_tomo = mc.Control(odin, button_tomo, stopped=None)      # run_tomo says what was kept
+ctl_tomo.on_click(run_tomo)
+display(w.VBox([w.HBox([button_tomo, ctl_tomo.stop]), bar.box, ctl_tomo.status]))
 """)
 
 md(r"""
