@@ -83,6 +83,13 @@ body .twq-ans { background: var(--tw-soft); color: var(--tw-text); }
 .tw-controls .widget-toggle-buttons .widget-toggle-button { margin: 0 8px 0 0; }
 .tw-controls .widget-inline-hbox > .widget-label:empty { display: none; }
 
+/* a folded section (page_output.collapsed: the bonus rounds), opened by a click on its title */
+.twin-collapsed .jupyter-widget-Collapse-header, .twin-collapsed .p-Collapse-header, .twin-collapsed .lm-Collapse-header {
+  font-size: var(--tw-text-size); font-weight: 700; color: var(--tw-teal-d); background: var(--tw-teal-l);
+  border: 1px solid var(--tw-teal); border-radius: 10px; padding: 10px 14px; cursor: pointer; }
+.twin-collapsed .jupyter-widget-Collapse-contents, .twin-collapsed .p-Collapse-contents, .twin-collapsed .lm-Collapse-contents {
+  border: 0; padding: 6px 0 0 0; background: transparent; }
+
 /* the online version: the bar at the top of a page, back to the missions */
 .twin-webbar { position: sticky; top: 0; z-index: 1000; display: flex; align-items: center; gap: 16px;
   padding: 10px 24px; background: #0F1D31; color: #9FB0C7; font-family: Inter, "Segoe UI", system-ui, sans-serif;

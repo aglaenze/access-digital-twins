@@ -29,12 +29,21 @@ def png(fig, dpi=100):
 
 class FigureImage(w.Image):
     """An image widget drawn from the matplotlib figure made inside `with view:` (the last one; the others are
-    closed). clear_output() is accepted and does nothing (it can replace an Output widget)."""
+    closed). clear_output() is accepted and does nothing (it can replace an Output widget).
+    The figure is drawn at twice its resolution and shown at its normal size: sharp on every screen. The widget is
+    hidden while it has no image (an empty image showed the icon of a broken picture)."""
 
     def __init__(self, dpi=100, **kw):
-        kw.setdefault("layout", w.Layout(max_width="100%"))
+        kw.setdefault("layout", w.Layout(max_width="100%", display="none"))
         super().__init__(format="png", **kw)
         self.dpi = dpi
+
+    def _set(self, fig):
+        data = png(fig, 2 * self.dpi)
+        width = int.from_bytes(data[16:20], "big") // 2              # PNG header: width in pixels, at normal size
+        self.value = data
+        self.layout.width = f"{width}px"
+        self.layout.display = None
 
     def __enter__(self):
         self._before = set(plt.get_fignums())
@@ -43,7 +52,7 @@ class FigureImage(w.Image):
     def __exit__(self, exc_type, exc, tb):
         new = [n for n in plt.get_fignums() if n not in self._before]
         if exc_type is None and new:
-            self.value = png(plt.figure(new[-1]), self.dpi)
+            self._set(plt.figure(new[-1]))
         for n in new:
             plt.close(n)
         return False
@@ -52,7 +61,7 @@ class FigureImage(w.Image):
         pass
 
     def show(self, fig):
-        self.value = png(fig, self.dpi)
+        self._set(fig)
 
 
 def throttled(fn, delay=0.05):

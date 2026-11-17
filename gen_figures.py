@@ -29,6 +29,12 @@ plt.rcParams.update({"font.family": "DejaVu Sans", "font.size": 11, "axes.edgeco
 A_ALPHA, A_GAMMA = 2.8665, 3.59           # lattice parameters [Å] (alpha-iron at room temperature; gamma-iron)
 
 
+
+def _save(fig, name):
+    """The figure as PNG (dpi 150) and as SVG (vectors: what the pages show, sharp at every size; nbfig.figure_cell)."""
+    fig.savefig(os.path.join(OUT, name), dpi=150)
+    fig.savefig(os.path.join(OUT, os.path.splitext(name)[0] + ".svg"))
+
 def edges(a, hkls):
     """Bragg edges lambda = 2 d_hkl, d_hkl = a / sqrt(h^2 + k^2 + l^2) (cubic)."""
     return [(h, 2 * a / np.sqrt(h[0] ** 2 + h[1] ** 2 + h[2] ** 2)) for h in hkls]
@@ -96,7 +102,7 @@ def iron():
     fig.text(0.01, 0.02, "Highlighted: one family of atomic planes. Neutrons longer than 2d cannot be diffracted by "
              "these planes: they go through,\nand the transmission jumps up. The last edge tells d, hence the structure.",
              fontsize=10, color="#5B6779")
-    fig.savefig(os.path.join(OUT, "iron_structures.png"), dpi=150)
+    _save(fig, "iron_structures.png")
     plt.close(fig)
 
 
@@ -156,7 +162,7 @@ def sans():
             ha="left", va="top", fontsize=9.5, color="#5B6779")
     for s in ("top", "right"):
         ax.spines[s].set_visible(False)
-    fig.savefig(os.path.join(OUT, "sans_particles.png"), dpi=150)
+    _save(fig, "sans_particles.png")
     plt.close(fig)
 
 
@@ -231,7 +237,7 @@ def steel_strain():
     ax.set_title("The (111) Bragg edge moves", color=INK, fontsize=13, fontweight="bold")
     for s_ in ("top", "right"):
         ax.spines[s_].set_visible(False)
-    fig.savefig(os.path.join(OUT, "steel_strain.png"), dpi=150)
+    _save(fig, "steel_strain.png")
     plt.close(fig)
 
 
@@ -309,7 +315,7 @@ def meteorite_tomography():
     fig.text(0.5, 0.03, "Tomography, seen from above: one horizontal slice of the piece of NWA 7034 (8 mm × 2 mm). "
              "H-rich clasts (about 0.3 mm) drawn 3 times larger; attenuation as measured at ICON.",
              ha="center", fontsize=11.5, color="#5B6779")
-    fig.savefig(os.path.join(OUT, "meteorite_tomography.png"), dpi=150)
+    _save(fig, "meteorite_tomography.png")
     plt.close(fig)
 
 

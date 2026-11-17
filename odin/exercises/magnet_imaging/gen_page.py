@@ -16,6 +16,18 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 sys.path.insert(0, ROOT)
 from nbgen import distribute  # noqa: E402
+from page_texts import measurement_table  # noqa: E402
+
+# the measurements of part 2, in order (the meteorite adds its side view, at 90°)
+_MEAS_HEADER = ("Step", "Images", "Button", "Sample", "Rotation", "Spin in", "Analyzer", "Each image")
+_MEAS_ROWS = [
+    ("1", "without the sample: P0 (2 images)", "*Measure without the sample*", "out (moved aside for you)", "—",
+     "+y, −y", "y", "150 s (30 s: a quick look)"),
+    ("2", "polarization matrix (18 images)", "*Measure the polarization matrix*", "in", "0°", "±x, ±y, ±z",
+     "x, y, z", "150 s"),
+]
+_MEAS_SIDE = ("3", "polarization matrix, side view (18 images)", "*Measure the polarization matrix*", "in", "90°",
+              "±x, ±y, ±z", "x, y, z", "150 s")
 
 VARIANTS = {
     "solenoid": dict(
@@ -632,6 +644,19 @@ ODIN is set for you: choppers in the *natural* mode (the band of wavelengths of 
 of flight), pinhole 2 cm, polarizer and analyzer in. **First** measure without the sample (stage out): spin in along
 $+y$ and $-y$, analyzer along $y$. This gives $P_0$. **Then** the 18 images of the sample. At RADEN each image took
 150 s; the twin computes them in about a minute.
+
+**Why a measurement without the sample?** What is measured here is not a transmission but a polarization: each $P_{ij}$
+is a ratio of two images taken the same way, so the attenuation of the sample, the unevenness of the beam and the
+sensitivity of each pixel cancel in it (no open-beam division is needed for that). The measurement without the sample
+plays the role of the open beam of an ordinary radiograph: it measures what the instrument does alone, $P_0$, and every
+image of the sample is divided by it. No dark image is taken here: a background of the detector, the same in the two
+images of a ratio, would pull $P$ slightly toward 0; on the real instrument it is measured with the shutter closed
+and subtracted.
+
+**The measurements to take**, in this order (the choppers, the pinhole, the polarizer and the spin settings are set by
+the buttons):
+
+""" + measurement_table(_MEAS_ROWS + ([_MEAS_SIDE] if key == "meteorite" else []), _MEAS_HEADER) + r"""
 """)
     code(MEASURE)
     code(P0_CELL)
@@ -683,9 +708,15 @@ The workshop computes the field of the coil in two ways: the formula of an infin
 $B = \mu_0 N I / \ell$ = 0.66 mT, and the Biot–Savart law along the real wire, which gives 0.54 mT at the center (the
 coil is short: its field spreads out at the ends). Compare with what you measured (Q5, Q6).
 """)
-    code(QUESTIONS[key])
+    code(QUESTIONS[key].replace("\nq.report()\n", "\n"))
     md(r"""
-## 7. Submit your work
+## 7. Your results
+
+Your score on the questions of the page, and a report to download.
+""")
+    code("q.report()")
+    md(r"""
+## 8. Submit your work
 
 When you are done, tell what you thought of the exercise and submit your work.
 """)

@@ -47,6 +47,12 @@ LOKI_CHOPPERS = (6.5, 15.21)
 LOKI_BANKS = (("front banks", 1.5, 0.75), ("middle banks", 3.1, 0.42), ("rear bank", 5.0, 0.8))   # distance, half-size
 
 
+
+def _save(fig, name):
+    """The figure as PNG (dpi 150) and as SVG (vectors: what the pages show, sharp at every size; nbfig.figure_cell)."""
+    fig.savefig(os.path.join(OUT, name), dpi=150)
+    fig.savefig(os.path.join(OUT, os.path.splitext(name)[0] + ".svg"))
+
 def _clean(ax):
     for s in ("top", "right", "left"):
         ax.spines[s].set_visible(False)
@@ -82,7 +88,7 @@ def odin_beamline():
     ax.set_xlabel("distance from the source (m)")
     _clean(ax)
     fig.tight_layout()
-    fig.savefig(os.path.join(OUT, "odin_beamline.png"), dpi=150)
+    _save(fig, "odin_beamline.png")
     plt.close(fig)
 
 
@@ -121,7 +127,7 @@ def odin_tof():
         ax.spines[s].set_visible(False)
     ax.text(98, 5, "slow neutrons = long wavelength\n= flatter line", fontsize=10.5, color=INK, va="center")
     fig.tight_layout()
-    fig.savefig(os.path.join(OUT, "odin_tof.png"), dpi=150)
+    _save(fig, "odin_tof.png")
     plt.close(fig)
 
 
@@ -173,7 +179,7 @@ def odin_choppers():
         ax2.spines[s_].set_visible(False)
     fig.text(0.64, 0.015, "WFM choppers: six short openings instead of one long pulse,\nso λ is known to 0.2 to 0.8 %",
              fontsize=9.5, color=TEAL, va="bottom")
-    fig.savefig(os.path.join(OUT, "odin_choppers.png"), dpi=150)
+    _save(fig, "odin_choppers.png")
     plt.close(fig)
 
 
@@ -205,7 +211,7 @@ def odin_pinhole():
     ax.text((zs + zd) / 2, -2.35, "l", ha="center", va="top", fontsize=11, color=INK)
     ax.set_xlim(-1.6, 13.2); ax.set_ylim(-3.6, 2.6); ax.axis("off")
     fig.tight_layout()
-    fig.savefig(os.path.join(OUT, "odin_pinhole.png"), dpi=150)
+    _save(fig, "odin_pinhole.png")
     plt.close(fig)
 
 
@@ -247,7 +253,7 @@ def odin_detector():
     ax.text(7.0, 1.7, steps, ha="left", va="top", fontsize=10.5, color=INK, linespacing=1.45)
     ax.set_xlim(-0.5, 12.4); ax.set_ylim(-1.5, 2.6); ax.axis("off")
     fig.tight_layout()
-    fig.savefig(os.path.join(OUT, "odin_detector.png"), dpi=150)
+    _save(fig, "odin_detector.png")
     plt.close(fig)
 
 
@@ -285,7 +291,7 @@ def odin_scintillator():
     ax.text(11.8, 6, "ε(λ) = 1 − exp(−λ / 8 Å)\n(the twin)", ha="right", va="bottom", fontsize=10, color=INK)
     for s in ("top", "right"):
         ax.spines[s].set_visible(False)
-    fig.savefig(os.path.join(OUT, "odin_scintillator.png"), dpi=150)
+    _save(fig, "odin_scintillator.png")
     plt.close(fig)
 
 
@@ -329,7 +335,7 @@ def odin_cameras():
     ax.set_title("all wavelengths added", fontsize=11, color=INK)
     fig.text(0.725, 0.1, "no time, no λ: one picture, smoother\n(all the neutrons in it), but no Bragg edge",
              fontsize=10, color=INK)
-    fig.savefig(os.path.join(OUT, "odin_cameras.png"), dpi=150)
+    _save(fig, "odin_cameras.png")
     plt.close(fig)
 
 
@@ -375,7 +381,7 @@ def loki_beamline():
     ax2.set_xlim(-0.4, 5.9); ax2.set_ylim(-1.0, 1.3)
     ax2.set_xlabel("distance from the sample (m)")
     _clean(ax2)
-    fig.savefig(os.path.join(OUT, "loki_beamline.png"), dpi=150)
+    _save(fig, "loki_beamline.png")
     plt.close(fig)
 
 
@@ -416,7 +422,7 @@ def loki_q():
     ax2.grid(alpha=0.3, which="both")
     for s in ("top", "right"):
         ax2.spines[s].set_visible(False)
-    fig.savefig(os.path.join(OUT, "loki_q.png"), dpi=150)
+    _save(fig, "loki_q.png")
     plt.close(fig)
 
 
@@ -454,7 +460,7 @@ def loki_tof():
             ax.spines[s_].set_visible(False)
     axs[0].set_ylabel("distance from the source (m)")
     fig.tight_layout()
-    fig.savefig(os.path.join(OUT, "loki_tof.png"), dpi=150)
+    _save(fig, "loki_tof.png")
     plt.close(fig)
 
 

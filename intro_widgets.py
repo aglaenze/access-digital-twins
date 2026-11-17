@@ -38,7 +38,7 @@ USAGE = {}
 
 def _png(fig):
     buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=110)
+    fig.savefig(buf, format="png", dpi=220)          # twice the resolution shown (780 px wide): sharp on all screens
     plt.close(fig)
     return buf.getvalue()
 

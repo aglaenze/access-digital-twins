@@ -14,6 +14,7 @@ ROOT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 sys.path.insert(0, ROOT)
 from nbfig import figure_cell, insert_after_mission  # noqa: E402
 from nbgen import distribute  # noqa: E402
+from page_texts import measurement_table, transmission_md  # noqa: E402
 
 # where the largest H-Fe-ox clast of the sample is (odin/samples/gen_nwa7034.py draws it at random): the sliders start
 # at its height, the texts say where to look (@Y1@: its height in mm, @WHERE@: "near the top"...)
@@ -34,13 +35,20 @@ md(r"""
 You are operating the ODIN imaging instrument at ESS. Behind this page, a simulation of the instrument produces your
 measurements, in the formats of the real instrument.
 
-**Your mission.** A request for the Neutron Solutions Team of ESS, where you are a trainee: it comes from the Mars
-team, planetary scientists with a collection of meteorites. The meteorite NWA 7034 ("Black Beauty"), found in the
-Sahara in 2011, is a piece of the Martian crust 4.4 billion years old, and it holds more water than any other Martian
-meteorite: about 6 000 ppm, bound in its minerals, a record of the water of early Mars. The team wants to know **where
-the water is**: spread evenly, or concentrated in some of the rock fragments (clasts) that make up the meteorite? A
-gram of it is worth more than a gram of gold: you must find out **without cutting it**, and tell the team how much
-water the richest regions hold (part 6).
+**Your mission.** A request for the Neutron Solutions Team of ESS, where you are a trainee, from the Mars team:
+planetary scientists who study the **water of early Mars**. Mars once had rivers and lakes; part of that water was
+taken into the rocks of the crust, bound in their minerals, and a rock keeps it for billions of years. The meteorite
+NWA 7034 ("Black Beauty"), found in the Sahara in 2011, is a piece of that crust, 4.4 billion years old, and the
+Martian meteorite richest in water: about 6 000 ppm.
+
+The team's question: **where is this water held?** Spread evenly in the whole rock, or concentrated in some of the
+rock fragments (clasts) that make it up? The two answers tell different stories: water spread everywhere points to
+the whole rock having been soaked; water held in a few clasts means these fragments carried it with them, a reservoir
+of their own, which counts in how much water the young crust of Mars could store. The team also wants to cut out a
+tiny grain of the richest clasts for a chemical analysis of its hydrogen: they need to know where these clasts are.
+
+A gram of the meteorite is worth more than a gram of gold: you must answer **without cutting it**. Find where the
+water is, and how much the richest regions hold (part 6).
 
 **The sample is real.** A piece of NWA 7034 of 12 × 8 × 2 mm³ was imaged with neutrons at the ICON instrument (PSI)
 and with X-rays at the ESRF by E. B. Naver, K. W. Nikolajsen *et al.*, *Direct detection of hydrogen reveals a new
@@ -138,12 +146,21 @@ are taken with a camera that integrates the light of a scintillator screen. Two 
 The blur comes mostly from the pinhole: seen from the camera, 5 cm behind the sample, the pinhole 10.5 m away makes
 each point of the sample a spot of size $l \cdot D / L$ (part 3 of the introduction to ODIN). The clasts you are
 looking for are 0.1 to 0.4 mm.
+""" + transmission_md("sample out: stage at 500 mm") + r"""
+**The measurements to take**, in this order (set the controls below, then *Take image*):
 
-**A. A first look** with the standard setup (10 s each): a **dark** (shutter closed: the signal of the camera without
-neutrons), an **open beam** (sample out: stage at 500 mm), then the **sample** at 0°.
+""" + measurement_table([
+    ("A1", "dark", "standard", "closed", "in", "10"),
+    ("A2", "open beam", "standard", "open", "out", "10"),
+    ("A3", "sample at 0°", "standard", "open", "in", "10"),
+    ("B1", "dark", "high resolution", "closed", "in", "300"),
+    ("B2", "open beam", "high resolution", "open", "out", "1500"),
+    ("B3", "sample at 0°", "high resolution", "open", "in", "300"),
+], ("Step", "Image", "Setup", "Shutter", "Sample", "Exposure (s)")) + r"""
 
-**B. The real measurement** with the high-resolution setup: dark **300 s**, open beam **1500 s**, sample **300 s**.
-The open beam is long on purpose: it divides every image, so its own noise would be printed on all of them (part 4).
+**A (A1 to A3) is a first look**, quick, with the standard setup. **B (B1 to B3) is the real measurement**, with
+the high-resolution setup. The open beam B2 is long on purpose: it divides every image, so its own noise would be
+printed on all of them (part 4). The title of each image is filled in for you if you leave it empty.
 """)
 
 code(r"""
@@ -478,7 +495,24 @@ The other phases (mineral and basaltic clasts, pores, a crack) follow the litera
 represented by an equivalent amount of water (NCrystal). The minerals are mixed at the scale of
 each region (no crystal, no Bragg edge). The camera is modeled by its mean signal, its noise and its blur.
 
-## 7. Your results
+## 7. Bonus round: for X-ray experts
+
+For those who know X-ray imaging or diffraction: click on the title below to open it.
+""")
+
+code(r"""
+from page_output import collapsed
+from IPython.display import Markdown
+with collapsed("Bonus round: for X-ray experts (click to open)"):
+    display(Markdown("You know X-ray imaging or diffraction? Then this round is for you: every question puts what you "
+                     "just did with neutrons next to what you would do with X-rays, with numbers. They count in your "
+                     "score like the others. Values used: neutrons from NCrystal, as in the twin; X-rays from the NIST "
+                     "tables (XCOM)."))
+    BONUS
+""")
+
+md(r"""
+## 8. Your results
 
 Your score on the questions of the page, and a report to download.
 """)
@@ -570,15 +604,8 @@ q.choice("**Your report to the Mars team.**",
 q.report()
 """)
 
-md(r"""
-### Bonus round: for X-ray experts
-
-You know X-ray imaging or diffraction? Then this round is for you: every question puts what you just did with neutrons
-next to what you would do with X-rays, with numbers. They count in your score like the others. Values used: neutrons
-from NCrystal, as in the twin; X-rays from the NIST tables (XCOM).
-""")
-
-code(r"""
+# the questions of the bonus round: put inside the folded section of part 7 (cell "BONUS", below)
+BONUS_SRC = r"""
 q.number("1 mm of water in the beam. With neutrons of 1.8 Å its attenuation coefficient is Σ = 3.6 cm⁻¹ (hydrogen); "
          "with X-rays of 60 keV, μ = 0.21 cm⁻¹. Which fraction of the **neutrons** does it remove, 1 − T (%)?",
          value=30.4, tol=1.5, unit="%",
@@ -657,10 +684,12 @@ q.choice("A colleague is thrilled: \"Then let's image at **8 Å** only: the clas
          explanation="What counts is the contrast compared with the noise, and the noise falls as 1/√N. From 5 to 8 Å the "
                      "contrast gains 25 %, but the neutrons become rare: the gain is eaten by the noise. The best choice "
                      "balances both, as you balance kV and flux with X-rays.", title="X6. The catch")
-""")
+"""
+_bonus = next(c for c in cells if c.cell_type == "code" and "    BONUS" in c.source)
+_bonus.source = _bonus.source.replace("    BONUS", "\n".join("    " + l if l else l for l in BONUS_SRC.strip().splitlines()))
 
 md(r"""
-## 8. Submit your work
+## 9. Submit your work
 
 When you are done, tell what you thought of the exercise and submit your work.
 """)

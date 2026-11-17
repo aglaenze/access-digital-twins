@@ -11,10 +11,14 @@ FIG = os.path.join(os.path.dirname(os.path.abspath(__file__)), "figures")
 
 
 def figure_cell(name, caption=""):
-    with open(os.path.join(FIG, name), "rb") as f:
+    """The figure figures/<name>; its SVG version if there is one (figures/<name>.svg next to the .png: drawn as
+    vectors, sharp at every size and on every screen; a PNG shown smaller than drawn looked blurred)."""
+    svg = os.path.join(FIG, os.path.splitext(name)[0] + ".svg")
+    path, mime = (svg, "image/svg+xml") if os.path.isfile(svg) else (os.path.join(FIG, name), "image/png")
+    with open(path, "rb") as f:
         data = base64.b64encode(f.read()).decode()
-    img = (f'<img src="data:image/png;base64,{data}" alt="{html.escape(caption or name)}" '
-           f'style="max-width: 100%; height: auto;">')
+    img = (f'<img src="data:{mime};base64,{data}" alt="{html.escape(caption or name)}" '
+           f'style="width: 100%; max-width: 1060px; height: auto;">')
     return nbf.v4.new_markdown_cell(img + (f"\n\n*{caption}*" if caption else ""))
 
 

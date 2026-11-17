@@ -15,6 +15,25 @@ from contextlib import contextmanager
 
 
 @contextmanager
+def collapsed(title):
+    """A section folded by default, opened by a click on its title (the bonus rounds): what the block prints and
+    displays (text, Markdown, questions) goes inside.
+
+        with collapsed("Bonus round: for X-ray experts"):
+            display(Markdown("..."))
+            q.number(...)
+    """
+    import ipywidgets as w
+    from IPython.display import display
+    out = w.Output()
+    with into(out):
+        yield
+    acc = w.Accordion(children=[out], selected_index=None)
+    acc.set_title(0, title)
+    display(acc.add_class("twin-collapsed"))
+
+
+@contextmanager
 def into(out):
     """Collects what is printed and displayed in the block (text first, then the figures) and puts it in `out`,
     even if the block fails (the error itself is raised as usual)."""

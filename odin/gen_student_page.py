@@ -9,6 +9,21 @@ import os
 import nbformat as nbf
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+import sys as _sys  # noqa: E402
+_sys.path.insert(0, os.path.dirname(HERE))
+from page_texts import measurement_table, transmission_md  # noqa: E402
+
+# why three measurements (page_texts), with the words of this page: an event detector (Timepix3), whose "dark"
+# background is gamma rays and fast neutrons, and runs normalized by the proton charge (part 3)
+TRANSMISSION = (transmission_md("shutter open, sample moved out of the beam: stage x = 500 mm", per_wavelength=True)
+                .replace("The camera does not measure", "The detector does not measure")
+                .replace("the camera gives a small signal even without neutrons (its offset and\n  noise), which must be "
+                         "taken away from the two others",
+                         "the detector still records a few counts (gamma rays, fast neutrons): a background, which "
+                         "must be\n  taken away from the two others")
+                .replace("with each image counted per second of exposure", "with each run divided by the proton "
+                         "charge it received (part 3)"))
+assert "gamma rays" in TRANSMISSION and "proton charge" in TRANSMISSION
 cells = []
 md = lambda s: cells.append(nbf.v4.new_markdown_cell(s.strip()))
 code = lambda s: cells.append(nbf.v4.new_code_cell(s.strip()))
@@ -30,10 +45,7 @@ instrument scientist of ODIN, has prepared the settings. Your job: measure the t
 of the neutron wavelength λ, find its Bragg edges, and give your verdict to Fyrø (part 4): α-iron or not, and with
 which lattice parameter?
 
-**You need three measurements**:
-1. the **dark** run: shutter closed. The detector still records a few counts (gamma rays, fast neutrons): the background;
-2. the **open beam**: shutter open, sample moved **out** of the beam (stage moved);
-3. the **sample**: shutter open, sample in the beam.
+**You need three measurements**: a dark run, an open beam and the sample (part 1 says why, and how to take them).
 """)
 
 code(r"""
@@ -64,8 +76,10 @@ import sample_library as sl
 from page_output import into
 import quiz
 q = quiz.Quiz("odin_iron_bsc")          # the questions, along the page
+_mounted = odin.status()["sample"]       # "none" in a new session: the iron plate of the exercise is proposed
 smp = w.Dropdown(options=[(odin.sample_spec(n).get("name", n), n) for n in odin.samples()],
-                 value=odin.status()["sample"], description="Sample", layout=w.Layout(width="420px"))
+                 value=_mounted if _mounted in odin.samples() else "iron_plate", description="Sample",
+                 layout=w.Layout(width="420px"))
 smp_out = w.Output()
 
 def show_sample(_=None):
@@ -91,14 +105,14 @@ can take a few minutes. The following ones are fast.
 **Chopper modes**: *WFM* (wavelength frame multiplication) cuts the long ESS pulse into short sub-pulses: good
 wavelength resolution; the separation δ of the two WFM discs sets the resolution. *Natural*: only the band-pass
 choppers turn: the resolution is set by the long ESS pulse (2.86 ms). *White*: no chopper at all.
-
+""" + TRANSMISSION + r"""
 **Your three measurements, setting by setting** (set the controls below, then click *Count*; one count per row):
 
-| Measurement | Choppers | Shutter | Pinhole D | Diffuser | Stage x (mm) | Time (s) | Title |
-|---|---|---|---|---|---|---|---|
-| 1. dark | WFM, δ = 0.30 m | **closed** | 3 cm | in | 0 | 30 | dark |
-| 2. open beam | WFM, δ = 0.30 m | **open** | 3 cm | in | **500** | 60 | open beam |
-| 3. sample | WFM, δ = 0.30 m | **open** | 3 cm | in | **0** | 60 | iron plate |
+""" + measurement_table([
+    ("1. dark", "WFM, δ = 0.30 m", "**closed**", "3 cm", "in", "0", "30", "dark"),
+    ("2. open beam", "WFM, δ = 0.30 m", "**open**", "3 cm", "in", "**500**", "60", "open beam"),
+    ("3. sample", "WFM, δ = 0.30 m", "**open**", "3 cm", "in", "**0**", "60", "iron plate"),
+], ("Measurement", "Choppers", "Shutter", "Pinhole D", "Diffuser", "Stage x (mm)", "Time (s)", "Title")) + r"""
 
 Only the shutter and the stage change from one row to the next (in bold). Why:
 - **choppers, pinhole and diffuser stay the same** for the three measurements: they set the beam (its wavelengths,
@@ -209,9 +223,9 @@ md(r"""
 
 For each pixel and each λ, the transmission is
 
-$$T = \frac{E - N}{O - N}$$
+$$T = \frac{I - D}{O - D}$$
 
-with $E$, $O$ and $N$ the counts of the sample, open-beam and dark runs. The dark run is first scaled to the duration
+with $I$, $O$ and $D$ the counts of the sample, open-beam and dark runs (part 1). The dark run is first scaled to the duration
 of each measurement and subtracted. Then each measurement is divided by the **proton charge** received by the target
 during the measurement (it is recorded in the file): the number of neutrons produced by the source is proportional to
 it, and the source power is never perfectly constant. The λ of each neutron is computed from its arrival time, with
@@ -374,8 +388,6 @@ import submit
 _ = submit.Submit("odin/exercises/iron_bragg_edges", "bsc", quiz=q)
 """)
 
-import sys as _sys
-_sys.path.insert(0, os.path.dirname(HERE))
 from nbfig import figure_cell, insert_after_mission
 from nbgen import distribute
 distribute(cells, [

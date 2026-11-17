@@ -12,6 +12,9 @@ import os
 import nbformat as nbf
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+import sys as _sys  # noqa: E402
+_sys.path.insert(0, os.path.dirname(HERE))
+from page_texts import measurement_table  # noqa: E402
 cells = []
 md = lambda s: cells.append(nbf.v4.new_markdown_cell(s.strip()))
 code = lambda s: cells.append(nbf.v4.new_code_cell(s.strip()))
@@ -57,14 +60,21 @@ loki = VirtualLoki(session=os.environ.get("LOKI_SESSION", "student"))
 md(r"""
 ## 1. Operate the instrument
 
+**Why an empty beam?** Most neutrons cross the sample without being scattered or absorbed. The fraction that crosses
+it, the **transmission**, is measured by the monitor behind the sample, compared with the monitor before it. The same ratio
+taken with nothing in the beam (the **empty beam**) is the reference: their quotient is the transmission of the
+sample, and of the solvent. The reduction needs both, to put the scattering in absolute units and to subtract the
+solvent correctly (part 3).
+
 **Your measurements, setting by setting** (set the controls below, then click *Count*):
 
-| Measurement | Sample | Main shutter | Fast shutter | Collimation | Pulse skipping | Detector distance | Time (s) |
-|---|---|---|---|---|---|---|---|
-| 1. empty beam | empty beam | open | open | 3m | off | 5 m | 60 |
-| 2. solvent | D2O | open | open | 3m | off | 5 m | 300 |
-| 3. sample | silica spheres | open | open | 3m | off | 5 m | 300 |
-| 4.-6. lower Q | the same three | open | open | **8m** | off | **10 m** | 60, 600, 600 |
+""" + measurement_table([
+    ("1. empty beam", "empty beam", "open", "open", "3m", "off", "5 m", "60"),
+    ("2. solvent", "D2O", "open", "open", "3m", "off", "5 m", "300"),
+    ("3. sample", "silica spheres", "open", "open", "3m", "off", "5 m", "300"),
+    ("4.-6. lower Q", "the same three", "open", "open", "**8m**", "off", "**10 m**", "60, 600, 600"),
+], ("Measurement", "Sample", "Main shutter", "Fast shutter", "Collimation", "Pulse skipping", "Detector distance",
+    "Time (s)")) + r"""
 
 Why:
 - **three measurements per configuration**, as in every SANS experiment: the **sample** (particles in D₂O, in a
@@ -393,7 +403,7 @@ q.report()
 """)
 
 md(r"""
-## Submit your work
+## 5. Submit your work
 
 When you are done, submit: the file for your teacher is made from your answers and your measurements.
 """)
@@ -403,8 +413,6 @@ import submit
 _ = submit.Submit("loki/exercises/silica_spheres", "bsc", quiz=q)
 """)
 
-import sys as _sys
-_sys.path.insert(0, os.path.dirname(HERE))
 from nbfig import figure_cell, insert_after_mission
 from nbgen import distribute
 distribute(cells, [

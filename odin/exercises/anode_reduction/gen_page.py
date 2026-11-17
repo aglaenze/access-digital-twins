@@ -13,6 +13,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 sys.path.insert(0, ROOT)
 from nbgen import distribute  # noqa: E402
+from page_texts import measurement_table, transmission_md  # noqa: E402
 
 cells = []
 md = lambda s: cells.append(nbf.v4.new_markdown_cell(s.strip()))
@@ -158,12 +159,16 @@ md(r"""
 Choose a holder, set the controls, then click *Measure*. The Timepix3 camera counts the neutrons of each pixel by
 wavelength (time of flight). The edges are only 1 to 3 % of the transmission, and a reduction degree to a few % needs
 the edge heights to a few thousandths: **one hour** for the open beam and for each holder.
+""" + transmission_md("the holder out of the field: stage x = 500 mm", per_wavelength=True) + r"""
+**The measurements to take**, in this order (set the controls below, then *Measure*):
 
-| Measurement | Shutter | Stage x (mm) | Time |
-|---|---|---|---|
-| 1. dark | **closed** | 0 | 1 min |
-| 2. open beam | **open** | **500** | **1 h** |
-| 3. each of the three holders | open | **0** | **1 h** |
+""" + measurement_table([
+    ("1", "dark", "(any)", "closed", "0", "1 min"),
+    ("2", "open beam", "(any: out of the beam)", "open", "500", "1 h"),
+    ("3", "standards", "standards 0 % and 52 %", "open", "0", "1 h"),
+    ("4", "standards", "standards 11 % and 92 %", "open", "0", "1 h"),
+    ("5", "loaded bar and reference", "reduced at 700 °C for 5 min: loaded and reference", "open", "0", "1 h"),
+], ("Step", "Image", "Holder", "Shutter", "Stage x (mm)", "Time")) + r"""
 
 Why these settings:
 - the **choppers** in WFM mode (discs 0.30 m apart) give a wavelength resolution of about 0.5 %: the edges of Ni(111)
@@ -267,8 +272,9 @@ display(listing)
 md(r"""
 ## 5. The edges of the standards, and the calibration
 
-For each bar, at each wavelength, the transmission is $T = (E - N)/(O - N)$ (sample, open beam and dark counts in the
-bar, the dark scaled to the duration, each measurement divided by its proton charge), and the attenuation coefficient
+For each bar, at each wavelength, the transmission is $T = (I - D)/(O - D)$ (part 3: sample, open beam and dark counts
+in the bar, the dark scaled to the duration, each measurement divided by its proton charge), and the attenuation
+coefficient
 $\Sigma = -\ln T / 0.09\ \text{cm}$. The **height of an edge** is the drop of $\Sigma$ across it: its mean just
 below the edge minus its mean just above (the shaded bands).
 

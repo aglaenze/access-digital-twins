@@ -13,6 +13,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 sys.path.insert(0, ROOT)
 from nbgen import distribute  # noqa: E402
+from page_texts import measurement_table, transmission_md  # noqa: E402
 
 cells = []
 md = lambda s: cells.append(nbf.v4.new_markdown_cell(s.strip()))
@@ -146,9 +147,15 @@ md(r"""
 
 The electrode is 0.4 mm thick: you need small pixels. ODIN is set for **white-beam imaging with the high-resolution
 camera** (512 × 512 pixels of 27.5 µm, pinhole 1 cm: blur about 0.05 mm), images of **60 s**.
+""" + transmission_md("the cell out: stage at 500 mm") + r"""
+**The measurements to take**, in this order (set the controls below, then click the button):
 
-1. a **dark** (shutter closed) and an **open beam** (cell out: stage at 500 mm), 60 s each;
-2. *Film the cycle*: one image every Δt of the cycle, from the pristine cell (0 h) to the end (55 h).
+""" + measurement_table([
+    ("1", "dark", "closed", "in", "*Take image (60 s)*", "60 s"),
+    ("2", "open beam", "open", "out", "*Take image (60 s)*", "60 s"),
+    ("3", "the cell during the cycle: one image every Δt, from the pristine cell (0 h) to the end (55 h)",
+     "open", "in", "*Film the cycle* (Δt: every 2.5 h is a good choice; every 5 h or every hour also work)", "60 s each"),
+], ("Step", "Image", "Shutter", "Cell", "Button", "Exposure")) + r"""
 
 A cycle lasts 55 hours; an image, one minute: the process is slow compared with the measurement, so each image is a
 snapshot. Strobl *et al.* summed 15 minutes per image at SENJU. (The twin computes each image in a few seconds.)
@@ -269,9 +276,9 @@ The image of the pristine cell (0 h) holds everything that does not change: the 
 the graphite. Dividing an image by it keeps only what changed. Averaged over the middle of the cell ($x$ from −2.75
 to 2.75 mm), for each row $y$:
 
-$$\Delta\mu(y, t) = -\frac{1}{D}\,\ln\frac{T(y, t)}{T(y, 0)}, \qquad D = 1.6\ \text{cm}$$
+$$\Delta\mu(y, t) = -\frac{1}{L}\,\ln\frac{T(y, t)}{T(y, 0)}, \qquad L = 1.6\ \text{cm (the 16 mm crossed)}$$
 
-($T$: the transmission, image minus dark over open beam minus dark): the change of the attenuation coefficient, the
+($T = (I - D)/(O - D)$: the transmission of part 3): the change of the attenuation coefficient, the
 lithium that came in. Move the slider through the times you measured.
 """)
 

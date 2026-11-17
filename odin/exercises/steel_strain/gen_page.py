@@ -14,6 +14,7 @@ ROOT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 sys.path.insert(0, ROOT)
 from nbfig import figure_cell, insert_after_mission  # noqa: E402
 from nbgen import distribute  # noqa: E402
+from page_texts import transmission_md  # noqa: E402
 
 cells = []
 md = lambda s: cells.append(nbf.v4.new_markdown_cell(s.strip()))
@@ -108,10 +109,11 @@ display(smp_out)
 
 md(r"""
 ## 1. Operate the instrument
-
-Set the controls, then click *Count*: the detector image and the spectrum of arrival times fill up during the count,
-as on the instrument. A strain of $10^{-3}$ moves the edge by only 0.004 Å, so you need many neutrons: **repeat** each
-measurement of the specimen and of the open beam **4 times** (60 s each); the analysis adds up the repeated counts.
+""" + transmission_md("stage at 500 mm: the specimen and its load frame out of the field", per_wavelength=True) + r"""
+**The measurements to take.** Set the controls, then click *Count*: the detector image and the spectrum of arrival
+times fill up during the count, as on the instrument. A strain of $10^{-3}$ moves the edge by only 0.004 Å, so you need
+many neutrons: **repeat** each measurement of the specimen and of the open beam **4 times** (60 s each); the analysis
+adds up the repeated counts.
 
 | Measurement | Shutter | Stage x (mm) | Load | Time (s) | Repeat |
 |---|---|---|---|---|---|
@@ -222,13 +224,10 @@ display(listing)
 md(r"""
 ## 3. The edge, without and with load
 
-For each wavelength, the transmission of a region of the specimen is
-
-$$T = \frac{E - N}{O - N}$$
-
-with $E$, $O$ and $N$ the counts of the specimen, open-beam and dark runs in that region (all the repeated counts
-added; the dark is scaled to the duration of each measurement, and each measurement is divided by the proton charge
-received by the target).
+For each wavelength, the transmission of a region of the specimen is $T = (I - D)/(O - D)$ (part 1), with $I$, $O$
+and $D$ the counts of the specimen, open-beam and dark runs in that region (all the repeated counts added; the dark is
+scaled to the duration of each measurement, and each measurement is divided by the proton charge received by the
+target).
 
 *Fit the edge* draws the transmission of a region without load and under the largest load, around the last Bragg edge
 of this steel, that of the (111) planes, near 4.16 Å. The edge is not a sharp step: the wavelength resolution of the
@@ -382,7 +381,24 @@ display(w.VBox([button_line, out_line]))
 """)
 
 md(r"""
-## 6. Your results
+## 6. Bonus round: for X-ray experts
+
+For those who know X-ray imaging or diffraction: click on the title below to open it.
+""")
+
+code(r"""
+from page_output import collapsed
+from IPython.display import Markdown
+with collapsed("Bonus round: for X-ray experts (click to open)"):
+    display(Markdown("You know X-ray imaging or diffraction? Then this round is for you: every question puts what you "
+                     "just did with neutrons next to what you would do with X-rays, with numbers. They count in your "
+                     "score like the others. Values used: neutrons from NCrystal, as in the twin; X-rays from the NIST "
+                     "tables (XCOM)."))
+    BONUS
+""")
+
+md(r"""
+## 7. Your results
 
 Your score on the questions of the page, and a report to download.
 """)
@@ -497,15 +513,8 @@ q.choice("**Your verdict for Fyrø.** What do your measurements show?",
 q.report()
 """)
 
-md(r"""
-### Bonus round: for X-ray experts
-
-You know X-ray imaging or diffraction? Then this round is for you: every question puts what you just did with neutrons
-next to what you would do with X-rays, with numbers. They count in your score like the others. Values used: neutrons
-from NCrystal, as in the twin; X-rays from the NIST tables (XCOM).
-""")
-
-code(r"""
+# the questions of the bonus round: put inside the folded section of part 6 (cell "BONUS", below)
+BONUS_SRC = r"""
 q.number("The (111) edge of the specimen is at 4.163 Å (part 3), so d₁₁₁ = 2.0815 Å. At which angle 2θ would a laboratory "
          "X-ray diffractometer (Cu Kα, 1.5406 Å) see the same (111) reflection (°)?",
          value=43.44, tol=0.05, unit="°",
@@ -558,10 +567,12 @@ q.number("**Stopwatch challenge.** An X-ray diffractometer measures d with an an
                      "0.2 % of the flight time, about 130 µs, and the fit of the whole edge (Q7) finds a 56 µs shift in it. "
                      "Energy-dispersive X-ray diffraction does the same with the energy of the photons, at a fixed angle.",
          title="X4. Stopwatch challenge")
-""")
+"""
+_bonus = next(c for c in cells if c.cell_type == "code" and "    BONUS" in c.source)
+_bonus.source = _bonus.source.replace("    BONUS", "\n".join("    " + l if l else l for l in BONUS_SRC.strip().splitlines()))
 
 md(r"""
-## 7. Submit your work
+## 8. Submit your work
 
 When you are done, tell what you thought of the exercise and submit your work.
 """)
