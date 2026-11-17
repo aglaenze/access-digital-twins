@@ -25,7 +25,9 @@ window.MathJax = {
         onerror="var s = document.createElement('script'); s.async = true; s.src = 'https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg-full.js'; document.head.appendChild(s);"></script>
 {#- the look of the app (fonts, colors, buttons, questions): static/twin.css -#}
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap">
-<link rel="stylesheet" href="{{ resources.base_url }}voila/templates/twin/static/twin.css">
+{#- ?v=...: a new address at each page, so that a browser (the app's above all) never keeps an old twin.css: the server
+    sends it without a cache rule, and the app went on showing the old look after a change -#}
+<link rel="stylesheet" href="{{ resources.base_url }}voila/templates/twin/static/twin.css?v={{ range(1, 1000000000) | random }}">
 {#- the online version (pages opened from the start page, "?sid=..."): a bar at the top to go back to the missions,
     as the tabs of the app. In the app (no sid) nothing changes. -#}
 <script>

@@ -696,7 +696,8 @@ function openTab(url, kind, label, { clean = false } = {}) {
       // the look of the app on the notebooks too (the questions, Submit, the buttons): the stylesheet of the pages
       view.executeJavaScript(`(() => { if (document.getElementById("twin-css")) return;
         const l = document.createElement("link"); l.id = "twin-css"; l.rel = "stylesheet";
-        l.href = "${server.base}/voila/templates/twin/static/twin.css"; document.head.append(l); })()`).catch(() => {});
+        l.href = "${server.base}/voila/templates/twin/static/twin.css?v=" + Date.now();      // (never an old copy)
+        document.head.append(l); })()`).catch(() => {});
       applyView(t);
       // a locked text cell stays rendered: no raw markdown on a double click or on Enter (it could not be changed anyway)
       view.executeJavaScript(`(() => { if (window.__twinKeepRendered) return; window.__twinKeepRendered = true;
