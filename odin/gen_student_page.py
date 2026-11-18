@@ -11,7 +11,7 @@ import nbformat as nbf
 HERE = os.path.dirname(os.path.abspath(__file__))
 import sys as _sys  # noqa: E402
 _sys.path.insert(0, os.path.dirname(HERE))
-from page_texts import measurement_table, transmission_md  # noqa: E402
+from page_texts import insert_bragg_edges, measurement_table, transmission_md  # noqa: E402
 
 # why three measurements (page_texts), with the words of this page: an event detector (Timepix3), whose "dark"
 # background is gamma rays and fast neutrons, and runs normalized by the proton charge (part 3)
@@ -410,6 +410,7 @@ distribute(cells, [
     ("button_red.on_click(reduce_runs)", [1, 2, 3, 6, 7, 4]),   # the edges, the lattice, counting, resolution, verdict
 ])
 insert_after_mission(cells, figure_cell('iron_structures.png', 'What you have to decide: α-iron (left) or γ-iron (middle)? Each structure has its own atomic planes, hence its own Bragg edges (right).'))
+insert_bragg_edges(cells, '**You need three measurements**')     # what a Bragg edge is (page_texts.py), with its figure
 nb = nbf.v4.new_notebook()
 nb["cells"] = cells
 nb["metadata"]["kernelspec"] = {"name": "python3", "display_name": "Python 3", "language": "python"}

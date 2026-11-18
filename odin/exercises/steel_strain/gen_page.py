@@ -14,7 +14,7 @@ ROOT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 sys.path.insert(0, ROOT)
 from nbfig import figure_cell, insert_after_mission  # noqa: E402
 from nbgen import distribute  # noqa: E402
-from page_texts import transmission_md  # noqa: E402
+from page_texts import insert_bragg_edges, transmission_md  # noqa: E402
 
 cells = []
 md = lambda s: cells.append(nbf.v4.new_markdown_cell(s.strip()))
@@ -48,9 +48,8 @@ Methods A 839, 102, 2016), without load and under 600 MPa. Its data are public (
 twin uses that specimen: its shape, its steel, its load. V20 needed **25 and 48 hours** of measurement to see the
 strain; you will see how long ODIN needs.
 
-**What you will measure.** A Bragg edge is the wavelength beyond which a family of planes can no longer scatter the
-neutrons: $\lambda_\text{edge} = 2d$, with $d$ the distance between the planes. At the edge the neutrons are scattered
-straight back, so the planes that count are those **facing the beam**. Under load $d$ becomes $d\,(1+\varepsilon)$,
+**What you will measure.** At the edge, $\lambda_\text{edge} = 2d$, the neutrons are scattered straight back
+($\theta$ = 90°), so the planes that count are those **facing the beam**. Under load $d$ becomes $d\,(1+\varepsilon)$,
 and the edge moves from $\lambda_0$ to $\lambda$:
 
 $$\varepsilon = \frac{\lambda - \lambda_0}{\lambda_0}$$
@@ -726,6 +725,7 @@ insert_after_mission(cells, figure_cell(
     "steel_strain.png", "The specimen in its load frame as the camera sees it (left); pulled along the force, the steel "
     "gets thinner across it, and the planes facing the beam move closer (middle); the Bragg edge of these planes moves "
     "to a shorter wavelength (right)."))
+insert_bragg_edges(cells, '**What you will measure.**')     # what a Bragg edge is (page_texts.py), with its figure
 nb = nbf.v4.new_notebook()
 nb["cells"] = cells
 nb["metadata"]["kernelspec"] = {"name": "python3", "display_name": "Python 3", "language": "python"}

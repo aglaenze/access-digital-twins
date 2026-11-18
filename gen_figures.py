@@ -274,6 +274,59 @@ def steel_lattice():
     plt.close(fig)
 
 
+def bragg_edge_explained():
+    """What a Bragg edge is. Left: planes d apart reflect a wave when λ = 2d sin θ; the longer λ, the larger θ, up to
+    θ = 90° (straight back) at λ = 2d; beyond, no reflection. Right: the transmission of 1 cm of α-iron against λ
+    (NCrystal, scattering + absorption): below 2d grains well oriented scatter neutrons out of the beam, above 2d none
+    can: the transmission jumps. Last edge: (110) planes, d = 2.027 Å, edge at 4.05 Å."""
+    import NCrystal as NC
+    from matplotlib.patches import FancyArrowPatch
+    cfg = "stdlib::Fe_sg229_Iron-alpha.ncmat"
+    info, sc, ab = NC.createInfo(cfg), NC.createScatter(cfg), NC.createAbsorption(cfg)
+    lam = np.linspace(1.0, 6.0, 1200)
+    e = NC.wl2ekin(lam)
+    sig = sc.xsect(ekin=e) + ab.xsect(ekin=e)                    # barn per atom
+    T = np.exp(-info.numberdensity * sig * 1.0)                    # 1 cm: n [Å⁻³] × σ [barn] = cm⁻¹ (1e24 × 1e-24)
+    fig = plt.figure(figsize=(10.6, 4.4))
+    # left: Bragg's law, three wavelengths
+    ax = fig.add_axes([0.02, 0.06, 0.40, 0.84])
+    for y in (0.0, -0.9, -1.8):
+        ax.plot([-2.2, 2.2], [y, y], color=GREY, lw=2)
+        ax.plot(np.linspace(-2, 2, 9), np.full(9, y), "o", color=INK, ms=5)
+    ax.annotate("", (2.45, -0.9), (2.45, 0.0), arrowprops=dict(arrowstyle="<->", color=INK))
+    ax.text(2.55, -0.45, "d", fontsize=13, color=INK, va="center", fontweight="bold")
+    for th, c, lab in ((25, TEAL, "short λ: small θ"), (60, ORANGE, "longer λ: larger θ"),
+                       (88, RED, "λ = 2d: θ = 90°,\nstraight back")):
+        t = np.radians(th)
+        x0, y0 = -1.9 * np.cos(t), 1.9 * np.sin(t)
+        ax.add_patch(FancyArrowPatch((x0, y0), (0, 0.02), arrowstyle="-|>", mutation_scale=14, color=c, lw=2))
+        x1 = -x0 if th < 85 else 0.12
+        ax.add_patch(FancyArrowPatch((0, 0.02), (x1, y0), arrowstyle="-|>", mutation_scale=14, color=c, lw=2, ls="--"))
+        if th < 85:                                         # at the reflected wave
+            ax.text(x1 + 0.15, y0, lab, fontsize=11, color=c, ha="left", va="center")
+        else:                                               # straight up: on the left, clear of the others
+            ax.text(-0.3, y0 + 0.25, lab, fontsize=11, color=c, ha="right", va="center")
+    ax.text(0.6, -2.45, "Bragg's law: λ = 2d sin θ, and sin θ ≤ 1:\nno reflection at all when λ > 2d",
+            ha="center", va="top", fontsize=11.5, color=INK)
+    ax.set_xlim(-2.6, 4.4); ax.set_ylim(-3.2, 2.6); ax.axis("off")
+    ax.set_title("A family of planes reflects up to λ = 2d", fontsize=12.5, fontweight="bold", color=INK)
+    # right: transmission of α-iron
+    b = fig.add_axes([0.53, 0.15, 0.44, 0.72])
+    b.plot(lam, T, color=TEAL, lw=2)
+    b.axvline(4.054, color=RED, lw=1.2, ls="--")
+    b.annotate("Bragg edge of the (110) planes:\nλ = 2d = 2 × 2.027 Å = 4.05 Å", (4.054, 0.45), (1.15, 0.66),
+               fontsize=11, color=RED, arrowprops=dict(arrowstyle="->", color=RED))
+    b.text(3.0, 0.08, "some grains scatter\nneutrons out of the beam", fontsize=10.5, color=INK, ha="center")
+    b.text(5.05, 0.70, "no grain can\nscatter any more", fontsize=10.5, color=INK, ha="center")
+    b.set(xlabel="wavelength λ (Å)", ylabel="transmission T", xlim=(1.0, 6.0), ylim=(0, 0.85))
+    b.set_title("Transmission of 1 cm of α-iron (NCrystal)", fontsize=12.5, fontweight="bold", color=INK)
+    b.grid(alpha=0.3)
+    for s in ("top", "right"):
+        b.spines[s].set_visible(False)
+    _save(fig, "bragg_edge_explained.png")
+    plt.close(fig)
+
+
 def meteorite_tomography():
     """Top view of one horizontal slice of the piece of NWA 7034 (8 mm across, 2 mm along the beam at 0°, as in the
     twin): two H-rich clasts one behind the other make one peak; turned by 60° they make two; back-projecting the
@@ -359,5 +412,6 @@ if __name__ == "__main__":
     sans()
     steel_strain()
     steel_lattice()
+    bragg_edge_explained()
     meteorite_tomography()
     print("written", OUT)

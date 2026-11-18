@@ -13,7 +13,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 sys.path.insert(0, ROOT)
 from nbgen import distribute  # noqa: E402
-from page_texts import measurement_table, transmission_md  # noqa: E402
+from page_texts import insert_bragg_edges, measurement_table, transmission_md  # noqa: E402
 
 cells = []
 md = lambda s: cells.append(nbf.v4.new_markdown_cell(s.strip()))
@@ -485,6 +485,7 @@ distribute(cells, [
     ("display(w.VBox([button_r, out_r]))", [3, 4, 5, 6]),
     ("display(w.VBox([button_map, out_map]))", [7, 8]),
 ])
+insert_bragg_edges(cells, '**Questions along the page**')     # what a Bragg edge is (page_texts.py), with its figure
 nb = nbf.v4.new_notebook()
 nb["cells"] = cells
 nb["metadata"]["kernelspec"] = {"name": "python3", "display_name": "Python 3", "language": "python"}
