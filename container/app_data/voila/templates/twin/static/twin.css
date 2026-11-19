@@ -100,6 +100,23 @@ div:has(> .jp-Cell .twin-gate) ~ div:has(> .jp-Cell) { display: none !important;
   border: 1px solid var(--tw-teal); border-radius: 10px; padding: 10px 14px; cursor: pointer; }
 .twin-collapsed .jupyter-widget-Collapse-contents, .twin-collapsed .p-Collapse-contents, .twin-collapsed .lm-Collapse-contents {
   border: 0; padding: 6px 0 0 0; background: transparent; }
+/* open: the title and the content in one frame (ipywidgets removes the bottom border of an open title: the rounded
+   corners then hung in the air) */
+.twin-collapsed .jupyter-widget-Collapse-open > .jupyter-widget-Collapse-header,
+.twin-collapsed .p-Collapse-open > .p-Collapse-header, .twin-collapsed .lm-Collapse-open > .lm-Collapse-header {
+  border: 1px solid var(--tw-teal) !important; border-radius: 10px 10px 0 0 !important; color: var(--tw-teal-d);
+  background: var(--tw-teal-l) !important; cursor: pointer; }
+.twin-collapsed .jupyter-widget-Collapse-open > .jupyter-widget-Collapse-contents,
+.twin-collapsed .p-Collapse-open > .p-Collapse-contents, .twin-collapsed .lm-Collapse-open > .lm-Collapse-contents {
+  border: 1px solid var(--tw-teal) !important; border-top: 0 !important; border-radius: 0 0 10px 10px;
+  padding: 8px 18px 12px !important; background: #fff; }
+
+/* a picture never wider than the page (live_view.FigureImage gives its width in pixels: a figure a little wider than
+   the column made a horizontal scroll bar appear) */
+.widget-image { max-width: calc(100% - 2 * var(--jp-widgets-margin, 2px)) !important; height: auto !important;
+  object-fit: contain; }
+.jp-OutputArea-output .widget-vbox, .jp-OutputArea-output .widget-hbox { max-width: 100%; }
+.jp-OutputArea-output .widget-vbox { overflow-x: hidden !important; }
 
 /* the online version: the bar at the top of a page, back to the missions */
 .twin-webbar { position: sticky; top: 0; z-index: 1000; display: flex; align-items: center; gap: 16px;

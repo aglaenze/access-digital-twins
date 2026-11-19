@@ -170,14 +170,54 @@ def histograms(file, lam, roi, n_pixels=64, wavelength_from=None):
     return dict(image=image, spectrum=spectrum, duration=duration(file), charge=proton_charge(file))
 
 
+_PREPARED = {}           # (file, its time, arguments) -> Future of histograms(): see prepare()
+_POOL = []
+
+
+def _key(file, lam, roi, n_pixels, wavelength_from):
+    import os
+    lam_k = None if lam is None else (float(lam.values[0]), float(lam.values[-1]), len(lam), str(lam.unit))
+    return (os.path.abspath(file), os.path.getmtime(file), lam_k, tuple(roi), n_pixels, wavelength_from)
+
+
+def prepare(file, lam=None, roi=(-3, 3, -3, 3), n_pixels=64, wavelength_from=None):
+    """Starts the reduction of one file in the background, as soon as it is written (the live reduction of ESS also
+    works while the instrument counts): reduce() with the same arguments then finds its histograms ready instead of
+    reading the millions of events again. One file at a time (one background thread): little memory taken."""
+    from concurrent.futures import ThreadPoolExecutor
+    if lam is None:
+        lam = sc.linspace("wavelength", 1.0, 9.0, 201, unit="angstrom")
+    key = _key(file, lam, roi, n_pixels, wavelength_from)
+    if key not in _PREPARED:
+        if not _POOL:
+            _POOL.append(ThreadPoolExecutor(max_workers=1, thread_name_prefix="reduce"))
+        if len(_PREPARED) > 12:                    # the oldest ones go
+            for k in list(_PREPARED)[:len(_PREPARED) - 12]:
+                _PREPARED.pop(k, None)
+        _PREPARED[key] = _POOL[0].submit(histograms, file, lam, roi, n_pixels, wavelength_from)
+    return _PREPARED[key]
+
+
+def _histograms(file, lam, roi, n_pixels, wavelength_from):
+    """histograms(), taken from prepare() when it was started for this file (waits for it to finish)."""
+    fut = _PREPARED.get(_key(file, lam, roi, n_pixels, wavelength_from))
+    if fut is not None:
+        try:
+            return fut.result()
+        except Exception:
+            pass                                    # it failed in the background: again here, to see the error
+    return histograms(file, lam, roi, n_pixels, wavelength_from)
+
+
 def reduce(sample, open_beam, dark=None, lam=None, roi=(-3, 3, -3, 3), n_pixels=64, normalization="charge",
            wavelength_from=None):
     """Transmission: image (all λ) and spectrum T(λ) in roi. normalization: "charge" or "duration";
-    wavelength_from: "simulation" (default, WAVELENGTH_FROM) or "analytical" (essimaging default)."""
+    wavelength_from: "simulation" (default, WAVELENGTH_FROM) or "analytical" (essimaging default).
+    The files given to prepare() before (same arguments) are not read again."""
     if lam is None:
         lam = sc.linspace("wavelength", 1.0, 9.0, 201, unit="angstrom")
-    H = {k: histograms(f, lam, roi, n_pixels, wavelength_from) for k, f in (("E", sample), ("O", open_beam), ("N", dark))
-         if f is not None}
+    H = {k: _histograms(f, lam, roi, n_pixels, wavelength_from)
+         for k, f in (("E", sample), ("O", open_beam), ("N", dark)) if f is not None}
     out = {}
     for what in ("image", "spectrum"):
         res = {}

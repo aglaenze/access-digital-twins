@@ -46,6 +46,15 @@ class _ThreadStdout(io.TextIOBase):
         return getattr(self.base, name)
 
 
+_AFTER = []
+
+
+def after_each(fn):
+    """fn() is called after every measurement of the page (stopped or not): the lists of files refresh themselves
+    (analysis_chain.file_viewer)."""
+    _AFTER.append(fn)
+
+
 def _router():
     if not isinstance(sys.stdout, _ThreadStdout):
         sys.stdout = _ThreadStdout(sys.stdout)
@@ -163,5 +172,10 @@ class Control:
                     c.disabled = was
                 self.stop.layout.display = "none"
                 self.running = False
+                for f in _AFTER:
+                    try:
+                        f()
+                    except Exception:
+                        pass
 
         threading.Thread(target=work, daemon=True).start()

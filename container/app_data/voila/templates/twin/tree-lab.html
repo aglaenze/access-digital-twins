@@ -59,6 +59,14 @@
     .note { margin-top: 34px; padding: 16px 18px; border-radius: 14px; border: 1px dashed var(--line); color: var(--mute);
             font-size: 14px; line-height: 1.55; }
     .note b { color: var(--ink); }
+    /* shown at once when Start is clicked, until the page arrives (the server starts its kernel first) */
+    #loading { position: fixed; inset: 0; z-index: 10; display: none; place-items: center; background: rgba(11,22,38,.92); }
+    #loading.on { display: grid; }
+    #loading .box { text-align: center; color: var(--ink); font-size: 18px; font-weight: 600; line-height: 1.6; }
+    #loading .box small { display: block; color: var(--mute); font-weight: 500; font-size: 14px; }
+    #loading .spin { width: 54px; height: 54px; margin: 0 auto 18px; border-radius: 50%; border: 4px solid var(--line);
+                     border-top-color: var(--teal); animation: spin 0.9s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
     @media (max-width: 640px) { .hero { grid-template-columns: 1fr; } .emblem { display: none; } main { padding-top: 22px; } }
   </style>
 </head>
@@ -106,6 +114,8 @@
       submit your work. A page takes a few seconds to open (up to a minute when many open at once); a measurement may
       wait for its turn on the server: the page tells you.</div>
   </main>
+  <div id="loading" role="status" aria-live="polite"><div class="box"><div class="spin"></div>Loading the instrument…
+    <small>The page takes a few seconds to open (up to a minute when many open at once).</small></div></div>
   <script>
     function sid() {
       var s = null;
@@ -135,10 +145,13 @@
       }
       card.querySelector(".go").addEventListener("click", function () {
         opened(page, true);
+        document.getElementById("loading").classList.add("on");
         // in this same tab (the bar "Missions" of the page comes back here)
         window.location.href = "{{ base_url }}voila/render/" + page + "?sid=" + sid();
       });
     });
+    // back to this page from the mission (the browser may show it from its cache): no loading screen
+    window.addEventListener("pageshow", function () { document.getElementById("loading").classList.remove("on"); });
   </script>
 </body>
 </html>

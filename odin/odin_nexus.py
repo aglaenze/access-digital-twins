@@ -271,6 +271,23 @@ def chopper_settings(mode, wfm_delta=0.30):
 
 
 # --------------------------------------------------------------------------- writing
+def _bin_index(edges, v):
+    """Index of the bin of each value (searchsorted(edges, v) - 1; -1 or len(edges) - 1 outside): by arithmetic when
+    the bins are regular, as the pixels of a camera (10 times quicker for millions of neutrons)."""
+    edges, v = np.asarray(edges, float), np.asarray(v, float)
+    d = np.diff(edges)
+    n = len(edges) - 1
+    if n > 0 and np.allclose(d, d[0], rtol=1e-9, atol=0) and not np.isnan(v).any():
+        i = np.clip(np.floor((v - edges[0]) / d[0]), 0, n - 1).astype(np.int64)
+        # as searchsorted (side left): bin i holds edges[i] < v <= edges[i + 1] (corrects the rounding at the edges)
+        i -= (v <= edges[i]) & (i > 0)
+        i += (v > edges[i + 1]) & (i < n - 1)
+        i[v <= edges[0]] = -1
+        i[v > edges[-1]] = n
+        return i
+    return np.searchsorted(edges, v) - 1
+
+
 def write_nexus(counts, out_file, t_exp, start=None, det_dist=0.05, title="ODIN digital twin", sample_name="",
                 settings=None, template=None, charge=None, pulses_per_frame=2):
     """Writes an ODIN NeXus file (ESS format) containing the measured counts.
@@ -292,8 +309,7 @@ def write_nexus(counts, out_file, t_exp, start=None, det_dist=0.05, title="ODIN 
     start = start or _dt.datetime.now(_dt.timezone.utc).replace(microsecond=0)
     t0_ns = int(start.timestamp() * 1e9)
     ex, ey, num = detector_geometry(template)
-    ix = np.searchsorted(ex, counts["x"]) - 1
-    iy = np.searchsorted(ey, counts["y"]) - 1
+    ix, iy = _bin_index(ex, counts["x"]), _bin_index(ey, counts["y"])
     ok = (ix >= 0) & (ix < len(ex) - 1) & (iy >= 0) & (iy < len(ey) - 1)
     rng = np.random.default_rng(int(t0_ns % 2**32))
     ppf = int(pulses_per_frame)
@@ -303,15 +319,21 @@ def write_nexus(counts, out_file, t_exp, start=None, det_dist=0.05, title="ODIN 
     else:
         # Beam neutrons follow the charge of the pulse that produced them (pulse ppf·c of frame c; with the band-pass
         # choppers, the other one is stopped); the background (λ = NaN) is spread uniformly.
+        # (how many neutrons each frame gets: one multinomial draw, then shuffled among the neutrons: the same law as
+        # drawing a frame for each neutron, several times faster)
         qf = np.asarray(charge, float)[0:ppf * n_frames:ppf]
         bkg = np.isnan(counts["lam"][ok])
         frame = np.empty(ok.sum(), dtype=np.int64)
         frame[bkg] = rng.integers(0, n_frames, bkg.sum())
-        frame[~bkg] = rng.choice(n_frames, size=(~bkg).sum(), p=qf / qf.sum()) if qf.sum() > 0 else 0
+        n_beam = int((~bkg).sum())
+        if qf.sum() > 0:
+            frame[~bkg] = rng.permutation(np.repeat(np.arange(n_frames), rng.multinomial(n_beam, qf / qf.sum())))
+        else:
+            frame[~bkg] = 0
     t_abs_ns = frame * (ppf * 1e9 / PULSE_HZ) + counts["t"][ok] * 1e9
     period_ns = 1e9 / PULSE_HZ
     k = np.floor(t_abs_ns / period_ns).astype(np.int64)
-    order = np.argsort(t_abs_ns, kind="stable")
+    order = np.argsort(t_abs_ns)               # (equal times: any order; quicker than a stable sort)
     k = k[order]
     # whole nanoseconds after the pulse time written in event_time_zero (rounded to the ns too), as at ESS (ev44:
     # int32 ns): the files of the ESS file-writer then hold exactly the same numbers

@@ -159,8 +159,8 @@ after each pulse (the time of flight: the slow neutrons, of long wavelength, arr
 | 3 | sample | open | in | 2 s |
 
 Two seconds are enough here: some 5 million neutrons reach the camera. A count lasts its counting time, as on the
-instrument, plus the time the twin needs to draw these neutrons one by one and write them to the file (10 to 20 s;
-on the real instrument the file is written while counting). *Stop* cancels a count: nothing of it is recorded.
+instrument, plus the time the twin needs to draw these neutrons one by one and write them, one event each, to the
+file (10 to 25 s in all; on the real instrument the file is written while counting). *Stop* cancels a count: nothing of it is recorded.
 """)
 
 code(r"""
@@ -190,6 +190,8 @@ def count(_):
         live.done(f)
         print(f"Written: {os.path.basename(f)} ({name}, {odin.last_n_counts:,} neutrons). Taken so far: "
               + ", ".join(x for x in ("dark", "open", "sample") if x in TPX) + ".")
+        import odin_reduction
+        odin_reduction.prepare(f, n_pixels=128)       # its reduction starts now, in the background (part 2)
     except Cancelled:
         pass
     except Exception as e:
@@ -224,7 +226,9 @@ Your three files hold **events** (one per neutron: its pixel, its pulse, its tim
    written in the file: it sets how many neutrons were made) and subtract the dark, scaled to its duration;
 5. **divide** by the open beam: $T = (S - D)/(O - D)$, with its uncertainty from the counting noise.
 
-This takes 10 to 30 seconds (some 10 million neutrons, one by one). The rest of the page appears when it is done.
+Reading some 10 million neutrons one by one takes time, so, as the live reduction of ESS does during a measurement,
+each file started to be reduced in the background as soon as it was written: *Reduce* then takes a few seconds (up
+to half a minute if you click right after your last count). The rest of the page appears when it is done.
 """)
 
 code(r"""
@@ -306,6 +310,23 @@ code(r"""
 button_tomo = w.Button(description="Run the tomography", button_style="primary", icon="sync", layout=w.Layout(width="auto"))
 bar = viz.Progress(60, "Images")
 REC = {}
+# while it runs: the last projection (transmission) and the sinogram of the orange row filling up, angle by angle;
+# small images made directly from the arrays (a few ms each: the simulation is not slowed down)
+proj_img = w.Image(format="png", layout=w.Layout(width="330px"))
+sino_img = w.Image(format="png", layout=w.Layout(width="330px"))
+proj_txt = w.HTML()
+tomo_view = w.VBox([proj_txt, w.HBox([proj_img, sino_img], layout=w.Layout(gap="24px"))],
+                   layout=w.Layout(display="none"))
+
+def _png(a, lo, hi, size=None):
+    import io
+    from PIL import Image
+    u8 = (np.clip((np.nan_to_num(a) - lo) / (hi - lo), 0, 1) * 255).astype(np.uint8)
+    im = Image.fromarray(u8[::-1])                                       # row 0 at the bottom
+    if size:
+        im = im.resize(size, Image.NEAREST)
+    b = io.BytesIO(); im.save(b, format="PNG", compress_level=1)
+    return b.getvalue()
 
 def run_tomo(_):
     try:
@@ -313,12 +334,31 @@ def run_tomo(_):
         print("The camera's dark and open beam...")
         odin.move(shutter="closed", stage_x=0.0)
         cam_dark = odin.camera(300.0, title="camera dark (tomography)", pixels=PX)
+        D = odin.last_image.astype(float)
         odin.move(shutter="open", stage_x=0.5)
         cam_open = odin.camera(1500.0, title="camera open beam (tomography)", pixels=PX)
+        O = odin.last_image.astype(float)
         angles = np.arange(0, 180, 3.0)
+        # per second, binned 2 x 2 (256 x 256 pixels: less noise on the screen)
+        bin2 = lambda a: a.reshape(PX // 2, 2, PX // 2, 2).sum(axis=(1, 3))
+        d2, o2 = bin2(D) / 300.0, bin2(O) / 1500.0
+        row = int(np.clip(round(@Y1@ / (14.1 / (PX // 2)) + (PX // 2 - 1) / 2), 0, PX // 2 - 1))
+        sino = np.full((len(angles), PX // 2), np.nan)
+
+        def show(k, n, f):
+            bar.update(k, n, f)
+            T = (bin2(odin.last_image.astype(float)) / 300.0 - d2) / np.maximum(o2 - d2, 1e-9)
+            sino[k - 1] = -np.log(np.clip(T[row], 1e-3, None))
+            proj_img.value = _png(T, 0.75, 1.05)
+            sino_img.value = _png(sino, 0.0, 0.6, size=(PX // 2, 3 * len(angles)))
+            proj_txt.value = (f"<b>Left:</b> projection {k} of {n}, at {angles[k - 1]:g}° (transmission T, white = "
+                              f"1) &nbsp;·&nbsp; <b>Right:</b> the sinogram of the row at y = @Y1@ mm: "
+                              f"−ln T of that row, one line per angle, from 0° (top) to 180°")
+            tomo_view.layout.display = None
+
         bar.start(len(angles))
         odin.move(shutter="open", stage_x=0.0)
-        files = odin.tomography(angles, 300.0, title="tomography", pixels=PX, progress=bar.update)
+        files = odin.tomography(angles, 300.0, title="tomography", pixels=PX, progress=show)
         print("Filtering and back-projecting...")
         REC["rec"] = tomo.Reconstruction(files, cam_open, cam_dark)
         ctl_tomo.clear()
@@ -335,7 +375,7 @@ def run_tomo(_):
 gate_tomo = gate("The slices and the rest of the page appear once the tomography is done.")
 ctl_tomo = mc.Control(odin, button_tomo, stopped=None)
 ctl_tomo.on_click(run_tomo)
-display(w.VBox([w.HBox([button_tomo, ctl_tomo.stop]), bar.box, ctl_tomo.status, gate_tomo]))
+display(w.VBox([w.HBox([button_tomo, ctl_tomo.stop]), bar.box, ctl_tomo.status, tomo_view, gate_tomo]))
 """)
 
 md(r"""
@@ -365,9 +405,21 @@ zs = w.FloatSlider(value=0.0, min=-1.0, max=1.0, step=0.0275, description="Depth
                    readout_format=".2f", layout=w.Layout(width="460px"))
 xs = w.FloatSlider(value=0.0, min=-4.0, max=4.0, step=0.0275, description="Point x (mm)", continuous_update=True,
                    readout_format=".2f", layout=w.Layout(width="460px"))
-img_sl = live_view.FigureImage()
 txt_sl = w.HTML("Run the tomography first.")
+head_sl = w.HTML()
 
+def frame():
+    # the axes, labels and colorbar drawn once; the slices are put in them at each move (live_view.FastFrame)
+    fig, (a, b) = plt.subplots(1, 2, figsize=(12, 5.2), gridspec_kw=dict(width_ratios=[1.6, 1]))
+    a.set(xlim=(-4.6, 4.6), ylim=(-1.6, 1.6), xlabel="x (mm)", ylabel="depth z (mm)", title="Horizontal slice at height y")
+    b.set(xlim=(-4.6, 4.6), ylim=(-6.6, 6.6), xlabel="x (mm)", ylabel="y (mm)", title="Vertical slice at depth z")
+    for ax in (a, b):
+        ax.set_aspect("equal"); ax.set_facecolor("black")
+    fig.colorbar(plt.cm.ScalarMappable(norm=plt.Normalize(0, 2.0), cmap="magma"), ax=[a, b], label="Σ (cm⁻¹)", shrink=0.8)
+    return live_view.FastFrame(fig, [a, b], cmap="magma", vmin=0, vmax=2.0)
+
+img_sl = frame()
+img_sl.layout.display = "none"
 CACHE = {}
 
 def slices(r):
@@ -388,23 +440,16 @@ def show_slices(_=None):
     if len(CACHE) > 40:
         CACHE.clear()
     h, v = slices(r)
-    with img_sl:
-        fig, (a, b) = plt.subplots(1, 2, figsize=(12, 5.2), gridspec_kw=dict(width_ratios=[1.6, 1]))
-        kw = dict(origin="lower", extent=EXT, cmap="magma", vmin=0, vmax=2.0)
-        im = a.imshow(h, **kw)
-        a.set(xlim=(-4.6, 4.6), ylim=(-1.6, 1.6), xlabel="x (mm)", ylabel="depth z (mm)",
-              title=f"Horizontal slice at y = {ys.value:.2f} mm")
-        a.axhline(zs.value, color="w", lw=0.6, ls="--"); a.plot(xs.value, zs.value, "c+", ms=14, mew=1.5)
-        b.imshow(v, **kw)
-        b.set(xlim=(-4.6, 4.6), ylim=(-6.6, 6.6), xlabel="x (mm)", ylabel="y (mm)",
-              title=f"Vertical slice at depth z = {zs.value:.2f} mm")
-        b.axhline(ys.value, color="w", lw=0.6, ls="--"); b.plot(xs.value, ys.value, "c+", ms=10, mew=1.5)
-        fig.colorbar(im, ax=[a, b], label="Σ (cm⁻¹)", shrink=0.8)
+    img_sl.draw([(h, EXT), (v, EXT)], marks=[[("hline", zs.value), ("cross", xs.value, zs.value)],
+                                            [("hline", ys.value), ("cross", xs.value, ys.value)]])
+    img_sl.layout.display = None
+    head_sl.value = (f"<b>Left:</b> horizontal slice at height y = {ys.value:.2f} mm &nbsp;·&nbsp; <b>Right:</b> "
+                     f"vertical slice at depth z = {zs.value:.2f} mm &nbsp;·&nbsp; cross at x = {xs.value:.2f} mm")
     txt_sl.value = "Cross (+) on a bright spot? Then part 5 measures Σ there."
 
 for s_ in (ys, zs, xs):
-    s_.observe(live_view.throttled(show_slices), "value")
-display(w.VBox([ys, zs, xs, img_sl, txt_sl]))
+    s_.observe(live_view.throttled(show_slices, delay=0.02), "value")
+display(w.VBox([ys, zs, xs, head_sl, img_sl, txt_sl]))
 show_slices()
 """)
 
@@ -585,7 +630,7 @@ q.choice("**Your report to the Mars team.**",
 
 
 # the questions along the page, each right after the step it checks: (anchor in a code or figure cell, questions)
-PLACE = [("ODIN from the source to the camera", ["water", "magnif"]), ("display(w.VBox([ys, zs, xs, img_sl, txt_sl]))", ["where"]),
+PLACE = [("ODIN from the source to the camera", ["water", "magnif"]), ("display(w.VBox([ys, zs, xs, head_sl, img_sl, txt_sl]))", ["where"]),
          ("display(w.VBox([button_s, out_s]))", ["element"]), ("display(w.VBox([button_w, out_w]))", ["howmuch", "report"])]
 for anchor, names_ in reversed(PLACE):
     k = next(i for i, c in enumerate(cells) if anchor in c.source)

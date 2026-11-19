@@ -146,11 +146,13 @@ def _tree(path, max_lines=60):
 
 
 def file_viewer(instrument):
-    """Choose one of your files, see what is inside."""
+    """Choose one of your files, see what is inside. The list refreshes itself after each measurement of the page
+    (measure_control.after_each), and the file chosen is shown at once."""
+    import measure_control
     pick = w.Dropdown(description="Your file", layout=w.Layout(width="460px"), style={"description_width": "90px"})
     view = w.HTML()
 
-    def update(_=None):
+    def update(_=None, newest=False):
         opts = []
         try:
             with open(instrument.log_file, encoding="utf-8") as f:
@@ -163,11 +165,15 @@ def file_viewer(instrument):
                         opts.append((f"{d['file']}: {d.get('title') or '(no title)'}", d["file"]))
         except (OSError, TypeError):
             pass
-        pick.options = list(reversed(opts))
+        keep = pick.value
+        opts = list(reversed(opts))
+        pick.options = opts                       # (ipywidgets 8 leaves the value empty: set it)
+        files = [f for _, f in opts]
+        pick.value = keep if keep in files and not newest else (files[0] if files else None)
 
     def show(_=None):
         if not pick.value:
-            view.value = "<i>No file yet: take a measurement first, then click Refresh.</i>"
+            view.value = "<i>No file yet: take a measurement first.</i>"
             return
         try:
             t = _tree(os.path.join(instrument.folder, pick.value))
@@ -179,7 +185,9 @@ def file_viewer(instrument):
     look = w.Button(description="Look inside", icon="search", layout=w.Layout(width="auto"))
     refresh.on_click(update)
     look.on_click(show)
+    pick.observe(lambda ch: show() if view.value else None, "value")     # a content shown follows the choice
     update()
+    measure_control.after_each(lambda: update(newest=True))      # a new file: chosen at once
     return w.VBox([w.HBox([pick, look, refresh]), view])
 
 
