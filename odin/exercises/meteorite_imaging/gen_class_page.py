@@ -8,6 +8,8 @@ Not an exercise of the catalogue of the app: the start page of the online versio
 import os
 import sys
 
+import re
+
 import nbformat as nbf
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -40,10 +42,13 @@ formats of ESS. Everything happens in this page: no code to write.
 | Time | What you do |
 |---|---|
 | 0–5 min | read *ODIN for X-ray imagers* and the mission |
-| 5–10 min | take the three images, look at the radiograph (parts 1–2) |
-| 10–20 min | run the tomography, find the bright clasts in the slices (parts 3–4) |
-| 20–27 min | measure Σ, estimate the water, answer the questions (parts 5–6) |
-| 27–30 min | your comment, and *Submit* (part 8) |
+| 5–12 min | take the three images with the Timepix3 camera, reduce them: the radiograph (parts 1–2) |
+| 12–20 min | run the tomography, find the bright clasts in the slices (parts 3–4) |
+| 20–27 min | measure Σ, estimate the water (parts 5–6) |
+| 27–30 min | your comment, and *Submit* (part 7) |
+
+Short questions along the way check each step: answer, then *Check*; a wrong answer is explained, and after a try you
+can show the answer.
 """)
 
 code(r"""
@@ -131,65 +136,141 @@ display(smp_out)
 md(r"""
 ## 1. Take the three images
 
-The instrument is set for you: white beam, 1 cm pinhole, high-resolution camera (512 × 512 pixels of 27.5 µm, thin
-scintillator).
+The instrument is set for you: white beam, 1 cm pinhole. You measure with the **Timepix3 camera**, which records
+**each neutron**: where it arrived and when. Watch the detector image fill up, and the histogram of the arrival times
+after each pulse (the time of flight: the slow neutrons, of long wavelength, arrive late).
 """ + transmission_md("sample out: stage at 500 mm") + r"""
-One click takes the three, with the exposures used on ODIN for such a sample: **dark 300 s, open beam 1500 s,
-sample 300 s** (the twin computes them in a few seconds). The open beam is long on purpose: it divides every
-projection, so its own noise would be printed in all of them, as rings in the tomography.
+**The measurements to take**, in this order (set the controls, then *Count*):
+
+| Step | Image | Shutter | Sample | Counting time |
+|---|---|---|---|---|
+| 1 | dark | closed | in | 5 s |
+| 2 | open beam | open | out | 5 s |
+| 3 | sample | open | in | 5 s |
+
+Each count lasts its counting time, as on the instrument, plus the time the twin needs to draw the neutrons (a few
+seconds; the first count of a session also prepares the beam). *Stop* cancels a count: nothing of it is recorded.
 """)
 
 code(r"""
-button = w.Button(description="Take the three images", button_style="primary", icon="camera", layout=w.Layout(width="auto"))
-img_T = live_view.FigureImage()
-FILES = {}
+st = odin.status()
+shut = w.ToggleButtons(options=[("closed", "closed"), ("open", "open")], value=st["shutter"], description="Shutter")
+inout = w.ToggleButtons(options=[("in", 0.0), ("out", 0.5)], value=0.0 if abs(st["stage_x"]) < 0.02 else 0.5,
+                        description="Sample")
+tcount = w.Dropdown(options=[5, 10], value=5, description="Counting time (s)", style={"description_width": "130px"})
+title = w.Text(value="", placeholder="dark, open beam, sample", description="Title")
+button = w.Button(description="Count", button_style="primary", icon="play", layout=w.Layout(width="auto"))
+live = viz.LiveView()
+TPX = {}                                      # the last file of each kind: dark, open, sample
 
-def show_T():
-    T = tomo.transmission(FILES["sample"], FILES["open"], FILES["dark"])
-    n = T.shape[0]
-    row = int(np.clip(round(@Y1@ / tomo.pixel_mm(n) + (n - 1) / 2), 0, n - 1))
-    with img_T:
-        fig, (a, b) = plt.subplots(1, 2, figsize=(11, 4.4), gridspec_kw=dict(width_ratios=[1, 1.25]))
-        im = a.imshow(T, origin="lower", extent=EXT, cmap="gray", vmin=0.8, vmax=1.0)
-        fig.colorbar(im, ax=a, label="transmission T")
-        a.axhline(@Y1@, color="tab:orange", lw=1)
-        a.set(xlabel="x (mm)", ylabel="y (mm)", title="Radiograph: transmission T")
-        b.plot(np.linspace(EXT[0], EXT[1], n), T[row], color="tab:orange", lw=0.8)
-        b.set(xlabel="x (mm)", ylabel="transmission T", title=f"Profile along the orange line (y = @Y1@ mm)",
-              ylim=(0.75, 1.05), xlim=(-5, 5))
-        b.grid(alpha=0.3)
-        plt.tight_layout()
+def kind():
+    return "dark" if shut.value == "closed" else ("open" if inout.value > 0.02 else "sample")
 
-def take(_):
-    # runs in a thread (measure_control): Stop cancels; prints go to ctl.status
+def count(_):
+    # runs in a thread (measure_control): the settings are locked, Stop cancels; prints go to ctl.status
+    k = kind()
+    name = title.value.strip() or {"dark": "dark", "open": "open beam", "sample": "meteorite 0°"}[k]
     try:
-        odin.move(choppers="white", pinhole=PINHOLE, diffuser="in", stage_rot=0.0, sample=SAMPLE)
-        for kind, shutter, x, t, title in (("dark", "closed", 0.0, 300, "dark"), ("open", "open", 0.5, 1500, "open beam"),
-                                           ("sample", "open", 0.0, 300, "meteorite 0°")):
-            odin.move(shutter=shutter, stage_x=x)
-            print(f"{title}: {t} s ...")
-            FILES[kind] = odin.camera(float(t), title=title, pixels=PX)
-        odin.move(shutter="open", stage_x=0.0)
-        ctl.clear()
-        print("Written: " + ", ".join(os.path.basename(FILES[k]) for k in ("dark", "open", "sample")) +
-              ". The radiograph is below.")
-        show_T()
+        odin.move(choppers="white", pinhole=PINHOLE, diffuser="in", shutter=shut.value, stage_x=inout.value,
+                  stage_rot=0.0, sample=SAMPLE)
+        live.reset()
+        f = odin.count(float(tcount.value), title=name, progress=live.update)
+        TPX[k] = f
+        live.done(f)
+        print(f"Written: {os.path.basename(f)} ({name}, {odin.last_n_counts:,} neutrons). Taken so far: "
+              + ", ".join(x for x in ("dark", "open", "sample") if x in TPX) + ".")
     except Cancelled:
         pass
     except Exception as e:
         print("Error:", e)
 
-ctl = mc.Control(odin, button)
-ctl.on_click(take)
-display(w.VBox([w.HBox([button, ctl.stop]), ctl.status, img_T]))
+ctl = mc.Control(odin, button, lock=[shut, inout, tcount, title])
+ctl.on_click(count)
+display(w.VBox([shut, inout, tcount, title, w.HBox([button, ctl.stop]), ctl.status, live.box]))
+""")
+
+code(r"""
+q.number("The histogram of the arrival times: a neutron reaches the camera, 60.55 m from the source, **61.2 ms** after "
+         "the pulse. Which wavelength does it have (Å)? (λ [Å] = 3956 / v [m/s])", value=4.0, tol=0.1, unit="Å",
+         mistakes=[(989, "that is its speed in m/s; then λ = 3956 / v")],
+         hints=["v = 60.55 m / 0.0612 s.", "v ≈ 989 m/s, λ = 3956 / 989."],
+         explanation="v = 60.55 / 0.0612 = 989 m/s, λ = 3956 / 989 = 4.0 Å. The arrival time is proportional to λ: this "
+                     "is how ODIN knows the wavelength of every neutron (here we sum them all: a white-beam radiograph).",
+         title="Q3. From the time of flight to the wavelength")
 """)
 
 md(r"""
-## 2. The radiograph
+## 2. Data reduction: from the files to the transmission
 
-About 89 % of the neutrons cross the 2 mm of rock: almost transparent. Small darker and brighter specks appear, but a
-radiograph adds up the whole 2 mm along the beam: a speck can be one grain or several, near the front or the back.
-Hence the tomography.
+Your three files hold **events** (one per neutron: its pixel, its pulse, its time of flight), not images.
+*Reduce* runs the chain of ESS on them:
+
+1. **read** the events of each file (`scippnexus`, into `scipp` arrays with units and uncertainties);
+2. **time of flight to wavelength** for each neutron (`essreduce`, in the ESS imaging package `essimaging`, workflow
+   `OdinBraggEdgeWorkflow`, from the chopper settings and distances read in the file);
+3. **histogram** the neutrons in 128 × 128 pixels (here all the wavelengths together);
+4. **normalize** each run by its **proton charge** (the number of protons that hit the target during the count,
+   written in the file: it sets how many neutrons were made) and subtract the dark, scaled to its duration;
+5. **divide** by the open beam: $T = (I - D)/(O - D)$, with its uncertainty from the counting noise.
+
+This takes about half a minute (some 35 million neutrons, one by one).
+""")
+
+code(r"""
+button_red = w.Button(description="Reduce", button_style="success", icon="cogs", layout=w.Layout(width="auto"))
+img_T = live_view.FigureImage()
+RED = {}
+
+def reduce(_):
+    try:
+        missing = [x for x in ("dark", "open", "sample") if x not in TPX]
+        if missing:
+            print("Take first: " + ", ".join(missing) + " (part 1)."); return
+        import odin_reduction as reduction
+        print("Reducing the three files with the ESS workflow...")
+        r = reduction.reduce(TPX["sample"], TPX["open"], TPX["dark"], n_pixels=128)
+        T = r["image"].values
+        RED["T"] = T
+        n = T.shape[0]
+        row = int(np.clip(round(@Y1@ / (14.1 / n) + (n - 1) / 2), 0, n - 1))
+        with img_T:
+            fig, (a, b) = plt.subplots(1, 2, figsize=(11, 4.4), gridspec_kw=dict(width_ratios=[1, 1.25]))
+            im = a.imshow(T, origin="lower", extent=EXT, cmap="gray", vmin=0.75, vmax=1.05)
+            fig.colorbar(im, ax=a, label="transmission T")
+            a.axhline(@Y1@, color="tab:orange", lw=1)
+            a.set(xlabel="x (mm)", ylabel="y (mm)", title="Radiograph: transmission T (128 × 128 pixels)")
+            b.plot(np.linspace(EXT[0], EXT[1], n), T[row], color="tab:orange", lw=0.9)
+            b.set(xlabel="x (mm)", ylabel="transmission T", title="Profile along the orange line (y = @Y1@ mm)",
+                  ylim=(0.7, 1.1), xlim=(-5, 5))
+            b.grid(alpha=0.3)
+            plt.tight_layout()
+        nm = r["normalization"]
+        ctl_red.clear()
+        print(f"Proton charge: sample {nm['E']['charge_uC'] / 1000:.1f} mC, open beam {nm['O']['charge_uC'] / 1000:.1f} mC "
+              f"(the source varies a little from pulse to pulse: that is why each run is normalized by its own charge).")
+    except Exception as e:
+        print("Error:", e)
+
+ctl_red = mc.Control(odin, button_red, stopped=None)
+ctl_red.on_click(reduce)
+display(w.VBox([w.HBox([button_red, ctl_red.stop]), ctl_red.status, img_T]))
+""")
+
+md(r"""
+**Reading the radiograph.** About 89 % of the neutrons cross the 2 mm of rock: almost transparent. With 5 s and
+pixels of 110 µm, the clasts (0.1–0.4 mm, a few % of contrast) are lost in the noise and the blur; and a radiograph
+adds up the whole 2 mm along the beam: a speck can be one grain or several, near the front or the back. Hence the
+tomography.
+""")
+
+code(r"""
+q.number("The rock lets through T ≈ 0.89 of the neutrons over its 2 mm thickness. What is its attenuation coefficient "
+         "Σ (cm⁻¹)?", value=0.58, tol=0.06, unit="cm⁻¹",
+         mistakes=[(0.058, "right, but per mm: the answer is asked in cm⁻¹"), (0.11, "this is 1 − T, not −ln T / x")],
+         hints=["T = exp(−Σ x): Σ = −ln T / x.", "x = 0.2 cm; −ln 0.89 = 0.117."],
+         explanation="Σ = −ln 0.89 / 0.2 cm = 0.58 cm⁻¹: the matrix of the meteorite in ODIN's white beam (0.45 cm⁻¹ at "
+                     "ICON, whose beam is warmer: these minerals attenuate slow neutrons more).",
+         title="Q4. Σ of the rock")
 """)
 fig("meteorite_tomography.png", "One horizontal slice of the piece (8 mm × 2 mm), seen from above. A radiograph adds "
     "up everything along the beam (left): two clasts one behind the other make one peak. Turning the sample over 180° "
@@ -198,8 +279,10 @@ fig("meteorite_tomography.png", "One horizontal slice of the piece (8 mm × 2 mm
 md(r"""
 ## 3. The tomography
 
-*Run the tomography* turns the sample in steps of 3° over 180° and takes one image of 300 s at each angle: 60 images,
-**5 hours of beam** on ODIN (a few minutes here). For each row of pixels, the projections $-\ln T$ are filtered (ramp)
+For the tomography ODIN uses the **integrating camera** in its high-resolution setup (512 × 512 pixels of 27.5 µm,
+thin scintillator): finer pixels than the Timepix3, and no need for the time of flight. It takes its own dark (300 s)
+and open beam (1500 s) first, then turns the sample in steps of 3° over 180° with one image of 300 s at each angle: 60
+images, **5 hours of beam** on ODIN (two or three minutes here). For each row of pixels, the projections $-\ln T$ are filtered (ramp)
 and back-projected: $\Sigma$ at every point of the slice. For comparison, Naver *et al.* took 1125 images of 4 minutes
 at ICON (75 hours), with pixels of 6.2 µm.
 """)
@@ -211,14 +294,18 @@ REC = {}
 
 def run_tomo(_):
     try:
-        if not FILES:
-            print("Take the three images first (part 1)."); return
+        odin.move(choppers="white", pinhole=PINHOLE, diffuser="in", stage_rot=0.0, sample=SAMPLE)
+        print("The camera's dark and open beam...")
+        odin.move(shutter="closed", stage_x=0.0)
+        cam_dark = odin.camera(300.0, title="camera dark (tomography)", pixels=PX)
+        odin.move(shutter="open", stage_x=0.5)
+        cam_open = odin.camera(1500.0, title="camera open beam (tomography)", pixels=PX)
         angles = np.arange(0, 180, 3.0)
         bar.start(len(angles))
-        odin.move(choppers="white", pinhole=PINHOLE, diffuser="in", shutter="open", stage_x=0.0, sample=SAMPLE)
+        odin.move(shutter="open", stage_x=0.0)
         files = odin.tomography(angles, 300.0, title="tomography", pixels=PX, progress=bar.update)
         print("Filtering and back-projecting...")
-        REC["rec"] = tomo.Reconstruction(files, FILES["open"], FILES["dark"])
+        REC["rec"] = tomo.Reconstruction(files, cam_open, cam_dark)
         ctl_tomo.clear()
         print(f"{len(angles)} projections reconstructed: explore the slices below.")
         show_slices()
@@ -350,73 +437,6 @@ button_w.on_click(water)
 display(w.VBox([button_w, out_w]))
 """)
 
-md(r"""
-## 7. Questions: neutrons and X-rays
-
-Six questions, about 5 minutes. A wrong answer is explained; after a try you can show the answer.
-""")
-
-code(r"""
-q.number("1 mm of water in the beam. With neutrons of 1.8 Å, Σ = 3.6 cm⁻¹ (hydrogen); with X-rays of 60 keV, "
-         "μ = 0.21 cm⁻¹. Which fraction of the **neutrons** does it remove, 1 − T (%)?",
-         value=30.4, tol=1.5, unit="%",
-         mistakes=[(2.0, "that is the X-ray value (μ = 0.21 cm⁻¹); the question is about neutrons"),
-                   (36, "3.6 cm⁻¹ × 0.1 cm = 0.36 is −ln T, not 1 − T: T = e^(−0.36)")],
-         hints=["T = exp(−Σ d), with d = 0.1 cm.", "1 − exp(−0.36)."],
-         explanation="1 − e^(−0.36) = 30 % with neutrons, 1 − e^(−0.021) = 2 % with X-rays. And 1 mm of iron: neutrons "
-                     "11 % (Σ = 1.2 cm⁻¹), X-rays of 60 keV 61 % (μ = 9.5 cm⁻¹). The contrasts are reversed.",
-         title="Q1. Water, for neutrons and X-rays")
-q.choice("Where is the hydrogen of the piece?",
-         ["In small bright regions (0.1–0.4 mm) grouped in clusters, not spread evenly.",
-          "Evenly in the whole piece.",
-          "Only at the surface.",
-          "In the large dark regions."],
-         answer=0, why={1: "The matrix is uniform, but look at the bright spots.",
-                        2: "The bright spots are inside, at all depths.",
-                        3: "Dark means a small Σ: little attenuation (feldspar)."},
-         explanation="Naver et al. found the H-rich phases in localised macroscopic clusters, 0.4 % of the volume: a new "
-                     "kind of water reservoir in the Martian crust.", hints=["Move the height slider through the piece."],
-         title="Q2. Where?")
-q.choice("Which material can attenuate **3 to 4 times** more than the matrix?",
-         ["Only a hydrogen-bearing one: no anhydrous mineral of the table reaches twice the matrix.",
-          "Magnetite: it is the densest.",
-          "Feldspar.",
-          "Any mineral, if the grain is large enough."],
-         answer=0, why={1: "Magnetite is at 1.8 times the matrix, not 3 or 4.",
-                        2: "Feldspar attenuates less than the matrix (0.6 times).",
-                        3: "Σ does not depend on the size of the grain: it is a property of the material."},
-         explanation="The argument of Naver et al.: the H-rich regions attenuate 1.9 cm⁻¹, their minerals without hydrogen "
-                     "0.61 cm⁻¹; only hydrogen explains the difference.",
-         hints=["Compare your ratio of part 5 with the last column of the table."], title="Q3. Which element?")
-q.number("The water by mass in the brightest spot you found (part 6, %):", value=8, tol=6, unit="%",
-         hints=["Part 6 computes it from your Σ of part 5."],
-         explanation="The model holds about 14 % (Naver et al.: up to 15 wt% OH). The blur lowers Σ in the middle of a "
-                     "small region, so the estimate is lower: a few % to about 12 %.", title="Q4. How much water?")
-q.choice("A laboratory micro-CT magnifies by bringing the sample close to a small focal spot (a cone beam). Why does "
-         "ODIN put the camera **5 cm** behind the sample instead, without magnification?",
-         ["The neutron source seen by the sample is the pinhole, 1 to 4 cm wide: a magnifying geometry would multiply "
-          "its blur (l · D / L). ODIN keeps the camera close and the beam almost parallel.",
-          "Neutrons have no charge, so they cannot be magnified.",
-          "There is no room behind the sample on ODIN.",
-          "The camera pixels are small enough: magnification would not help."],
-         answer=0, why={1: "Micro-CT magnification is geometric (cone beam), not by lenses: neutrons would follow the same "
-                           "geometry. The problem is the size of the source.",
-                        2: "Room is not the reason: the blur is.",
-                        3: "With the camera 1 m away, the 1 cm pinhole would blur by 1 mm."},
-         explanation="Geometric blur = l · D / L: with D = 1 cm and L = 10.5 m, every cm of l adds 10 µm of blur. The "
-                     "camera stays close, and the parallel-beam reconstruction (180°) applies.",
-         title="Q5. No magnification")
-q.choice("**Your report to the Mars team.**",
-         ["The water is concentrated in small clasts (0.1–0.4 mm) grouped in clusters; their attenuation can only be "
-          "explained by hydrogen, about 10 % water by mass; the tomography gives their positions for sampling.",
-          "The water is spread evenly in the meteorite.",
-          "There is no water: the bright spots are magnetite.",
-          "Neutrons cannot answer: X-rays are needed."],
-         answer=0, why={1: "The bright spots are local.", 2: "Magnetite reaches 1.8 times the matrix, not 4.",
-                        3: "Neutrons are the right probe for hydrogen; X-rays see the Fe-Ti oxides."},
-         explanation="Your conclusion is that of Naver et al. (2026): a new macroscopic crustal water reservoir on early "
-                     "Mars, found without cutting the meteorite.", hints=["Q2, Q3 and Q4 together."], title="Q6. The report")
-""")
 
 md(r"""
 Curious about what your files contain and how the images become a tomography? Open the section below (optional).
@@ -431,7 +451,7 @@ md(r"""
 the clasts); where the clasts sit is drawn at random. The minerals are mixed at the scale of each region (no
 crystal). The camera is modeled by its mean signal, its noise and its blur.
 
-## 8. Your results, your comment
+## 7. Your results, your comment
 
 Your score on the questions, then a few words on the session (what was clear, what was not, what you would change)
 and *Submit*: it helps us improve it.
@@ -445,6 +465,94 @@ code(r"""
 import submit
 _ = submit.Submit("odin/exercises/meteorite_imaging", "class", quiz=q, title="ODIN in 30 minutes: a Martian meteorite")
 """)
+
+QS = {
+    'water': r'''
+q.number("1 mm of water in the beam. With neutrons of 1.8 Å, Σ = 3.6 cm⁻¹ (hydrogen); with X-rays of 60 keV, "
+         "μ = 0.21 cm⁻¹. Which fraction of the **neutrons** does it remove, 1 − T (%)?",
+         value=30.4, tol=1.5, unit="%",
+         mistakes=[(2.0, "that is the X-ray value (μ = 0.21 cm⁻¹); the question is about neutrons"),
+                   (36, "3.6 cm⁻¹ × 0.1 cm = 0.36 is −ln T, not 1 − T: T = e^(−0.36)")],
+         hints=["T = exp(−Σ d), with d = 0.1 cm.", "1 − exp(−0.36)."],
+         explanation="1 − e^(−0.36) = 30 % with neutrons, 1 − e^(−0.021) = 2 % with X-rays. And 1 mm of iron: neutrons "
+                     "11 % (Σ = 1.2 cm⁻¹), X-rays of 60 keV 61 % (μ = 9.5 cm⁻¹). The contrasts are reversed.",
+         title="Q1. Water, for neutrons and X-rays")
+''',
+    'where': r'''
+q.choice("Where is the hydrogen of the piece?",
+         ["In small bright regions (0.1–0.4 mm) grouped in clusters, not spread evenly.",
+          "Evenly in the whole piece.",
+          "Only at the surface.",
+          "In the large dark regions."],
+         answer=0, why={1: "The matrix is uniform, but look at the bright spots.",
+                        2: "The bright spots are inside, at all depths.",
+                        3: "Dark means a small Σ: little attenuation (feldspar)."},
+         explanation="Naver et al. found the H-rich phases in localised macroscopic clusters, 0.4 % of the volume: a new "
+                     "kind of water reservoir in the Martian crust.", hints=["Move the height slider through the piece."],
+         title="Q2. Where?")
+''',
+    'element': r'''
+q.choice("Which material can attenuate **3 to 4 times** more than the matrix?",
+         ["Only a hydrogen-bearing one: no anhydrous mineral of the table reaches twice the matrix.",
+          "Magnetite: it is the densest.",
+          "Feldspar.",
+          "Any mineral, if the grain is large enough."],
+         answer=0, why={1: "Magnetite is at 1.8 times the matrix, not 3 or 4.",
+                        2: "Feldspar attenuates less than the matrix (0.6 times).",
+                        3: "Σ does not depend on the size of the grain: it is a property of the material."},
+         explanation="The argument of Naver et al.: the H-rich regions attenuate 1.9 cm⁻¹, their minerals without hydrogen "
+                     "0.61 cm⁻¹; only hydrogen explains the difference.",
+         hints=["Compare your ratio of part 5 with the last column of the table."], title="Q3. Which element?")
+''',
+    'howmuch': r'''
+q.number("The water by mass in the brightest spot you found (part 6, %):", value=8, tol=6, unit="%",
+         hints=["Part 6 computes it from your Σ of part 5."],
+         explanation="The model holds about 14 % (Naver et al.: up to 15 wt% OH). The blur lowers Σ in the middle of a "
+                     "small region, so the estimate is lower: a few % to about 12 %.", title="Q4. How much water?")
+''',
+    'magnif': r'''
+q.choice("A laboratory micro-CT magnifies by bringing the sample close to a small focal spot (a cone beam). Why does "
+         "ODIN put the camera **5 cm** behind the sample instead, without magnification?",
+         ["The neutron source seen by the sample is the pinhole, 1 to 4 cm wide: a magnifying geometry would multiply "
+          "its blur (l · D / L). ODIN keeps the camera close and the beam almost parallel.",
+          "Neutrons have no charge, so they cannot be magnified.",
+          "There is no room behind the sample on ODIN.",
+          "The camera pixels are small enough: magnification would not help."],
+         answer=0, why={1: "Micro-CT magnification is geometric (cone beam), not by lenses: neutrons would follow the same "
+                           "geometry. The problem is the size of the source.",
+                        2: "Room is not the reason: the blur is.",
+                        3: "With the camera 1 m away, the 1 cm pinhole would blur by 1 mm."},
+         explanation="Geometric blur = l · D / L: with D = 1 cm and L = 10.5 m, every cm of l adds 10 µm of blur. The "
+                     "camera stays close, and the parallel-beam reconstruction (180°) applies.",
+         title="Q5. No magnification")
+''',
+    'report': r'''
+q.choice("**Your report to the Mars team.**",
+         ["The water is concentrated in small clasts (0.1–0.4 mm) grouped in clusters; their attenuation can only be "
+          "explained by hydrogen, about 10 % water by mass; the tomography gives their positions for sampling.",
+          "The water is spread evenly in the meteorite.",
+          "There is no water: the bright spots are magnetite.",
+          "Neutrons cannot answer: X-rays are needed."],
+         answer=0, why={1: "The bright spots are local.", 2: "Magnetite reaches 1.8 times the matrix, not 4.",
+                        3: "Neutrons are the right probe for hydrogen; X-rays see the Fe-Ti oxides."},
+         explanation="Your conclusion is that of Naver et al. (2026): a new macroscopic crustal water reservoir on early "
+                     "Mars, found without cutting the meteorite.", hints=["Your answers on where the hydrogen is, which element, and how much water."], title="Q6. The report")
+''',
+}
+
+
+# the questions along the page, each right after the step it checks: (anchor in a code or figure cell, questions)
+PLACE = [("ODIN from the source to the camera", ["water", "magnif"]), ("display(w.VBox([ys, zs, xs, img_sl, txt_sl]))", ["where"]),
+         ("display(w.VBox([button_s, out_s]))", ["element"]), ("display(w.VBox([button_w, out_w]))", ["howmuch", "report"])]
+for anchor, names_ in reversed(PLACE):
+    k = next(i for i, c in enumerate(cells) if anchor in c.source)
+    for n_ in reversed(names_):
+        cells.insert(k + 1, nbf.v4.new_code_cell(QS[n_].strip()))
+# number the questions in the order of the page
+qn = iter(range(1, 100))
+for c in cells:
+    if c.cell_type == "code":
+        c.source = re.sub(r'title="Q\d+\. ', lambda m: f'title="Q{next(qn)}. ', c.source)
 
 nb = nbf.v4.new_notebook()
 nb["cells"] = cells
