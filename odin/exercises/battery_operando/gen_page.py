@@ -283,7 +283,7 @@ to 2.75 mm), for each row $y$:
 
 $$\Delta\mu(y, t) = -\frac{1}{L}\,\ln\frac{T(y, t)}{T(y, 0)}, \qquad L = 1.6\ \text{cm (the 16 mm crossed)}$$
 
-($T = (I - D)/(O - D)$: the transmission of part 3): the change of the attenuation coefficient, the
+($T = (S - D)/(O - D)$: the transmission of part 3): the change of the attenuation coefficient, the
 lithium that came in. Move the slider through the times you measured.
 """)
 

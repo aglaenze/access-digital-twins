@@ -166,7 +166,7 @@ Read from the files themselves: camera images (`camera`, with their number of pi
 """)), code(FILES), md("## 2. Which file is what?"), code(PICK), md(r"""
 ## 3. The radiograph
 
-$T = (I - D)/(O - D)$, each image per second of exposure. At 0° the beam crosses the 2 mm thickness of the piece: in
+$T = (S - D)/(O - D)$, each image per second of exposure. At 0° the beam crosses the 2 mm thickness of the piece: in
 the matrix, $T = e^{-\Sigma \cdot 0.2\,\text{cm}}$; the cell estimates $\Sigma$ of the matrix from a region of the
 piece.
 """), code(r'''

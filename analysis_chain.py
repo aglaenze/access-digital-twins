@@ -36,7 +36,7 @@ neutrons were made.
    settings and the distances read in the file (the time a neutron of each λ needs to reach the camera).
 3. **Histogram**: the events are counted per pixel (or region) and per bin of wavelength.
 4. **Normalize** each run by its proton charge, subtract the dark run (scaled to its duration).
-5. **Divide by the open beam**: the transmission $T(\lambda) = (I - D)/(O - D)$, with its uncertainty (the Poisson
+5. **Divide by the open beam**: the transmission $T(\lambda) = (S - D)/(O - D)$, with its uncertainty (the Poisson
    noise of the three runs, propagated by `scipp`).
 
 The pages call these steps for you (twin file `odin_reduction.py`: the ESS workflow, unmodified, plus steps 4 and 5).
@@ -53,7 +53,7 @@ charge received during the image.
 
 1. **Read** the images (`h5py`).
 2. **Per second**: each image is divided by its exposure time.
-3. **Transmission**: $T = (I - D)/(O - D)$ for each pixel, with the sample, open-beam and dark images.
+3. **Transmission**: $T = (S - D)/(O - D)$ for each pixel, with the sample, open-beam and dark images.
 4. **Tomography** (when there is one): for each row of pixels, $-\ln T$ at every angle forms a *sinogram*; it is
    filtered (ramp filter) and back-projected: this gives the attenuation coefficient $\Sigma$ at each point of the
    slice (filtered back-projection).

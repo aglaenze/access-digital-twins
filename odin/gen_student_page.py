@@ -228,9 +228,9 @@ md(r"""
 
 For each pixel and each λ, the transmission is
 
-$$T = \frac{I - D}{O - D}$$
+$$T = \frac{S - D}{O - D}$$
 
-with $I$, $O$ and $D$ the counts of the sample, open-beam and dark runs (part 1). The dark run is first scaled to the duration
+with $S$, $O$ and $D$ the counts of the sample, open-beam and dark runs (part 1). The dark run is first scaled to the duration
 of each measurement and subtracted. Then each measurement is divided by the **proton charge** received by the target
 during the measurement (it is recorded in the file): the number of neutrons produced by the source is proportional to
 it, and the source power is never perfectly constant. The λ of each neutron is computed from its arrival time, with

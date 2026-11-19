@@ -14,7 +14,7 @@ def transmission_md(open_beam_how="the sample moved out of the beam", per_wavele
 **Why three images?** The camera does not measure the transmission $T$ directly: it counts, in each pixel, what
 arrives. To get $T$, three images are needed:
 
-- the **sample** image $I$: the neutrons that crossed the sample;
+- the **sample** image $S$: the neutrons that crossed the sample;
 - the **open beam** $O$ ({open_beam_how}): the same beam without the sample. The beam is not perfectly even over the
   field, and the pixels are not all equally sensitive: the open beam records both, so that they can be divided out;
 - the **dark** $D$ (shutter closed, no neutrons): the camera gives a small signal even without neutrons (its offset and
@@ -22,7 +22,7 @@ arrives. To get $T$, three images are needed:
 
 Then, for each pixel{per}, with each image counted per second of exposure,
 
-$$T = \\frac{{I - D}}{{O - D}}$$
+$$T = \\frac{{S - D}}{{O - D}}$$
 
 Everything that is not the sample cancels: $T$ = 1 where nothing is stopped, $T$ = 0 where everything is.
 """

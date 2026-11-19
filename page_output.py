@@ -14,6 +14,20 @@ keep "with out:" in the callbacks of buttons (they run after the page is shown).
 from contextlib import contextmanager
 
 
+def gate(text="The rest of the page appears once this step is done."):
+    """A barrier in the page: while it is shown, every cell after the one that displays it is hidden (twin.css:
+    .jp-Cell:has(.twin-gate) ~ .jp-Cell), so that a result is not seen before the student computed it. open(gate)
+    removes it. Returns the widget, to display at the end of the cell of the step."""
+    import html as _html
+    import ipywidgets as w
+    return w.HTML(f"<div class='twin-gate'>🔒 {_html.escape(text)}</div>")
+
+
+def open_gate(g):
+    """The step is done: the rest of the page appears."""
+    g.value = ""
+
+
 @contextmanager
 def collapsed(title):
     """A section folded by default, opened by a click on its title (the bonus rounds): what the block prints and

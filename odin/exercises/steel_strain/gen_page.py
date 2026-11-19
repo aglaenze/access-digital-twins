@@ -301,7 +301,7 @@ in wavelength bins of 0.01 Å (all the repeated counts added), the dark is subtr
 measurement), each measurement is divided by the proton charge received by the target, and the specimen is divided by
 the open beam:
 
-$$T(\lambda) = \frac{I - D}{O - D} \quad\text{(part 1), for each wavelength bin}$$
+$$T(\lambda) = \frac{S - D}{O - D} \quad\text{(part 1), for each wavelength bin}$$
 
 **The three regions.** A shift of $10^{-4}$ needs many neutrons: the edge is fitted on a whole region of the specimen,
 not pixel by pixel. The three regions are drawn below: the **middle** (narrowest section, the largest stress) and the

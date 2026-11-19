@@ -275,7 +275,7 @@ display(w.VBox([listing, rename]))
 md(r"""
 ## 5. The edges of the standards, and the calibration
 
-For each bar, at each wavelength, the transmission is $T = (I - D)/(O - D)$ (part 3: sample, open beam and dark counts
+For each bar, at each wavelength, the transmission is $T = (S - D)/(O - D)$ (part 3: sample, open beam and dark counts
 in the bar, the dark scaled to the duration, each measurement divided by its proton charge), and the attenuation
 coefficient
 $\Sigma = -\ln T / 0.09\ \text{cm}$. The **height of an edge** is the drop of $\Sigma$ across it: its mean just

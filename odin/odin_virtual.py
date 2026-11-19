@@ -93,6 +93,27 @@ def _union_boxes(volumes):
             enable_refraction=0, enable_reflection=0)
     return f
 
+def _quiet_ncrystal():
+    """NCrystal prints "NCrystal WARNING: Discarding N edges of provided kernel data due to missing S values" when it
+    loads the scattering kernel of some materials: the kernel table has empty entries at its edges, which NCrystal
+    leaves out; nothing for the student to act on, and it showed on the pages (seen with the meteorite, 2026-11-19).
+    That message is dropped; every other message of NCrystal is printed as before."""
+    try:
+        from NCrystal._msg import _default_pymsghandler, _setMsgHandler
+    except Exception:
+        return
+
+    def handler(msg, msgtype):
+        if msgtype == 1 and "missing S values" in msg:
+            return
+        _default_pymsghandler(msg, msgtype)
+
+    _setMsgHandler(handler)
+
+
+_quiet_ncrystal()
+
+
 class Cancelled(Exception):
     """A measurement stopped by the user (VirtualOdin.cancel): nothing was written, nothing logged."""
 

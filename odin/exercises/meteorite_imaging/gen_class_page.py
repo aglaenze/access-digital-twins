@@ -83,10 +83,11 @@ md(r"""
 
 The lecture showed the principles (Beer-Lambert, the pinhole camera, the contrasts); here is what they mean on ODIN.
 
-1. **The contrast is the other way round.** Neutrons interact with the **nuclei**, not with the electrons.
-   **Hydrogen** removes neutrons more than any other element (it scatters them strongly), and lithium, boron, cadmium,
-   gadolinium absorb them; but iron, aluminum, silicon, lead let most of them through. A neutron image shows the
-   water inside a metal or a rock, where X-rays see the heavy elements.
+1. **Compared with X-rays, the contrast is reversed.** X-rays interact with the electrons, so the heavy elements
+   stand out; neutrons interact with the **nuclei**. **Hydrogen** removes neutrons more than any other element (it
+   scatters them strongly), and lithium, boron, cadmium, gadolinium absorb them; but iron, aluminum, silicon, lead let
+   most of them through. A neutron image shows the water inside a metal or a rock, where X-rays see the heavy
+   elements.
 2. **A pulsed source and the time of flight.** At ESS, protons hit a tungsten target 14 times per second; each pulse
    (2.86 ms) makes neutrons, slowed down by a moderator. ODIN is 60 m long: the arrival time of a neutron at the camera
    gives its speed, so its wavelength. Today you use the **white beam**: all the wavelengths together, like a
@@ -96,7 +97,7 @@ The lecture showed the principles (Beer-Lambert, the pinhole camera, the contras
    camera, $l$ being the distance from the sample to the camera: the camera sits 5 cm behind the sample. Best blur here
    about 0.05 mm, not the micrometers of a laboratory micro-CT with a small focal spot.
 4. **Few particles.** Even at ESS there are far fewer neutrons than photons from an X-ray tube: about 10 neutrons per
-   pixel and second in the high-resolution setup. Exposures last minutes, a tomography hours of beam.
+   pixel (27.5 µm × 27.5 µm) and second in the high-resolution setup. Exposures last minutes, a tomography hours of beam.
 5. **The detector.** A scintillator containing lithium-6 turns each neutron into a flash of light, filmed by a camera
    through a mirror, out of the beam: an indirect detector, as in many X-ray setups.
 
@@ -109,11 +110,20 @@ fig("odin_beamline.png", "ODIN from the source to the camera (distances of the o
 md(r"""
 ## The mission
 
-**Who asks.** Planetary scientists studying the **water of early Mars**. Part of it was taken into the rocks of the
-crust, bound in their minerals. The meteorite **NWA 7034** ("Black Beauty"), a piece of that crust 4.4 billion years
-old, is the Martian meteorite richest in water: about 6 000 ppm. **Where is this water held?** Spread in the whole
-rock, or concentrated in some of the rock fragments (clasts) that make it up, a reservoir of its own? A gram is worth
-more than a gram of gold: answer **without cutting it**.
+**Why the water of a meteorite matters.** About 4 billion years ago Mars had rivers and lakes; today its surface is
+a frozen desert. Where did the water go? Part escaped to space, but part was taken into the rocks of the crust, bound
+in their minerals, where it can still be today. How much water the crust stored, and in which minerals, bears on three
+questions: how much water young Mars had at all; whether liquid water stayed long enough somewhere for the planet to be
+habitable; and what to look for in the samples that future missions will bring back from Mars, which will have to be
+analyzed without being destroyed. Water bound in a mineral also keeps a record of its origin, in the isotopes of its
+hydrogen.
+
+**Who asks.** Planetary scientists of the Mars team. The meteorite **NWA 7034** ("Black Beauty") is a piece of the
+Martian crust of that time, 4.4 billion years old, and the Martian meteorite richest in water: about 6 000 ppm.
+**Where is this water held?** Spread in the whole rock (as if water had soaked it everywhere), or concentrated in some
+of the rock fragments (clasts) that make it up? In the second case these clasts carried their water with them: a
+reservoir of its own in the budget of the crust, and the grains to pick for a chemical analysis of their hydrogen. A
+gram of the meteorite is worth more than a gram of gold: answer **without cutting it**.
 
 **The sample is real.** A piece of 12 × 8 × 2 mm³ was imaged with neutrons at ICON (PSI) and with X-rays at the ESRF
 by E. B. Naver, K. W. Nikolajsen *et al.*, *Geophysical Research Letters* (2026), doi:10.1029/2026GL121841 (the
@@ -144,12 +154,13 @@ after each pulse (the time of flight: the slow neutrons, of long wavelength, arr
 
 | Step | Image | Shutter | Sample | Counting time |
 |---|---|---|---|---|
-| 1 | dark | closed | in | 5 s |
-| 2 | open beam | open | out | 5 s |
-| 3 | sample | open | in | 5 s |
+| 1 | dark | closed | in | 2 s |
+| 2 | open beam | open | out | 2 s |
+| 3 | sample | open | in | 2 s |
 
-Each count lasts its counting time, as on the instrument, plus the time the twin needs to draw the neutrons (a few
-seconds; the first count of a session also prepares the beam). *Stop* cancels a count: nothing of it is recorded.
+Two seconds are enough here: some 5 million neutrons reach the camera. A count lasts its counting time, as on the
+instrument, plus the time the twin needs to draw these neutrons one by one and write them to the file (10 to 20 s;
+on the real instrument the file is written while counting). *Stop* cancels a count: nothing of it is recorded.
 """)
 
 code(r"""
@@ -157,7 +168,7 @@ st = odin.status()
 shut = w.ToggleButtons(options=[("closed", "closed"), ("open", "open")], value=st["shutter"], description="Shutter")
 inout = w.ToggleButtons(options=[("in", 0.0), ("out", 0.5)], value=0.0 if abs(st["stage_x"]) < 0.02 else 0.5,
                         description="Sample")
-tcount = w.Dropdown(options=[5, 10], value=5, description="Counting time (s)", style={"description_width": "130px"})
+tcount = w.Dropdown(options=[2, 5], value=2, description="Counting time (s)", style={"description_width": "130px"})
 title = w.Text(value="", placeholder="dark, open beam, sample", description="Title")
 button = w.Button(description="Count", button_style="primary", icon="play", layout=w.Layout(width="auto"))
 live = viz.LiveView()
@@ -211,15 +222,18 @@ Your three files hold **events** (one per neutron: its pixel, its pulse, its tim
 3. **histogram** the neutrons in 128 × 128 pixels (here all the wavelengths together);
 4. **normalize** each run by its **proton charge** (the number of protons that hit the target during the count,
    written in the file: it sets how many neutrons were made) and subtract the dark, scaled to its duration;
-5. **divide** by the open beam: $T = (I - D)/(O - D)$, with its uncertainty from the counting noise.
+5. **divide** by the open beam: $T = (S - D)/(O - D)$, with its uncertainty from the counting noise.
 
-This takes about half a minute (some 35 million neutrons, one by one).
+This takes 10 to 30 seconds (some 10 million neutrons, one by one). The rest of the page appears when it is done.
 """)
 
 code(r"""
+from page_output import gate, open_gate
 button_red = w.Button(description="Reduce", button_style="success", icon="cogs", layout=w.Layout(width="auto"))
 img_T = live_view.FigureImage()
 RED = {}
+gate_red = gate("The radiograph and the rest of the page appear once you have reduced your three files.")
+XR = (-5.0, 5.0)                       # the x range of both plots: the piece is 8 mm wide
 
 def reduce(_):
     try:
@@ -237,15 +251,16 @@ def reduce(_):
             fig, (a, b) = plt.subplots(1, 2, figsize=(11, 4.4), gridspec_kw=dict(width_ratios=[1, 1.25]))
             im = a.imshow(T, origin="lower", extent=EXT, cmap="gray", vmin=0.75, vmax=1.05)
             fig.colorbar(im, ax=a, label="transmission T")
-            a.axhline(@Y1@, color="tab:orange", lw=1)
-            a.set(xlabel="x (mm)", ylabel="y (mm)", title="Radiograph: transmission T (128 × 128 pixels)")
+            a.plot(XR, [@Y1@, @Y1@], color="tab:orange", lw=1.2)
+            a.set(xlabel="x (mm)", ylabel="y (mm)", xlim=XR, title="Radiograph: transmission T (128 × 128 pixels)")
             b.plot(np.linspace(EXT[0], EXT[1], n), T[row], color="tab:orange", lw=0.9)
             b.set(xlabel="x (mm)", ylabel="transmission T", title="Profile along the orange line (y = @Y1@ mm)",
-                  ylim=(0.7, 1.1), xlim=(-5, 5))
+                  ylim=(0.7, 1.1), xlim=XR)
             b.grid(alpha=0.3)
             plt.tight_layout()
         nm = r["normalization"]
         ctl_red.clear()
+        open_gate(gate_red)
         print(f"Proton charge: sample {nm['E']['charge_uC'] / 1000:.1f} mC, open beam {nm['O']['charge_uC'] / 1000:.1f} mC "
               f"(the source varies a little from pulse to pulse: that is why each run is normalized by its own charge).")
     except Exception as e:
@@ -253,11 +268,11 @@ def reduce(_):
 
 ctl_red = mc.Control(odin, button_red, stopped=None)
 ctl_red.on_click(reduce)
-display(w.VBox([w.HBox([button_red, ctl_red.stop]), ctl_red.status, img_T]))
+display(w.VBox([w.HBox([button_red, ctl_red.stop]), ctl_red.status, img_T, gate_red]))
 """)
 
 md(r"""
-**Reading the radiograph.** About 89 % of the neutrons cross the 2 mm of rock: almost transparent. With 5 s and
+**Reading the radiograph.** About 89 % of the neutrons cross the 2 mm of rock: almost transparent. With 2 s and
 pixels of 110 µm, the clasts (0.1–0.4 mm, a few % of contrast) are lost in the noise and the blur; and a radiograph
 adds up the whole 2 mm along the beam: a speck can be one grain or several, near the front or the back. Hence the
 tomography.
@@ -309,6 +324,7 @@ def run_tomo(_):
         ctl_tomo.clear()
         print(f"{len(angles)} projections reconstructed: explore the slices below.")
         show_slices()
+        open_gate(gate_tomo)
     except Cancelled:
         print("Tomography stopped: no reconstruction.")
     except Exception as err:
@@ -316,16 +332,28 @@ def run_tomo(_):
     finally:
         odin.move(stage_rot=0.0)
 
+gate_tomo = gate("The slices and the rest of the page appear once the tomography is done.")
 ctl_tomo = mc.Control(odin, button_tomo, stopped=None)
 ctl_tomo.on_click(run_tomo)
-display(w.VBox([w.HBox([button_tomo, ctl_tomo.stop]), bar.box, ctl_tomo.status]))
+display(w.VBox([w.HBox([button_tomo, ctl_tomo.stop]), bar.box, ctl_tomo.status, gate_tomo]))
+""")
+
+md(r"""
+**Optional, if you are curious:** what your files contain (the raw data of the NeXus files, event by event or image by
+image) and how they become a radiograph and a tomography, step by step, with the software used. Click to open; you can
+skip it.
+""")
+
+code(r"""
+analysis_chain.section("odin_camera", odin, title="Optional: the raw data and the analysis chain (click to open)")
 """)
 
 md(r"""
 ## 4. Look inside
 
 Left: a **horizontal slice** at the height $y$ you choose, seen from above ($x$ across, $z$ along the beam at 0°).
-Right: a **vertical slice** at the depth $z$. The color is $\Sigma$ in cm⁻¹. The rings around the rotation axis are the
+Right: a **vertical slice** at the depth $z$. The color is $\Sigma$ in cm⁻¹. The slices follow the sliders (computed on every
+second pixel, 55 µm, to be quick). The rings around the rotation axis are the
 noise of the open beam, the same in every projection. The largest clasts are @WHERE@: move the cross (+) onto the
 brightest spot.
 """)
@@ -340,11 +368,26 @@ xs = w.FloatSlider(value=0.0, min=-4.0, max=4.0, step=0.0275, description="Point
 img_sl = live_view.FigureImage()
 txt_sl = w.HTML("Run the tomography first.")
 
+CACHE = {}
+
+def slices(r):
+    # the slices on every second pixel (55 µm, 4 times faster than all of them), kept while y or z do not change
+    m = r.mm[::2]
+    key_h, key_v = ("h", r._row(ys.value)), ("v", round(zs.value, 4))
+    if key_h not in CACHE:
+        X, Z = np.meshgrid(m, m)
+        CACHE[key_h] = r._bp([r._row(ys.value)], X.ravel(), Z.ravel()).reshape(len(m), len(m))
+    if key_v not in CACHE:
+        CACHE[key_v] = r._bp(list(range(0, r.n, 2)), m, np.full(len(m), zs.value))
+    return CACHE[key_h], CACHE[key_v]
+
 def show_slices(_=None):
     if "rec" not in REC:
         return
     r = REC["rec"]
-    h, v = r.horizontal(ys.value), r.vertical(zs.value)
+    if len(CACHE) > 40:
+        CACHE.clear()
+    h, v = slices(r)
     with img_sl:
         fig, (a, b) = plt.subplots(1, 2, figsize=(12, 5.2), gridspec_kw=dict(width_ratios=[1.6, 1]))
         kw = dict(origin="lower", extent=EXT, cmap="magma", vmin=0, vmax=2.0)
@@ -396,10 +439,16 @@ def measure(_=None):
         ring = [r.value(xs.value + d * np.cos(a), ys.value, float(np.clip(zs.value + d * np.sin(a), -0.85, 0.85)), 0.04)
                 for d in (0.4, 0.6) for a in ang]
         mat = float(np.median(ring))
-        RES.update(spot=spot, matrix=mat)
         print(f"spot:   Σ = {spot:.2f} cm⁻¹")
         print(f"matrix: Σ = {mat:.2f} cm⁻¹")
         print(f"ratio spot / matrix = {spot / mat:.1f}")
+        if spot / mat < 1.5:
+            RES.clear()
+            print("\nThe cross is not on a bright spot (the spot hardly differs from the matrix around it). Move it "
+                  "onto a bright spot with the three sliders of part 4 (look for yellow-white in the slices), then "
+                  "click Measure Σ again.")
+        else:
+            RES.update(spot=spot, matrix=mat)
 
 button_s.on_click(measure)
 display(w.VBox([button_s, out_s]))
@@ -438,13 +487,6 @@ display(w.VBox([button_w, out_w]))
 """)
 
 
-md(r"""
-Curious about what your files contain and how the images become a tomography? Open the section below (optional).
-""")
-
-code(r"""
-analysis_chain.section("odin_camera", odin)
-""")
 
 md(r"""
 **Limits of the twin.** The piece is a model built from the published numbers (sizes, amounts and attenuations of
@@ -468,8 +510,9 @@ _ = submit.Submit("odin/exercises/meteorite_imaging", "class", quiz=q, title="OD
 
 QS = {
     'water': r'''
-q.number("1 mm of water in the beam. With neutrons of 1.8 Å, Σ = 3.6 cm⁻¹ (hydrogen); with X-rays of 60 keV, "
-         "μ = 0.21 cm⁻¹. Which fraction of the **neutrons** does it remove, 1 − T (%)?",
+q.number("1 mm of water in the beam, with neutrons of 1.8 Å: Σ = 3.6 cm⁻¹ (mostly the scattering by hydrogen). "
+         "Which fraction of the neutrons does it remove, 1 − T (%)? (For comparison after you answer: X-rays of "
+         "60 keV see μ = 0.21 cm⁻¹ for water.)",
          value=30.4, tol=1.5, unit="%",
          mistakes=[(2.0, "that is the X-ray value (μ = 0.21 cm⁻¹); the question is about neutrons"),
                    (36, "3.6 cm⁻¹ × 0.1 cm = 0.36 is −ln T, not 1 − T: T = e^(−0.36)")],

@@ -176,9 +176,9 @@ LMAX = max(BY_LOAD)
 
 In a region of the specimen (here its middle, the narrowest part), for each wavelength bin of 0.01 Å:
 
-$$T = \frac{(E - N)/Q_E}{(O - N)/Q_O}$$
+$$T = \frac{(S - D)/Q_S}{(O - D)/Q_O}$$
 
-$E$, $O$, $N$: the counts of the specimen, open-beam and dark files in the region ($N$ scaled to the duration of each
+$S$, $O$, $D$: the counts of the specimen (sample), open-beam and dark files in the region ($D$ scaled to the duration of each
 measurement), $Q$ the proton charge of each measurement (the number of neutrons produced is proportional to it).
 Error bars: Poisson, propagated. Reading a file of 30 million neutrons takes about 20 s the first time.
 """), code(r'''

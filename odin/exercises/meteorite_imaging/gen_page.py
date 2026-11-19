@@ -273,7 +273,7 @@ display(w.VBox([listing, rename]))
 md(r"""
 ## 3. The radiograph
 
-*Show the transmission* computes $T = (I - D)/(O - D)$ for each pixel (each image per second of exposure). Choose the
+*Show the transmission* computes $T = (S - D)/(O - D)$ for each pixel (each image per second of exposure). Choose the
 setup of the images to compare. The profile follows one horizontal line of pixels (choose its height).
 """)
 

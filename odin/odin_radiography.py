@@ -2,7 +2,7 @@
 (the tomography of time-of-flight files, by wavelength band: odin_tomo.py).
 
     img = image(file)                                    # counts per pixel (128 x 128), its time and its angle
-    T = transmission(sample, open_beam, dark)            # T = (I - D) / (O - D), each scaled to its exposure
+    T = transmission(sample, open_beam, dark)            # T = (S - D) / (O - D), each scaled to its exposure
     vol = reconstruct(files, open_beam, dark)            # filtered back-projection: Σ (cm⁻¹) in 3D, (y, z, x)
 
 A radiograph shows the transmission T = exp(−∫Σ dl) along each line through the sample: everything along the beam is
@@ -48,7 +48,7 @@ def image(file):
 
 
 def transmission(sample, open_beam, dark=None):
-    """T = (I − D) / (O − D), I, O and D per second of exposure."""
+    """T = (S − D) / (O − D), S, O and D per second of exposure."""
     I, O = image(sample), image(open_beam)
     i, o = I["data"] / I["t"], O["data"] / O["t"]
     if dark:
