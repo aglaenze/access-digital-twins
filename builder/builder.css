@@ -206,3 +206,6 @@ body.loki .viewer { overflow: hidden; }
 .mini .mt { font-size: 12px; font-weight: 600; color: var(--mute); margin-bottom: 2px; }
 .mini svg { width: 100%; height: 120px; display: block; }
 @media (max-width: 900px) { body.loki .viewer { height: auto; position: static; } .plotwrap { height: 340px; flex: none; } }
+
+/* no WebGL: a note in place of the 3D view */
+.nogl { margin: 40px auto; max-width: 420px; padding: 14px 16px; border: 1px dashed #b8c2d0; border-radius: 10px; color: #4a5568; font-size: 14px; line-height: 1.45; background: #f8fafc; }

@@ -413,19 +413,27 @@ function go(n) {
 const V = { renderer: null, scene: null, camera: null, controls: null, group: null, box: null, bounds: null, fitted: false };
 function init3d() {
   const host = $("three");
-  V.renderer = new THREE.WebGLRenderer({ antialias: true });
+  V.scene = new THREE.Scene();
+  V.camera = new THREE.PerspectiveCamera(32, 1, 0.1, 2000);
+  V.group = new THREE.Group(); V.scene.add(V.group);
+  V.helpers = new THREE.Group(); V.scene.add(V.helpers);
+  try {
+    V.renderer = new THREE.WebGLRenderer({ antialias: true });
+  } catch (e) {          // no WebGL (graphics off, some remote desktops): everything works but the 3D view
+    V.renderer = null;
+    V.controls = { target: new THREE.Vector3(), update() {} };
+    host.append(el("div", { class: "nogl" }, "No 3D view in this browser (WebGL is off). The beam's eye view, the "
+      + "checks and the saving work: use the tab Beam's eye view."));
+    return;
+  }
   V.renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
   V.renderer.setClearColor(0xffffff);
   host.append(V.renderer.domElement);
-  V.scene = new THREE.Scene();
-  V.camera = new THREE.PerspectiveCamera(32, 1, 0.1, 2000);
   V.controls = new OrbitControls(V.camera, V.renderer.domElement);
   V.controls.enableDamping = true;
   V.scene.add(new THREE.HemisphereLight(0xffffff, 0x8899aa, 1.1));
   const d1 = new THREE.DirectionalLight(0xffffff, 1.4); d1.position.set(30, 50, -20); V.scene.add(d1);
   const d2 = new THREE.DirectionalLight(0xffffff, 0.5); d2.position.set(-30, -10, 40); V.scene.add(d2);
-  V.group = new THREE.Group(); V.scene.add(V.group);
-  V.helpers = new THREE.Group(); V.scene.add(V.helpers);
   const resize = () => { const w = host.clientWidth, h = host.clientHeight; if (!w || !h) return; V.renderer.setSize(w, h); V.camera.aspect = w / h; V.camera.updateProjectionMatrix(); };
   new ResizeObserver(resize).observe(host); resize();
   const loop = () => { V.controls.update(); V.renderer.render(V.scene, V.camera); requestAnimationFrame(loop); };
