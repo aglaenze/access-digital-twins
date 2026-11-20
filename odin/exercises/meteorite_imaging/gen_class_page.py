@@ -291,8 +291,9 @@ q.number("The rock lets through T ≈ 0.90 of the neutrons over its 2 mm thickne
          "Σ (cm⁻¹)?", value=0.53, tol=0.05, unit="cm⁻¹",
          mistakes=[(0.053, "right, but per mm: the answer is asked in cm⁻¹"), (0.10, "this is 1 − T, not −ln T / x")],
          hints=["T = exp(−Σ x): Σ = −ln T / x.", "x = 0.2 cm; −ln 0.90 = 0.105."],
-         explanation="Σ = −ln 0.90 / 0.2 cm = 0.53 cm⁻¹: the matrix of the meteorite in ODIN's white beam (0.45 cm⁻¹ at "
-                     "ICON, whose beam is warmer: these minerals attenuate slow neutrons more).",
+         explanation="Σ = −ln 0.90 / 0.2 cm = 0.53 cm⁻¹: the matrix of the meteorite in ODIN's white beam (Naver et al.: "
+                     "0.45 cm⁻¹, taken by the twin at 1.8 Å; the neutrons counted on ODIN have a mean wavelength of "
+                     "3.2 Å, and these minerals attenuate slower neutrons more).",
          title="Q4. Σ of the rock")
 """)
 fig("meteorite_tomography.png", "One horizontal slice of the piece (8 mm × 2 mm), seen from above. A radiograph adds "
@@ -507,8 +508,8 @@ display(w.VBox([button_s, out_s]))
 """)
 
 md(r"""
-The twin's values are higher than the table's: ODIN's white beam is colder (mean wavelength 3.3 Å) than ICON's
-(1.8 Å), and these materials attenuate slow neutrons more; ratios change much less. A spot of 0.1–0.3 mm is also
+The twin's values are higher than the table's: the table is for neutrons of 1.8 Å (25 meV), the neutrons counted on
+ODIN have a mean wavelength of 3.2 Å, and these materials attenuate slower neutrons more; ratios change much less. A spot of 0.1–0.3 mm is also
 blurred with its surroundings: the value in its middle is lower than the true one.
 
 ## 6. How much water?

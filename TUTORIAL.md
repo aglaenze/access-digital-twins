@@ -307,7 +307,7 @@ folder written in its first cell (a session or a proposal) and reduces it with t
 
 **Other samples**: the page and NICOS offer several samples (`move(sample_holder, '<name>')`; `sample_info()`
 describes them). For a free beamtime you can design your own with
-the sample builder, `Sample_builder.ipynb` (see README.md, "Samples").
+the sample builder (button *Sample builder* of the notebook; see README.md, "Samples").
 
 **Going further**: other chopper modes (`move(choppers, "natural")`, `"white"`), tomography (`scan(stage_rot, ...)`),
 the game `ODIN_mission.ipynb`, the 3D view of the neutrons in the beamline (`python odin/show_3d.py`, route B).

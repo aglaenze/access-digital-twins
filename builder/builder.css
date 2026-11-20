@@ -166,3 +166,43 @@ textarea.code { width: 100%; font-family: Consolas, "Cascadia Mono", monospace; 
 .mcard .sw { width: 20px; height: 20px; border-radius: 5px; border: 1px solid rgba(0,0,0,.15); flex: none; }
 .mcard .t { font-weight: 600; font-size: 13px; }
 .mcard .s { font-size: 11.5px; color: var(--mute); }
+
+/* ---------------- the LoKI page (builder/loki.html) ---------------- */
+.choice { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; margin-bottom: 10px; }
+.opt { text-align: left; display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; }
+.opt .t { font-weight: 600; }
+.opt .x { font-size: 12px; color: var(--mute); }
+.opt.on { border-color: var(--teal); background: var(--teal-soft); }
+.slider.wide { grid-template-columns: 132px 1fr 74px minmax(64px, auto); }
+.slider .fixed { grid-column: 2 / span 3; color: var(--mute); font-size: 13px; }
+.sldline svg { width: 100%; height: auto; display: block; margin-top: 6px; }
+.sldline .small { line-height: 1.35; }
+svg text.ax { font-size: 11px; fill: var(--mute); text-anchor: middle; }
+svg text.axl { font-size: 12px; fill: var(--ink); }
+svg text.lb { font-size: 11px; text-anchor: middle; fill: var(--mute); }
+svg text.lb.b { font-weight: 600; }
+.kind { border: 1px solid var(--line); border-radius: 9px; padding: 8px 10px 4px; margin-bottom: 10px; }
+.khead { display: flex; align-items: center; gap: 8px; }
+.khead .sw { width: 14px; height: 14px; border-radius: 50%; }
+.khead .grow, .sheet-head .grow, .mcard .grow { flex: 1; }
+.small-btn { padding: 3px 9px; font-size: 12.5px; }
+.kind .shapes { grid-template-columns: repeat(3, minmax(84px, 1fr)); }
+.kind .matcard { margin-bottom: 6px; }
+.lock { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; background: #F3F4F6;
+  border: 1px dashed #B8C0CC; border-radius: 8px; padding: 6px 10px; margin: 4px 0; font-size: 13px; color: #374151; }
+.cbar { height: 5px; background: #EEF1F5; border-radius: 3px; margin-top: 4px; overflow: hidden; max-width: 260px; }
+.cbar span { display: block; height: 100%; border-radius: 3px; }
+.holder:disabled { opacity: .45; }
+.cell-big { width: 100%; height: auto; display: block; background: #FBFCFD; border-radius: 8px; margin: 8px 0 4px; }
+body.loki .viewer { overflow: hidden; }
+.plotwrap { position: relative; flex: 1; min-height: 240px; }
+.plotwrap svg { position: absolute; inset: 0; display: block; }
+.tip { position: absolute; background: rgba(255,255,255,.95); border: 1px solid var(--line); border-radius: 8px; padding: 5px 9px;
+  font-size: 12.5px; pointer-events: none; box-shadow: 0 2px 8px rgba(20,32,51,.08); }
+.numbers { display: flex; flex-wrap: wrap; gap: 4px 18px; padding: 6px 12px; font-size: 12.5px; color: var(--mute); border-top: 1px solid var(--line); }
+.numbers b { color: var(--ink); font-weight: 600; }
+.minis { display: grid; grid-template-columns: 1.3fr 1fr; gap: 10px; padding: 6px 12px 12px; }
+.mini { border: 1px solid var(--line); border-radius: 9px; padding: 6px 8px; background: #FBFCFD; min-width: 0; }
+.mini .mt { font-size: 12px; font-weight: 600; color: var(--mute); margin-bottom: 2px; }
+.mini svg { width: 100%; height: 120px; display: block; }
+@media (max-width: 900px) { body.loki .viewer { height: auto; position: static; } .plotwrap { height: 340px; flex: none; } }

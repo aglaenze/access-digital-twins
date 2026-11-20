@@ -22,10 +22,13 @@ All requests need the token of the server (header "Authorization: token ...").
     POST /twin/nicos {instrument}  opens NICOS of this instrument: windows of this computer (local app), or the control
                                    room of the container (returns the address of the remote screen)
     GET  /twin/handin              the work of the student as a zip file (logbooks, notebooks, measurements logbook)
-    GET  /twin/builder?instrument=odin&proposal=N[&start=<sample>&name=..&title=..]   the sample builder (a page of
-                                   the app: builder/index.html, its files under /twin/builder/static/)
-    GET|POST /twin/builder/api/<what>   what the page asks (builder_api.py): info, load, preview, radiograph,
-                                   check, sigmas, catalogue_sigmas, thumb (PNG), yaml, parse, save, save_model
+    GET  /twin/builder?instrument=odin|loki&proposal=N[&start=<sample>&name=..&title=..]   the sample builder (a page
+                                   of the app: builder/index.html for ODIN, builder/loki.html for LoKI, their files
+                                   under /twin/builder/static/)
+    GET|POST /twin/builder/api/<what>   what the page asks. ODIN (builder_api.py): info, load, preview, radiograph,
+                                   check, sigmas, catalogue_sigmas, thumb (PNG), yaml, parse, save, save_model.
+                                   LoKI ("instrument": "loki", builder_loki.py): info, load, view, check, thumb, save,
+                                   save_model, download
 
 The student's things: notebooks in work/<user>/, logbooks in TWIN_RUN_ROOT/progress/<user>/, measurements of the
 pages in the sessions TWIN_RUN_ROOT/<instrument>/<user>/. Accounts and passwords stay in the app (twin/app/accounts.js).
@@ -465,13 +468,10 @@ class Handin(Base):
 class BuilderPage(JupyterHandler):
     @web.authenticated
     def get(self):
-        """The sample builder page (ODIN). LoKI keeps its Voila page (kinds of particles)."""
-        if self.get_argument("instrument", "odin") == "loki":
-            q = self.request.query
-            self.redirect(url_path_join(self.base_url, "voila/render/Sample_builder.ipynb") + (f"?{q}" if q else ""))
-            return
+        """The sample builder page: ODIN (index.html: a samplecraft scene) or LoKI (loki.html: particles in a solvent)."""
+        page = "loki.html" if self.get_argument("instrument", "odin").lower() == "loki" else "index.html"
         root = os.path.abspath(os.path.expanduser(self.settings["server_root_dir"]))
-        with open(os.path.join(root, "builder", "index.html"), encoding="utf-8") as f:
+        with open(os.path.join(root, "builder", page), encoding="utf-8") as f:
             self.set_header("Content-Type", "text/html; charset=utf-8")
             self.set_header("Cache-Control", "no-store")
             self.finish(f.read())
@@ -499,7 +499,11 @@ class BuilderApi(Base):
             raise web.HTTPError(404)
         a = lambda k, d="": self.get_argument(k, d)
         try:
-            png = await self._run(B.thumb, a("instrument", "odin"), a("kind"), a("ref"), a("proposal"))
+            if a("instrument", "odin") == "loki":
+                import builder_loki as L
+                png = await self._run(L.thumb, a("kind"), a("ref"), a("proposal"))
+            else:
+                png = await self._run(B.thumb, a("instrument", "odin"), a("kind"), a("ref"), a("proposal"))
         except Exception as e:                         # noqa: BLE001 (a picture: never an error page)
             self.log.warning("builder thumb %s: %s", a("ref"), e)
             raise web.HTTPError(404)
@@ -510,10 +514,13 @@ class BuilderApi(Base):
     @web.authenticated
     async def post(self, what):
         import builder_api as B
-        if what not in self.POST:
-            raise web.HTTPError(404)
         d = self.body()
         ins, prop = d.get("instrument", "odin"), str(d.get("proposal", "") or "")
+        if ins == "loki":
+            await self._loki(what, d, prop)
+            return
+        if what not in self.POST:
+            raise web.HTTPError(404)
         rec, hol = d.get("recipe"), d.get("holder")
         try:
             if what == "info":
@@ -545,6 +552,39 @@ class BuilderApi(Base):
             return
         except Exception as e:                         # noqa: BLE001 (a recipe that samplecraft cannot build)
             self.log.exception("builder %s", what)
+            self.finish(json.dumps(dict(error=f"{type(e).__name__}: {e}")))
+            return
+        self.finish(json.dumps(out))
+
+    LOKI = ("info", "load", "view", "check", "save", "save_model", "download")
+
+    async def _loki(self, what, d, prop):
+        """The LoKI page (builder/loki.html): builder_loki.py, the state of the page in d["state"]."""
+        import builder_loki as L
+        if what not in self.LOKI:
+            raise web.HTTPError(404)
+        st = d.get("state")
+        try:
+            if what == "info":
+                out = await self._run(L.info, prop, d.get("start", ""))
+            elif what == "load":
+                out = await self._run(L.load, d.get("kind", "scratch"), d.get("ref", ""), prop)
+            elif what == "view":
+                out = await self._run(L.view, st)
+            elif what == "check":
+                out = dict(items=await self._run(L.check, st))
+            elif what == "save":
+                out = await self._run(L.save, prop, d.get("name", ""), d.get("title", ""), d.get("description", ""), st)
+            elif what == "save_model":
+                out = await self._run(L.save_model, prop, d.get("model", ""), d.get("title", ""),
+                                      d.get("description", ""), st)
+            else:
+                out = dict(text=await self._run(L.download, d.get("title", ""), d.get("description", ""), st))
+        except (ValueError, KeyError, TypeError, OSError) as e:
+            self.finish(json.dumps(dict(error=str(e))))
+            return
+        except Exception as e:                         # noqa: BLE001
+            self.log.exception("builder loki %s", what)
             self.finish(json.dumps(dict(error=f"{type(e).__name__}: {e}")))
             return
         self.finish(json.dumps(out))

@@ -258,7 +258,7 @@ has a single chopper phasing, the one of the official model (Airbus acceptance r
 14 Hz operation would need chopper phases from the ODIN team, not invented here.
 
 Adding a sample: one YAML file in `odin/samples/` (blocks: NCrystal file, center, size in mm; see
-`../sample_library.py`), or with the sample builder (`../Sample_builder.ipynb`, saved with the proposal); the same
+`../sample_library.py`), or with the sample builder (`../builder/`, saved with the proposal); the same
 volumes are used by McStas (Union) and by the hybrid mode. A sample changed under the same name is simulated again
 (fingerprint of its geometry in the name of the McStas instrument). Only boxes for now; cylinders, spheres and holes
 will come with the exercises that need them (tomography, real components).

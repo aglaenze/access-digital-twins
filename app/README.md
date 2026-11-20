@@ -58,8 +58,24 @@ selected in the list outlined; the field of view and the beam drawn) and the bea
 wavelength chosen, `odin_hybrid.scene_transmission`). The parts an exercise hides (secret fills and bodies of a
 library sample) are sealed: the page gets a placeholder, the part stays on the server
 (`TWIN_RUN_ROOT/builder/sealed/`) and comes back when the sample is saved; the views leave them out. A large sample
-(the meteorite: about a minute to place its grains) is shown without its grains while it is edited. LoKI keeps the
-Voila page (`../gen_sample_builder.py`, `Sample_builder.ipynb`: kinds of particles), to which `/twin/builder` redirects.
+(the meteorite: about a minute to place its grains) is shown without its grains while it is edited.
+LoKI: its own page at the same address (`?instrument=loki`: `../builder/loki.html`, `loki.js`, the same `builder.css`;
+its API `../builder_loki.py`, the same `/twin/builder/api/<what>` with `"instrument": "loki"`). The same three steps:
+**1. Sample** (the gallery: the library samples, models `TWIN_RUN_ROOT/templates/loki/`, the proposal's samples, from
+scratch; the liquid: H2O/D2O mixture or air, its D2O fraction and thickness, a line of scattering length densities;
+any number of kinds of particles: sphere, rod (cylinder), core-shell sphere, their materials as cards with ρ and the
+contrast Δρ against the liquid, sizes in Å by log sliders, volume fraction); **2. Holder** (the quartz cell of
+`sample_library`, windows 2 × 1.25 mm fixed, only the gap = the liquid thickness changes, drawn to scale; or no cell
+for the empty beam); **3. Check & save** (traffic lights from the twin's physics: transmission at 3 and 10 Å from
+`sample_library.loki_sample`, signal over the incoherent background, contrast and match point of each kind, dilute
+regime (Percus-Yevick S(0) of hard spheres), the sizes against LoKI's Q range 0.003–0.6 Å⁻¹ (Guinier plateau, first
+minimum); save with the proposal, `sample_library.save("loki", ...)`, or as a model, or download the YAML). On the
+right: dΣ/dΩ(Q) on log-log axes (`sample_library.loki_cross_section`, exact, no instrument; each kind and the
+background apart, LoKI's Q range shaded), the particles to scale with one another, the cell seen from the side.
+Polydispersity: not in the sample format, so not offered. The properties an exercise hides (`exercise.yml`,
+e.g. the radius and volume fraction of `silica_spheres`) are sealed value by value (keyed hash ids, the values in
+`TWIN_RUN_ROOT/builder/sealed/`): a kind with a sealed value is neither drawn nor checked nor put in a model or a
+download; saved with the proposal, the values come back and stay hidden (`hidden:` in the file).
 
 **Where things are.** Logbooks: `TWIN_RUN_ROOT/progress/<account>/`; measurements of the pages:
 `TWIN_RUN_ROOT/<instrument>/<account>/`; notebooks: `work/<account>/`. NICOS data stay in the proposal folders

@@ -16,10 +16,6 @@ as wanted: boxes, spheres and cylinders (vertical axis, the axis of the rotation
       - {material: Al_sg225.ncmat, shape: cylinder, center_mm: [-4, 0, 0], size_mm: [2, 8, 2]}          # d 2, h 8
   x horizontal, y vertical, z along the beam (size_mm: the bounding box, size_mm[2] the thickness), centers relative to
   the stage axis. Without "shape": a box.
-  Natural samples (rocks, meteorites) also use irregular shapes (rock_shapes.py):
-      - {material: matrix, shape: slab, center_mm: [0, 0, 0], size_mm: [8, 12, 2], seed: 11}    # a sawn piece
-      - {material: feldspar, shape: blob, inside: 0, center_mm: [1, 2, 0], size_mm: [0.3, 0.4, 0.2],
-         angles_deg: [20, 40, 10], wobble: 0.12, seed: 5}                                       # a lumpy grain
   an ellipsoid turned in 3D (angles about z, x, then y) with lumps (wobble 0: a plain ellipsoid); "inside: k" makes
   a volume an inclusion of volume k (it replaces its material); "secret: true" marks what an exercise hides (drawn
   and described as the material around it when the exercise hides its "inclusions").
@@ -114,7 +110,33 @@ def _mix_part_ok(mat):
 
 def odin_material_problem(cfg):
     """What is wrong with the material of a student's volume (None: fine): a crystal of the list, a composition
-    (solid::), or a mixture of them and of the minerals of the builder, with an optional density factor."""
+    (solid::), or a mixture of them and of the minerals of the builder, with an optional density factor; else any
+    material NCrystal can make (the materials of the library samples: a sample changed in the builder keeps them)."""
+    problem = _material_rule(cfg)
+    if problem and _ncrystal_ok(cfg):
+        return None
+    return problem
+
+
+_NC_OK = {}
+try:                                                    # NCrystal finds the twin's own materials (odin/materials)
+    import NCrystal as _NC
+    _NC.addCustomSearchDirectory(os.path.join(os.path.dirname(os.path.abspath(__file__)), "odin", "materials"))
+except Exception:                                       # (NCrystal missing: the LoKI-only environments)
+    pass
+
+
+def _ncrystal_ok(cfg):
+    if cfg not in _NC_OK:
+        try:
+            import samplecraft
+            _NC_OK[cfg] = bool(np.isfinite(samplecraft.sigma(cfg, [3.0])).all())
+        except Exception:
+            _NC_OK[cfg] = False
+    return _NC_OK[cfg]
+
+
+def _material_rule(cfg):
     if cfg in ODIN_MATERIALS.values() or cfg in LEGACY.values():
         return None
     base, dens = _split_density(cfg)
@@ -203,20 +225,14 @@ QUARTZ_REMOVAL, QUARTZ_ABS = 23.4, 0.38          # 1/m
 LOKI_MODELS = {"none": [], "sphere": ["radius"], "cylinder": ["radius", "length"],
                "core_shell_sphere": ["radius", "thickness"]}
 UNITS = {"radius": "Å", "length": "Å", "thickness": "Å"}
-ODIN_SHAPES = ("box", "sphere", "cylinder", "ellipsoid", "blob", "slab")
+ODIN_SHAPES = ("box", "sphere", "cylinder", "ellipsoid")
 
 
 def shape_dims(v):
-    """dims [m] (and angles, lumps, seed) of a volume for odin_hybrid and rock_shapes."""
+    """dims [m] (and the own angle of a box or an ellipsoid) of a volume for odin_hybrid."""
     size = [float(s) * 1e-3 for s in v["size_mm"]]
     if len(size) > 3:                                   # the 4th item of a box or an ellipsoid: its own angle [deg]
         size[3] = float(v["size_mm"][3])
-    shape = v.get("shape", "box")
-    if shape == "blob":
-        size = size[:3] + [float(a) for a in (v.get("angles_deg") or (0, 0, 0))] + [float(v.get("wobble", 0.0)),
-                                                                                    int(v.get("seed", 0))]
-    elif shape == "slab":
-        size = size[:3] + [int(v.get("seed", 0))]
     return tuple(size)
 
 
@@ -225,9 +241,6 @@ def odin_inside(v, pts):
     c = np.asarray(v.get("center_mm", (0, 0, 0)), float)
     d = np.asarray(pts, float) - c
     shape = v.get("shape", "box")
-    if shape in ("blob", "slab"):
-        import rock_shapes
-        return rock_shapes.inside(shape, shape_dims(v), d * 1e-3)
     sx, sy, sz = (float(a) for a in v["size_mm"][:3])
     if shape in ("box", "ellipsoid") and len(v["size_mm"]) > 3 and float(v["size_mm"][3]):
         t = np.radians(float(v["size_mm"][3]))         # its own angle about y: back to its frame
@@ -342,11 +355,7 @@ def validate(instrument, spec):
             elif shape == "cylinder" and not np.isclose(size[0], size[2]):
                 errors.append(f"{what}: a cylinder has the same size in x and z (its diameter)")
             c = np.asarray(v.get("center_mm", [0, 0, 0]), float)
-            if shape == "blob":                       # turned in 3D, its lumps out to 1 + wobble
-                half = np.full(3, size.max() / 2 * (1 + abs(float(v.get("wobble", 0)))))
-            elif shape == "slab":
-                half = size / 2 + 0.3
-            elif shape in ("box", "ellipsoid") and len(v.get("size_mm", [])) > 3:
+            if shape in ("box", "ellipsoid") and len(v.get("size_mm", [])) > 3:
                 half = np.full(3, float(np.linalg.norm(size)) / 2)        # turned about y
             else:
                 half = size / 2
@@ -474,8 +483,8 @@ def body_center(spec, material):
 
 def scene_from_volumes(spec):
     """The samplecraft scene (description, not built) of a sample given as a list of volumes: each volume a body,
-    an inclusion ("inside": k) a child of its host; boxes and ellipsoids turned about y, blobs in 3D, the sawn piece
-    ("slab") as a sawn_piece mesh; materials named as in the sample (their NCrystal configuration kept)."""
+    an inclusion ("inside": k) a child of its host; boxes and ellipsoids turned about y; materials named as in the
+    sample (their NCrystal configuration kept)."""
     named = spec.get("materials") or {}
     mats, bodies, roots = {}, {}, []
     for k, v in enumerate(spec.get("volumes") or []):
@@ -494,11 +503,6 @@ def scene_from_volumes(spec):
             sh = dict(type="sphere", diameter=size[0])
         elif shape == "cylinder":
             sh = dict(type="cylinder", diameter=size[0], height=size[1])
-        elif shape == "blob":
-            sh = dict(type="blob", size=size[:3], wobble=float(v.get("wobble", 0.0)), seed=int(v.get("seed", 0)))
-            pose["rotation"] = {"euler_deg": [float(a) for a in (v.get("angles_deg") or (0, 0, 0))]}
-        elif shape == "slab":
-            sh = dict(type="sawn_piece", size=size[:3], seed=int(v.get("seed", 0)))
         else:
             raise ValueError(f"volume {k + 1}: shape {shape!r}")
         b = dict(name=v.get("name", f"{m} {k + 1}"), material=m, shape=dict(sh, **pose))
@@ -645,8 +649,6 @@ def describe(instrument, spec, hidden=()):
         lines.append(spec["description"])
     if instrument == "odin" and is_scene(spec):
         lines += _describe_scene(spec, hidden)
-    elif instrument == "odin" and any(v.get("shape") in ("blob", "slab") for v in spec.get("volumes", [])):
-        lines += _describe_rock(spec, hidden)
     elif instrument == "odin":
         n_inc = 0
         for k, v in enumerate(spec.get("volumes", [])):
@@ -761,56 +763,6 @@ def _describe_scene(spec, hidden):
     return lines
 
 
-def _describe_rock(spec, hidden):
-    """A rock: its outline, then each phase (how many grains, how large), the hidden ones left out."""
-    vols = spec.get("volumes", [])
-    has_secret = any(v.get("secret") for v in vols)
-    skip = set()
-    if "inclusions" in hidden:
-        skip = {k for k, v in enumerate(vols) if (v.get("secret") if has_secret else "inside" in v)}
-        while True:
-            n = len(skip)
-            skip |= {k for k, v in enumerate(vols) if v.get("inside") in skip}
-            if len(skip) == n:
-                break
-    lines, groups = [], {}
-    named = spec.get("materials") or {}
-    is_void = lambda n: _split_density(named.get(n, n))[0] == "void.ncmat"
-    what_shape = {"box": "a block", "cylinder": "a cylinder", "sphere": "a sphere", "ellipsoid": "an ellipsoid",
-                  "slab": "a sawn piece (irregular edges)"}
-    for k, v in enumerate(vols):
-        if k in skip:
-            continue
-        sx, sy, sz = (float(a) for a in v["size_mm"][:3])
-        shape = v.get("shape", "box")
-        label = _rock_label(spec, v["material"])
-        if v.get("holder"):
-            dims = (f"diameter {sx:g} mm, height {sy:g} mm" if shape == "cylinder" else
-                    f"{sx:g} × {sy:g} mm, {sz:g} mm thick")
-            lines.append(f"  holder ({'cylinder' if shape == 'cylinder' else 'block'}): {label}, {dims}, centered at "
-                         f"y = {v['center_mm'][1]:g} mm")
-        elif "inside" not in v:
-            kind = what_shape.get(shape, "a lumpy piece" if v.get("wobble") else "an ellipsoid")
-            dims = (f"{sx:g} mm across" if shape == "sphere" else
-                    f"diameter {sx:g} mm, height {sy:g} mm" if shape == "cylinder" else
-                    f"{sx:g} × {sy:g} × {sz:g} mm")
-            lines.append(f"  {kind} of {label}, {dims}")
-        else:
-            groups.setdefault(v["material"], []).append(max(sx, sy, sz))
-    for name, sizes in groups.items():
-        sizes = np.array(sizes) * 1e3
-        label = _rock_label(spec, name)
-        if is_void(name):
-            lines.append(f"  {len(sizes)} pores, {sizes.min():.0f} to {sizes.max():.0f} µm" if len(sizes) > 1 else
-                         f"  1 pore, {sizes[0]:.0f} µm")
-        else:
-            lines.append(f"  {len(sizes)} grains of {label}, {sizes.min():.0f} to {sizes.max():.0f} µm"
-                         if len(sizes) > 1 else f"  1 inclusion of {label}, {sizes[0]:.0f} µm")
-    if skip:
-        lines.append("  what holds the hydrogen: ? (where, how many, how much: to be found)")
-    return lines
-
-
 def show(fig=None):
     """Shows a figure in Jupyter at twice the resolution (sharp on all screens), at its normal size. Used instead of
     plt.show() after draw(): the global "retina" setting of matplotlib could block Voila pages."""
@@ -838,8 +790,6 @@ def draw(instrument, spec, hidden=(), fig=None):
     fig.clf()
     if instrument == "odin" and is_scene(spec):
         return _draw_scene(spec, hidden, fig)
-    if instrument == "odin" and any(v.get("shape") in ("blob", "slab") for v in spec.get("volumes", [])):
-        return _draw_rock(spec, hidden, fig)
     if instrument == "odin":
         # two views at the same scale, framed on the sample (and the field of view of the camera); the holder hatched
         # and behind; the legend under the views
@@ -996,95 +946,6 @@ def _rock_label(spec, name):
     if name in named and not name.endswith(".ncmat"):
         return with_formula(re.sub(r" \d+$", "", name))
     return odin_material_label(spec, name)
-
-
-def _draw_rock(spec, hidden, fig):
-    """A natural sample (a rock): its face toward the neutrons and a horizontal cut through its middle, as phase maps
-    computed from the volumes (every grain, clast and pore at its real size and shape). What an exercise hides (its
-    "secret" inclusions) is drawn as the material around it."""
-    from matplotlib.colors import to_rgb
-    from matplotlib.lines import Line2D
-    from matplotlib.patches import Circle, Rectangle
-    ink, mute, beam = "#1F2A3C", "#6B7689", "#B4562B"
-    vols = spec.get("volumes", [])
-    has_secret = any(v.get("secret") for v in vols)
-    skip = set()
-    if "inclusions" in hidden:
-        skip = {k for k, v in enumerate(vols) if (v.get("secret") if has_secret else "inside" in v)}
-        while True:                                    # what is inside a hidden volume is hidden too
-            n = len(skip)
-            skip |= {k for k, v in enumerate(vols) if v.get("inside") in skip}
-            if len(skip) == n:
-                break
-    body = [k for k, v in enumerate(vols) if not v.get("holder") and "inside" not in v]
-    ext = []
-    for k in body:
-        c = np.asarray(vols[k].get("center_mm", (0, 0, 0)), float)
-        s_ = np.asarray(vols[k]["size_mm"][:3], float)
-        ext.append(np.r_[c - s_ / 2 - 0.3, c + s_ / 2 + 0.3])
-    ext = np.array(ext)
-    lo, hi = ext[:, :3].min(axis=0), ext[:, 3:].max(axis=0)
-    step = max(0.01, float(max(hi[0] - lo[0], hi[1] - lo[1])) / 700)
-    z_face = float(0.5 * (lo[2] + hi[2]))              # a cut parallel to the face, through its middle (beam along z)
-    gx = np.arange(lo[0], hi[0], step)
-    gy = np.arange(lo[1], hi[1], step)
-    gz = np.arange(lo[2], hi[2], step / 2)
-    names = []
-
-    def phase_map(axes_pts, shape):
-        lab = np.full(shape, -1, np.int32)
-        for k, v in enumerate(vols):
-            if k in skip or v.get("holder"):
-                continue
-            c = np.asarray(v.get("center_mm", (0, 0, 0)), float)
-            if v.get("shape") == "slab":
-                r = 0.5 * float(np.linalg.norm(v["size_mm"][:3])) + 0.3
-            elif v.get("shape") == "blob":
-                r = 0.5 * max(v["size_mm"][:3]) * (1 + abs(float(v.get("wobble", 0))))
-            else:
-                r = 0.5 * float(np.linalg.norm(np.asarray(v["size_mm"][:3], float)))
-            sel, pts, shp = axes_pts(c, r)
-            if sel is None:
-                continue
-            ins = odin_inside(v, pts).reshape(shp)
-            if not ins.any():
-                continue
-            name = v["material"]
-            if name not in names:
-                names.append(name)
-            lab[sel] = np.where(ins, names.index(name), lab[sel])
-        return lab
-
-    def face(c, r):                                    # plane z = z_face, grid (y, x)
-        if abs(c[2] - z_face) > r:
-            return None, None, None
-        ix = np.where(np.abs(gx - c[0]) <= r)[0]
-        iy = np.where(np.abs(gy - c[1]) <= r)[0]
-        if not len(ix) or not len(iy):
-            return None, None, None
-        X, Y = np.meshgrid(gx[ix], gy[iy])
-        return ((slice(iy[0], iy[-1] + 1), slice(ix[0], ix[-1] + 1)),
-                np.c_[X.ravel(), Y.ravel(), np.full(X.size, z_face)], X.shape)
-
-    def cut(c, r):                                     # plane y = 0, grid (x, z)
-        if abs(c[1]) > r:
-            return None, None, None
-        ix = np.where(np.abs(gx - c[0]) <= r)[0]
-        iz = np.where(np.abs(gz - c[2]) <= r)[0]
-        if not len(ix) or not len(iz):
-            return None, None, None
-        Z, X = np.meshgrid(gz[iz], gx[ix])
-        return ((slice(ix[0], ix[-1] + 1), slice(iz[0], iz[-1] + 1)),
-                np.c_[X.ravel(), np.zeros(X.size), Z.ravel()], X.shape)
-
-    m1 = phase_map(face, (len(gy), len(gx)))
-    m2 = phase_map(cut, (len(gx), len(gz)))
-    hold = [v for v in vols if v.get("holder")]
-    note = None
-    if skip:
-        note = ("what holds hydrogen: to be found" if any("H" in vols[k]["material"] for k in skip)
-                else "inclusions inside: to be found")
-    return _plot_phase_maps(spec, fig, gx, gy, gz, step, m1, m2, names, hold, lo, hi, note)
 
 
 def _draw_scene(spec, hidden, fig):

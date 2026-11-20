@@ -302,31 +302,25 @@ async function selftest(out) {
     await new Promise((r) => setTimeout(r, 2000));
     await shot("5b_notebook_end");
     await js(`document.querySelectorAll(".pane.on webview")[0].executeJavaScript("(() => { const w = window.jupyterapp.shell.currentWidget; w.content.scrollToCell(w.content.widgets[0], 'start'); return true; })()")`).catch(() => {});
-    // the sample builder, opened for ODIN and a proposal (as from a beamtime notebook): a block, + a sphere, + a cylinder
+    // the sample builder (/twin/builder), opened for ODIN and a proposal (as from a beamtime notebook): start from the
+    // first example of the gallery, its 3D view, then step 3 (checks); then the LoKI page and its first sample
     const t4 = Date.now();
-    await js(`openTab("/voila/render/Sample_builder.ipynb?instrument=odin&proposal=1234", "page", "Sample builder"); true`);
+    await js(`openTab("/twin/builder?instrument=odin&proposal=1234", "page", "Sample builder"); true`);
     check("sample builder loaded", await wait(`document.querySelectorAll(".pane .loading").length === 0`, 180), t4);
-    await new Promise((r) => setTimeout(r, 3000));
     const sb = (code) => js(`document.querySelector(".pane.on webview").executeJavaScript(${JSON.stringify(code)})`);
-    const setX = (row, val) => `(() => { const rows = [...document.querySelectorAll('.widget-hbox')].filter(r => r.querySelector('.jupyter-button [class*=trash], .jupyter-button .fa-trash')); const i = rows[${row}].querySelector('input[type=number]'); i.value = '${val}'; i.dispatchEvent(new Event('input', {bubbles: true})); i.dispatchEvent(new Event('change', {bubbles: true})); return rows.length; })()`;
-    const click = (label) => `(() => { const b = [...document.querySelectorAll('button')].find(x => x.textContent.trim() === '${label}'); if (b) b.click(); return !!b; })()`;
-    log("no instrument choice: " + await sb(`!document.body.innerText.includes('Instrument') || document.body.innerText.includes('Instrument: ODIN')`));
-    for (let i = 0; i < 60; i++) {           // the widgets of the page come after its loading
-      if (await sb(`[...document.querySelectorAll('button')].some(x => x.textContent.trim() === 'Add a sphere')`)) break;
-      await new Promise((r) => setTimeout(r, 1000));
-    }
-    log("add sphere: " + await sb(click("Add a sphere")));
-    await new Promise((r) => setTimeout(r, 1500));
-    log("add cylinder: " + await sb(click("Add a cylinder")));
-    await new Promise((r) => setTimeout(r, 1500));
-    log("rows: " + await sb(setX(1, 8)) + " " + await sb(setX(2, -8)));
-    await new Promise((r) => setTimeout(r, 1000));
-    await sb(click("Show my sample"));
-    await new Promise((r) => setTimeout(r, 8000));
-    log("shown: " + await sb(`['block 1:', 'sphere 2:', 'cylinder 3:', 'To fix'].map(k => k + ' ' + document.body.innerText.includes(k)).join(', ')`));
-    await sb(`window.scrollTo(0, document.body.scrollHeight); true`);
-    await new Promise((r) => setTimeout(r, 1000));
+    const until = async (code, s) => { for (let i = 0; i < s; i++) { if (await sb(code).catch(() => false)) return true; await new Promise((r) => setTimeout(r, 1000)); } return false; };
+    check("builder: gallery filled", await until(`document.querySelectorAll('#gallery .card').length > 1`, 60), t4);
+    await sb(`(() => { const c = [...document.querySelectorAll('#gallery .card')].find(x => !x.querySelector('.ph')); if (c) c.click(); return !!c; })()`);
+    check("builder: a sample loaded, 3D view drawn", await until(`document.querySelectorAll('#tree li').length > 0 && !!document.querySelector('#viewer canvas')`, 120), t4);
+    await sb(`document.querySelector('#steps [data-step="3"]').click(); true`);
+    check("builder: checks computed", await until(`document.querySelectorAll('#checks li').length > 0 && !document.querySelector('#checks li.wait')`, 180), t4);
+    await new Promise((r) => setTimeout(r, 2000));
     await shot("6_sample_builder");
+    const tLoki = Date.now();
+    await js(`openTab("/twin/builder?instrument=loki&proposal=3001", "page", "Sample builder"); true`);
+    check("LoKI builder: gallery filled", await until(`document.querySelectorAll('#gallery .card').length > 1`, 90), tLoki);
+    await new Promise((r) => setTimeout(r, 1500));
+    await shot("6b_sample_builder_loki");
     await js(`document.querySelector("#tab-cat").click(); true`);
     await new Promise((r) => setTimeout(r, 2500));
     await shot("4_catalogue_again");

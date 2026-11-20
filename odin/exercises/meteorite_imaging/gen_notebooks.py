@@ -265,7 +265,8 @@ display(w.VBox([yv, zv, xv, img_3d, button_roi, txt_3d])); show3d()
 Naver *et al.* computed $\Sigma$ of the minerals of NWA 7034 at 25 meV (their Table S1) and measured the matrix at
 ICON (0.45 cm⁻¹): plagioclase 0.27–0.28, pyroxenes 0.34–0.38, chlorapatite 0.34, ilmenite 0.70, magnetite and
 maghemite 0.80–0.82 cm⁻¹, that is at most **1.8 times** the matrix. Ratios hardly depend on the spectrum of the beam
-(ODIN's white beam is colder than ICON's: all the values are higher here). Assuming, as the paper, that all the excess
+(the neutrons counted on ODIN, mean wavelength 3.2 Å, are slower than those of the table, 1.8 Å: all the values are
+higher here). Assuming, as the paper, that all the excess
 attenuation is due to hydrogen, the fraction of the region that water would fill is
 $f = (\Sigma_\text{spot} - \Sigma_\text{clast}) / \Sigma_\text{water}$, with $\Sigma_\text{clast}$ the clast without
 hydrogen (0.57 cm⁻¹ at ICON, 1.27 times the matrix) and $\Sigma_\text{water}$; the cell computes both in ODIN's beam
@@ -303,7 +304,8 @@ q.choice("Part 5: with 1 angle in 4 (15 angles), what happens?",
          hints=["Compare all angles and 1 in 4."], title="Q3. The angles")
 q.number("Σ of the matrix (part 3 or 6, cm⁻¹, in ODIN's white beam):", value=0.53, tol=0.08, unit="cm⁻¹",
          hints=["Part 3 prints it from the radiograph; part 6 around the cross."],
-         explanation="About 0.51–0.55 cm⁻¹ here (0.45 cm⁻¹ at ICON, whose beam is warmer).", title="Q4. The matrix")
+         explanation="About 0.51–0.55 cm⁻¹ here (Naver et al.: 0.45 cm⁻¹, taken by the twin at 1.8 Å; "
+                     "slower neutrons are attenuated more).", title="Q4. The matrix")
 q.choice("Where is the hydrogen?",
          ["In small bright regions (0.1–0.4 mm) grouped in clusters.", "Evenly in the whole piece.",
           "Only at the surface.", "In the dark elongated grains."],

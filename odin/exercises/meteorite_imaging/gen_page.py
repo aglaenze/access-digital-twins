@@ -329,7 +329,7 @@ analysis_chain.section("odin_camera", odin)
 """)
 
 md(r"""
-**Reading the radiograph.** About 89 % of the neutrons cross the 2 mm of rock: rocks are almost transparent to
+**Reading the radiograph.** About 90 % of the neutrons cross the 2 mm of rock: rocks are almost transparent to
 neutrons. With the standard setup the piece looks uniform: the clasts are as small as the blur and the pixels, and
 their contrast (a few %) is hidden in the noise. With the high-resolution setup small darker and brighter specks
 appear, but a radiograph adds up the whole 2 mm: a speck can be one grain or several, near the front or the back.
@@ -465,8 +465,9 @@ display(w.VBox([button_s, out_s]))
 """)
 
 md(r"""
-**Reading the numbers.** The values of the twin are higher than those of the table: ODIN's white beam is colder
-(mean wavelength 3.3 Å) than ICON's (1.8 Å), and these materials attenuate slow neutrons more. Ratios change much
+**Reading the numbers.** The values of the twin are higher than those of the table: the table is for neutrons
+of 1.8 Å (25 meV), the neutrons counted on ODIN have a mean wavelength of 3.2 Å, and these materials attenuate slower
+neutrons more. Ratios change much
 less. The tomography also blurs a spot of 0.1 to 0.3 mm with its surroundings (the blur, about 0.05 mm, and the
 pixels, 0.0275 mm): the value in the middle of a small spot is lower than the true one.
 
@@ -540,7 +541,7 @@ q.choice("With the **standard** setup, can the radiograph show the clasts of 0.1
           "Yes, but only at 90°."],
          answer=0, why={1: "Hydrogen gives contrast, but the clasts are tiny and the 2 mm of rock around them is added "
                            "on each line of sight.",
-                        2: "The rock lets 89 % of the neutrons through: it is seen, as a uniform grey.",
+                        2: "The rock lets 90 % of the neutrons through: it is seen, as a uniform grey.",
                         3: "At 90° the beam crosses 8 mm of rock: even less contrast for a small clast."},
          explanation="To see a 0.2 mm clast, the blur and the pixels must be well below 0.2 mm, and enough neutrons must "
                      "be counted to see a contrast of a few %: hence the high-resolution setup and long exposures.",
@@ -567,7 +568,8 @@ q.choice("Why must the **open beam** be measured much longer than each image of 
          title="Q3. The rings")
 q.number("Σ of the **matrix** in the slices (cm⁻¹, in ODIN's white beam):", value=0.53, tol=0.08, unit="cm⁻¹",
          hints=["Part 5 prints it around the cross; or read the color of the slices far from the bright spots."],
-         explanation="About 0.51–0.55 cm⁻¹ in ODIN's beam (0.45 cm⁻¹ measured at ICON, whose beam is warmer).",
+         explanation="About 0.51–0.55 cm⁻¹ in ODIN's beam (Naver et al.: 0.45 cm⁻¹, taken by the twin at "
+                     "1.8 Å; slower neutrons are attenuated more).",
          title="Q4. The matrix")
 q.choice("Where is the hydrogen?",
          ["In small bright regions (0.1–0.4 mm) grouped in clusters, not spread evenly.",

@@ -42,9 +42,9 @@ def nicos(instr):
 
 
 def builder_url(instr):
-    """The sample builder of an instrument: the page of the app for ODIN (builder/, served by container/twin_app.py),
-    the Voila page for LoKI (kinds of particles)."""
-    return "/twin/builder" if instr == "odin" else "/voila/render/Sample_builder.ipynb"
+    """The sample builder of an instrument: the page of the app (builder/, served by container/twin_app.py; ODIN:
+    builder/index.html, LoKI: builder/loki.html, chosen by ?instrument=)."""
+    return "/twin/builder"
 
 
 def sample_builder(instr, proposal=""):
