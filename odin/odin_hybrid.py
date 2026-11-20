@@ -200,7 +200,12 @@ def volumes_transmission(volumes, stage_x, stage_rot, lam_grid=np.linspace(0.3, 
     strains: lattice strain ε of each volume along the beam (a sample under load, sample_library.odin_strain_per_kN):
     every lattice spacing seen by the beam becomes d (1 + ε), so every Bragg edge (λ = 2d) moves to λ (1 + ε):
     Σ_tot(λ) of the strained volume = Σ_tot(λ / (1 + ε)) of the unstrained material. (The smooth parts of Σ_tot,
-    absorption and inelastic scattering, move with it: an error of ε, about 10⁻³, on a slowly varying term.)"""
+    absorption and inelastic scattering, move with it: an error of ε, about 10⁻³, on a slowly varying term.)
+    A sample described as a samplecraft scene (sample_library.SceneSample): scene_transmission."""
+    if hasattr(volumes, "scene"):
+        if strains is not None and any(strains):
+            raise ValueError("a sample described as a scene cannot be strained (load frame) yet")
+        return scene_transmission(volumes, stage_x, stage_rot, lam_grid)
     th = np.radians(stage_rot)
     c, s = np.cos(th), np.sin(th)
     if strains is not None:
@@ -255,6 +260,71 @@ def _mapped_transmission(volumes, vols, stage_rot, lam_grid, epss=None):
         maps = _compute_maps(vols, keys, g, n, stage_rot)
         if cached:
             _write_maps(cached, maps)
+    return _transmission_from_maps(maps, sigs, n, lam_grid)
+
+
+def scene_transmission(sample, stage_x, stage_rot, lam_grid=np.linspace(0.3, 20.0, 4000)):
+    """T(x, y, λ) of a samplecraft scene: rays along the beam (lab z) through the grid of the thickness maps, taken
+    into the frame of the sample (stage translated by stage_x [m], turned by stage_rot [deg] about y); the exact path
+    length of each (material, material around) from the scene (mm), Σ_material − Σ_around applied to it. Maps kept
+    on disk per sample file and position (as for the other samples)."""
+    scene = sample.scene
+    cfg = scene.cfg()
+    t = np.radians(stage_rot)
+    S = np.array([[np.cos(t), 0, np.sin(t)], [0, 1, 0], [-np.sin(t), 0, np.cos(t)]])   # sample -> lab
+    if sum(1 for _ in scene.walk()) <= 20:
+        # a few bodies: the exact path of each neutron (as volumes_transmission does for few volumes)
+        sigs = {}
+
+        def sig(key):
+            if key not in sigs:
+                sg = sigma_tot(key[0], lam_grid)
+                sigs[key] = sg - sigma_tot(key[1], lam_grid) if key[1] is not None else sg
+            return sigs[key]
+
+        def T(x, y, lam):
+            o = np.c_[np.asarray(x) * 1e3 - stage_x * 1e3, np.asarray(y) * 1e3, np.full(len(x), -1e3)] @ S
+            d = np.tile(np.array([0.0, 0.0, 1.0]) @ S, (len(o), 1))
+            mu = np.zeros(len(o))
+            for (m, around), L in scene.path_lengths(o, d).items():
+                L = np.asarray(L, float) * 1e-3
+                k = L > 0
+                key = (cfg[m], cfg[around] if around is not None else None)
+                mu[k] += np.interp(lam[k], lam_grid, sig(key)) * L[k]
+            return np.exp(-mu)
+        return T
+    n = int(round(2 * MAP_HALF / MAP_STEP)) + 1
+    g = -MAP_HALF + np.arange(n) * MAP_STEP
+    import hashlib
+    name = hashlib.sha1(repr((MAP_CACHE_VERSION, "scene", sample.key, round(float(stage_x), 9),
+                              round(float(stage_rot), 9), MAP_STEP, MAP_HALF)).encode()).hexdigest()[:24]
+    cached = os.path.join(MAP_CACHE, f"{name}.npz") if not sample.key.startswith("mem:") else None
+    maps = {}
+    if cached and os.path.exists(cached):
+        try:
+            maps = _read_maps(cached, n)
+        except Exception:
+            maps = {}
+    if not maps:
+        X, Y = np.meshgrid(g * 1e3, g * 1e3)                       # mm
+        o_lab = np.c_[X.ravel() - stage_x * 1e3, Y.ravel(), np.full(X.size, -1e3)]
+        o = o_lab @ S                                              # lab -> sample: S^T p (row vectors)
+        d = np.tile(np.array([0.0, 0.0, 1.0]) @ S, (len(o), 1))
+        for (m, around), L in scene.path_lengths(o, d).items():
+            key = (cfg[m], cfg[around] if around is not None else None, 0.0)
+            arr = np.asarray(L, float).reshape(n, n) * 1e-3          # m
+            if key in maps:
+                maps[key] += arr.astype(np.float32)
+            else:
+                maps[key] = arr.astype(np.float32)
+        if cached:
+            _write_maps(cached, maps)
+    sigs = {}
+    for key in maps:
+        sig = sigma_tot(key[0], lam_grid)
+        if key[1] is not None:
+            sig = sig - sigma_tot(key[1], lam_grid)
+        sigs[key] = sig
     return _transmission_from_maps(maps, sigs, n, lam_grid)
 
 

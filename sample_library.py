@@ -293,6 +293,13 @@ def _read_yml(f):
 def validate(instrument, spec):
     """List of problems (empty: the sample can be used)."""
     errors = []
+    if instrument == "odin" and is_scene(spec):
+        try:
+            scene = SceneSample(spec).scene
+            scene.cfg()
+        except Exception as e:                         # a material or a shape that cannot be made
+            return [f"scene: {e}"]
+        return scene.check(n=1000)
     if instrument == "odin":
         vols = spec.get("volumes") or []
         if not [v for v in vols if not v.get("holder")]:
@@ -388,7 +395,107 @@ def save(instrument, spec, data_folder, name):
 
 
 # --------------------------------------------------------------------------- physics
+_SCENES = {}
+
+
+def is_scene(spec):
+    """A sample described as a samplecraft scene (key "scene": the scene as built)."""
+    return isinstance(spec.get("scene"), dict)
+
+
+class SceneSample:
+    """The samplecraft scene of a sample, built on first use, once per process and version of its file (a rock:
+    thousands of bodies). Stands where the list of volumes of the other samples goes (odin_hybrid)."""
+
+    def __init__(self, spec):
+        self.spec = spec
+        f = spec.get("file")
+        if f and os.path.exists(f):
+            st = os.stat(f)
+            self.key = f"{os.path.basename(f)}:{st.st_mtime_ns}:{st.st_size}"
+        else:
+            import hashlib
+            import json
+            self.key = "mem:" + hashlib.sha1(json.dumps(spec["scene"], sort_keys=True, default=str).encode()).hexdigest()
+
+    @property
+    def scene(self):
+        if self.key not in _SCENES:
+            import samplecraft
+            f = self.spec.get("file")
+            _SCENES[self.key] = samplecraft.Scene.from_dict(self.spec["scene"],
+                                                           base_dir=os.path.dirname(f) if f else None)
+        return _SCENES[self.key]
+
+    def __repr__(self):
+        return f"SceneSample({self.key})"
+
+
+def material_cfgs(spec):
+    """{material name: NCrystal configuration} of an ODIN sample (a scene: its materials resolved)."""
+    if is_scene(spec):
+        return dict(SceneSample(spec).scene.cfg())
+    return dict(spec.get("materials") or {})
+
+
+def body_center(spec, material):
+    """Center [mm] of the first body (or volume) of a material: e.g. where the largest clast of a rock is."""
+    if is_scene(spec):
+        for b, _, _ in SceneSample(spec).scene.walk():
+            if getattr(b, "material", None) == material:
+                return [float(x) for x in b.shape.bounding_sphere()[0]]
+    else:
+        for v in spec.get("volumes") or []:
+            if v["material"] == material:
+                return [float(x) for x in v.get("center_mm", (0, 0, 0))]
+    raise KeyError(f"no body of {material!r}")
+
+
+def scene_from_volumes(spec):
+    """The samplecraft scene (description, not built) of a sample given as a list of volumes: each volume a body,
+    an inclusion ("inside": k) a child of its host; boxes and ellipsoids turned about y, blobs in 3D, the sawn piece
+    ("slab") as a sawn_piece mesh; materials named as in the sample (their NCrystal configuration kept)."""
+    named = spec.get("materials") or {}
+    mats, bodies, roots = {}, {}, []
+    for k, v in enumerate(spec.get("volumes") or []):
+        m = v["material"]
+        mats.setdefault(m, {"ncrystal": named.get(m, m)})
+        shape = v.get("shape", "box")
+        size = [float(x) for x in v["size_mm"]]
+        pose = {"position": [float(x) for x in v.get("center_mm", (0, 0, 0))]}
+        if shape in ("box", "ellipsoid") and len(size) > 3 and size[3]:
+            pose["rotation"] = {"euler_deg": [0.0, 0.0, size[3]]}
+        if shape == "box":
+            sh = dict(type="box", size=size[:3])
+        elif shape == "ellipsoid":
+            sh = dict(type="ellipsoid", size=size[:3])
+        elif shape == "sphere":
+            sh = dict(type="sphere", diameter=size[0])
+        elif shape == "cylinder":
+            sh = dict(type="cylinder", diameter=size[0], height=size[1])
+        elif shape == "blob":
+            sh = dict(type="blob", size=size[:3], wobble=float(v.get("wobble", 0.0)), seed=int(v.get("seed", 0)))
+            pose["rotation"] = {"euler_deg": [float(a) for a in (v.get("angles_deg") or (0, 0, 0))]}
+        elif shape == "slab":
+            sh = dict(type="sawn_piece", size=size[:3], seed=int(v.get("seed", 0)))
+        else:
+            raise ValueError(f"volume {k + 1}: shape {shape!r}")
+        b = dict(name=v.get("name", f"{m} {k + 1}"), material=m, shape=dict(sh, **pose))
+        for f in ("secret", "holder"):
+            if v.get(f):
+                b[f] = True
+        bodies[k] = b
+        if "inside" in v:
+            bodies[int(v["inside"])].setdefault("children", []).append(b)
+        else:
+            roots.append(b)
+    return dict(samplecraft=1, name=spec.get("name", ""), description=spec.get("description", ""), materials=mats,
+                bodies=roots)
+
+
 def odin_volumes(spec):
+    if is_scene(spec):
+        return SceneSample(spec)
     """[(NCrystal file, center [m], dims [m]), ...] of an ODIN sample (format of odin_virtual); a sphere or a cylinder
     has a 4th item, its shape (boxes keep 3 items: the same as before, for the cached simulations). A volume inside
     another one (an inclusion: "inside: k", the index of the volume around it, listed before it) has a 5th item, the
@@ -515,7 +622,9 @@ def describe(instrument, spec, hidden=()):
     lines = [f"{spec.get('name', spec.get('id'))}" + (f"  ({spec['source']} sample)" if spec.get("source") else "")]
     if spec.get("description"):
         lines.append(spec["description"])
-    if instrument == "odin" and any(v.get("shape") in ("blob", "slab") for v in spec.get("volumes", [])):
+    if instrument == "odin" and is_scene(spec):
+        lines += _describe_scene(spec, hidden)
+    elif instrument == "odin" and any(v.get("shape") in ("blob", "slab") for v in spec.get("volumes", [])):
         lines += _describe_rock(spec, hidden)
     elif instrument == "odin":
         n_inc = 0
@@ -561,6 +670,74 @@ def describe(instrument, spec, hidden=()):
     if hidden:
         lines.append("  ? = not given: this is what you have to measure")
     return "\n".join(lines)
+
+
+SHAPE_WORDS = {"Box": "a block", "Sphere": "a sphere", "Ellipsoid": "an ellipsoid", "Cylinder": "a cylinder",
+               "Cone": "a cone", "Torus": "a torus", "Superellipsoid": "a rounded block", "Blob": "a lumpy piece",
+               "Prism": "a prism", "Mesh": "a shape from a mesh", "SawnPiece": "a sawn piece (irregular edges)",
+               "Union": "a composite shape", "Intersection": "a composite shape", "Difference": "a shape with cuts"}
+
+
+def _extent(shape, lo, hi, n=120):
+    """The extent of a shape along x, y and z [mm]: the first and last points of rays along each axis (a grid of
+    n × n rays across its bounds)."""
+    lo2, hi2 = np.array(lo, float), np.array(hi, float)
+    for a in range(3):
+        b, c = [k for k in range(3) if k != a]
+        U, V = np.meshgrid(np.linspace(lo[b], hi[b], n), np.linspace(lo[c], hi[c], n))
+        o = np.zeros((U.size, 3)); o[:, b], o[:, c], o[:, a] = U.ravel(), V.ravel(), lo[a] - 1
+        d = np.zeros_like(o); d[:, a] = 1
+        iv = shape.intervals(o, d)
+        if len(iv.t0):
+            lo2[a], hi2[a] = lo[a] - 1 + float(np.min(iv.t0)), lo[a] - 1 + float(np.max(iv.t1))
+    return lo2, hi2
+
+
+def _describe_scene(spec, hidden):
+    """A scene: its main bodies (shape, material, size), then what is inside them, by material (how many, how
+    large), the secret bodies left out when the inclusions are hidden."""
+    scene = SceneSample(spec).scene
+    hide = "inclusions" in hidden
+    cfg = scene.cfg()
+    label = lambda m: _rock_label(dict(spec, materials=cfg), m) if m else "?"
+    lines, groups, secret = [], {}, False
+
+    def go(bodies, depth):
+        nonlocal secret
+        for b in bodies:
+            if hide and getattr(b, "secret", False):
+                secret = True
+                continue
+            if type(b).__name__ == "VoxelBody":
+                for lab, m in b.materials.items():
+                    groups.setdefault(m, []).append(None)
+                continue
+            lo, hi = b.shape.bounds()
+            if depth == 0 and type(b.shape).__name__ not in ("Box", "Cylinder", "Sphere"):
+                lo, hi = _extent(b.shape, lo, hi)      # its real extent (the bounds of a lumpy shape are wider)
+            ext = hi - lo
+            if depth == 0:
+                what = SHAPE_WORDS.get(type(b.shape).__name__, "a body")
+                where = f", centered at y = {(lo[1] + hi[1]) / 2:g} mm" if getattr(b, "holder", False) else ""
+                lines.append(f"  {'holder: ' if getattr(b, 'holder', False) else ''}{what} of {label(b.material)}, "
+                             f"{ext[0]:.3g} × {ext[1]:.3g} × {ext[2]:.3g} mm{where}")
+            else:
+                groups.setdefault(b.material, []).append(float(ext.max()))
+            go(b.children, depth + 1)
+    go(scene.bodies, 0)
+    for m, sizes in groups.items():
+        known = np.array([x for x in sizes if x is not None]) * 1e3
+        void = _split_density(cfg.get(m, m))[0] == "void.ncmat"
+        if not len(known):
+            lines.append(f"  {'pores' if void else label(m)} (from a voxel grid)")
+        elif len(known) == 1:
+            lines.append(f"  1 {'pore' if void else 'inclusion of ' + label(m)}, {known[0]:.0f} µm")
+        else:
+            lines.append(f"  {len(known)} {'pores' if void else 'grains of ' + label(m)}, {known.min():.0f} to "
+                         f"{known.max():.0f} µm")
+    if secret:
+        lines.append("  what holds the hydrogen: ? (where, how many, how much: to be found)")
+    return lines
 
 
 def _describe_rock(spec, hidden):
@@ -638,6 +815,8 @@ def draw(instrument, spec, hidden=(), fig=None):
         hidden.add("material")
     fig = fig or plt.figure(figsize=(10, 4.2))
     fig.clf()
+    if instrument == "odin" and is_scene(spec):
+        return _draw_scene(spec, hidden, fig)
     if instrument == "odin" and any(v.get("shape") in ("blob", "slab") for v in spec.get("volumes", [])):
         return _draw_rock(spec, hidden, fig)
     if instrument == "odin":
@@ -879,6 +1058,59 @@ def _draw_rock(spec, hidden, fig):
 
     m1 = phase_map(face, (len(gy), len(gx)))
     m2 = phase_map(cut, (len(gx), len(gz)))
+    hold = [v for v in vols if v.get("holder")]
+    note = None
+    if skip:
+        note = ("what holds hydrogen: to be found" if any("H" in vols[k]["material"] for k in skip)
+                else "inclusions inside: to be found")
+    return _plot_phase_maps(spec, fig, gx, gy, gz, step, m1, m2, names, hold, lo, hi, note)
+
+
+def _draw_scene(spec, hidden, fig):
+    """A sample described as a samplecraft scene: the same two cuts, the material at each point from the scene
+    (secret bodies, and all inside them, drawn as the material around them when the inclusions are hidden)."""
+    scene = SceneSample(spec).scene
+    hide = "inclusions" in hidden
+    holders, bodies = [], []
+    for b in scene.bodies:
+        (holders if getattr(b, "holder", False) else bodies).append(b)
+    lo = np.min([b.shape.bounds()[0] for b in bodies], axis=0) - 0.3
+    hi = np.max([b.shape.bounds()[1] for b in bodies], axis=0) + 0.3
+    step = max(0.01, float(max(hi[0] - lo[0], hi[1] - lo[1])) / 700)
+    z_face = float(0.5 * (lo[2] + hi[2]))
+    gx, gy, gz = np.arange(lo[0], hi[0], step), np.arange(lo[1], hi[1], step), np.arange(lo[2], hi[2], step / 2)
+    part = type(scene)(bodies, scene.materials)
+    skip = (lambda b: getattr(b, "secret", False)) if hide else None
+    X, Y = np.meshgrid(gx, gy)
+    f = part.material_at(np.c_[X.ravel(), Y.ravel(), np.full(X.size, z_face)], skip=skip)
+    Z, X2 = np.meshgrid(gz, gx)
+    c = part.material_at(np.c_[X2.ravel(), np.zeros(X2.size), Z.ravel()], skip=skip)
+    names = [n for n in dict.fromkeys(list(f) + list(c)) if n is not None]
+    idx = {n: i for i, n in enumerate(names)}
+    lab = lambda a, shp: np.array([idx[n] if n is not None else -1 for n in a], np.int32).reshape(shp)
+    m1, m2 = lab(f, X.shape), lab(c, X2.shape)
+    hold = []
+    for b in holders:                                  # drawn as boxes or cylinders (their bounds)
+        blo, bhi = b.shape.bounds()
+        cyl = type(b.shape).__name__ == "Cylinder"
+        hold.append(dict(material=b.material, center_mm=list((blo + bhi) / 2), size_mm=list(bhi - blo),
+                         shape="cylinder" if cyl else "box"))
+    spec2 = dict(spec, materials={k: v for k, v in scene.cfg().items()})
+    note = None
+    if hide and any(getattr(b, "secret", False) for b, _, _ in scene.walk()):
+        note = ("what holds hydrogen: to be found" if any("H" in (b.material or "") for b, _, _ in scene.walk()
+                                                          if getattr(b, "secret", False))
+                else "inclusions inside: to be found")
+    return _plot_phase_maps(spec2, fig, gx, gy, gz, step, m1, m2, names, hold, lo, hi, note)
+
+
+def _plot_phase_maps(spec, fig, gx, gy, gz, step, m1, m2, names, hold, lo, hi, note):
+    """The two cuts of a sample (phase maps m1: face, m2: from above; names of their materials), its holders
+    (hatched), the field of view, the beam, a legend."""
+    from matplotlib.colors import to_rgb
+    from matplotlib.lines import Line2D
+    from matplotlib.patches import Circle, Rectangle
+    ink, mute, beam = "#1F2A3C", "#6B7689", "#B4562B"
     colors = _rock_colors(spec, names)
     pal = np.array([to_rgb(colors[n]) for n in names] + [to_rgb("#FBFCFD")])
 
@@ -892,9 +1124,7 @@ def _draw_rock(spec, hidden, fig):
     a2.imshow(rgba(m2), extent=(gz[0], gz[-1] + step / 2, gx[0], gx[-1] + step), origin="lower",
               interpolation="nearest", zorder=3)
     legend = {}
-    for v in vols:                                     # the holder, hatched and behind
-        if not v.get("holder"):
-            continue
+    for v in hold:                                     # the holder, hatched and behind
         c = v.get("center_mm", (0, 0, 0))
         s_ = v["size_mm"]
         style = dict(fc="#EEF1F5", ec="#8A94A6", lw=1.0, hatch="////", zorder=1)
@@ -912,7 +1142,6 @@ def _draw_rock(spec, hidden, fig):
                                                             ls=(0, (5, 3)))
     a1.plot([0], [0], marker="o", ms=7, mfc="none", mec=beam, mew=1.5, zorder=6)
     legend["beam axis (toward you)"] = Line2D([], [], marker="o", ms=7, mfc="none", mec=beam, mew=1.5, ls="none")
-    hold = [v for v in vols if v.get("holder")]
     ylo = min([lo[1]] + [v["center_mm"][1] - v["size_mm"][1] / 2 for v in hold])
     f1 = [min(lo[0], -h) - 1.0, max(hi[0], h) + 1.0, min(ylo, -h) - 1.0, max(hi[1], h) + 1.0]
     z0 = lo[2] - 3.5
@@ -933,9 +1162,8 @@ def _draw_rock(spec, hidden, fig):
             s_.set_color("#CBD2DC")
         ax.grid(alpha=0.25, lw=0.6)
         ax.set_facecolor("#FBFCFD")
-    if skip:                                           # the note in the legend (inside the axes it hid the ticks)
-        legend["what holds hydrogen: to be found" if any("H" in vols[k]["material"] for k in skip)
-               else "inclusions inside: to be found"] = Line2D([], [], ls="none")
+    if note:                                           # the note in the legend (inside the axes it hid the ticks)
+        legend[note] = Line2D([], [], ls="none")
     rows = -(-len(legend) // 4)
     # room for the ticks, the axis labels and the legend under the two pictures, whatever size the caller asked for:
     # the legend lies below the axis labels, never over them

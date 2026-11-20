@@ -380,7 +380,7 @@ transmission (Beer–Lambert, NCrystal cross-sections, mean over the region), 2.
 The Bragg edges are where they must be (copper (111) 4.17 Å, α-iron (110) 4.05 Å). The mcstas points scatter a little
 more than their error bars: the statistics of the simulated neutrons over 10 s (the twin warns, `mc_factor`).
 
-**9.9 Natural samples: lumpy grains and sawn pieces** (2026-11-17; `../rock_shapes.py`, `../rock_builder.py`). A rock
+**9.9 Natural samples: lumpy grains and sawn pieces** (2026-11-17; `../rock_shapes.py`; since 2026-11-20 the samples are `samplecraft` scenes, § 9.10). A rock
 is thousands of volumes (the meteorite NWA 7034, `samples/gen_nwa7034.py`: 9 660): grains and clasts are "blobs"
 (ellipsoids turned in 3D, their surface ρ = 1 + w·f(u), f six plane waves on the sphere), the piece a "slab" (wavy
 sides, rounded edges, a corner broken off). Path lengths: without lumps the exact chord of the ellipsoid; with lumps the
@@ -394,6 +394,18 @@ bounding box, hosts of hosts excepted) finds none in the meteorite. Sample files
 a 300 s image of the meteorite went from about 40 s to 4 s. The tomography of the exercise (60 angles, 300 s,
 high resolution): 4.5 min; Σ of the matrix 0.51–0.55 cm⁻¹ in ODIN's beam, the brightest spot of the largest clast 3.4
 times the matrix (1.9 / 0.45 = 4.2 in the model, lowered by the blur on a region 0.12 mm thin).
+
+**9.10 Samples as `samplecraft` scenes** (2026-11-20; `../samplecraft/README.md`). The hybrid model takes a sample as a
+tree of bodies (exact shapes, CSG, meshes, voxels of a tomogram, generated grains and pores) and computes the path
+length in each material exactly. Same transmission as the former list of volumes to 1e-13 (library samples, 3 angles,
+a stage offset); against McStas Union (`python -m samplecraft.union_check`): machined part, λ = 3 Å, 2·10⁷ neutrons,
+McStas/samplecraft = 0.9998 ± 0.0003, χ²/pixel 1.00; duplex steel (400 grains and a holder), 3.5·10⁶ neutrons,
+1.0008 ± 0.0008, χ²/pixel 1.01 (1.5 % and 0.74 % of the neutrons scattered behind the sample, which the path-length
+model neglects). The fragment of NWA 7034 of the polarized exercise (`samples/gen_polarized.py`) is a voxel body
+segmented from the attenuation tomogram of Qvistgaard et al. (2026) (80³ voxels of 0.186 mm, the grid of their field
+map): one piece, 9.5 × 11.9 mm, median thickness 2.05 mm (the paper: 2 mm). Its matrix is that of the meteorite
+(0.45 cm⁻¹ at 1.8 Å, 0.53 at 3 Å after Naver et al.); the authors' tomogram gives 0.34 cm⁻¹ inside, averaged over
+RADEN's spectrum: the polarized images (which use that tomogram) attenuate a little less than the ordinary ones.
 
 ## 10. NICOS
 NICOS drives the twin since 2026-11-03 (Windows, and Linux in the container), organized as at ESS since 2026-11-04:

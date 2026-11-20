@@ -12,8 +12,9 @@ ordinary images (camera, Timepix) and their drawing.
   * nwa7034_fragment: the fragment of NWA 7034 of C. Qvistgaard et al., Geochem. Geophys. Geosyst. 27, e2025GC012641
     (2026): 2 mm thick, about 10 mm wide and 13 mm tall, magnetized with a small whiteboard magnet before the
     measurement (no remanent field was left in it); measured at RADEN at 33 angles. Its field and its attenuation: the
-    authors' reconstruction (data DTU Data, doi:10.11583/DTU.30775208, CC BY 4.0). Drawn as a plate of the matrix of
-    the meteorite (same material as meteorite_nwa7034.yml).
+    authors' reconstruction (data DTU Data, doi:10.11583/DTU.30775208, CC BY 4.0). Its shape: segmented from their
+    attenuation tomogram (a samplecraft voxel body, fragment_labels()), in the matrix of the meteorite (same material
+    as meteorite_nwa7034.yml), so that the ordinary images and the polarized ones show the same piece.
 """
 import os
 
@@ -59,12 +60,73 @@ def solenoid():
     }
 
 
+MU_THRESHOLD = 0.5          # the surface of the fragment: half of the median attenuation of its inside (partial volume)
+
+
+def fragment_labels():
+    """The fragment segmented from the authors' attenuation tomogram (80³ voxels of 0.186 mm, the grid of their field
+    map): smoothed a little (σ = 0.7 voxel, against the noise of the reconstruction), cut at MU_THRESHOLD of the
+    median inside, holes filled, the largest connected piece kept, cropped to it. Returns (labels (1 = rock),
+    voxel [mm], center of the cropped grid [mm] in the frame of the field map, information)."""
+    from scipy import ndimage
+    z = np.load(os.path.join(HERE, "data", "nwa7034_qvistgaard2026.npz"))
+    mu, vox = z["mu_voxel"].astype(float), float(z["voxel"]) * 1e3
+    s = ndimage.gaussian_filter(mu, 0.7)
+    inside = np.median(s[s > 0.5 * s.max()])
+    rock = ndimage.binary_fill_holes(s > MU_THRESHOLD * inside)
+    lab, n = ndimage.label(rock)
+    rock = lab == 1 + int(np.argmax(ndimage.sum(rock, lab, range(1, n + 1))))
+    idx = np.argwhere(rock)
+    i0, i1 = idx.min(0), idx.max(0) + 1
+    labels = rock[i0[0]:i1[0], i0[1]:i1[1], i0[2]:i1[2]].astype(np.uint8)
+    center = (0.5 * (i0 + i1) - 0.5 * np.array(mu.shape)) * vox
+    thick = labels.sum(2)
+    info = dict(volume_mm3=float(labels.sum() * vox ** 3), size_mm=((i1 - i0) * vox).tolist(),
+                thickness_mm=float(np.median(thick[thick > 0]) * vox), mu_inside_per_voxel=float(inside),
+                mu_inside_cm=float(inside / (vox / 10)), pieces=int(n), y_bottom_mm=float(center[1] - 0.5 * (i1 - i0)[1] * vox))
+    return labels, vox, center, info
+
+
 def fragment():
+    """The fragment as a samplecraft scene: its true shape, from the tomogram of the authors (a voxel body), in the
+    matrix of NWA 7034 (the material of meteorite_nwa7034.yml, calibrated on Naver et al. 2026), on its pin."""
+    import samplecraft as sc
+    from samplecraft.scene import pack_labels
+    import gen_nwa7034 as g
+    labels, vox, c, info = fragment_labels()
+    recipe = {
+        "samplecraft": 1, "name": "Magnetized fragment of NWA 7034 (Qvistgaard et al. 2026)",
+        "provenance": {
+            "sources": ["C. H. Qvistgaard, E. B. Naver et al., G-cubed 27, e2025GC012641 (2026); attenuation tomogram "
+                        "Structure_Recon_rot.tiff, DTU Data, doi:10.11583/DTU.30775208 (CC BY 4.0)",
+                        "matrix: E. B. Naver et al., arXiv:2601.08390 (2026), Table S2 (0.45 cm⁻¹ at 1.8 Å)"],
+            "assumptions": [f"surface at {MU_THRESHOLD} of the median attenuation inside (smoothed σ = 0.7 voxel); "
+                            "one material: the variations inside the reconstruction (streaks, a ring on the rotation "
+                            "axis) are mostly artefacts of the reconstruction",
+                            "the pin (aluminium, 3 mm) is not in the field of view of the tomogram: placed under the "
+                            "lowest point of the fragment, on the rotation axis"]},
+        "materials": {"matrix": {"calibrate": {"base": {"minerals": g.PHASES["matrix"]}, "add": "water", "sigma_cm": 0.45,
+                                     "wavelength_A": 1.8}, "source": "Naver et al. (2026), Table S2: matrix, 0.45 cm⁻¹ at ICON"},
+                      "aluminium": {"ncrystal": "Al_sg225.ncmat"}},
+        "bodies": [
+            {"name": "fragment (RADEN tomogram)", "position": [round(float(x), 5) for x in c],
+             "voxels": {"packed": pack_labels(labels), "voxel_mm": vox, "materials": {1: "matrix"}}},
+            {"name": "pin", "material": "aluminium", "holder": True,
+             "shape": {"type": "cylinder", "diameter": 3.0, "height": 6.0,
+                       "position": [0.0, round(info["y_bottom_mm"] - 3.0, 4), 0.0]}},
+        ],
+    }
+    scene = sc.Scene.from_dict(recipe)
+    problems = scene.check()
+    sig = sc.sigma(scene.cfg()["matrix"], [1.8, 3.0, 4.5])
+    print("fragment:", {k: (np.round(v, 3).tolist() if isinstance(v, list) else round(v, 4)) for k, v in info.items()})
+    print(f"  Σ matrix (1.8, 3.0, 4.5 Å) = {np.round(sig, 3).tolist()} cm⁻¹; check: {problems or 'no problem'}")
     return {
         "name": "Magnetized fragment of NWA 7034 (Qvistgaard et al. 2026)",
         "description": (
-            "A fragment of the Martian meteorite NWA 7034, 2 mm thick, about 10 mm wide and 13 mm tall, standing on "
-            "the rotation stage (its thickness along the beam at 0°). It held no field of its own: it was magnetized "
+            f"A fragment of the Martian meteorite NWA 7034, about {info['thickness_mm']:.1f} mm thick, "
+            f"{info['size_mm'][0]:.0f} mm wide and {info['size_mm'][1]:.0f} mm tall, its true shape (from the tomogram of "
+            "the authors), standing on the rotation stage (its thickness along the beam at 0°). It held no field of its own: it was magnetized "
             "with a small whiteboard magnet before the measurement; its magnetic minerals (iron oxides) keep a field "
             "of a few millitesla. Measured by polarized imaging at RADEN (J-PARC) at 33 angles, Qvistgaard et al. "
             "(2026). It is glued on an aluminium pin (3 mm in diameter) on the axis of the rotation stage."),
@@ -74,11 +136,7 @@ def fragment():
         "reference": ("C. H. Qvistgaard, E. B. Naver et al., Geochem. Geophys. Geosyst. 27, e2025GC012641 (2026); field "
                       "and data: DTU Data, doi:10.11583/DTU.30775208 (CC BY 4.0). Generated by "
                       "odin/samples/gen_polarized.py."),
-        "materials": {"matrix": "phases<0.9754*solid::Na106Ca244Al275Si1088O3831Mg299Fe480P30Cl10/3.290gcm3&"
-                                "0.0246*stdlib::LiquidWaterH2O_T293.6K.ncmat>", "aluminium": "Al_sg225.ncmat"},
-        "volumes": [dict(material="matrix", center_mm=[0, 0, 0], size_mm=[10.0, 13.0, 2.0]),
-                    dict(material="aluminium", shape="cylinder", center_mm=[0, -9.5, 0], size_mm=[3.0, 6.0, 3.0],
-                         holder=True)],
+        "scene": scene.to_dict(),
     }
 
 
@@ -87,7 +145,7 @@ def main():
         with open(os.path.join(HERE, name + ".yml"), "w", encoding="utf-8") as f:
             f.write("# Generated by gen_polarized.py (do not edit by hand).\n")
             yaml.safe_dump(spec, f, sort_keys=False, allow_unicode=True, width=120)
-        print(name, len(spec["volumes"]), "volumes")
+        print(name, len(spec["volumes"]) if "volumes" in spec else "samplecraft scene")
 
 
 if __name__ == "__main__":

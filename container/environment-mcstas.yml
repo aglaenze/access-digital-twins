@@ -25,6 +25,10 @@ dependencies:
   - plopp=26.9.0
   - mcstastox=0.0.12
   - pooch
+  - numba=0.68          # samplecraft: compiled ray kernels (exact path lengths through the samples)
+  - trimesh=5.2         # samplecraft: meshes read from files (STL, OBJ, OFF, PLY)
+  - scikit-image=0.26   # samplecraft: segmentation of tomograms into voxel bodies
+  - tifffile            # samplecraft: voxel bodies from TIFF stacks
   - ipywidgets=8.1.9
   - ipympl=0.10.0
   - jupyterlab=4.6

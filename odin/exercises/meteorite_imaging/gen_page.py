@@ -19,8 +19,8 @@ from page_texts import measurement_table, transmission_md  # noqa: E402
 # where the largest H-Fe-ox clast of the sample is (odin/samples/gen_nwa7034.py draws it at random): the sliders start
 # at its height, the texts say where to look (@Y1@: its height in mm, @WHERE@: "near the top"...)
 import yaml  # noqa: E402
-with open(os.path.join(HERE, "..", "..", "samples", "meteorite_nwa7034.yml"), encoding="utf-8") as _f:
-    _Y1 = next(v["center_mm"][1] for v in yaml.safe_load(_f)["volumes"] if v["material"] == "H-Fe-ox clast 1")
+import sample_library as _sl  # noqa: E402
+_Y1 = _sl.body_center(_sl.load("odin")["meteorite_nwa7034"], "H-rich region 1")[1]     # the H-rich region of clast 1
 Y1S = f"{round(_Y1 / 0.0275) * 0.0275:.2f}"
 WHERE = "near the top" if _Y1 > 2 else ("in the lower part" if _Y1 < -2 else "around the middle")
 _sub = lambda s: s.replace("@Y1@", Y1S).replace("@WHERE@", WHERE)
