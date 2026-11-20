@@ -1,4 +1,6 @@
-"""Generates twin/Sample_builder.ipynb: the sample builder of the beamtimes (Voilà page).
+"""Generates twin/Sample_builder.ipynb: the sample builder of the beamtimes (Voilà page), still used for LoKI.
+ODIN has its own page since 2026-11-20 (builder/, builder_api.py, served at /twin/builder by container/twin_app.py),
+to which the notebooks link (nb_tools.builder_url); this page still works for ODIN if opened directly.
 
     python gen_sample_builder.py
     voila Sample_builder.ipynb
@@ -49,7 +51,8 @@ import scene_builder as sb
 
 ROOT = os.environ.get("TWIN_RUN_ROOT", os.path.join(os.path.expanduser("~"), "McStas_runs", "twin")).replace(os.sep, "/")
 QS = parse_qs(os.environ.get("QUERY_STRING", ""))         # ?instrument=odin&proposal=1234 (from the notebook;
-#                                                          an imported proposal also gives &name=...&title=...)
+#                                                          an imported proposal also gives &name=...&title=...;
+#                                                          Change the sample: &start=<the sample of the proposal>)
 GIVEN = QS.get("instrument", [""])[0].lower()
 NAMES = {"odin": "ODIN (imaging)", "loki": "LoKI (small-angle scattering)"}
 instr = w.ToggleButtons(options=[(v, k) for k, v in NAMES.items()], value=GIVEN if GIVEN in NAMES else "odin",
@@ -213,6 +216,12 @@ def load_start(_):
             print("Could not load it:", e)
 
 b_start.on_click(load_start)
+# opened from a beamtime notebook (Change the sample): start from the sample of the proposal (&start=<short name>)
+_given = QS.get("start", [""])[0]
+if _given and ("sample", _given) in [v for _, v in start.options]:
+    start.value = ("sample", _given)
+    name.value = name.value or f"{_given}_changed"
+    load_start(None)
 """)
 
 md(r"""

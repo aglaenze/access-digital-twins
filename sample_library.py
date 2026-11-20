@@ -141,6 +141,27 @@ def odin_material_problem(cfg):
     return None
 
 
+# The chemical formula after a mineral's name (physics students do not know the mineral names): the first key found
+# in the name of a material (longest first), e.g. "goethite" -> "goethite: FeO(OH)".
+MINERAL_FORMULAS = {
+    "plagioclase": "(Na,Ca)(Al,Si)₄O₈", "pyroxene": "(Ca,Mg,Fe)₂Si₂O₆", "olivine": "(Mg,Fe)₂SiO₄",
+    "apatite": "Ca₅(PO₄)₃Cl", "pyrite": "FeS₂", "magnetite": "Fe₃O₄", "maghemite": "γ-Fe₂O₃", "hematite": "Fe₂O₃",
+    "ilmenite": "FeTiO₃", "Fe-Ti oxide": "FeTiO₃, Fe₃O₄", "goethite": "FeO(OH)", "H-Fe-ox": "FeO(OH) in Fe oxides",
+    "serpentine": "Mg₃Si₂O₅(OH)₄", "quartz": "SiO₂", "calcite": "CaCO₃", "gypsum": "CaSO₄·2H₂O",
+    "kaolinite": "Al₂Si₂O₅(OH)₄", "feldspar": "(Na,K,Ca)(Al,Si)₄O₈",
+}
+
+
+def with_formula(label):
+    """A mineral name followed by its formula (if it is a mineral and has none yet)."""
+    if "(" in label or ":" in label:
+        return label
+    for k in sorted(MINERAL_FORMULAS, key=len, reverse=True):
+        if k.lower() in label.lower():
+            return f"{label}: {MINERAL_FORMULAS[k]}"
+    return label
+
+
 def odin_material_label(spec, name):
     """What a student reads for the material of a volume: the crystal, or the composition of a mixture."""
     named = spec.get("materials") or {}
@@ -156,7 +177,7 @@ def odin_material_label(spec, name):
         txt = "mixture of " + ", ".join(f"{100 * float(p.partition('*')[0]):.3g} % {labels[p.partition('*')[2]].split(' (')[0]}"
                                          for p in m.group(1).split("&"))
     else:
-        return name                     # a material named in the sample (a rock of a built-in sample)
+        return with_formula(name)       # a material named in the sample (a rock of a built-in sample)
     return txt + (f", {dens:.3g} % of its density" if abs(dens - 100) > 1e-9 else "")
 ODIN_COLORS = {"Fe_sg229_Iron-alpha.ncmat": "#6B7280", "Fe_sg225_Iron-gamma.ncmat": "#9CA3AF",
                "Al_sg225.ncmat": "#C7D2FE", "Cu_sg225.ncmat": "#C2410C", "Ni_sg225.ncmat": "#A3A380",
@@ -973,7 +994,7 @@ def _rock_label(spec, name):
     """What the legend says for a material: its name, or the label of its crystal or mixture."""
     named = spec.get("materials") or {}
     if name in named and not name.endswith(".ncmat"):
-        return re.sub(r" \d+$", "", name)
+        return with_formula(re.sub(r" \d+$", "", name))
     return odin_material_label(spec, name)
 
 

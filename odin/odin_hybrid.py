@@ -450,6 +450,7 @@ class HybridModel:
     def __init__(self, front_mcpl, D, events_ob, field, cache_dir, lam=(1.0, 9.0)):
         from scipy.interpolate import splev
         self.field, self.D = field, D
+        self.det_dist = tw.DET_DIST           # sample -> detector [m]: the blur l·D/L and the flight time (set per count)
         self.S = pinhole_spectrum(front_mcpl, D, cache_dir)
         name = os.path.join(cache_dir, f"model_D{D:.3f}_{os.path.basename(os.path.dirname(events_ob))}.npz")
         if os.path.isfile(name):
@@ -510,7 +511,7 @@ class HybridModel:
             Tm = sum(wk * transmission(X, Y, np.full(X.size, lk)) for lk, wk in zip(lc, wl)) / wl.sum()
         mean = (wl.sum() * t_exp * beam_factor * f * Tm).reshape(bins, bins)
         L = tw.Z_SAMPLE - tw.Z_PINHOLE
-        sigma = np.hypot(tw.DET_DIST * self.D / L / np.sqrt(12), blur_m) / ((x1 - x0) / bins)     # [pixels]
+        sigma = np.hypot(self.det_dist * self.D / L / np.sqrt(12), blur_m) / ((x1 - x0) / bins)     # [pixels]
         mean = gaussian_filter(mean, sigma, mode="nearest")
         return rng.poisson(mean) + rng.poisson(dark_per_s * t_exp, mean.shape)
 
@@ -561,7 +562,7 @@ class HybridModel:
             out[k] = mean[:, idx == k].sum(axis=1)
         out = out.reshape(-1, bins, bins)
         Lp = tw.Z_SAMPLE - tw.Z_PINHOLE
-        sigma = np.hypot(tw.DET_DIST * self.D / Lp / np.sqrt(12), blur_m) / ((x1 - x0) / bins)
+        sigma = np.hypot(self.det_dist * self.D / Lp / np.sqrt(12), blur_m) / ((x1 - x0) / bins)
         out = np.array([gaussian_filter(o, sigma, mode="nearest") for o in out])
         return rng.poisson(out)
 
@@ -571,7 +572,8 @@ class HybridModel:
 
         transmission(x, y, lam) -> T: attenuation by the sample at (x, y) in the sample plane (None: open beam).
         Then the L/D geometric blur (the neutron starts from a point of the pinhole, drawn uniformly over D × D, and
-        flies DET_DIST further to the detector), then the scintillator blur.
+        flies det_dist further to the detector), then the scintillator blur. The times of S are at DET_DIST: moved to
+        det_dist.
         """
         from odin_nexus import efficiency, _background
         rng = rng or np.random.default_rng()
@@ -581,6 +583,8 @@ class HybridModel:
         n = rng.poisson(cum[-1])
         idx = np.searchsorted(cum, rng.uniform(0, cum[-1], n))
         lam, t = lamS[idx], self.S["t"][idx]
+        if self.det_dist != tw.DET_DIST:                          # the detector moved: shorter or longer flight
+            t = t + (self.det_dist - tw.DET_DIST) * lam / H_OVER_M
         # Position: profile f(x, y), by rejection
         x0, x1, y0, y1 = self.field
         fmax = 1.05 * max(profile(self.c_f, xx, yy) for xx in (x0, x1, 0) for yy in (y0, y1, 0))
@@ -596,8 +600,8 @@ class HybridModel:
         n = len(x)
         L = tw.Z_SAMPLE - tw.Z_PINHOLE
         xs, ys = rng.uniform(-self.D / 2, self.D / 2, n), rng.uniform(-self.D / 2, self.D / 2, n)
-        out = dict(x=(x + tw.DET_DIST * (x - xs) / L + rng.normal(0, blur_m, n)).astype(np.float32),
-                   y=(y + tw.DET_DIST * (y - ys) / L + rng.normal(0, blur_m, n)).astype(np.float32),
+        out = dict(x=(x + self.det_dist * (x - xs) / L + rng.normal(0, blur_m, n)).astype(np.float32),
+                   y=(y + self.det_dist * (y - ys) / L + rng.normal(0, blur_m, n)).astype(np.float32),
                    t=t, lam=lam.astype(np.float32))
         if background > 0:
             out = _background(out, t_exp, self.field, background, background_pixel, rng)

@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sample builder</title>
+<link rel="stylesheet" href="builder/static/builder.css">
+<script type="importmap">{"imports": {"three": "./builder/static/vendor/three.module.min.js"}}</script>
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <div class="title">Sample builder</div>
+    <div class="sub" id="where">ODIN</div>
+  </div>
+  <nav class="steps" id="steps">
+    <button data-step="1" class="on"><span class="n">1</span>Sample</button>
+    <button data-step="2"><span class="n">2</span>Holder</button>
+    <button data-step="3"><span class="n">3</span>Check &amp; save</button>
+  </nav>
+</header>
+
+<main class="layout">
+  <section class="panel" id="panel">
+    <!-- ============ step 1: the sample ============ -->
+    <div class="step" id="step1">
+      <details class="box" id="gallery-box" open>
+        <summary><h2>Start from</h2><span class="hint" id="start-now"></span></summary>
+        <p class="lead">An example, a model saved by someone, a sample of the library or of your proposal: everything
+          can then be changed.</p>
+        <input class="search" id="gallery-search" placeholder="Search (steel, rock, meteorite...)">
+        <div class="gallery" id="gallery"></div>
+      </details>
+
+      <div class="box">
+        <h2>Parts of the sample</h2>
+        <p class="lead">The sample is a tree of parts: each part is one shape of one material; a part inside another
+          replaces its material there (an inclusion, a hole, a grain).</p>
+        <ul class="tree" id="tree"></ul>
+        <div class="toolbar">
+          <button id="add-inside" title="A new part inside the selected one">+ Inside</button>
+          <button id="add-beside" title="A new part next to the selected one">+ Beside</button>
+          <button id="duplicate">Duplicate</button>
+          <button id="up" title="Move up">↑</button>
+          <button id="down" title="Move down">↓</button>
+          <button id="remove" class="danger">Delete</button>
+        </div>
+      </div>
+
+      <div class="box" id="part-box">
+        <h2 id="part-title">The selected part</h2>
+        <div id="part"></div>
+      </div>
+
+      <details class="box advanced" id="advanced">
+        <summary><h2>Advanced</h2><span class="hint">grains placed at random, components, combined shapes, the
+          recipe as text</span></summary>
+        <div id="adv"></div>
+      </details>
+      <div class="next"><span></span><button class="primary" data-go="2">Next: the holder →</button></div>
+    </div>
+
+    <!-- ============ step 2: the holder ============ -->
+    <div class="step hidden" id="step2">
+      <div class="box">
+        <h2>What holds the sample</h2>
+        <p class="lead">The holder is chosen apart from the sample and placed for you, under it or around it, from
+          its size. Only its size and material can change. It is saved with the sample (and attenuates the beam
+          where it is in it).</p>
+        <div class="holders" id="holders"></div>
+      </div>
+      <div class="box" id="holder-params-box">
+        <h2 id="holder-title">Its size and material</h2>
+        <div id="holder-params"></div>
+      </div>
+      <div class="next"><button data-go="1">← The sample</button><button class="primary" data-go="3">Next: check and save →</button></div>
+    </div>
+
+    <!-- ============ step 3: check and save ============ -->
+    <div class="step hidden" id="step3">
+      <div class="box">
+        <h2>Check</h2>
+        <ul class="checks" id="checks"><li class="wait">Checking…</li></ul>
+      </div>
+      <div class="box">
+        <h2>Attenuation of the materials</h2>
+        <p class="lead">Σ: the attenuation coefficient of each material, per cm (T = e<sup>−Σx</sup> through a
+          thickness x), from NCrystal, at two wavelengths.</p>
+        <div id="sigmas"></div>
+      </div>
+      <div class="box">
+        <h2>Save it</h2>
+        <div class="form">
+          <label>Short name <input id="f-name" placeholder="e.g. my_steel_wedge" pattern="[a-z][a-z0-9_]{1,30}"></label>
+          <label>Title <input id="f-title" placeholder="e.g. Steel wedge with a copper insert"></label>
+          <label>Description <textarea id="f-desc" rows="3" placeholder="what it is, why you made it"></textarea></label>
+          <label>Proposal <input id="f-proposal" placeholder="e.g. 1234"></label>
+        </div>
+        <div class="toolbar">
+          <button class="primary" id="save">Save it with my proposal</button>
+          <button id="download">Download the recipe (YAML)</button>
+        </div>
+        <div class="msg" id="save-msg"></div>
+        <details class="sub-box">
+          <summary>Save it as a model (anyone can start from it)</summary>
+          <div class="form inline">
+            <label>Model name <input id="f-model" placeholder="e.g. wet_sandstone"></label>
+            <button id="save-model">Save as a model</button>
+          </div>
+          <div class="msg" id="model-msg"></div>
+        </details>
+      </div>
+      <div class="next"><button data-go="2">← The holder</button><span></span></div>
+    </div>
+  </section>
+
+  <section class="viewer" id="viewer">
+    <div class="vtabs">
+      <button data-view="3d" class="on">3D view</button>
+      <button data-view="beam">Beam's eye view</button>
+      <span class="grow"></span>
+      <label class="small" id="grains-box" title="The grains placed at random: slower for a large sample">
+        <input type="checkbox" id="grains" checked> grains</label>
+      <button class="small" id="reset-view" title="Back to the first view">Reset view</button>
+    </div>
+    <div class="stage" id="stage">
+      <div id="three"></div>
+      <div id="beam" class="hidden">
+        <img id="radio" alt="">
+        <div class="lam"><label>λ <input type="range" id="lam" min="1" max="9" step="0.1" value="3"></label>
+          <span id="lam-v">3.0 Å</span></div>
+        <p class="small">What the camera would see (transmission, no noise, no blur), over the 14 mm field of view.
+          The hidden parts of an exercise are left out.</p>
+      </div>
+      <div class="status" id="status"></div>
+    </div>
+    <div class="legend" id="legend"></div>
+    <p class="small note">Turn: drag · zoom: wheel · move: right drag. A view on a grid: the finest details are
+      smoothed (the model itself is exact). Click a part in the list to outline it.</p>
+  </section>
+</main>
+
+<div class="modal hidden" id="picker">
+  <div class="sheet">
+    <div class="sheet-head"><h2>Choose a material</h2><input class="search" id="mat-search" placeholder="Search (iron, quartz, water...)">
+      <button id="picker-close">Close</button></div>
+    <div id="mat-list"></div>
+  </div>
+</div>
+
+<script type="module" src="builder/static/builder.js"></script>
+</body>
+</html>

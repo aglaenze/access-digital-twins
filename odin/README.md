@@ -405,7 +405,9 @@ model neglects). The fragment of NWA 7034 of the polarized exercise (`samples/ge
 segmented from the attenuation tomogram of Qvistgaard et al. (2026) (80³ voxels of 0.186 mm, the grid of their field
 map): one piece, 9.5 × 11.9 mm, median thickness 2.05 mm (the paper: 2 mm). Its matrix is that of the meteorite
 (0.45 cm⁻¹ at 1.8 Å, 0.53 at 3 Å after Naver et al.); the authors' tomogram gives 0.34 cm⁻¹ inside, averaged over
-RADEN's spectrum: the polarized images (which use that tomogram) attenuate a little less than the ordinary ones.
+RADEN's spectrum, against 0.52 cm⁻¹ for the matrix over the same spectrum. Its absolute scale is not documented, so
+the polarized model keeps its shape and variations and multiplies it by 1.54 (`odin_polarized.mu_scale_nwa7034`): one
+attenuation in the polarized and the ordinary images (question sent to the authors).
 
 ## 10. NICOS
 NICOS drives the twin since 2026-11-03 (Windows, and Linux in the container), organized as at ESS since 2026-11-04:

@@ -620,15 +620,16 @@ q.report()
 
 # the questions of the bonus round: put inside the folded section of part 7 (cell "BONUS", below)
 BONUS_SRC = r"""
-q.number("1 mm of water in the beam. With neutrons of 1.8 Å its attenuation coefficient is Σ = 3.6 cm⁻¹ (hydrogen); "
-         "with X-rays of 60 keV, μ = 0.21 cm⁻¹. Which fraction of the **neutrons** does it remove, 1 − T (%)?",
-         value=30.4, tol=1.5, unit="%",
+q.number("1 mm of water in the beam. With neutrons of 3 Å (the middle of ODIN's beam) its attenuation coefficient is "
+         "Σ = 4.9 cm⁻¹ (hydrogen); with X-rays of 60 keV, μ = 0.21 cm⁻¹. Which fraction of the **neutrons** does it "
+         "remove, 1 − T (%)?",
+         value=39.0, tol=1.5, unit="%",
          mistakes=[(2.0, "that is the X-ray value (μ = 0.21 cm⁻¹); the question is about neutrons"),
-                   (36, "3.6 cm⁻¹ × 0.1 cm = 0.36 is −ln T, not 1 − T: T = e^(−0.36)")],
-         hints=["T = exp(−Σ d), with d = 0.1 cm.", "1 − exp(−0.36)."],
-         explanation="1 − e^(−0.36) = 30 % with neutrons, 1 − e^(−0.021) = 2 % with X-rays. And 1 mm of iron: neutrons "
-                     "11 % (Σ = 1.2 cm⁻¹), X-rays of 60 keV 61 % (μ = 9.5 cm⁻¹). The contrasts are reversed: X-rays see "
-                     "the heavy elements, neutrons see the hydrogen.", title="X1. Water, for neutrons and X-rays")
+                   (49, "4.9 cm⁻¹ × 0.1 cm = 0.49 is −ln T, not 1 − T: T = e^(−0.49)")],
+         hints=["T = exp(−Σ d), with d = 0.1 cm.", "1 − exp(−0.49)."],
+         explanation="1 − e^(−0.49) = 39 % with neutrons, 1 − e^(−0.021) = 2 % with X-rays. And 1 mm of iron: neutrons "
+                     "10 % (Σ = 1.1 cm⁻¹ at 3 Å), X-rays of 60 keV 61 % (μ = 9.5 cm⁻¹). The contrasts are very "
+                     "different: X-rays see the heavy elements, neutrons see the hydrogen.", title="X1. Water, for neutrons and X-rays")
 q.number("An H-rich clast of 0.3 mm in the matrix of the meteorite (ICON, 1.8 Å: Σ = 1.9 cm⁻¹ against 0.45 cm⁻¹). By how "
          "much does it lower the transmission of a line that crosses it, compared with the matrix around (%)?",
          value=4.3, tol=0.4, unit="%",

@@ -266,6 +266,9 @@ class VirtualOdin:
             Device("diffuser", "in", choices=("in", "out"), nexus="pinhole_diffuser/status",
                    to_nexus=lambda v: 3 if v == "in" else 0,               # assumed convention, to be checked
                    help="graphite diffuser after the pinhole (homogenises the beam)"),
+            Device("detector_distance", tw.DET_DIST, "m", limits=(0.005, 0.10),
+                   help="distance from the sample (rotation axis) to the scintillator of the cameras: closer = less "
+                        "geometric blur (l·D/L); leave room for the sample to turn"),
             Device("stage_x", 0.0, "m", limits=(-0.5, 0.5), nexus="spst1_lin_x", to_nexus=lambda v: v * 1e3,
                    help="horizontal sample translation; |x| > 2 cm: out of the field of view"),
             Device("stage_rot", 0.0, "deg", limits=(-180, 180), nexus="spst1_rot_y",
@@ -471,6 +474,9 @@ class VirtualOdin:
             draw = lambda dt: model.counts(dt, transmission=T, rng=self.rng, beam_factor=beam_factor)
             counts = self._in_slices(draw, t, progress)
         else:
+            if abs(state.get("detector_distance", tw.DET_DIST) - tw.DET_DIST) > 1e-6:
+                raise ValueError(f"the full McStas mode has its detector at {tw.DET_DIST * 1e3:.0f} mm from the sample: "
+                                 f"move(detector_distance={tw.DET_DIST}) or use the hybrid mode")
             counts = nx.counts_from_mcpl(self.simulate(state), t, field=FIELD, rng=self.rng,
                                          beam_factor=beam_factor, copies=self.copies)
         self._check()                               # stopped while counting: no file, no log
@@ -498,7 +504,7 @@ class VirtualOdin:
         self.number += 1
         out_file = f"{self.folder}/odin_{self.number:06d}.nxs"
         r = nx.write_nexus(counts, out_file, t, title=title or f"run {self.number}",
-                           sample_name=self._sample_name(state), det_dist=tw.DET_DIST, charge=charge,
+                           sample_name=self._sample_name(state), det_dist=float(state.get("detector_distance", tw.DET_DIST)), charge=charge,
                            pulses_per_frame=ppf,
                            settings=self._nexus_settings() | nx.chopper_settings(state["choppers"], state["wfm_delta"]))
         self.last_n_counts = r["n_counts"]
@@ -853,7 +859,9 @@ class VirtualOdin:
             self._models[key] = hy.HybridModel(mcpl, state["pinhole"], events_ob, field=FIELD,
                                                cache_dir=f"{RUN_ROOT}/hybrid/{tag}",
                                                lam=LAM_RANGE[state["choppers"]])
-        return self._models[key]
+        m = self._models[key]
+        m.det_dist = float(state.get("detector_distance", tw.DET_DIST))
+        return m
 
     def _instrument(self, sample):
         vols = self.samples()[sample]["volumes"]

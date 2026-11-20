@@ -22,6 +22,10 @@ All requests need the token of the server (header "Authorization: token ...").
     POST /twin/nicos {instrument}  opens NICOS of this instrument: windows of this computer (local app), or the control
                                    room of the container (returns the address of the remote screen)
     GET  /twin/handin              the work of the student as a zip file (logbooks, notebooks, measurements logbook)
+    GET  /twin/builder?instrument=odin&proposal=N[&start=<sample>&name=..&title=..]   the sample builder (a page of
+                                   the app: builder/index.html, its files under /twin/builder/static/)
+    GET|POST /twin/builder/api/<what>   what the page asks (builder_api.py): info, load, preview, radiograph,
+                                   check, sigmas, catalogue_sigmas, thumb (PNG), yaml, parse, save, save_model
 
 The student's things: notebooks in work/<user>/, logbooks in TWIN_RUN_ROOT/progress/<user>/, measurements of the
 pages in the sessions TWIN_RUN_ROOT/<instrument>/<user>/. Accounts and passwords stay in the app (twin/app/accounts.js).
@@ -38,7 +42,7 @@ import subprocess
 import sys
 import zipfile
 
-from jupyter_server.base.handlers import APIHandler
+from jupyter_server.base.handlers import APIHandler, JupyterHandler
 from jupyter_server.utils import url_path_join
 from tornado import web
 
@@ -458,6 +462,94 @@ class Handin(Base):
         self.finish(buf.getvalue())
 
 
+class BuilderPage(JupyterHandler):
+    @web.authenticated
+    def get(self):
+        """The sample builder page (ODIN). LoKI keeps its Voila page (kinds of particles)."""
+        if self.get_argument("instrument", "odin") == "loki":
+            q = self.request.query
+            self.redirect(url_path_join(self.base_url, "voila/render/Sample_builder.ipynb") + (f"?{q}" if q else ""))
+            return
+        root = os.path.abspath(os.path.expanduser(self.settings["server_root_dir"]))
+        with open(os.path.join(root, "builder", "index.html"), encoding="utf-8") as f:
+            self.set_header("Content-Type", "text/html; charset=utf-8")
+            self.set_header("Cache-Control", "no-store")
+            self.finish(f.read())
+
+
+class BuilderStatic(web.StaticFileHandler):
+    """The files of the page (its script, style, three.js): no secret in them."""
+    def set_extra_headers(self, path):
+        self.set_header("Cache-Control", "no-cache")
+
+
+class BuilderApi(Base):
+    """What the builder page asks: one function of builder_api.py per name, run in a thread (builds take seconds)."""
+    POST = ("info", "load", "preview", "radiograph", "check", "sigmas", "catalogue_sigmas", "yaml", "parse", "save",
+            "save_model")
+
+    async def _run(self, f, *a, **k):
+        import functools
+        return await asyncio.get_event_loop().run_in_executor(None, functools.partial(f, *a, **k))
+
+    @web.authenticated
+    async def get(self, what):
+        import builder_api as B
+        if what != "thumb":
+            raise web.HTTPError(404)
+        a = lambda k, d="": self.get_argument(k, d)
+        try:
+            png = await self._run(B.thumb, a("instrument", "odin"), a("kind"), a("ref"), a("proposal"))
+        except Exception as e:                         # noqa: BLE001 (a picture: never an error page)
+            self.log.warning("builder thumb %s: %s", a("ref"), e)
+            raise web.HTTPError(404)
+        self.set_header("Content-Type", "image/png")
+        self.set_header("Cache-Control", "max-age=600")
+        self.finish(png)
+
+    @web.authenticated
+    async def post(self, what):
+        import builder_api as B
+        if what not in self.POST:
+            raise web.HTTPError(404)
+        d = self.body()
+        ins, prop = d.get("instrument", "odin"), str(d.get("proposal", "") or "")
+        rec, hol = d.get("recipe"), d.get("holder")
+        try:
+            if what == "info":
+                out = await self._run(B.info, ins, prop, d.get("start", ""))
+            elif what == "load":
+                out = await self._run(B.load, ins, d.get("kind", "scratch"), d.get("ref", ""), prop)
+            elif what == "preview":
+                out = await self._run(B.preview, rec, hol, int(d.get("n", 56)), bool(d.get("grains", True)))
+            elif what == "radiograph":
+                out = await self._run(B.radiograph, rec, hol, float(d.get("lam", 3.0)))
+            elif what == "check":
+                out = dict(items=await self._run(B.check, rec, hol))
+            elif what == "sigmas":
+                out = dict(rows=await self._run(B.sigmas, rec, hol, tuple(d.get("lams", (1.8, 3.0)))))
+            elif what == "catalogue_sigmas":
+                out = dict(sigma=await self._run(B.catalogue_sigmas, float(d.get("lam", 3.0))))
+            elif what == "yaml":
+                out = dict(text=B.to_yaml(d.get("obj")))
+            elif what == "parse":
+                out = dict(obj=B.from_yaml(d.get("text", "")))
+            elif what == "save":
+                out = await self._run(B.save, ins, prop, d.get("name", ""), d.get("title", ""), d.get("description", ""),
+                                      rec, hol)
+            else:
+                out = await self._run(B.save_model, ins, prop, d.get("model", ""), d.get("title", ""),
+                                      d.get("description", ""), rec, hol)
+        except (ValueError, KeyError, TypeError, OSError) as e:
+            self.finish(json.dumps(dict(error=str(e))))
+            return
+        except Exception as e:                         # noqa: BLE001 (a recipe that samplecraft cannot build)
+            self.log.exception("builder %s", what)
+            self.finish(json.dumps(dict(error=f"{type(e).__name__}: {e}")))
+            return
+        self.finish(json.dumps(out))
+
+
 def _jupyter_server_extension_points():
     return [{"module": "twin_app"}]
 
@@ -466,7 +558,10 @@ def _load_jupyter_server_extension(serverapp):
     base = serverapp.web_app.settings["base_url"]
     serverapp.web_app.add_handlers(".*$", [(url_path_join(base, "twin", p), h) for p, h in [
         ("catalogue", Catalogue), ("user", User), ("open", Open), ("reset", Reset), ("proposal", Proposal),
-        ("nicos", Nicos), ("handin", Handin)]])
+        ("nicos", Nicos), ("handin", Handin), ("builder", BuilderPage), (r"builder/api/(\w+)", BuilderApi)]])
+    serverapp.web_app.add_handlers(".*$", [(url_path_join(base, "twin", "builder", "static", "(.*)"), BuilderStatic,
+                                            {"path": os.path.join(os.path.abspath(os.path.expanduser(serverapp.root_dir)),
+                                                                  "builder")})])
     # the twin root on the path of the server (quiz.py: the progress shown in the catalogue)
     root = os.path.abspath(os.path.expanduser(serverapp.root_dir))
     os.environ["TWIN_ROOT"] = root            # the kernels find the twin from the students' copies (work/<user>/...)
