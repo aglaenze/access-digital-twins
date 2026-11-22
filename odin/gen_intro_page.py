@@ -322,11 +322,9 @@ measuring position: a field of view of **10 cm × 10 cm** at position 1 (60.5 m)
 (64 m). Two kinds of camera can be mounted in it, with several lenses (magnifications) and scintillators: an
 **integrating camera** (CMOS) and an **event camera** (Timepix3).
 
-**In the twin**, you choose the **position** (1 or 2) and the **lens** of the camera: the **zoom** lens, a field of
-**14 mm × 14 mm** (the field of the Timepix3 camera in the real ODIN file used as model for the twin's data files: a
-high magnification, small pixels), or the **full field** of the camera box (10 cm at position 1, 20 cm at position
-2). The exercises use position 1 with the zoom lens. Both cameras see the same field, 5 cm behind the sample; the
-pixel sizes below are those of the zoom lens (with the full field they are 7 or 14 times larger):
+**In the twin's exercises**, the sample and the cameras are at **position 1**, with a high-magnification lens: a
+field of view of **14 mm × 14 mm**, the field of the Timepix3 camera in the real ODIN file used as model for the
+twin's data files (small pixels). Both cameras see this field, 5 cm behind the sample:
 
 | | Timepix3 camera (event mode) | Integrating camera (scintillator + sCMOS) |
 |---|---|---|
@@ -351,11 +349,11 @@ code(r"""
 iw.odin_resolution()
 """)
 md(r"""
-The position, the lens and the pixel size are **your choice**; the distance from the sample to the camera and the
-efficiency are **fixed** in the twin. The real ODIN has more to choose from: other lenses and scintillators.
-*Limits of the twin*: a real Timepix3 camera loses neutrons above a few million per second (in the white beam with a
-large pinhole, or with the full field); the twin does not lose them, it warns you, and it refuses a count of far too
-many neutrons. And the
+The pixel size is **your choice** among these settings of the cameras; the measuring position, the field of view,
+the distance from the sample to the camera and the efficiency are **fixed** in the exercises. The real ODIN has more
+to choose from: the second position, the 10 cm and 20 cm fields, other lenses and scintillators. *Limits of the
+twin*: a real Timepix3 camera loses neutrons above a few million per second (in the white beam with a large pinhole);
+the twin does not lose them, it warns you. And the
 neutrons **scattered** by the sample that still reach the camera, 5 cm behind it, are left out: on the real
 instrument they add a faint halo, which matters for thick samples rich in hydrogen (water, plastics) and makes their
 transmission look a little higher.
@@ -407,23 +405,23 @@ What sets a measurement on the twin's ODIN, and who decides: **you** (a setting 
 | Part | Setting | Values in the twin | Who | What it changes |
 |---|---|---|---|---|
 | Source | pulses | 14 per second, 2.86 ms long | fixed | the time-of-flight clock (part 4) |
-| | distance source → sample | 60.5 m (position 1) or 64 m (position 2) | follows (position) | arrival time of each wavelength |
+| | distance source → sample | 60.5 m (position 1; the real ODIN also has position 2, 64 m) | fixed | arrival time of each wavelength |
 | Choppers | mode | white (none), natural (band-pass + T0), WFM (WFM + frame-overlap + band-pass + T0) | you | resolution in wavelength against flux (part 5) |
 | | WFM disc separation δ | 0.10, 0.30, 0.45 m | you (WFM) | smaller δ: finer resolution, fewer neutrons |
 | | the ten discs: WFM 1–2 (7 m, 56 Hz), FO 1–5 (8.4 to 33 m, 42 to 14 Hz), BP 1–2 (8.4 and 12.2 m, 7 Hz), T0 (13.6 m, 28 Hz) | speeds and phases read in NICOS | follows (mode, δ) | which neutrons pass, when |
 | | wavelength band | 1 to 9 Å (WFM, natural); 0.5 to 15 Å (white) | follows (mode) | which Bragg edges are seen |
 | Beam | experiment shutter | open, closed | you | closed: the dark picture |
 | | pinhole side D | 1, 2, 3, 4 cm | you | sharpness against flux (part 3) |
-| | measuring position | 1 (L = 10.5 m after the pinhole, L/D from 1050 to 262) or 2 (L = 14 m, L/D from 1400 to 350) | you | sharpness and field against neutrons per cm² (part 3) |
+| | distance pinhole → sample L | 10.5 m (L/D from 1050 to 262); real ODIN, position 2: 14 m | fixed | with D, the blur |
 | | diffuser | in, out | you | a more even beam |
 | Sample | sample mounted | the samples of your proposal; none | you | — |
-| | stage translation x (across the beam) | −500 to +500 mm (500 mm: out of the field at any position and lens, open beam) | you | sample in or out of the beam |
+| | stage translation x (across the beam) | −500 to +500 mm (beyond 20 mm: out of the field, open beam) | you | sample in or out of the beam |
 | | stage rotation | −180° to +180° | you | the angle (tomography) |
 | | load frame | 0 kN up to the limit of the sample (frame: 50 kN) | you (samples that can be loaded) | strain |
 | | battery cycler | time in the cycle, 0 to 55 h | you (batteries) | state of charge |
 | | polarizer and analyzer | in, out; spin in ±x, ±y, ±z; spin analyzed x, y, z | you | polarized imaging |
 | Detection | distance sample → camera | 5 cm (the stage moves the sample across the beam, not along it; on a real instrument this distance can be changed) | fixed | with L/D, the blur |
-| | lens of the camera | zoom (14 mm × 14 mm) or full field (10 cm × 10 cm at position 1, 20 cm × 20 cm at position 2) | you | the largest object seen at once, against pixel size |
+| | field of view | 14 mm × 14 mm (real ODIN: 10 cm × 10 cm at position 1, 20 cm × 20 cm at position 2) | fixed | the largest object seen at once |
 | | Timepix3 camera | counting time; pictures per wavelength: range, bin (0.01 Å), 128 or 64 pixels | you | wavelength, statistics |
 | | integrating camera | exposure (up to 3600 s); standard (110 µm) or high resolution (27.5 µm) | you | sharpness against neutrons per pixel |
 | | efficiency of the scintillator | 1 − exp(−λ / 8 Å) | fixed | counts at short wavelengths |
