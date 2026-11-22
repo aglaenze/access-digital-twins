@@ -190,6 +190,11 @@ class Panel:
                               value=st["choppers"], description="Choppers")
         delta = w.Dropdown(options=[0.10, 0.30, 0.45], value=st["wfm_delta"], description="WFM δ (m)")
         pinhole = w.Dropdown(options=[0.01, 0.02, 0.03, 0.04], value=st["pinhole"], description="Pinhole (m)")
+        # the measuring position (sample stage and camera box at 60.5 or 64 m) and the lens of the camera
+        position = w.Dropdown(options=[("1: 60.5 m (L = 10.5 m)", 1), ("2: 64 m (L = 14 m)", 2)],
+                              value=int(st.get("position", 1)), description="Position")
+        lens = w.Dropdown(options=[("zoom: 14 mm field", "zoom"), ("full field (10 or 20 cm)", "full")],
+                          value=st.get("lens", "zoom"), description="Lens")
         import sample_library as sl
         lib = sl.load("odin")
         max_kN = max((float((lib.get(n) or {}).get("load", {}).get("max_kN", 0)) for n in samples), default=0)
@@ -223,7 +228,8 @@ class Panel:
             last_draw[0] = time.time()
             with live_img:
                 fig, ax = plt.subplots(1, 2, figsize=(11, 4.2), gridspec_kw=dict(width_ratios=[1, 1.4]))
-                im = ax[0].imshow(image, origin="lower", extent=[-7.05, 7.05, -7.05, 7.05], cmap="inferno", vmin=0,
+                h = odin._field[1] * 1e3                     # half the field of the measurement [mm]
+                im = ax[0].imshow(image, origin="lower", extent=[-h, h, -h, h], cmap="inferno", vmin=0,
                                   vmax=max(float(np.max(image)), 1.0))
                 ax[0].set(xlabel="x (mm)", ylabel="y (mm)",
                           title=f"Detector after {t_done:.1f} s ({float(np.sum(image)):,.0f} neutrons)")
@@ -247,7 +253,8 @@ class Panel:
                 print("Error:", e)
         # the integrating camera (white-beam radiography, tomography): as radiograph() and tomography() in NICOS
         cam = w.Button(description="Camera image", icon="camera", button_style="primary", layout=w.Layout(width="auto"))
-        cam_px = w.Dropdown(options=[("standard (128 px, 110 µm)", 128), ("high resolution (512 px, 27.5 µm)", 512)],
+        cam_px = w.Dropdown(options=[("standard (128 px: 110 µm with the zoom lens)", 128),
+                                     ("high resolution (512 px: 27.5 µm with the zoom lens)", 512)],
                             value=128, description="Resolution")
         step = w.Dropdown(options=[("12° (15 images)", 12.0), ("6° (30 images)", 6.0), ("3° (60 images)", 3.0)],
                           value=6.0, description="Tomography", layout=w.Layout(width="250px"))
@@ -256,7 +263,7 @@ class Panel:
 
         def settings():
             odin.move(sample=sample.value, shutter=shutter.value, stage_x=stage.value / 1000, choppers=choppers.value,
-                      wfm_delta=delta.value, pinhole=pinhole.value)
+                      wfm_delta=delta.value, pinhole=pinhole.value, position=position.value, lens=lens.value)
             if max_kN:
                 odin.move(load=float(load.value))
 
@@ -314,7 +321,8 @@ class Panel:
 
         t.max = 4 * 3600
         actions = [(go, count), (hist, histogram), (cam, image), (tomo, tomography)]     # Control: further down
-        locked = [sample, shutter, stage, choppers, delta, pinhole, *([load] if max_kN else []), t, title, cam_px, step]
+        locked = [sample, shutter, stage, choppers, delta, pinhole, position, lens, *([load] if max_kN else []), t,
+                  title, cam_px, step]
         # operando samples (a battery on its cycler): the time of the cycle, and a film of the cycle with the camera
         operando = [n for n in samples if (lib.get(n) or {}).get("operando")]
         op_box = []
@@ -411,6 +419,9 @@ class Panel:
         settings_cards = _grid(
             _card("Sample", *_fit(sample, stage, *([load] if max_kN else []))),
             _card("Beam", *_fit(shutter, choppers, delta, pinhole)),
+            _card("Position and lens", *_fit(position, lens),
+                  note="Position 2: a sharper image (L/D larger), fewer neutrons per cm². Full field: 10 cm at "
+                       "position 1, 20 cm at position 2, with larger pixels."),
             _card("Each measurement", *_fit(t, title), note="One file per measurement, with its title."))
         detector_cards = _grid(
             _card("Timepix3 · time of flight", _row(go, hist), action=True,

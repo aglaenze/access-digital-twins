@@ -38,9 +38,15 @@ PERIOD = 1 / 14            # s between two ESS pulses
 TAU = 2.86e-3              # s, length of an ESS pulse
 # ODIN (odin_mcstas.py; chopper positions: the ODIN NeXus file, distances from the moderator)
 ODIN_PINHOLE, ODIN_SAMPLE, ODIN_DET = 50.0, 60.5, 60.55
+ODIN_SAMPLE_2 = 64.0       # second measuring position of the real ODIN (L = 14 m, 20 cm x 20 cm field)
 ODIN_GUIDE_END = 49.01
-ODIN_WFM = (6.775, 7.225)
+ODIN_WFM = (6.85, 7.15)    # the two WFM discs, δ = 0.30 m apart around 7 m
 ODIN_CHOPPERS = (8.4, 12.2, 13.6, 17.0, 23.69, 33.0)     # frame-overlap, band-pass and T0 choppers
+# Every chopper of the official model (ODIN_instr: guide.py for the positions, choppers.py for the speeds):
+# (name, distance from the moderator [m], turns per second, family)
+ODIN_CHOPPER_LIST = (("WFM 1–2", 7.0, 56, "wfm"), ("FO 1", 8.392, 42, "fo"), ("BP 1", 8.442, 7, "bp"),
+                     ("FO 2", 12.2, 42, "fo"), ("BP 2", 12.25, 7, "bp"), ("T0", 13.603, 28, "t0"),
+                     ("FO 3", 16.987, 28, "fo"), ("FO 4", 23.686, 14, "fo"), ("FO 5", 33.005, 14, "fo"))
 # LoKI (loki_mcstas.py, virtual_loki.py)
 LOKI_SAMPLE = 23.52
 LOKI_CHOPPERS = (6.5, 15.21)
@@ -59,34 +65,68 @@ def _clean(ax):
     ax.set_yticks([])
 
 
+CHOPPER_COLORS = {"wfm": TEAL, "fo": BLUE, "bp": "#7A3FB0", "t0": INK}
+
+
 def odin_beamline():
-    fig, ax = plt.subplots(figsize=(13, 3.6))
+    """Top: the whole beamline, with the two measuring positions. Bottom: the chopper section, every chopper named."""
+    fig, (ax, az) = plt.subplots(2, 1, figsize=(13, 7.4), gridspec_kw=dict(height_ratios=[1.05, 1]))
+    # ---- top: source to camera
     ax.plot([0, ODIN_GUIDE_END], [0, 0], color="#E8C9A0", lw=12, solid_capstyle="butt", zorder=1)
-    ax.plot([ODIN_PINHOLE, ODIN_DET], [0, 0], color="#F3E2C6", lw=12, solid_capstyle="butt", zorder=1)
+    ax.plot([ODIN_PINHOLE, ODIN_SAMPLE_2 + 0.6], [0, 0], color="#F3E2C6", lw=12, solid_capstyle="butt", zorder=1)
     ax.add_patch(Rectangle((-1.2, -0.55), 1.2, 1.1, color=RED, zorder=3))
     ax.text(-0.6, 1.02, "source\n(moderator)", ha="center", va="bottom", fontsize=10.5, color=INK)
-    for z in ODIN_WFM:
-        ax.add_patch(Rectangle((z - 0.12, -0.6), 0.24, 1.2, color=TEAL, zorder=3))
-    ax.text(7.0, 1.02, "WFM choppers\n(7 m)", ha="center", va="bottom", fontsize=10.5, color=TEAL)
-    for z in ODIN_CHOPPERS:
-        ax.add_patch(Rectangle((z - 0.12, -0.5), 0.24, 1.0, color=BLUE, zorder=3))
-    ax.text(20.7, 1.02, "band choppers (8 to 33 m)", ha="center", va="bottom", fontsize=10.5, color=BLUE)
-    ax.text(40, -0.62, "neutron guide: mirrors that carry the beam", ha="center", va="top", fontsize=10.5, color=ORANGE)
+    for _, z, _, fam in ODIN_CHOPPER_LIST:
+        ax.add_patch(Rectangle((z - 0.12, -0.55), 0.24, 1.1, color=CHOPPER_COLORS[fam], zorder=3))
+    ax.annotate("", (34, 0.95), (6.5, 0.95), arrowprops=dict(arrowstyle="-", color=INK, lw=1))
+    ax.text(20.2, 1.02, "choppers, 7 to 33 m (enlarged below)", ha="center", va="bottom", fontsize=10.5, color=INK)
+    ax.text(30, -0.62, "neutron guide: mirrors that carry the beam", ha="center", va="top", fontsize=10.5, color=ORANGE)
     ax.add_patch(Rectangle((ODIN_PINHOLE - 0.12, -0.9), 0.24, 0.72, color=INK, zorder=3))
     ax.add_patch(Rectangle((ODIN_PINHOLE - 0.12, 0.18), 0.24, 0.72, color=INK, zorder=3))
-    ax.text(ODIN_PINHOLE, 1.02, "pinhole\n(50 m)", ha="center", va="bottom", fontsize=10.5, color=INK)
-    ax.add_patch(Rectangle((ODIN_SAMPLE - 0.35, -0.4), 0.3, 0.8, color=GREY, ec=INK, zorder=3))
-    ax.add_patch(Rectangle((ODIN_DET + 0.25, -0.7), 0.25, 1.4, color=TEAL, zorder=3))
-    # sample and camera are 5 cm apart (drawn wider apart): one label each, with an arrow
-    ax.annotate("sample\n(60.5 m)", (ODIN_SAMPLE - 0.2, 0.42), (56.6, 1.35), ha="center", va="bottom", fontsize=10.5,
-                color=INK, arrowprops=dict(arrowstyle="-|>", color=INK, lw=1.1, shrinkA=2, shrinkB=2))
-    ax.annotate("camera\n(5 cm behind)", (ODIN_DET + 0.38, 0.72), (63.8, 1.35), ha="center", va="bottom", fontsize=10.5,
-                color=TEAL, arrowprops=dict(arrowstyle="-|>", color=TEAL, lw=1.1, shrinkA=2, shrinkB=2))
-    ax.annotate("", (ODIN_SAMPLE - 0.4, -1.25), (ODIN_PINHOLE, -1.25), arrowprops=dict(arrowstyle="<->", color=INK))
-    ax.text((ODIN_PINHOLE + ODIN_SAMPLE) / 2, -1.33, "L = 10.5 m", ha="center", va="top", fontsize=10.5, color=INK)
-    ax.set_xlim(-3, 67); ax.set_ylim(-1.9, 2.4)
+    ax.text(ODIN_PINHOLE - 1, 1.02, "pinhole\n(50 m)", ha="center", va="bottom", fontsize=10.5, color=INK)
+    for k, (zs, txt, xt) in enumerate(((ODIN_SAMPLE, "position 1: 60.5 m\nfield 10 × 10 cm²", 57.5),
+                                       (ODIN_SAMPLE_2, "position 2: 64 m\nfield 20 × 20 cm²", 69.0))):
+        ax.add_patch(Rectangle((zs - 0.35, -0.4), 0.3, 0.8, color=GREY, ec=INK, zorder=3))
+        ax.add_patch(Rectangle((zs + 0.1, -0.7), 0.25, 1.4, color=TEAL, zorder=3))
+        ax.annotate(txt, (zs, 0.75), (xt, 1.35), ha="center", va="bottom", fontsize=10, color=TEAL,
+                    arrowprops=dict(arrowstyle="-|>", color=TEAL, lw=1.1, shrinkA=2, shrinkB=2))
+    for zs, L, y in ((ODIN_SAMPLE, 10.5, -1.2), (ODIN_SAMPLE_2, 14.0, -1.9)):
+        ax.annotate("", (zs - 0.2, y), (ODIN_PINHOLE, y), arrowprops=dict(arrowstyle="<->", color=INK))
+        ax.text(ODIN_PINHOLE - 0.5, y, f"L = {L:g} m", ha="right", va="center", fontsize=10.5, color=INK)
+    ax.text(66, -0.95, "at each position: the sample\n(gray), the camera (teal)\njust behind it", ha="left",
+            va="center", fontsize=9.5, color=INK)
+    ax.set_xlim(-3, 75); ax.set_ylim(-2.4, 2.6)
     ax.set_xlabel("distance from the source (m)")
     _clean(ax)
+    # ---- bottom: the chopper section. Choppers 5 cm apart (FO 1 and BP 1, FO 2 and BP 2) drawn side by side.
+    az.plot([5.3, 35], [0, 0], color="#E8C9A0", lw=10, solid_capstyle="butt", zorder=1)
+    shift = {"FO 1": -0.17, "BP 1": 0.17, "FO 2": -0.17, "BP 2": 0.17}
+    # label tier (y of the text) for each chopper, chosen so that no two labels overlap
+    tier = {"WFM 1–2": 1.0, "FO 1": 2.35, "BP 1": -1.0, "FO 2": 1.0, "BP 2": -1.0, "T0": 2.35, "FO 3": 1.0,
+            "FO 4": 1.0, "FO 5": 1.0}
+    for name, z, nu, fam in ODIN_CHOPPER_LIST:
+        c = CHOPPER_COLORS[fam]
+        zz = z + shift.get(name, 0.0)
+        if fam == "wfm":
+            for zw in ODIN_WFM:
+                az.add_patch(Rectangle((zw - 0.07, -0.6), 0.14, 1.2, color=c, zorder=3))
+        else:
+            w = 0.3 if fam == "t0" else 0.16                 # T0: a heavy 20 cm block
+            az.add_patch(Rectangle((zz - w / 2, -0.6), w, 1.2, color=c, zorder=3))
+        y = tier[name]
+        va = "bottom" if y > 0 else "top"
+        az.plot([zz, zz], [0.62 if y > 0 else -0.62, y - 0.08 if y > 0 else y + 0.08], color=c, lw=0.8)
+        az.text(zz, y, f"{name}\n{z:.1f} m, {nu} Hz", ha="center", va=va, fontsize=9.5, color=c)
+    legend = [("WFM: cut the long pulse into six short ones (WFM mode)", "wfm"),
+              ("FO (frame overlap): keep the six short pulses apart (WFM mode)", "fo"),
+              ("BP (band-pass): one pulse in two, 1 to 9 Å (natural and WFM modes)", "bp"),
+              ("T0: closed at the proton impact: stops the flash of fast neutrons and γ (natural and WFM)", "t0")]
+    for k, (txt, fam) in enumerate(legend):
+        az.add_patch(Rectangle((18.2, -1.55 - 0.62 * k - 0.17), 0.45, 0.34, color=CHOPPER_COLORS[fam]))
+        az.text(18.9, -1.55 - 0.62 * k, txt, ha="left", va="center", fontsize=9.5, color=INK)
+    az.set_xlim(5, 36); az.set_ylim(-4.2, 3.6)
+    az.set_xlabel("distance from the source (m)   (FO 1 / BP 1 and FO 2 / BP 2 are 5 cm apart: drawn side by side)")
+    _clean(az)
     fig.tight_layout()
     _save(fig, "odin_beamline.png")
     plt.close(fig)

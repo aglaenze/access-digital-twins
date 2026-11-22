@@ -116,16 +116,16 @@ def odin_time_of_flight():
     _show([lam], draw)
 
 
-ODIN_BAND = (1.0, 9.0)          # Å, band let through by the band choppers (one pulse in two)
+ODIN_BAND = (1.0, 9.0)          # Å, band let through by the band-pass choppers (one pulse in two)
 ODIN_FIRST_BAND_CHOPPER = 8.4   # m
 ODIN_WFM_Z = 7.0                # m, middle of the two WFM discs
 
 
 def odin_band_choppers():
     """Distance against time for the neutrons of three pulses; a camera time picked with the slider: which
-    wavelengths (of which pulses) can arrive then? Band choppers stopped: two or more; turning: one."""
+    wavelengths (of which pulses) can arrive then? Band-pass choppers stopped: two or more; turning: one."""
     on = w.ToggleButtons(options=[("stopped", False), ("turning: one pulse in two", True)], value=False,
-                         description="band choppers", style={"button_width": "190px", "description_width": "230px"})
+                         description="band-pass choppers", style={"button_width": "190px", "description_width": "230px"})
     t_cam = w.FloatSlider(value=95.0, min=5.0, max=210.0, step=0.5, description="arrival time at the camera (ms)",
                           readout_format=".1f", continuous_update=True, style=STYLE, layout=LAYOUT)
     lam_all = (0.8, 14.0)          # Å: what the moderator sends (the slow tail goes on)
@@ -147,7 +147,7 @@ def odin_band_choppers():
                 ax.text(t0 + 9, ODIN_FIRST_BAND_CHOPPER + 3, "stopped", fontsize=8.5, color=cols[k])
         if on.value:
             ax.axhline(ODIN_FIRST_BAND_CHOPPER, color=BLUE, lw=1.2, ls="--")
-            ax.text(212, ODIN_FIRST_BAND_CHOPPER + 1, "band chopper", ha="right", va="bottom", fontsize=8.5, color=BLUE)
+            ax.text(212, ODIN_FIRST_BAND_CHOPPER + 1, "band-pass chopper BP 1", ha="right", va="bottom", fontsize=8.5, color=BLUE)
         ax.axhline(ODIN_L, color=INK, lw=1)
         ax.text(212, ODIN_L + 1.5, "camera", ha="right", va="bottom", fontsize=9.5, color=INK)
         ax.axvline(t_cam.value, color=TEAL, lw=2)
@@ -178,7 +178,7 @@ def odin_band_choppers():
                 f"<b>{l:.2f} Å</b> from pulse {k + 1}" for k, l in found) +
                    ": <b>frame overlap</b>, the wavelength cannot be told.")
         if on.value:
-            txt += (" The band choppers stop one pulse in two (143 ms between the pulses that pass) and keep 1 to 9 Å: "
+            txt += (" The band-pass choppers stop one pulse in two (143 ms between the pulses that pass) and keep 1 to 9 Å: "
                     "the band of each pulse reaches the camera before the next one.")
         return fig, txt
 

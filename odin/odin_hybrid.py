@@ -35,9 +35,11 @@ Z_DET = tw.Z_SAMPLE + tw.DET_DIST
 
 
 # --------------------------------------------------------------------------- open beam
-def pinhole_spectrum(front_mcpl, D, cache_dir):
-    """S: upstream neutrons passing the square pinhole D (at Z_PINHOLE), with t at the detector. Cached .npz."""
-    name = os.path.join(cache_dir, f"S_D{D:.3f}.npz")
+def pinhole_spectrum(front_mcpl, D, cache_dir, z_det=Z_DET):
+    """S: upstream neutrons passing the square pinhole D (at Z_PINHOLE), with t at the detector (z_det: moderator ->
+    detector [m], measuring position 1 by default). Cached .npz."""
+    tag = "" if abs(z_det - Z_DET) < 1e-9 else f"_z{z_det:.3f}"
+    name = os.path.join(cache_dir, f"S_D{D:.3f}{tag}.npz")
     if os.path.isfile(name):
         z = np.load(name)
         return {k: z[k] for k in z.files}
@@ -48,7 +50,7 @@ def pinhole_spectrum(front_mcpl, D, cache_dir):
     ok = (np.abs(xp) <= D / 2) & (np.abs(yp) <= D / 2)
     lam = fr["lam"][ok].astype(np.float64)
     v = H_OVER_M / lam
-    t_det = fr["t"][ok] + (Z_DET - fr["z"][ok]) / (v * fr["uz"][ok])
+    t_det = fr["t"][ok] + (z_det - fr["z"][ok]) / (v * fr["uz"][ok])
     S = dict(t=t_det, lam=lam.astype(np.float32), w=fr["w"][ok].astype(np.float64))
     os.makedirs(cache_dir, exist_ok=True)
     np.savez(name, **S)
@@ -98,7 +100,37 @@ def fit_profile(events_ob, field, n=14):
     return c, dict(chi2n=float(np.mean(resid ** 2)), variation=float(model.max() / model.min() - 1))
 
 
+def fit_profile_map(events_ob, field, n=24, smooth=1.0):
+    """f(x, y) for a large field (the full field of the camera box, 10 or 20 cm), where a degree-2 polynomial is too
+    stiff: the McStas intensity on an n x n grid, smoothed by a Gaussian of `smooth` cells, normalized to a mean of 1;
+    read by bilinear interpolation (profile). Returns (("map", x0, x1, y0, y1, values), diagnostics)."""
+    from scipy.ndimage import gaussian_filter
+    x0, x1, y0, y1 = field
+    xe, ye = np.linspace(x0, x1, n + 1), np.linspace(y0, y1, n + 1)
+    h = np.zeros((n, n)); v = np.zeros((n, n))
+    for e in tw.iter_mcpl(events_ob, light=True):
+        w = e["w"].astype(float)
+        a, _, _ = np.histogram2d(e["y"], e["x"], [ye, xe], weights=w)           # rows y, columns x
+        b, _, _ = np.histogram2d(e["y"], e["x"], [ye, xe], weights=w * w)
+        h += a; v += b
+    m = gaussian_filter(h, smooth, mode="nearest")
+    m = m / m.mean()
+    model = m * h.mean()
+    resid = (h - model) / np.sqrt(np.where(v > 0, v, np.inf))
+    return (("map", x0, x1, y0, y1, m.astype(np.float64)),
+            dict(chi2n=float(np.mean(resid ** 2)), variation=float(m.max() / m.min() - 1), kind="map", n=n))
+
+
 def profile(c, x, y):
+    if isinstance(c, tuple) and c and c[0] == "map":          # a smoothed map (fit_profile_map)
+        _, x0, x1, y0, y1, m = c
+        n = m.shape[0]
+        fx = np.clip((np.asarray(x, float) - x0) / (x1 - x0) * n - 0.5, 0, n - 1)
+        fy = np.clip((np.asarray(y, float) - y0) / (y1 - y0) * n - 0.5, 0, n - 1)
+        i, j = np.minimum(fx.astype(int), n - 2), np.minimum(fy.astype(int), n - 2)
+        ax, ay = fx - i, fy - j
+        return ((1 - ax) * (1 - ay) * m[j, i] + ax * (1 - ay) * m[j, i + 1] + (1 - ax) * ay * m[j + 1, i]
+                + ax * ay * m[j + 1, i + 1])
     return c[0] + c[1] * x + c[2] * y + c[3] * x * x + c[4] * y * y + c[5] * x * y
 
 
@@ -174,6 +206,17 @@ MAP_CACHE = f"{odin_paths.RUN_ROOT}/hybrid/maps"     # thickness maps of large s
 MAP_CACHE_MIN = 200        # volumes: below, computing the maps is faster than reading them
 MAP_CACHE_FILES = 600      # files kept (a tomography: 60 angles; the oldest go first)
 MAP_CACHE_VERSION = 1      # to change when the computation of the maps changes
+MAP_POINTS = 2000          # largest number of grid steps across a map (memory: 4 bytes x 2001^2 per material)
+
+
+def map_grid(field_half=None):
+    """(half-width, step) [m] of the thickness maps for a field of view of half-width field_half: the 14 mm field keeps
+    MAP_HALF and MAP_STEP; a larger field (the full field of the camera box, 10 or 20 cm) a grid of MAP_POINTS steps
+    (50 or 100 µm, below its pixels: 0.2 mm at the finest)."""
+    if field_half is None:
+        return MAP_HALF, MAP_STEP
+    half = max(MAP_HALF, 1.02 * field_half)
+    return half, max(MAP_STEP, 2 * half / MAP_POINTS)
 
 
 _SIGMA = {}
@@ -191,7 +234,8 @@ def sigma_tot(cfg, lam):
     return _SIGMA[key]
 
 
-def volumes_transmission(volumes, stage_x, stage_rot, lam_grid=np.linspace(0.3, 20.0, 4000), strains=None):
+def volumes_transmission(volumes, stage_x, stage_rot, lam_grid=np.linspace(0.3, 20.0, 4000), strains=None,
+                         field_half=None):
     """Function T(x, y, λ) for a sample made of volumes [(NCrystal cfg, center (m), dims (m)[, shape[, host cfg]]), ...]
     (boxes, spheres, vertical cylinders; an inclusion names the material of the volume around it, which it replaces),
     centers given with
@@ -201,11 +245,12 @@ def volumes_transmission(volumes, stage_x, stage_rot, lam_grid=np.linspace(0.3, 
     every lattice spacing seen by the beam becomes d (1 + ε), so every Bragg edge (λ = 2d) moves to λ (1 + ε):
     Σ_tot(λ) of the strained volume = Σ_tot(λ / (1 + ε)) of the unstrained material. (The smooth parts of Σ_tot,
     absorption and inelastic scattering, move with it: an error of ε, about 10⁻³, on a slowly varying term.)
-    A sample described as a samplecraft scene (sample_library.SceneSample): scene_transmission."""
+    A sample described as a samplecraft scene (sample_library.SceneSample): scene_transmission.
+    field_half: half-width of the field of view [m] (None: the 14 mm field): sets the grid of the thickness maps."""
     if hasattr(volumes, "scene"):
         if strains is not None and any(strains):
             raise ValueError("a sample described as a scene cannot be strained (load frame) yet")
-        return scene_transmission(volumes, stage_x, stage_rot, lam_grid)
+        return scene_transmission(volumes, stage_x, stage_rot, lam_grid, field_half=field_half)
     th = np.radians(stage_rot)
     c, s = np.cos(th), np.sin(th)
     if strains is not None:
@@ -225,7 +270,7 @@ def volumes_transmission(volumes, stage_x, stage_rot, lam_grid=np.linspace(0.3, 
         epss.append(eps)
 
     if len(vols) > 20 or any(v[3] in ("blob", "slab") for v in vols):     # irregular shapes: always on maps
-        return _mapped_transmission(volumes, vols, stage_rot, lam_grid, epss)
+        return _mapped_transmission(volumes, vols, stage_rot, lam_grid, epss, grid=map_grid(field_half))
 
     def T(x, y, lam):
         mu = np.zeros(len(x))
@@ -237,33 +282,34 @@ def volumes_transmission(volumes, stage_x, stage_rot, lam_grid=np.linspace(0.3, 
     return T
 
 
-def _mapped_transmission(volumes, vols, stage_rot, lam_grid, epss=None):
+def _mapped_transmission(volumes, vols, stage_rot, lam_grid, epss=None, grid=(MAP_HALF, MAP_STEP)):
     """A sample made of many volumes (a rock: hundreds of grains): the thickness crossed in each material is computed
     once, on a grid of MAP_STEP over the field (each volume only within its own extent), then read for each neutron
     or pixel; T = exp(−Σ_m Σ_m(λ) L_m(x, y)). The volumes of the same material (and host, and strain) share one
     map."""
-    n = int(round(2 * MAP_HALF / MAP_STEP)) + 1
-    g = -MAP_HALF + np.arange(n) * MAP_STEP
+    half, step = grid
+    n = int(round(2 * half / step)) + 1
+    g = -half + np.arange(n) * step
     maps, sigs = {}, {}
     keys = []
     for k, (v, (sig, center, dims, shape)) in enumerate(zip(volumes, vols)):
         key = (v[0], v[4] if len(v) > 4 else None, round(float(epss[k]), 9) if epss else 0.0)
         sigs[key] = sig
         keys.append(key)
-    cached = _map_cache_file(vols, keys) if len(vols) >= MAP_CACHE_MIN else None
+    cached = _map_cache_file(vols, keys, grid) if len(vols) >= MAP_CACHE_MIN else None
     if cached and os.path.exists(cached):
         try:
             maps = _read_maps(cached, n)
         except Exception:                              # a file being written by another kernel, or damaged
             maps = {}
     if not maps:
-        maps = _compute_maps(vols, keys, g, n, stage_rot)
+        maps = _compute_maps(vols, keys, g, n, stage_rot, step)
         if cached:
             _write_maps(cached, maps)
-    return _transmission_from_maps(maps, sigs, n, lam_grid)
+    return _transmission_from_maps(maps, sigs, n, lam_grid, grid)
 
 
-def scene_transmission(sample, stage_x, stage_rot, lam_grid=np.linspace(0.3, 20.0, 4000)):
+def scene_transmission(sample, stage_x, stage_rot, lam_grid=np.linspace(0.3, 20.0, 4000), field_half=None):
     """T(x, y, λ) of a samplecraft scene: rays along the beam (lab z) through the grid of the thickness maps, taken
     into the frame of the sample (stage translated by stage_x [m], turned by stage_rot [deg] about y); the exact path
     length of each (material, material around) from the scene (mm), Σ_material − Σ_around applied to it. Maps kept
@@ -293,11 +339,12 @@ def scene_transmission(sample, stage_x, stage_rot, lam_grid=np.linspace(0.3, 20.
                 mu[k] += np.interp(lam[k], lam_grid, sig(key)) * L[k]
             return np.exp(-mu)
         return T
-    n = int(round(2 * MAP_HALF / MAP_STEP)) + 1
-    g = -MAP_HALF + np.arange(n) * MAP_STEP
+    half, step = grid = map_grid(field_half)
+    n = int(round(2 * half / step)) + 1
+    g = -half + np.arange(n) * step
     import hashlib
     name = hashlib.sha1(repr((MAP_CACHE_VERSION, "scene", sample.key, round(float(stage_x), 9),
-                              round(float(stage_rot), 9), MAP_STEP, MAP_HALF)).encode()).hexdigest()[:24]
+                              round(float(stage_rot), 9), step, half)).encode()).hexdigest()[:24]
     cached = os.path.join(MAP_CACHE, f"{name}.npz") if not sample.key.startswith("mem:") else None
     maps = {}
     if cached and os.path.exists(cached):
@@ -325,14 +372,14 @@ def scene_transmission(sample, stage_x, stage_rot, lam_grid=np.linspace(0.3, 20.
         if key[1] is not None:
             sig = sig - sigma_tot(key[1], lam_grid)
         sigs[key] = sig
-    return _transmission_from_maps(maps, sigs, n, lam_grid)
+    return _transmission_from_maps(maps, sigs, n, lam_grid, grid)
 
 
-def _map_cache_file(vols, keys):
+def _map_cache_file(vols, keys, grid=(MAP_HALF, MAP_STEP)):
     """The file of the thickness maps of this sample in this position (a class measures the same rock at the same
     angles: the first student computes them, the others read them)."""
     import hashlib
-    h = hashlib.sha1(repr((MAP_CACHE_VERSION, MAP_STEP, MAP_HALF,
+    h = hashlib.sha1(repr((MAP_CACHE_VERSION, grid[1], grid[0],
                            [(key, tuple(np.round(np.asarray(v[1], float), 12)), tuple(np.ravel(v[2]).tolist()), v[3])
                             for key, v in zip(keys, vols)])).encode()).hexdigest()[:24]
     return os.path.join(MAP_CACHE, f"{h}.npz")
@@ -374,7 +421,7 @@ def _write_maps(path, maps):
         pass                                           # no cache: computed again next time
 
 
-def _compute_maps(vols, keys, g, n, stage_rot):
+def _compute_maps(vols, keys, g, n, stage_rot, step=MAP_STEP):
     """{key: thickness map [m]} of the volumes of each material (and host, strain)."""
     maps = {}
     # the blobs (a rock: thousands of grains), all at once: the pixels of the map around each one, one ray each
@@ -383,8 +430,8 @@ def _compute_maps(vols, keys, g, n, stage_rot):
         key_id = {key: i for i, key in enumerate(dict.fromkeys(keys[k] for k in bl))}
         cen = np.array([vols[k][1] for k in bl], float)
         rad = np.array([rock_shapes.blob_bound(vols[k][2]) for k in bl])
-        x0 = np.searchsorted(g, cen[:, 0] - rad - MAP_STEP); x1 = np.searchsorted(g, cen[:, 0] + rad + MAP_STEP, "right")
-        y0 = np.searchsorted(g, cen[:, 1] - rad - MAP_STEP); y1 = np.searchsorted(g, cen[:, 1] + rad + MAP_STEP, "right")
+        x0 = np.searchsorted(g, cen[:, 0] - rad - step); x1 = np.searchsorted(g, cen[:, 0] + rad + step, "right")
+        y0 = np.searchsorted(g, cen[:, 1] - rad - step); y1 = np.searchsorted(g, cen[:, 1] + rad + step, "right")
         nx, ny = np.clip(x1 - x0, 0, None), np.clip(y1 - y0, 0, None)
         cnt = nx * ny
         idx = np.repeat(np.arange(len(bl)), cnt)
@@ -407,8 +454,8 @@ def _compute_maps(vols, keys, g, n, stage_rot):
         else:
             r = 0.5 * float(np.sqrt(dims[0] ** 2 + dims[2] ** 2)) if shape in ("box", "ellipsoid") else 0.5 * dims[0]
             hy = 0.5 * (dims[1] if shape != "sphere" else dims[0])
-        ix = np.where((g >= center[0] - r - MAP_STEP) & (g <= center[0] + r + MAP_STEP))[0]
-        iy = np.where((g >= center[1] - hy - MAP_STEP) & (g <= center[1] + hy + MAP_STEP))[0]
+        ix = np.where((g >= center[0] - r - step) & (g <= center[0] + r + step))[0]
+        iy = np.where((g >= center[1] - hy - step) & (g <= center[1] + hy + step))[0]
         if not len(ix) or not len(iy):
             continue
         X, Y = np.meshgrid(g[ix], g[iy])
@@ -418,8 +465,9 @@ def _compute_maps(vols, keys, g, n, stage_rot):
     return maps
 
 
-def _transmission_from_maps(maps, sigs, n, lam_grid):
+def _transmission_from_maps(maps, sigs, n, lam_grid, grid=(MAP_HALF, MAP_STEP)):
     """T(x, y, λ) = exp(−Σ_m Σ_m(λ) L_m(x, y)), with T.thickness and T.sigma (images: maps read once per pixel)."""
+    MAP_HALF, MAP_STEP = grid           # noqa: N806  (the grid of these maps; the module constants: the 14 mm field)
 
     def thickness(x, y):
         """{material: thickness crossed [m]} at (x, y) (for images: read once, combined at each wavelength)."""
@@ -447,19 +495,28 @@ def _transmission_from_maps(maps, sigs, n, lam_grid):
 class HybridModel:
     """Open beam of one configuration (upstream file, D, diffuser): S, a(λ), f(x, y). Built once, then reused."""
 
-    def __init__(self, front_mcpl, D, events_ob, field, cache_dir, lam=(1.0, 9.0)):
+    def __init__(self, front_mcpl, D, events_ob, field, cache_dir, lam=(1.0, 9.0), z_sample=tw.Z_SAMPLE, tag=""):
+        """z_sample: moderator -> sample [m] (the measuring position, odin_mcstas.POSITIONS); tag: the setting of
+        position and lens (odin_virtual.config_tag, '' for position 1 with the zoom lens), in the name of the cache."""
         from scipy.interpolate import splev
         self.field, self.D = field, D
-        self.S = pinhole_spectrum(front_mcpl, D, cache_dir)
-        name = os.path.join(cache_dir, f"model_D{D:.3f}_{os.path.basename(os.path.dirname(events_ob))}.npz")
+        self.z_sample = z_sample
+        self.L = z_sample - tw.Z_PINHOLE                 # pinhole -> sample: the L of L/D
+        self.S = pinhole_spectrum(front_mcpl, D, cache_dir, z_det=z_sample + tw.DET_DIST)
+        name = os.path.join(cache_dir, f"model_D{D:.3f}_{os.path.basename(os.path.dirname(events_ob))}{tag}.npz")
+        # the 14 mm field: a degree-2 polynomial; a larger field (more than 2 cm): a smoothed map of the beam
+        large = (field[1] - field[0]) > 0.02
         if os.path.isfile(name):
             z = np.load(name, allow_pickle=True)
             self.c_a, self.c_f, self.diag = tuple(z["c_a"]), z["c_f"], z["diag"].item()
+            if large:
+                self.c_f = tuple(self.c_f.tolist())
         else:
             self.c_a, da = fit_acceptance(self.S, events_ob, field, lam_edges=np.arange(lam[0], lam[1] + 1e-4, 0.1))
-            self.c_f, df = fit_profile(events_ob, field)
+            self.c_f, df = (fit_profile_map if large else fit_profile)(events_ob, field)
             self.diag = dict(acceptance=da, profile=df)
-            np.savez(name, c_a=np.array(self.c_a, dtype=object), c_f=self.c_f, diag=np.array(self.diag, dtype=object))
+            c_f = np.array(self.c_f, dtype=object) if large else self.c_f
+            np.savez(name, c_a=np.array(self.c_a, dtype=object), c_f=c_f, diag=np.array(self.diag, dtype=object))
         lamS = self.S["lam"].astype(float)
         lo, hi = self.diag["acceptance"]["lc"][[0, -1]]
         self.r = self.S["w"] * np.exp(splev(np.clip(lamS, lo, hi), self.c_a))   # intensity (n/s) in the field
@@ -494,7 +551,7 @@ class HybridModel:
         xc = x0 + (np.arange(bins) + 0.5) * (x1 - x0) / bins
         yc = y0 + (np.arange(bins) + 0.5) * (y1 - y0) / bins
         X, Y = (a.ravel() for a in np.meshgrid(xc, yc))
-        f = profile(self.c_f, X, Y)
+        f = np.clip(profile(self.c_f, X, Y), 0, None)     # (a polynomial: never below zero at the corners)
         f = f / f.sum()                                              # share of the beam in each pixel
         Tm = np.ones(X.size)
         if transmission is not None and hasattr(transmission, "thickness"):     # a sample on thickness maps
@@ -509,7 +566,7 @@ class HybridModel:
         elif transmission is not None:
             Tm = sum(wk * transmission(X, Y, np.full(X.size, lk)) for lk, wk in zip(lc, wl)) / wl.sum()
         mean = (wl.sum() * t_exp * beam_factor * f * Tm).reshape(bins, bins)
-        L = tw.Z_SAMPLE - tw.Z_PINHOLE
+        L = self.L
         sigma = np.hypot(tw.DET_DIST * self.D / L / np.sqrt(12), blur_m) / ((x1 - x0) / bins)     # [pixels]
         mean = gaussian_filter(mean, sigma, mode="nearest")
         return rng.poisson(mean) + rng.poisson(dark_per_s * t_exp, mean.shape)
@@ -535,7 +592,7 @@ class HybridModel:
         xc = x0 + (np.arange(bins) + 0.5) * (x1 - x0) / bins
         yc = y0 + (np.arange(bins) + 0.5) * (y1 - y0) / bins
         X, Y = (a.ravel() for a in np.meshgrid(xc, yc))
-        f = profile(self.c_f, X, Y)
+        f = np.clip(profile(self.c_f, X, Y), 0, None)     # (a polynomial: never below zero at the corners)
         f = f / f.sum()
         if transmission is None:
             Tm = np.ones((X.size, fine.size))
@@ -560,7 +617,7 @@ class HybridModel:
         for k in range(lam_edges.size - 1):
             out[k] = mean[:, idx == k].sum(axis=1)
         out = out.reshape(-1, bins, bins)
-        Lp = tw.Z_SAMPLE - tw.Z_PINHOLE
+        Lp = self.L
         sigma = np.hypot(tw.DET_DIST * self.D / Lp / np.sqrt(12), blur_m) / ((x1 - x0) / bins)
         out = np.array([gaussian_filter(o, sigma, mode="nearest") for o in out])
         return rng.poisson(out)
@@ -583,7 +640,8 @@ class HybridModel:
         lam, t = lamS[idx], self.S["t"][idx]
         # Position: profile f(x, y), by rejection
         x0, x1, y0, y1 = self.field
-        fmax = 1.05 * max(profile(self.c_f, xx, yy) for xx in (x0, x1, 0) for yy in (y0, y1, 0))
+        fmax = (1.05 * float(self.c_f[5].max()) if isinstance(self.c_f, tuple) else
+                1.05 * max(profile(self.c_f, xx, yy) for xx in (x0, x1, 0) for yy in (y0, y1, 0)))
         x = rng.uniform(x0, x1, n); y = rng.uniform(y0, y1, n)
         rej = rng.uniform(0, fmax, n) > profile(self.c_f, x, y)
         while rej.any():
@@ -594,7 +652,7 @@ class HybridModel:
             keep = rng.uniform(0, 1, n) < transmission(x, y, lam)
             x, y, t, lam = x[keep], y[keep], t[keep], lam[keep]
         n = len(x)
-        L = tw.Z_SAMPLE - tw.Z_PINHOLE
+        L = self.L
         xs, ys = rng.uniform(-self.D / 2, self.D / 2, n), rng.uniform(-self.D / 2, self.D / 2, n)
         out = dict(x=(x + tw.DET_DIST * (x - xs) / L + rng.normal(0, blur_m, n)).astype(np.float32),
                    y=(y + tw.DET_DIST * (y - ys) / L + rng.normal(0, blur_m, n)).astype(np.float32),

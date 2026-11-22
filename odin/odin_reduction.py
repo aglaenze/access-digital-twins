@@ -104,7 +104,8 @@ _LUTS = {}
 
 
 def _chopper_fingerprint(file):
-    """Chopper configuration written in the file (speed setpoints, WFM disc translation): one lookup table each."""
+    """Chopper configuration (speed setpoints, WFM disc translation) and flight path written in the file: one lookup
+    table each."""
     import h5py
     with h5py.File(file, "r") as f:
         ins = f["entry/instrument"]
@@ -112,6 +113,9 @@ def _chopper_fingerprint(file):
         key = [(c, float(ins[f"{c}/rotation_speed_setpoint/value"][-1])) for c in ("wfm1", "wfm2", "foc1", "foc2", "foc3",
                                                                                  "foc4", "foc5", "bpc1", "bpc2", "t0")]
         key.append(float(ins["wfm1/transformations/wfmc_translation/value"][-1]))
+        # the flight path (measuring position 1 or 2): the table covers the distances of the file's detector
+        key.append(round(float(ins["source/transformations/source_position"][()]), 6))
+        key.append(round(float(ins["timepix3/transformations/translation"][()]), 6))
     return tuple(key)
 
 

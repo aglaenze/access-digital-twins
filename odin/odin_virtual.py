@@ -15,11 +15,17 @@ What count(t) does:
   4. writes a NeXus file in ESS format (odin_nexus.write_nexus) with the state of the devices and choppers;
   5. records the action in a log (log.jsonl), as a server recording the sessions would.
 
-Chopper modes (devices "choppers" and "wfm_delta"): WFM (δ = 0.10, 0.30 or 0.45 m), "natural" (band-pass choppers
+Chopper modes (devices "choppers" and "wfm_delta"): WFM (Î´ = 0.10, 0.30 or 0.45 m), "natural" (band-pass choppers
 and T0 only), "white" (no chopper). Each mode reads its own precomputed McStas upstream part (FRONTS).
 
-Limits (told to students): Timepix3 field of view 14 mm × 14 mm; "mcstas" mode: finite number of distinct simulated
-neutrons, a long count reuses them (warning); "hybrid" mode: neutrons scattered by the sample are neglected.
+Measuring positions and lenses (devices "position" and "lens"): the sample and the camera at position 1 (60.5 m from
+the moderator, L = 10.5 m after the pinhole) or position 2 (64 m, L = 14 m), as the two sample stages and camera boxes
+of ODIN; the camera with its high-magnification lens ("zoom": the 14.1 mm field of the Timepix3 of the ODIN file) or
+its full field ("full": 10 cm at position 1, 20 cm at position 2). Position 1 with the zoom lens is the default, and
+the setting of every exercise; each other setting has its own McStas simulations and hybrid models (computed once).
+
+Limits (told to students): "mcstas" mode: finite number of distinct simulated neutrons, a long count reuses them
+(warning); "hybrid" mode: neutrons scattered by the sample are neglected.
 """
 import datetime as _dt
 import hashlib
@@ -44,24 +50,67 @@ COMPONENTS = paths.COMPONENTS
 FIELD = (-0.00705, 0.00705, -0.00705, 0.00705)  # [m] Timepix3 field of view of the template
 TOA_BINS = 150                                   # spectrum of arrival times shown while counting (odin_viz.LiveCount)
 FOV = 0.016                      # [m] McStas detector window, slightly larger than the Timepix3 (14 mm)
-# Largest number of counts per file (memory: ~40 bytes per count while writing). The open beam gives ~1·10⁶ counts/s
-# in WFM mode but ~2·10⁷ counts/s in white mode. (A real Timepix3 camera would saturate at such rates; not modeled.)
+# Largest number of counts per file (memory: ~40 bytes per count while writing). The open beam gives ~1Â·10â¶ counts/s
+# in WFM mode but ~2Â·10â· counts/s in white mode. (A real Timepix3 camera would saturate at such rates; not modeled.)
 MAX_COUNTS = 5e7
 # Count rate above which a real Timepix3 camera loses neutrons (approximate): the chip reads about 80 million pixel
-# hits per second (40 Mhits/s/cm², 2 cm²) and each neutron lights a cluster of about ten pixels through the
+# hits per second (40 Mhits/s/cmÂ², 2 cmÂ²) and each neutron lights a cluster of about ten pixels through the
 # scintillator and the intensifier: a few million neutrons per second at most. The losses are not modeled: the twin
 # warns instead.
 TPX_MAX_RATE = 5e6               # [neutrons/s in the field of view]
 MAX_LOAD = 50.0            # [kN] capacity of the load frame; each sample has its own limit (load: max_kN)
-# Precomputed upstream parts (odin_mcstas.front): (mode, δ) -> (δ in the folder name, neutrons).
-# δ only matters in WFM mode (the other modes were computed with δ = 0.30, which has no effect without WFM choppers).
+# Precomputed upstream parts (odin_mcstas.front): (mode, Î´) -> (Î´ in the folder name, neutrons).
+# Î´ only matters in WFM mode (the other modes were computed with Î´ = 0.30, which has no effect without WFM choppers).
 FRONTS = {("wfm", 0.30): (0.30, 1e10), ("wfm", 0.10): (0.10, 2e8), ("wfm", 0.45): (0.45, 2e8),
           ("natural", None): (0.30, 2e8), ("white", None): (0.30, 1e8)}
-# Wavelength range simulated at the source for each mode [Å]
+# Wavelength range simulated at the source for each mode [Ã…]
 LAM_RANGE = tw.FRONT_LAM
 # Focused diffuser (components/Graphite_Diffuser_focus.comp): aims at a 20 mm square in the detector plane
 # (Z_SAMPLE + DET_DIST), from the diffuser entrance (Z_PINHOLE + 1 mm, as in odin_mcstas.build_back).
 FOCUS = dict(focus_xw=0.020, focus_yh=0.020, focus_z=tw.Z_SAMPLE + tw.DET_DIST - (tw.Z_PINHOLE + 1e-3), f_phys=0.1)
+
+
+def is_default(state):
+    """Position 1 with the zoom lens: the setting of the exercises (and the only one before 2026-11-20); its
+    simulations, models and caches keep their names."""
+    return int(state.get("position", 1)) == 1 and state.get("lens", "zoom") == "zoom"
+
+
+def config_tag(state):
+    """'' for the default setting, else e.g. '_P2full': added to the names of the instruments and simulations."""
+    return "" if is_default(state) else f"_P{int(state.get('position', 1))}{state.get('lens', 'zoom')}"
+
+
+def field_of(state):
+    """(x0, x1, y0, y1) [m]: the field of view of the camera for the position and lens of the state."""
+    if state.get("lens", "zoom") == "zoom":
+        return FIELD
+    h = tw.field_width(state.get("position", 1), "full") / 2
+    return (-h, h, -h, h)
+
+
+def field_half(state):
+    """Half-width of the field [m] for the thickness maps (None: the 14 mm field, the default grid)."""
+    return None if state.get("lens", "zoom") == "zoom" else tw.field_width(state.get("position", 1), "full") / 2
+
+
+def z_sample_of(state):
+    return tw.POSITIONS[int(state.get("position", 1))]
+
+
+def focus_of(state):
+    """Focused diffuser for a setting: aims at a square a little larger than the field, in the detector plane."""
+    if is_default(state):
+        return FOCUS
+    w = tw.field_width(state.get("position", 1), state.get("lens", "zoom"))
+    side = 0.020 if state.get("lens", "zoom") == "zoom" else w + 0.02
+    return dict(focus_xw=side, focus_yh=side, focus_z=z_sample_of(state) + tw.DET_DIST - (tw.Z_PINHOLE + 1e-3),
+                f_phys=0.1)
+
+
+def window_of(state):
+    """Side of the McStas detector window [m]: slightly larger than the field."""
+    return FOV if state.get("lens", "zoom") == "zoom" else 1.08 * tw.field_width(state.get("position", 1), "full")
 
 
 # --------------------------------------------------------------------------- samples
@@ -148,10 +197,10 @@ def _with_rotation(build_sample):
     return f
 
 
-def _focused_diffuser(instr):
+def _focused_diffuser(instr, focus=None):
     """Graphite diffuser with importance sampling toward the field of view (same dimensions as build_back)."""
     g = instr.add_component("graph", "Graphite_Diffuser_focus", AT=tw.Z_PINHOLE + 1e-3, RELATIVE="optical_axis")
-    g.set_parameters(xwidth=0.1, ywidth=0.1, thick=0.2, **FOCUS)
+    g.set_parameters(xwidth=0.1, ywidth=0.1, thick=0.2, **(focus or FOCUS))
     g.set_WHEN("use_diffuser == 1")
 
 
@@ -262,12 +311,20 @@ class VirtualOdin:
                    help="experiment shutter, just upstream of the sample"),
             Device("pinhole", 0.03, "m", choices=(0.01, 0.02, 0.03, 0.04),
                    nexus=("pinhole_2/horizontal_gap", "pinhole_2/vertical_gap"), to_nexus=lambda v: v * 1e3,
-                   help="side D of the square pinhole at 50 m (L = 10.5 m to the sample: L/D)"),
+                   help="side D of the square pinhole at 50 m (L = 10.5 m to the sample at position 1, 14 m at "
+                        "position 2: L/D)"),
             Device("diffuser", "in", choices=("in", "out"), nexus="pinhole_diffuser/status",
                    to_nexus=lambda v: 3 if v == "in" else 0,               # assumed convention, to be checked
                    help="graphite diffuser after the pinhole (homogenises the beam)"),
+            Device("position", 1, choices=(1, 2),
+                   help="measuring position: the sample stage and the camera at 60.5 m from the source (1: L = 10.5 m "
+                        "after the pinhole) or at 64 m (2: L = 14 m, sharper, larger beam, fewer neutrons per cmÂ²)"),
+            Device("lens", "zoom", choices=tw.LENSES,
+                   help="lens of the camera: zoom (high magnification, a 14 mm field, fine pixels) or full (the whole "
+                        "field of the camera box: 10 cm at position 1, 20 cm at position 2)"),
             Device("stage_x", 0.0, "m", limits=(-0.5, 0.5), nexus="spst1_lin_x", to_nexus=lambda v: v * 1e3,
-                   help="horizontal sample translation; |x| > 2 cm: out of the field of view"),
+                   help="horizontal sample translation; out of the field of view when |x| is more than half the field "
+                        "plus half the sample (500 mm: out of the beam at any position and lens)"),
             Device("stage_rot", 0.0, "deg", limits=(-180, 180), nexus="spst1_rot_y",
                    help="sample rotation about the vertical axis"),
             Device("sample", EMPTY, choices=(EMPTY,) + tuple(SAMPLES),
@@ -286,6 +343,7 @@ class VirtualOdin:
         ]}
         self._back = {}
         self._models = {}
+        self._field = FIELD                     # field of view of the measurement under way (field_of(state))
         self.last_image = np.zeros((128, 128), dtype=np.uint32)
         self.number = self._last_number()
 
@@ -371,8 +429,8 @@ class VirtualOdin:
     @staticmethod
     def stream_pulses(nexus_file, block=32):
         """The neutrons of a NeXus file, pulse by pulse, for the live stream (kafka/streamer.py): list of (time of the
-        pulse after the first one [ns], arrival times [ns], pixel ids). The Timepix3 pixels (4096 × 4096) are grouped
-        in blocks of block × block, numbered 1 + ix + n iy (n = 4096 / block: 128 × 128 for 32), so that the live
+        pulse after the first one [ns], arrival times [ns], pixel ids). The Timepix3 pixels (4096 Ã— 4096) are grouped
+        in blocks of block Ã— block, numbered 1 + ix + n iy (n = 4096 / block: 128 Ã— 128 for 32), so that the live
         histograms stay small; the file keeps the full pixel ids."""
         import h5py
         with h5py.File(nexus_file, "r") as f:
@@ -440,8 +498,11 @@ class VirtualOdin:
         file). The result is the same as in one go: the slices are independent Poisson draws, added."""
         if not 0 < t <= 3600:
             raise ValueError("counting time between 0 and 3600 s")
+        if t < 2 / nx.PULSE_HZ:
+            raise ValueError(f"counting time at least {2 / nx.PULSE_HZ:.2f} s (one frame: two source pulses)")
         t0 = time.time()
         state = self._physical(self.status())
+        self._field = field = field_of(state)
         if self.budget_s is not None and state["shutter"] == "open" and self.beam_used() + t > self.budget_s + 1e-9:
             raise ValueError(f"beamtime exhausted: {self.budget_s - self.beam_used():.0f} s left of {self.budget_s:.0f} s")
         if "stage_offset" in self.faults:          # the stage is not where it says it is (hidden from the files)
@@ -456,22 +517,28 @@ class VirtualOdin:
             progress(np.zeros((128, 128)), np.zeros(TOA_BINS), 0.0, t, "preparing")
         if state["shutter"] == "closed":                              # background only
             draw = lambda dt: nx.sample_counts({k: np.zeros(0) for k in ("x", "y", "t", "lam", "w")}, dt,
-                                               field=FIELD, rng=self.rng)
+                                               field=field, rng=self.rng)
             counts = self._in_slices(draw, t, progress)
         elif self.mode == "hybrid":
             model = self.model(state)
             expected = model.rate() * t * beam_factor
             if expected > MAX_COUNTS:
+                t_max = t * MAX_COUNTS / expected
+                if t_max < 2 / nx.PULSE_HZ:      # not even one frame: this beam is far too strong for the event mode
+                    raise ValueError(
+                        f"about {expected / t:.2g} neutrons per second reach the camera: far too many for the Timepix3 "
+                        f"in event mode (a real one stands a few million per second). Use a smaller pinhole, the WFM "
+                        f"mode or the zoom lens, or measure with the histogram image or the integrating camera")
                 raise ValueError(f"about {expected:.2g} counts expected, above the twin's limit of {MAX_COUNTS:.0e} "
-                                 f"counts per file: count for at most {t * MAX_COUNTS / expected:.1f} s here "
+                                 f"counts per file: count for at most {t_max:.1f} s here "
                                  f"(or use a smaller pinhole / another chopper mode)")
             smp = self.samples()[state["sample"]]
             T = hy.volumes_transmission(_operando_volumes(smp, state["cycle_time"]), state["stage_x"], state["stage_rot"],
-                                        strains=self.strains(state))
+                                        strains=self.strains(state), field_half=field_half(state))
             draw = lambda dt: model.counts(dt, transmission=T, rng=self.rng, beam_factor=beam_factor)
             counts = self._in_slices(draw, t, progress)
         else:
-            counts = nx.counts_from_mcpl(self.simulate(state), t, field=FIELD, rng=self.rng,
+            counts = nx.counts_from_mcpl(self.simulate(state), t, field=field, rng=self.rng,
                                          beam_factor=beam_factor, copies=self.copies)
         self._check()                               # stopped while counting: no file, no log
         counts = self._apply_faults(counts, t)
@@ -484,9 +551,9 @@ class VirtualOdin:
                   f"camera loses neutrons above a few million per second (each neutron lights a cluster of pixels, "
                   f"the chip reads about 80 million pixel hits per second); the twin does not model this loss. "
                   f"Close the pinhole or use the choppers (natural or WFM mode) for a realistic rate.")
-        # Detector image of this measurement (128 × 128 pixels of 110 µm), for live displays (NICOS, page)
+        # Detector image of this measurement (128 Ã— 128 pixels: 110 Âµm with the zoom lens), for live displays
         self.last_image = np.histogram2d(counts["y"], counts["x"], bins=128,
-                                         range=[FIELD[2:], FIELD[:2]])[0].astype(np.uint32)
+                                         range=[field[2:], field[:2]])[0].astype(np.uint32)
         if not write:
             self.last_n_counts = int(self.last_image.sum())
             self._log("count", dict(t=t, title=title, file=None, n_counts=self.last_n_counts, mode=self.mode,
@@ -500,7 +567,9 @@ class VirtualOdin:
         r = nx.write_nexus(counts, out_file, t, title=title or f"run {self.number}",
                            sample_name=self._sample_name(state), det_dist=tw.DET_DIST, charge=charge,
                            pulses_per_frame=ppf,
-                           settings=self._nexus_settings() | nx.chopper_settings(state["choppers"], state["wfm_delta"]))
+                           settings=self._nexus_settings() | nx.chopper_settings(state["choppers"], state["wfm_delta"]),
+                           field_scale=(field[1] - field[0]) / (FIELD[1] - FIELD[0]),
+                           l1_shift=z_sample_of(state) - tw.Z_SAMPLE)
         self.last_n_counts = r["n_counts"]
         if self.strains(state) is not None:          # a sample in the load frame: its force, in the file (kN)
             import h5py
@@ -519,8 +588,8 @@ class VirtualOdin:
         seconds: one image, no time of flight, no neutron recorded one by one (hybrid model: HybridModel.image).
         Returns the path of the file written (NeXus, entry/instrument/camera/data: counts per pixel, 128 x 128 over
         the field of the Timepix3 camera), or None with write=False (the image is in last_image).
-        pixels: 128 (110 µm pixels, a thick bright scintillator) or 512 (27.5 µm, the high-resolution setup: a thin
-        scintillator, 20 µm of blur: 16 times fewer neutrons per pixel, so longer exposures)."""
+        pixels: 128 (110 Âµm pixels, a thick bright scintillator) or 512 (27.5 Âµm, the high-resolution setup: a thin
+        scintillator, 20 Âµm of blur: 16 times fewer neutrons per pixel, so longer exposures)."""
         self._check()
         if pixels not in (128, 256, 512):
             raise ValueError("camera pixels: 128, 256 or 512")
@@ -528,6 +597,7 @@ class VirtualOdin:
             raise ValueError("camera exposure between 0 and 3600 s")
         t0 = time.time()
         state = self._physical(self.status())
+        self._field = FIELD_ = field_of(state)  # noqa: N806
         if self.budget_s is not None and state["shutter"] == "open" and self.beam_used() + t > self.budget_s + 1e-9:
             raise ValueError(f"beamtime exhausted: {self.budget_s - self.beam_used():.0f} s left of {self.budget_s:.0f} s")
         ppf = nx.PULSES_PER_FRAME[state["choppers"]]
@@ -540,7 +610,7 @@ class VirtualOdin:
                 raise ValueError("the camera is modeled in the hybrid mode only")
             smp = self.samples()[state["sample"]]
             T = hy.volumes_transmission(_operando_volumes(smp, state["cycle_time"]), state["stage_x"], state["stage_rot"],
-                                        strains=self.strains(state))
+                                        strains=self.strains(state), field_half=field_half(state))
             img = self.model(state).image(t, transmission=T, beam_factor=beam_factor, rng=self.rng, bins=pixels)
         self.last_image = img.astype(np.uint32)
         self.last_n_counts = int(img.sum())
@@ -560,7 +630,7 @@ class VirtualOdin:
                 e["sample/x_translation"] = float(state.get("_stage_x", state["stage_x"]))
                 cam = e.create_group("instrument/camera")
                 cam.attrs["NX_class"] = "NXdetector"
-                for k in ("shutter", "choppers", "diffuser"):        # the state of the instrument during the image
+                for k in ("shutter", "choppers", "diffuser", "position", "lens"):   # the state during the image
                     cam.attrs[k] = str(state[k])
                 cam.attrs["pinhole_m"] = float(state["pinhole"])
                 cam.attrs["wfm_delta_m"] = float(state["wfm_delta"])
@@ -568,8 +638,10 @@ class VirtualOdin:
                     cam.attrs["cycle_time_h"] = float(state["cycle_time"])
                 d = cam.create_dataset("data", data=self.last_image, compression="gzip")
                 d.attrs["units"] = "counts"
-                cam["x_pixel_offset"] = np.linspace(FIELD[0], FIELD[1], pixels + 1)[:-1] + (FIELD[1] - FIELD[0]) / (2 * pixels)
-                cam["y_pixel_offset"] = np.linspace(FIELD[2], FIELD[3], pixels + 1)[:-1] + (FIELD[3] - FIELD[2]) / (2 * pixels)
+                cam["x_pixel_offset"] = np.linspace(FIELD_[0], FIELD_[1], pixels + 1)[:-1] + (FIELD_[1] - FIELD_[0]) / (2 * pixels)
+                cam["y_pixel_offset"] = np.linspace(FIELD_[2], FIELD_[3], pixels + 1)[:-1] + (FIELD_[3] - FIELD_[2]) / (2 * pixels)
+                cam["distance_from_source"] = float(z_sample_of(state) + tw.DET_DIST)
+                cam["distance_from_source"].attrs["units"] = "m"
                 e["instrument/source/proton_charge"] = float(charge.sum())
         self._log("camera", dict(t=t, title=title, file=os.path.basename(out_file) if out_file else None,
                                  pixels=pixels, n_counts=self.last_n_counts, mode=self.mode, charge_uC=round(float(charge.sum()), 1),
@@ -578,9 +650,9 @@ class VirtualOdin:
 
     def polarimetry(self, t, title="", write=True, pixels=128, n_lam=16):
         """Polarized imaging (polarizer "in"): t seconds with the Timepix3 camera, the neutrons sorted by wavelength
-        (n_lam bins from 1.5 to 6 Å); the spin enters along spin_in, the analyzer passes the spin along spin_out
+        (n_lam bins from 1.5 to 6 Ã…); the spin enters along spin_in, the analyzer passes the spin along spin_out
         (odin_polarized.measurement). Returns the file (NeXus, entry/instrument/camera/data: counts (n_lam, y, x),
-        with entry/instrument/camera/wavelength [Å]), or None with write=False (counts in last_cube)."""
+        with entry/instrument/camera/wavelength [Ã…]), or None with write=False (counts in last_cube)."""
         import odin_polarized as pol
         self._check()
         if pixels not in (64, 128):
@@ -589,6 +661,7 @@ class VirtualOdin:
             raise ValueError("exposure between 0 and 4 hours")
         t0 = time.time()
         state = self._physical(self.status())
+        self._field = FIELD_ = field_of(state)  # noqa: N806
         if self.budget_s is not None and state["shutter"] == "open" and self.beam_used() + t > self.budget_s + 1e-9:
             raise ValueError(f"beamtime exhausted: {self.budget_s - self.beam_used():.0f} s left of {self.budget_s:.0f} s")
         if self.mode != "hybrid":
@@ -629,7 +702,7 @@ class VirtualOdin:
                 e["sample/x_translation"] = float(state.get("_stage_x", state["stage_x"]))
                 cam = e.create_group("instrument/camera")
                 cam.attrs["NX_class"] = "NXdetector"
-                for k in ("shutter", "choppers", "diffuser", "polarizer", "spin_in", "spin_out"):
+                for k in ("shutter", "choppers", "diffuser", "polarizer", "spin_in", "spin_out", "position", "lens"):
                     cam.attrs[k] = str(state[k])
                 cam.attrs["pinhole_m"] = float(state["pinhole"])
                 d = cam.create_dataset("data", data=self.last_cube, compression="gzip")
@@ -637,8 +710,8 @@ class VirtualOdin:
                 d.attrs["axes"] = "wavelength, y, x"
                 cam["wavelength"] = lam
                 cam["wavelength"].attrs["units"] = "angstrom"
-                cam["x_pixel_offset"] = np.linspace(FIELD[0], FIELD[1], pixels + 1)[:-1] + (FIELD[1] - FIELD[0]) / (2 * pixels)
-                cam["y_pixel_offset"] = np.linspace(FIELD[2], FIELD[3], pixels + 1)[:-1] + (FIELD[3] - FIELD[2]) / (2 * pixels)
+                cam["x_pixel_offset"] = np.linspace(FIELD_[0], FIELD_[1], pixels + 1)[:-1] + (FIELD_[1] - FIELD_[0]) / (2 * pixels)
+                cam["y_pixel_offset"] = np.linspace(FIELD_[2], FIELD_[3], pixels + 1)[:-1] + (FIELD_[3] - FIELD_[2]) / (2 * pixels)
                 e["instrument/source/proton_charge"] = float(charge.sum())
         self._log("polarimetry", dict(t=t, title=title, file=os.path.basename(out_file) if out_file else None,
                                       pixels=pixels, n_lam=n_lam, n_counts=self.last_n_counts,
@@ -647,11 +720,11 @@ class VirtualOdin:
         return out_file
 
     def tof_image(self, t, title="", write=True, pixels=128, lam_range=(2.7, 4.5), lam_bin=0.01):
-        """The Timepix3 camera in histogram mode: counts per pixel and wavelength bin (lam_range, bins of lam_bin Å)
+        """The Timepix3 camera in histogram mode: counts per pixel and wavelength bin (lam_range, bins of lam_bin Ã…)
         for t seconds, computed without drawing the neutrons one by one (HybridModel.tof_image), so that long
         exposures stay fast. The wavelength resolution is that of the chopper mode (WFM: about 0.2 % for discs 0.30 m
         apart; natural: about 2 %). Returns the file (NeXus, entry/instrument/camera/data: counts (wavelength, y, x),
-        entry/instrument/camera/wavelength: the bin edges [Å])."""
+        entry/instrument/camera/wavelength: the bin edges [Ã…])."""
         self._check()
         if pixels not in (64, 128):
             raise ValueError("histogram mode pixels: 64 or 128")
@@ -659,11 +732,16 @@ class VirtualOdin:
             raise ValueError("exposure between 0 and 4 hours")
         t0 = time.time()
         state = self._physical(self.status())
+        self._field = FIELD_ = field_of(state)  # noqa: N806
         if state["choppers"] not in ("wfm", "natural"):
             raise ValueError("histogram mode: choppers 'wfm' or 'natural' (a white beam has no time of flight)")
         if self.budget_s is not None and state["shutter"] == "open" and self.beam_used() + t > self.budget_s + 1e-9:
             raise ValueError(f"beamtime exhausted: {self.budget_s - self.beam_used():.0f} s left of {self.budget_s:.0f} s")
         rel = 0.0019 * state["wfm_delta"] / 0.30 if state["choppers"] == "wfm" else 0.02
+        # the resolutions above are those of position 1; a longer flight path (position 2) divides the same time
+        # spread by a longer time of flight: from the WFM discs (7 m) in WFM mode, from the source otherwise
+        z_det, z_det1 = z_sample_of(state) + tw.DET_DIST, tw.Z_SAMPLE + tw.DET_DIST
+        rel *= (z_det1 - 7.0) / (z_det - 7.0) if state["choppers"] == "wfm" else z_det1 / z_det
         edges = np.arange(lam_range[0], lam_range[1] + lam_bin / 2, lam_bin)
         ppf = nx.PULSES_PER_FRAME[state["choppers"]]
         charge = nx.pulse_charges(t, self.rng, fluctuation=self.fluctuation, outages=[])
@@ -675,7 +753,7 @@ class VirtualOdin:
             if self.mode != "hybrid":
                 raise ValueError("the histogram mode is modeled in the hybrid mode only")
             T = hy.volumes_transmission(_operando_volumes(smp, state["cycle_time"]), state["stage_x"],
-                                        state["stage_rot"], strains=self.strains(state))
+                                        state["stage_rot"], strains=self.strains(state), field_half=field_half(state))
             cube = self.model(state).tof_image(t, transmission=T, lam_edges=edges, bins=pixels, rel_sigma=rel,
                                                beam_factor=beam_factor, rng=self.rng)
         self.last_cube = cube.astype(np.uint32)
@@ -698,7 +776,7 @@ class VirtualOdin:
                 cam = e.create_group("instrument/camera")
                 cam.attrs["NX_class"] = "NXdetector"
                 cam.attrs["mode"] = "tof histogram"
-                for k in ("shutter", "choppers", "diffuser"):
+                for k in ("shutter", "choppers", "diffuser", "position", "lens"):
                     cam.attrs[k] = str(state[k])
                 cam.attrs["pinhole_m"] = float(state["pinhole"])
                 cam.attrs["wfm_delta_m"] = float(state["wfm_delta"])
@@ -707,8 +785,8 @@ class VirtualOdin:
                 d.attrs["axes"] = "wavelength, y, x"
                 cam["wavelength"] = edges
                 cam["wavelength"].attrs["units"] = "angstrom"
-                cam["x_pixel_offset"] = np.linspace(FIELD[0], FIELD[1], pixels + 1)[:-1] + (FIELD[1] - FIELD[0]) / (2 * pixels)
-                cam["y_pixel_offset"] = np.linspace(FIELD[2], FIELD[3], pixels + 1)[:-1] + (FIELD[3] - FIELD[2]) / (2 * pixels)
+                cam["x_pixel_offset"] = np.linspace(FIELD_[0], FIELD_[1], pixels + 1)[:-1] + (FIELD_[1] - FIELD_[0]) / (2 * pixels)
+                cam["y_pixel_offset"] = np.linspace(FIELD_[2], FIELD_[3], pixels + 1)[:-1] + (FIELD_[3] - FIELD_[2]) / (2 * pixels)
                 e["instrument/source/proton_charge"] = float(charge.sum())
         self._log("tof_image", dict(t=t, title=title, file=os.path.basename(out_file) if out_file else None,
                                     pixels=pixels, n_counts=self.last_n_counts, charge_uC=round(float(charge.sum()), 1),
@@ -716,7 +794,7 @@ class VirtualOdin:
         return out_file
 
     def polarization_matrix(self, t, title="", pixels=128, n_lam=16, progress=None):
-        """The 18 measurements of the full polarization matrix: spin in along ±x, ±y, ±z, analyzer along x, y, z, t
+        """The 18 measurements of the full polarization matrix: spin in along Â±x, Â±y, Â±z, analyzer along x, y, z, t
         seconds each (polarizer in). Returns {(spin_in, spin_out): file}. progress(k, 18, file) after each one."""
         files, k = {}, 0
         self.move(polarizer="in", shutter="open")
@@ -730,7 +808,7 @@ class VirtualOdin:
         return files
 
     def camera_spectrum(self, n=80):
-        """(λ [Å], weights) of the neutrons the camera sees in the current beam (chopper mode, pinhole): the spectrum
+        """(Î» [Ã…], weights) of the neutrons the camera sees in the current beam (chopper mode, pinhole): the spectrum
         a white-beam image averages over (odin_radiography.effective_sigma)."""
         from odin_nexus import efficiency
         model = self.model(dict(self.status(), shutter="open"))
@@ -750,9 +828,9 @@ class VirtualOdin:
                 progress(k + 1, len(angles), files[-1])
         return files
 
-    @staticmethod
-    def _image(counts):
-        return np.histogram2d(counts["y"], counts["x"], bins=128, range=[FIELD[2:], FIELD[:2]])[0]
+    def _image(self, counts):
+        f = self._field
+        return np.histogram2d(counts["y"], counts["x"], bins=128, range=[f[2:], f[:2]])[0]
 
     @staticmethod
     def _toa(counts):
@@ -796,9 +874,9 @@ class VirtualOdin:
 
     def _apply_faults(self, counts, t):
         """Hidden detector faults (troubleshooting exercises)."""
-        if "hot_pixels" in self.faults:            # a few noisy pixels: many counts, random times, no λ
+        if "hot_pixels" in self.faults:            # a few noisy pixels: many counts, random times, no Î»
             rng = np.random.default_rng(7)         # always the same pixels
-            hot = rng.uniform(FIELD[0], FIELD[1], (6, 2))
+            hot = rng.uniform(self._field[0], self._field[1], (6, 2))
             n = int(2000 * t)
             k = self.rng.integers(0, len(hot), n)
             counts = dict(counts, x=np.r_[counts["x"], hot[k, 0].astype(np.float32)],
@@ -806,7 +884,8 @@ class VirtualOdin:
                           t=np.r_[counts["t"], self.rng.uniform(0, 1 / nx.PULSE_HZ, n)],
                           lam=np.r_[counts["lam"], np.full(n, np.nan, dtype=np.float32)])
         if "dead_region" in self.faults:           # a dead corner of the detector (e.g. a damaged chip)
-            keep = ~((counts["x"] > 0.003) & (counts["y"] > 0.003))
+            c = 0.003 * self._field[1] / FIELD[1]          # the same corner of the detector, whatever the lens
+            keep = ~((counts["x"] > c) & (counts["y"] > c))
             counts = dict(counts, **{k: counts[k][keep] for k in ("x", "y", "t", "lam")})
         return counts
 
@@ -829,10 +908,10 @@ class VirtualOdin:
         background remains). Each configuration is simulated once (disk cache)."""
         if state["shutter"] == "closed":
             return None
-        back = self._instrument(state["sample"])
+        back = self._instrument(state["sample"], state)
         tag, mcpl = self._upstream(state)
         runner = tw.Runner(back, f"{RUN_ROOT}/mcstas/{state['sample']}_{'focus' if self.focus else 'phys'}_"
-                                 f"{tag}_c{self.copies}", mpi=self.mpi)
+                                 f"{tag}_c{self.copies}{config_tag(state)}", mpi=self.mpi)
         name = (f"D{state['pinhole']:.3f}_x{state['stage_x']:+.4f}_rot{state['stage_rot']:+.2f}_"
                 f"diff{int(state['diffuser'] == 'in')}")
         if not runner.complete(runner.folder(name)):
@@ -846,28 +925,35 @@ class VirtualOdin:
         """Hybrid open-beam model for (chopper mode, D, diffuser): built from the full McStas simulation of the open
         beam (sample out, stage_x = 0.5 m), once, then cached."""
         tag, mcpl = self._upstream(state)
-        key = (tag, state["pinhole"], state["diffuser"])
+        key = (tag, state["pinhole"], state["diffuser"], config_tag(state))
         if key not in self._models:
             # Open beam: the sample is out of the beam, so the reference sample instrument is used for every sample
             events_ob = self.simulate(dict(state, stage_x=0.5, stage_rot=0.0, sample=REFERENCE_SAMPLE))
-            self._models[key] = hy.HybridModel(mcpl, state["pinhole"], events_ob, field=FIELD,
+            self._models[key] = hy.HybridModel(mcpl, state["pinhole"], events_ob, field=field_of(state),
                                                cache_dir=f"{RUN_ROOT}/hybrid/{tag}",
-                                               lam=LAM_RANGE[state["choppers"]])
+                                               lam=LAM_RANGE[state["choppers"]], z_sample=z_sample_of(state),
+                                               tag=config_tag(state))
         return self._models[key]
 
-    def _instrument(self, sample):
+    def _instrument(self, sample, state=None):
+        """The McStas instrument of a sample, for the measuring position and lens of the state (default: position 1,
+        zoom lens; another setting is another instrument: its name ends with config_tag)."""
+        state = state or {}
         vols = self.samples()[sample]["volumes"]
-        key = (sample, repr(vols))
+        key = (sample, repr(vols), config_tag(state))
         if key not in self._back:
             os.makedirs(BUILD, exist_ok=True)
             shutil.copy(os.path.join(COMPONENTS, "Graphite_Diffuser_focus.comp"), BUILD)   # McStas searches BUILD
             # the name carries a fingerprint of the geometry: a sample changed under the same name is simulated again
             tag = sample if sample in SAMPLES else f"{sample}_{hashlib.md5(repr(vols).encode()).hexdigest()[:6]}"
+            focus = focus_of(state)
             self._back[key] = tw.build_back(
-                f"ODIN_twin_{tag}_{'focus' if self.focus else 'phys'}", BUILD,
-                sample=_with_rotation(_union_boxes(vols)), det_size=FOV,
-                diffuser=not self.focus, before_sample=_focused_diffuser if self.focus else None,
-                sample_monitors=True)   # monitors needed: Runner.complete() checks their data
+                f"ODIN_twin_{tag}_{'focus' if self.focus else 'phys'}{config_tag(state)}", BUILD,
+                sample=_with_rotation(_union_boxes(vols)), det_size=window_of(state),
+                diffuser=not self.focus,
+                before_sample=(lambda instr: _focused_diffuser(instr, focus)) if self.focus else None,
+                sample_monitors=True,   # monitors needed: Runner.complete() checks their data
+                z_sample=z_sample_of(state))
         return self._back[key]
 
     def _upstream(self, state):
@@ -875,7 +961,7 @@ class VirtualOdin:
         mode = state["choppers"]
         delta = round(float(state["wfm_delta"]), 2) if mode == "wfm" else None
         if (mode, delta) not in FRONTS:
-            raise ValueError(f"no precomputed upstream part for {mode} δ={delta}; available: {list(FRONTS)}")
+            raise ValueError(f"no precomputed upstream part for {mode} Î´={delta}; available: {list(FRONTS)}")
         tw_delta, n = FRONTS[(mode, delta)]
         folder = tw.front_folder(mode, n, tw_delta)
         if not tw.Runner.complete(folder):
@@ -905,13 +991,16 @@ class VirtualOdin:
         return {f"entry/instrument/{k}": v for k, v in settings.items()}
 
     def _nexus_settings(self):
+        """{device path in the file: value}. At position 2 the sample sits on the second sample stage of ODIN: its
+        motors are written to spst2_* instead of spst1_*."""
         out = {}
+        stage2 = int(self.devices["position"].value) == 2
         for d in self.devices.values():
             if d.nexus is None:
                 continue
             v = d.to_nexus(d.value) if d.to_nexus else d.value
             for path in (d.nexus if isinstance(d.nexus, tuple) else (d.nexus,)):
-                out[path] = v
+                out[path.replace("spst1_", "spst2_") if stage2 else path] = v
         return out
 
     def _last_number(self):

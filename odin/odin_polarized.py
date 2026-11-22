@@ -219,7 +219,7 @@ def measurement(model, field, rot_deg, polarizer, spin_in, spin_out, t, beam_fac
     else:
         share = np.ones((n_lam, bins, bins))
     mean = wl[:, None, None] * t * beam_factor * f[None] * T[None] * share
-    L = tw.Z_SAMPLE - tw.Z_PINHOLE
+    L = getattr(model, "L", tw.Z_SAMPLE - tw.Z_PINHOLE)
     sigma = np.hypot(tw.DET_DIST * model.D / L / np.sqrt(12), 0.055e-3) / ((x1 - x0) / bins)      # [pixels]
     mean = np.array([gaussian_filter(m, sigma, mode="nearest") for m in mean])
     return rng.poisson(mean), lc

@@ -191,7 +191,32 @@ A simulated neutron i carries an intensity wᵢ (neutrons/s). During t seconds i
 mᵢ = wᵢ · t · ε(λᵢ) counts, with ε(λ) = 1 − exp(−λ/8 Å) (absorption in the scintillator). The number of counts follows
 a Poisson law; their position is blurred (0.1 mm, light spread in the scintillator); a uniform background is added
 (0.05 count/s/mm²: gamma rays, fast neutrons). The detector is the Timepix3 of the template: 4096 × 4096 pixels of
-3.4 µm, 14 mm field of view.
+3.4 µm, 14 mm field of view (the "zoom" lens).
+
+### 4.3b Measuring positions and lenses (devices `position`, `lens`; added 2026-11-20)
+ODIN has two measuring positions (sample stages `spst1`, `spst2` and camera boxes `camera1`, `camera2` in the ODIN
+file): the sample at 60.5 m (position 1, L = 10.5 m after the pinhole) or 64 m (position 2, L = 14 m; ODIN
+requirement: 20 cm × 20 cm illuminated at L = 14 m). The camera has the high-magnification lens of the template
+(`zoom`, 14.1 mm field) or its full field (`full`: 10 cm at position 1, 20 cm at position 2).
+- **Default = position 1, zoom**: every exercise; its instruments, simulations, hybrid models and caches keep their
+  names (`config_tag` = ''), so nothing is recomputed.
+- **Another setting** is another McStas back end (`ODIN_twin_<sample>_focus_P2full`: sample at `z_sample`, detector
+  window and focused diffuser sized to the field), its own open-beam simulation and hybrid model (pinhole spectrum S
+  with the arrival times at the new detector distance; L of the blurs = z_sample − 50 m). Computed once per chopper
+  mode, pinhole and diffuser, then cached.
+- **Thickness maps** (`odin_hybrid.map_grid`): 20 µm steps over the 14 mm field; a full field a grid of 2000 steps
+  (51 µm at 10 cm, 102 µm at 20 cm), below the pixels.
+- **Files**: the full field keeps the 4096 × 4096 pixel numbers, with pixels 7.1 (10 cm) or 14.2 (20 cm) times
+  larger (`x/y_pixel_offset`, `x/y_pixel_size`); at position 2 every component upstream of the sample (source,
+  moderator, choppers, pinholes, slits) is written 3.5 m farther upstream (`odin_nexus.shift_upstream`: the sample is
+  the origin of the file), and the stage motors go to `spst2_*`. The reduction then reads the right flight path.
+- **Histogram mode** (`tof_image`): the wavelength resolution of position 1 scaled by the flight paths (WFM: from the
+  discs at 7 m; natural: from the source).
+- **Limits**: the full field is read with the same Timepix3 event mode as the zoom: in a white beam or with a large
+  pinhole the count rate is far above what a real Timepix3 stands (the twin warns; MAX_COUNTS stops long counts).
+  The live views of the ESS chain (esslivedata) use their own ODIN geometry (14 mm, 60.5 m): with another setting their
+  wavelengths and image scale are those of position 1 / zoom; the files are right. The file-writer template of the ESS
+  chain (`filewriter/`) is that of position 1, zoom.
 
 ### 4.4 The source and time in the NeXus file
 - **Proton charge**: each source pulse carries 71.4 µC (2 MW, 2 GeV protons, 14 Hz, as in the McStas model), with 1 %

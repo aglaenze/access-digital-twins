@@ -271,6 +271,30 @@ def chopper_settings(mode, wfm_delta=0.30):
 
 
 # --------------------------------------------------------------------------- writing
+def shift_upstream(f, shift):
+    """Moves every component upstream of the sample `shift` metres farther from it (f: h5py file open for writing):
+    each translation along the beam of a transformation chain under entry/instrument whose value is upstream (below
+    -1 m; the sample is the origin, the beam goes along +z) gets -shift. Used for measuring position 2."""
+    done = []
+
+    def visit(name, obj):
+        if not isinstance(obj, h5py.Dataset) or "/transformations/" not in f"/{name}" or obj.ndim != 0:
+            return
+        if obj.attrs.get("units", b"m") not in ("m", b"m"):
+            return
+        v = obj.attrs.get("vector")
+        if v is not None and not np.allclose(np.asarray(v, float), (0, 0, 1)):
+            return
+        if np.issubdtype(obj.dtype, np.number) and float(obj[()]) < -1.0:
+            done.append(name)
+    f["entry/instrument"].visititems(visit)
+    g = f["entry/instrument"]
+    for name in done:
+        parent, key = name.rsplit("/", 1)
+        _replace(g[parent], key, np.asarray(g[name][()] - shift, dtype=g[name].dtype))
+    return done
+
+
 def _bin_index(edges, v):
     """Index of the bin of each value (searchsorted(edges, v) - 1; -1 or len(edges) - 1 outside): by arithmetic when
     the bins are regular, as the pixels of a camera (10 times quicker for millions of neutrons)."""
@@ -289,7 +313,7 @@ def _bin_index(edges, v):
 
 
 def write_nexus(counts, out_file, t_exp, start=None, det_dist=0.05, title="ODIN digital twin", sample_name="",
-                settings=None, template=None, charge=None, pulses_per_frame=2):
+                settings=None, template=None, charge=None, pulses_per_frame=2, field_scale=1.0, l1_shift=0.0):
     """Writes an ODIN NeXus file (ESS format) containing the measured counts.
 
     counts: output of sample_counts() / counts_from_mcpl(); t = time since the emitting pulse [s] (McStas time).
@@ -304,11 +328,20 @@ def write_nexus(counts, out_file, t_exp, start=None, det_dist=0.05, title="ODIN 
     each count gets a random frame of 2 pulses (pulses_per_frame = 2). Without choppers (white beam), every pulse
     emits: frames of 1 pulse; slow neutrons then arrive after the next pulse (frame overlap, as on the real
     instrument).
+
+    field_scale: field of view of the camera / that of the template (14.1 mm): the full field of the camera box (10 or
+    20 cm) keeps the 4096 x 4096 pixel numbers of the Timepix3, with pixels field_scale times larger (written in
+    x/y_pixel_offset and x/y_pixel_size).
+    l1_shift: how much farther from the source the sample is than in the template (60.5 m) [m]: measuring position 2
+    (64 m) is 3.5 m. The sample is the origin of the ODIN NeXus frame, so every component upstream of it (source,
+    moderator, choppers, pinholes, slits...) is written l1_shift farther upstream: the reduction then reads the right
+    flight path.
     """
     template = template or template_file()
     start = start or _dt.datetime.now(_dt.timezone.utc).replace(microsecond=0)
     t0_ns = int(start.timestamp() * 1e9)
     ex, ey, num = detector_geometry(template)
+    ex, ey = ex * field_scale, ey * field_scale
     ix, iy = _bin_index(ex, counts["x"]), _bin_index(ey, counts["y"])
     ok = (ix >= 0) & (ix < len(ex) - 1) & (iy >= 0) & (iy < len(ey) - 1)
     rng = np.random.default_rng(int(t0_ns % 2**32))
@@ -360,6 +393,12 @@ def write_nexus(counts, out_file, t_exp, start=None, det_dist=0.05, title="ODIN 
         _replace(d, "event_index", index, compress=True)
         _replace(d, "event_time_zero", etz, compress=True)
         _replace(f[f"{DET}/transformations"], "translation", np.float64(det_dist))
+        if field_scale != 1.0:
+            g = f[DET]
+            for k in ("x_pixel_offset", "y_pixel_offset", "x_pixel_size", "y_pixel_size"):
+                _replace(g, k, g[k][()] * field_scale)
+        if l1_shift:
+            shift_upstream(f, l1_shift)
         e = f["entry"]
         iso = lambda ns: _dt.datetime.fromtimestamp(ns / 1e9, _dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
         for name, val in (("title", title), ("start_time", iso(t0_ns)), ("end_time", iso(end_ns)),

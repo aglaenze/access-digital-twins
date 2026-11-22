@@ -44,8 +44,23 @@ import odin_paths
 # --------------------------------------------------------------------------- geometry (optical axis, m)
 Z_GUIDE_EXIT = 49.01        # end of the last guide (component "guide_end" of the model)
 Z_PINHOLE = 50.0            # pinhole, at the second focal point of the guide
-Z_SAMPLE = 60.5             # sample position (moderator -> sample distance)
+Z_SAMPLE = 60.5             # sample position (moderator -> sample distance): measuring position 1
 L_PINHOLE_SAMPLE = Z_SAMPLE - Z_PINHOLE   # 10.5 m: the "L" of the L/D ratio
+# The two measuring positions of ODIN (sample stages spst1 and spst2, camera boxes camera1 and camera2 of the ODIN
+# NeXus file): moderator -> sample [m]. Position 2 is 14 m after the pinhole (ODIN requirement: a 20 cm x 20 cm field
+# illuminated at L = 14 m).
+POSITIONS = {1: Z_SAMPLE, 2: 64.0}
+# Field of view of the camera [m, full width]: the high-magnification lens ("zoom": the 14.1 mm of the Timepix3 of the
+# ODIN file, at either position) or the full field of the camera box at each position (10 cm at position 1, 20 cm at
+# position 2)
+FIELD_ZOOM = 0.0141
+FIELD_FULL = {1: 0.10, 2: 0.20}
+LENSES = ("zoom", "full")
+
+
+def field_width(position=1, lens="zoom"):
+    """Side of the field of view of the camera [m] for a measuring position and a lens."""
+    return FIELD_ZOOM if lens == "zoom" else FIELD_FULL[int(position)]
 DET_DIST = 0.05             # sample -> detector (as in the examples of the ODIN repository)
 H_OVER_M = 3956.034         # h/m_n in m·Å/s: λ[Å] = 3956 / v[m/s]
 
@@ -108,7 +123,7 @@ def build_front(mode, build_dir, name=None, lam_min=1.0, lam_max=9.0):
 # --------------------------------------------------------------------------- downstream part (pinhole -> detector)
 def build_back(name, build_dir, sample=None, det_size=0.08, det_dist=DET_DIST,
                D_default=0.03, sample_monitors=True, diffuser=True, lam_min=1.0, lam_max=9.0, polarisation=False,
-               events=True, before_sample=None):
+               events=True, before_sample=None, z_sample=Z_SAMPLE):
     """Downstream part: MCPL (guide exit) -> square pinhole D -> graphite diffuser -> sample -> detector.
 
     sample(instr): function adding the sample, placed RELATIVE "sample_arm" (which follows sample_x).
@@ -122,6 +137,7 @@ def build_back(name, build_dir, sample=None, det_size=0.08, det_dist=DET_DIST,
     events=False: no event file (the monitors added by sample() are enough).
     before_sample(instr): function adding components between the diffuser and the sample (placed RELATIVE
       "optical_axis", at z < Z_SAMPLE); the twin uses it for the focused diffuser.
+    z_sample: moderator -> sample [m], the measuring position (POSITIONS).
     """
     os.makedirs(build_dir, exist_ok=True)
     instr = ms.McStas_instr(name, input_path=build_dir, author="ACCESS training (DTU)", origin="DTU")
@@ -151,7 +167,7 @@ def build_back(name, build_dir, sample=None, det_size=0.08, det_dist=DET_DIST,
         g.set_WHEN("use_diffuser == 1")
     if before_sample is not None:
         before_sample(instr)
-    instr.add_component("sample_position", "Arm", AT=Z_SAMPLE, RELATIVE="optical_axis")
+    instr.add_component("sample_position", "Arm", AT=z_sample, RELATIVE="optical_axis")
     if sample_monitors:
         # Open-beam monitors just before the sample (field of view 30 cm x 30 cm, as in the official model)
         arm = instr.add_component("sample_monitor_arm", "Arm", AT=-0.01, RELATIVE="sample_position")

@@ -90,15 +90,21 @@ md(r"""
 ## 2. ODIN, from the source to the camera
 
 ESS makes neutrons in **pulses**: 14 times per second, for 2.86 ms, protons hit a tungsten target, and a
-**moderator** (cold hydrogen and water) slows the neutrons down. ODIN is 60 m long:
+**moderator** (cold hydrogen and water) slows the neutrons down. ODIN is about 65 m long:
 """)
-fig("odin_beamline.png", "ODIN from the source to the camera (distances of the official McStas model of ODIN).")
+fig("odin_beamline.png", "Top: ODIN from the source to the camera, with its two measuring positions. Bottom: the "
+    "chopper section enlarged, every chopper with its distance from the source and its speed (turns per second). "
+    "Distances and speeds of the official McStas model of ODIN.")
 md(r"""
-- the **choppers** (rotating discs with openings, between 7 and 33 m) let neutrons pass only at chosen times (part 5);
+- the **choppers** (rotating discs with openings, between 7 and 33 m) let neutrons pass only at chosen times. There
+  are four kinds, explained in part 5: two **WFM** choppers, five **frame-overlap** choppers (FO), two **band-pass**
+  choppers (BP) and one **T0** chopper;
 - the **neutron guide** (a tube of mirrors) carries the beam over 49 m without losing it;
 - the **pinhole**, at 50 m, is a hole of 1 to 4 cm: seen from the sample, it is the source of the beam (part 3);
-- the **sample** is at 60.5 m, on a stage that moves and turns it;
-- the **camera** just behind it records each neutron: where it arrived (which pixel) and when (part 4).
+- the **sample** sits on a stage that moves and turns it, at one of **two measuring positions**: 60.5 m (position 1)
+  or 64 m (position 2), that is $L$ = 10.5 m or 14 m after the pinhole (part 3);
+- the **camera** just behind the sample records each neutron: where it arrived (which pixel) and when (part 4). Its
+  field of view is **10 cm × 10 cm** at position 1 and **20 cm × 20 cm** at position 2 (part 6).
 """)
 
 code(r"""
@@ -114,8 +120,8 @@ md(r"""
 ## 3. The pinhole: sharp or bright?
 
 ODIN works like a **pinhole camera**. Each point of the sample is lit by the whole opening of the pinhole, of side
-$D$, at a distance $L$ = 10.5 m. Behind the sample, the rays from the two edges of the hole spread apart again: on a
-camera at a distance $l$ behind the sample, a point becomes a spot of width
+$D$, at a distance $L$ (10.5 m at position 1). Behind the sample, the rays from the two edges of the hole spread apart
+again: on a camera at a distance $l$ behind the sample, a point becomes a spot of width
 $$\text{blur} = l \times \frac{D}{L}.$$
 """)
 fig("odin_pinhole.png", "Why a point of the sample becomes a spot on the camera: the rays from the two edges of the "
@@ -124,6 +130,12 @@ md(r"""
 The ratio $L/D$ is the **collimation ratio**: the larger, the sharper the picture. But the neutrons that reach the
 sample are those that pass the hole: their number goes with its **area**, $D^2$. A small pinhole gives a sharp but
 dark, hence noisy, picture. Try it: the picture below is a test pattern of bars of four widths.
+
+**The two measuring positions.** Moving the sample and the camera from position 1 ($L$ = 10.5 m) to position 2
+($L$ = 14 m) is the other way to change $L/D$. The beam leaving the pinhole spreads over a larger area: the field
+of view grows from 10 cm × 10 cm to 20 cm × 20 cm, the blur shrinks by 10.5/14 = 0.75 for the same pinhole, but
+the neutrons per cm² drop to about $(10.5/14)^2$ = 0.56 of those at position 1. Position 1 for small samples and
+short exposures; position 2 for large objects, or when sharpness matters more than counting time.
 """)
 
 code(r"""
@@ -194,16 +206,18 @@ q.choice("The camera records a neutron 30.6 ms after the pulse. Which wavelength
 md(r"""
 ## 5. The choppers: keeping the pulses apart, and sharpening them
 
-**Two problems** with the simple picture of part 4.
+ODIN has ten chopper discs (figure of part 2), of four kinds. Each answers one problem of the simple picture of
+part 4.
 
 **Problem 1: the pulses overlap.** A new pulse leaves every 71.4 ms. Look again at the figure of part 4: a 6 Å
 neutron of pulse 1 needs 92 ms, so it arrives *after* the fast neutrons of pulse 2. The camera cannot tell them
 apart: this is **frame overlap**. Between two pulses the camera can only sort a band of wavelengths
-$3956 \times 0.0714 / 60.55$ = **4.7 Å** wide. ODIN's *band choppers* turn at 7 turns per second and let through
-**one pulse in two**: the pulses are then 143 ms apart, and a band of about 9 Å (1 to 9 Å) fits without overlap.
+$3956 \times 0.0714 / 60.55$ = **4.7 Å** wide. ODIN's two **band-pass choppers** (BP 1 at 8.4 m, BP 2 at 12.2 m)
+turn at 7 turns per second, half the pulse rate, and let through **one pulse in two**: the pulses are then 143 ms
+apart, and a band up to $3956 \times 0.143 / 60.55$ = 9.3 Å wide fits without overlap: ODIN uses 1 to 9 Å. Their opening also sets the edges of the band.
 
-*Try it*: choose a time at the camera with the slider. With the band choppers stopped, neutrons of two pulses (two
-different wavelengths) can arrive at that same time; start the choppers: only one remains.
+*Try it*: choose a time at the camera with the slider. With the band-pass choppers stopped, neutrons of two pulses
+(two different wavelengths) can arrive at that same time; start the choppers: only one remains.
 """)
 code(r"""
 iw.odin_band_choppers()
@@ -212,9 +226,10 @@ md(r"""
 **Problem 2: the pulse is long.** The neutrons do not leave at one instant but during 2.86 ms. Two neutrons of the
 same wavelength can thus arrive 2.86 ms apart, and the clock mistakes this for a difference of wavelength of
 $3956 \times 0.00286 / 60.55$ = **0.19 Å**. At 4 Å this is an uncertainty of about 5 %: too coarse to measure, for
-instance, how much a metal is stretched (0.1 %). The *WFM choppers* (wavelength frame multiplication), 7 m from
-the source, cut the long pulse into six short ones: the wavelength is then known to **0.2 to 0.8 %**, at a price:
-only **3 % of the neutrons** are left.
+instance, how much a metal is stretched (0.1 %). The two **WFM choppers** (wavelength frame multiplication), 7 m
+from the source, turn at 56 turns per second; each disc has six openings, so they cut the long pulse into six short
+ones, each for its own slice of the band: the wavelength is then known to **0.2 to 0.8 %**, at a price: only
+**3 % of the neutrons** are left.
 
 *Try it*: with the WFM choppers stopped, all the neutrons of one wavelength that leave during the 2.86 ms reach the
 camera spread over 2.86 ms. Start them: two discs a distance δ apart let through only those that left within a short
@@ -224,13 +239,29 @@ code(r"""
 iw.odin_wfm()
 """)
 md(r"""
+**Problem 3: the six short pulses overlap in their turn.** After the WFM choppers, the six short pulses fly on
+side by side, and the slow neutrons of one could catch up with the fast ones of the next before the camera. The five
+**frame-overlap choppers** (FO 1 to FO 5, from 8.4 to 33 m, 42 to 14 turns per second) each have six openings, one
+per short pulse, placed so that each short pulse passes through its own openings only: the neutrons that would mix
+two of them are stopped on the way. They turn only in WFM mode.
+
+**Problem 4: the flash of the proton impact.** When the protons hit the target, they also send out very fast
+neutrons and gamma rays. ODIN looks almost straight at the source, so this flash would fly down the beamline and add
+a background to the pictures. The **T0 chopper**, at 13.6 m, is a heavy rotating block, 20 cm thick along the beam, that turns
+28 times per second, twice per pulse period: it is **closed at the instant of each proton impact** (for about 3 ms on
+each side of it) and open in between, when the 1 to 9 Å neutrons arrive.
+
 Hence the three chopper settings of the twin, which you will choose yourself in the exercises:
 
 | Chopper mode | What turns | Wavelengths | Wavelength known to | Neutrons |
 |---|---|---|---|---|
 | `white` | nothing | all, mixed | not measured | all (100 %) |
-| `natural` | band choppers | 1 to 9 Å | 0.19 Å (2 to 10 %) | about half (one pulse in two) |
-| `wfm` | band + WFM choppers | 1 to 9 Å | 0.2 to 0.8 % | 3 % |
+| `natural` | band-pass + T0 | 1 to 9 Å | 0.19 Å (2 to 10 %) | about half (one pulse in two) |
+| `wfm` | WFM + frame-overlap + band-pass + T0 | 1 to 9 Å | 0.2 to 0.8 % | 3 % |
+
+*Limit of the twin*: its simulated source sends no fast neutrons and no gamma rays, so the T0 chopper is simulated
+(it turns, it stops what it should) but has nothing to stop; the background it removes on the real instrument is
+added to the twin's pictures as a small uniform level.
 """)
 
 code(r"""
@@ -286,7 +317,16 @@ fig("odin_scintillator.png", "Left: in a thick screen the neutrons are absorbed 
     "each flash spreads on its way out: a larger spot, so a blurred picture; a thin screen keeps the spot small but "
     "stops fewer neutrons. Right: the share of the neutrons detected in the twin, larger for slow neutrons.")
 md(r"""
-The twin's ODIN has **two cameras**, with the same field of view, **14 mm × 14 mm**, 5 cm behind the sample:
+**On the real ODIN**, the camera box (scintillator, mirror, camera, lens) stands just behind the sample at either
+measuring position: a field of view of **10 cm × 10 cm** at position 1 (60.5 m) and **20 cm × 20 cm** at position 2
+(64 m). Two kinds of camera can be mounted in it, with several lenses (magnifications) and scintillators: an
+**integrating camera** (CMOS) and an **event camera** (Timepix3).
+
+**In the twin**, you choose the **position** (1 or 2) and the **lens** of the camera: the **zoom** lens, a field of
+**14 mm × 14 mm** (the field of the Timepix3 camera in the real ODIN file used as model for the twin's data files: a
+high magnification, small pixels), or the **full field** of the camera box (10 cm at position 1, 20 cm at position
+2). The exercises use position 1 with the zoom lens. Both cameras see the same field, 5 cm behind the sample; the
+pixel sizes below are those of the zoom lens (with the full field they are 7 or 14 times larger):
 
 | | Timepix3 camera (event mode) | Integrating camera (scintillator + sCMOS) |
 |---|---|---|
@@ -311,10 +351,11 @@ code(r"""
 iw.odin_resolution()
 """)
 md(r"""
-The pixel size is **your choice** among these settings of the cameras; the field of view, the distance from the
-sample to the camera and the efficiency are **fixed** in the twin. The real ODIN has more detectors and optics to
-choose from (larger fields, other pixels). *Limits of the twin*: a real Timepix3 camera loses neutrons above a few
-million per second (in the white beam with a large pinhole); the twin does not lose them, it warns you. And the
+The position, the lens and the pixel size are **your choice**; the distance from the sample to the camera and the
+efficiency are **fixed** in the twin. The real ODIN has more to choose from: other lenses and scintillators.
+*Limits of the twin*: a real Timepix3 camera loses neutrons above a few million per second (in the white beam with a
+large pinhole, or with the full field); the twin does not lose them, it warns you, and it refuses a count of far too
+many neutrons. And the
 neutrons **scattered** by the sample that still reach the camera, 5 cm behind it, are left out: on the real
 instrument they add a faint halo, which matters for thick samples rich in hydrogen (water, plastics) and makes their
 transmission look a little higher.
@@ -366,23 +407,23 @@ What sets a measurement on the twin's ODIN, and who decides: **you** (a setting 
 | Part | Setting | Values in the twin | Who | What it changes |
 |---|---|---|---|---|
 | Source | pulses | 14 per second, 2.86 ms long | fixed | the time-of-flight clock (part 4) |
-| | distance source → sample | 60.5 m | fixed | arrival time of each wavelength |
-| Choppers | mode | white (none), natural (band-pass + T0), WFM | you | resolution in wavelength against flux (part 5) |
+| | distance source → sample | 60.5 m (position 1) or 64 m (position 2) | follows (position) | arrival time of each wavelength |
+| Choppers | mode | white (none), natural (band-pass + T0), WFM (WFM + frame-overlap + band-pass + T0) | you | resolution in wavelength against flux (part 5) |
 | | WFM disc separation δ | 0.10, 0.30, 0.45 m | you (WFM) | smaller δ: finer resolution, fewer neutrons |
-| | speeds and phases of the discs | read in NICOS | follows (mode, δ) | which neutrons pass, when |
+| | the ten discs: WFM 1–2 (7 m, 56 Hz), FO 1–5 (8.4 to 33 m, 42 to 14 Hz), BP 1–2 (8.4 and 12.2 m, 7 Hz), T0 (13.6 m, 28 Hz) | speeds and phases read in NICOS | follows (mode, δ) | which neutrons pass, when |
 | | wavelength band | 1 to 9 Å (WFM, natural); 0.5 to 15 Å (white) | follows (mode) | which Bragg edges are seen |
 | Beam | experiment shutter | open, closed | you | closed: the dark picture |
 | | pinhole side D | 1, 2, 3, 4 cm | you | sharpness against flux (part 3) |
-| | distance pinhole → sample L | 10.5 m (L/D from 1050 to 262) | fixed | with D, the blur |
+| | measuring position | 1 (L = 10.5 m after the pinhole, L/D from 1050 to 262) or 2 (L = 14 m, L/D from 1400 to 350) | you | sharpness and field against neutrons per cm² (part 3) |
 | | diffuser | in, out | you | a more even beam |
 | Sample | sample mounted | the samples of your proposal; none | you | — |
-| | stage translation x (across the beam) | −500 to +500 mm (beyond 20 mm: out of the field, open beam) | you | sample in or out of the beam |
+| | stage translation x (across the beam) | −500 to +500 mm (500 mm: out of the field at any position and lens, open beam) | you | sample in or out of the beam |
 | | stage rotation | −180° to +180° | you | the angle (tomography) |
 | | load frame | 0 kN up to the limit of the sample (frame: 50 kN) | you (samples that can be loaded) | strain |
 | | battery cycler | time in the cycle, 0 to 55 h | you (batteries) | state of charge |
 | | polarizer and analyzer | in, out; spin in ±x, ±y, ±z; spin analyzed x, y, z | you | polarized imaging |
 | Detection | distance sample → camera | 5 cm (the stage moves the sample across the beam, not along it; on a real instrument this distance can be changed) | fixed | with L/D, the blur |
-| | field of view | 14 mm × 14 mm | fixed | the largest object seen at once |
+| | lens of the camera | zoom (14 mm × 14 mm) or full field (10 cm × 10 cm at position 1, 20 cm × 20 cm at position 2) | you | the largest object seen at once, against pixel size |
 | | Timepix3 camera | counting time; pictures per wavelength: range, bin (0.01 Å), 128 or 64 pixels | you | wavelength, statistics |
 | | integrating camera | exposure (up to 3600 s); standard (110 µm) or high resolution (27.5 µm) | you | sharpness against neutrons per pixel |
 | | efficiency of the scintillator | 1 − exp(−λ / 8 Å) | fixed | counts at short wavelengths |
