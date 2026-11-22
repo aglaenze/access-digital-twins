@@ -82,33 +82,63 @@ md(r"""
 ## ODIN for X-ray imagers, in five points
 
 The lecture showed the principles (Beer-Lambert, the pinhole camera, the contrasts); here is what they mean on ODIN.
+First the whole instrument, 60 m long:
+""")
+fig("odin_beamline_line.png", "ODIN from the source to the camera (distances of the official McStas model of ODIN).")
 
-1. **Compared with X-rays, the contrast is different.** X-rays interact with the electrons, so the heavy elements
-   stand out; neutrons interact with the **nuclei**. **Hydrogen** removes neutrons more than any other element (it
-   scatters them strongly), and lithium, boron, cadmium, gadolinium absorb them; but iron, aluminum, silicon, lead let
-   most of them through. A neutron image shows the water inside a metal or a rock, where X-rays see the heavy
-   elements.
-2. **A pulsed source and the time of flight.** At ESS, protons hit a tungsten target 14 times per second; each pulse
-   (2.86 ms) makes neutrons, slowed down by a moderator. ODIN is 60 m long: the arrival time of a neutron at the camera
-   gives its speed, so its wavelength. Today you use the **white beam**: all the wavelengths together, like a
-   polychromatic X-ray beam.
-3. **No lens, no magnification.** The beam is shaped by a **pinhole** of D = 1 to 4 cm, L = 10.5 m before the sample:
-   an almost parallel beam (L/D up to 1050). Each point of the sample becomes a spot of size $l \cdot D / L$ on the
-   camera, $l$ being the distance from the sample to the camera. So the camera is brought **as close as possible**:
-   here 6 mm from the rotation axis, just room for the piece to turn. Then the blur is 6 µm with D = 1 cm and 17 µm
-   with D = 3 cm, below the pixel (27.5 µm): a wider pinhole gives more neutrons at no cost in sharpness.
-4. **Few particles.** Even at ESS there are far fewer neutrons than photons from an X-ray tube. In the twin (ESS at
-   2 MW, its power at the start), with the camera at 6 mm, a pixel of 27.5 µm × 27.5 µm receives about 55 neutrons per
-   second with a 3 cm pinhole (L/D = 350), 9 times fewer with 1 cm (L/D = 1050). An image of a
-   rock takes tens of seconds, a tomography about half an hour of beam.
-5. **The detector.** A scintillator containing lithium-6 turns each neutron into a flash of light, filmed by a camera
-   through a mirror, out of the beam: an indirect detector, as in many X-ray setups.
+md(r"""
+**1. Compared with X-rays, the contrast is different.** X-rays interact with the electrons, so the heavy elements
+stand out; neutrons interact with the **nuclei**. **Hydrogen** removes neutrons more than any other element (it
+scatters them strongly), and lithium, boron, cadmium, gadolinium absorb them; but iron, aluminum, silicon, lead let
+most of them through. A neutron image shows the water inside a metal or a rock, where X-rays see the heavy elements.
+""")
+fig("contrast_xray_neutron.png", "The attenuation coefficient of a few materials: X-rays of 100 keV (NIST) and neutrons "
+    "of 1.8 Å (NCrystal, absorption plus scattering). Water is almost transparent to the X-rays and dark for the "
+    "neutrons; lead is the opposite.")
 
+md(r"""
+**2. A pulsed source and the time of flight.** At ESS, protons hit a tungsten target 14 times per second; each pulse
+(2.86 ms) makes neutrons, slowed down by a moderator. ODIN is 60 m long: the arrival time of a neutron at the camera
+gives its speed, so its wavelength. Today you use the **white beam**: all the wavelengths together, like a
+polychromatic X-ray beam.
+""")
+fig("odin_tof.png", "Distance against time for neutrons of one pulse: the slow ones (long wavelength) arrive later. "
+    "The arrival time at the camera gives the wavelength.")
+
+md(r"""
+**3. No lens, no magnification.** The **magnification** is the ratio of the size of the image on the detector to the
+size of the object. In a lab micro-CT it comes from the cone beam: the X-rays leave a focal spot of a few µm and
+spread out, so an object close to the source casts a larger shadow on a far detector, magnification
+$M = (\text{source to detector}) / (\text{source to object})$, often 10 or more: a detector with large pixels then
+sees small details. Neutrons have no small focal spot and cannot be focused well: the beam is shaped by a **pinhole**
+of D = 1 to 4 cm, L = 10.5 m before the sample, an almost parallel beam (L/D up to 1050). The image on the camera has
+the size of the object ($M = 1$): the resolution is set by the camera pixel (27.5 µm here) and by the blur.
+
+Each point of the sample becomes a spot of size $l \cdot D / L$ on the camera, $l$ being the distance from the sample
+to the camera. So the camera is brought **as close as possible**: here 6 mm from the rotation axis, just room for the
+piece to turn. Then the blur is 6 µm with D = 1 cm and 17 µm with D = 3 cm, below the pixel: a wider pinhole gives
+more neutrons at no cost in sharpness.
+""")
+fig("odin_pinhole.png", "The pinhole camera: a point of the sample sees the whole pinhole, so it becomes a spot of "
+    "size l·D/L on the camera.")
+
+md(r"""
+**4. Few particles.** Even at ESS there are far fewer neutrons than photons from an X-ray tube. In the twin (ESS at
+2 MW, its power at the start), with the camera at 6 mm, a pixel of 27.5 µm × 27.5 µm receives about 55 neutrons per
+second with a 3 cm pinhole (L/D = 350), 9 times fewer with 1 cm (L/D = 1050). An image of a rock takes tens of
+seconds, a tomography about half an hour of beam.
+
+**5. The detector.** A scintillator containing lithium-6 turns each neutron into a flash of light, filmed by a camera
+through a mirror, out of the beam: an indirect detector, as in many X-ray setups.
+""")
+fig("odin_detector_6mm.png", "Side view of the detection: the scintillator glows where a neutron is absorbed; a mirror "
+    "sends the light to the camera, out of the beam.")
+
+md(r"""
 Then radiography and tomography work as you know them: $T = I/I_0 = e^{-\Sigma x}$ through a thickness $x$, with
 $\Sigma$ the attenuation coefficient in cm⁻¹ (the $\mu$ of the lecture: absorption plus scattering), and a filtered
 back-projection of parallel projections over 180°.
 """)
-fig("odin_beamline.png", "ODIN from the source to the camera (distances of the official McStas model of ODIN).")
 
 md(r"""
 ## The mission
