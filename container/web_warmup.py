@@ -15,10 +15,15 @@ odin.move(choppers="wfm", wfm_delta=0.30, pinhole=0.03, diffuser="in", shutter="
 odin.count(2, title="warm-up", write=False)
 odin.move(choppers="white")
 odin.camera(1, title="warm-up", write=False)
-# the class session (odin/exercises/meteorite_imaging/ODIN_meteorite_class.ipynb): white beam, 1 cm pinhole, the
-# meteorite; Timepix3 counts and high-resolution camera images. Without this, the first count of each student would
-# prepare this beam itself (minutes).
-odin.move(choppers="white", pinhole=0.01, sample="meteorite_nwa7034", stage_x=0.0)
+# the class session (odin/exercises/meteorite_imaging/ODIN_meteorite_class.ipynb): white beam, the camera 6 mm from
+# the axis, the meteorite; Timepix3 counts with the 1 cm pinhole, then the tomography with the 3 cm pinhole (60 angles,
+# 512 pixels). Without this, the first count of each student would prepare this beam itself (minutes), and the first
+# tomography would compute the thickness maps of the meteorite at each angle (kept on disk for all the students).
+odin.move(choppers="white", pinhole=0.01, sample="meteorite_nwa7034", stage_x=0.0, detector_distance=0.006)
 odin.count(1, title="warm-up", write=False)
-odin.camera(1, title="warm-up", write=False, pixels=512)
+odin.move(pinhole=0.03)
+for a in range(0, 180, 3):
+    odin.move(stage_rot=float(a))
+    odin.camera(1, title="warm-up", write=False, pixels=512)
+odin.move(stage_rot=0.0)
 print(f"online version ready (beam prepared in {time.time() - t:.0f} s)")

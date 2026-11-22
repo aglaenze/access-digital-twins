@@ -213,7 +213,7 @@ typed in the Experiment tab, as when the proposal system is unreachable.
 ### Samples
 
 `sample_holder` (device `TwinSampleChanger`) is the sample changer: its list comes from the twin, i.e. the built-in
-samples of the instrument and the student's own samples of the current proposal (made with `Sample_builder.ipynb`,
+samples of the instrument and the student's own samples of the current proposal (made with the sample builder,
 saved in `<proposal>/samples/`): `move(sample_holder, 'steel_steps')`. `sample_info()` prints the description of the
 mounted sample (materials, sizes; for LoKI particles, solvent, cell) and saves its drawing in `<proposal>/samples/`.
 

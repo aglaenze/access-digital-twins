@@ -15,7 +15,7 @@ What count(t) does:
   4. writes a NeXus file in ESS format (odin_nexus.write_nexus) with the state of the devices and choppers;
   5. records the action in a log (log.jsonl), as a server recording the sessions would.
 
-Chopper modes (devices "choppers" and "wfm_delta"): WFM (Î´ = 0.10, 0.30 or 0.45 m), "natural" (band-pass choppers
+Chopper modes (devices "choppers" and "wfm_delta"): WFM (δ = 0.10, 0.30 or 0.45 m), "natural" (band-pass choppers
 and T0 only), "white" (no chopper). Each mode reads its own precomputed McStas upstream part (FRONTS).
 
 Measuring positions and lenses (devices "position" and "lens"): the sample and the camera at position 1 (60.5 m from
@@ -50,20 +50,20 @@ COMPONENTS = paths.COMPONENTS
 FIELD = (-0.00705, 0.00705, -0.00705, 0.00705)  # [m] Timepix3 field of view of the template
 TOA_BINS = 150                                   # spectrum of arrival times shown while counting (odin_viz.LiveCount)
 FOV = 0.016                      # [m] McStas detector window, slightly larger than the Timepix3 (14 mm)
-# Largest number of counts per file (memory: ~40 bytes per count while writing). The open beam gives ~1Â·10â¶ counts/s
-# in WFM mode but ~2Â·10â· counts/s in white mode. (A real Timepix3 camera would saturate at such rates; not modeled.)
+# Largest number of counts per file (memory: ~40 bytes per count while writing). The open beam gives ~1·10⁶ counts/s
+# in WFM mode but ~2·10⁷ counts/s in white mode. (A real Timepix3 camera would saturate at such rates; not modeled.)
 MAX_COUNTS = 5e7
 # Count rate above which a real Timepix3 camera loses neutrons (approximate): the chip reads about 80 million pixel
-# hits per second (40 Mhits/s/cmÂ², 2 cmÂ²) and each neutron lights a cluster of about ten pixels through the
+# hits per second (40 Mhits/s/cm², 2 cm²) and each neutron lights a cluster of about ten pixels through the
 # scintillator and the intensifier: a few million neutrons per second at most. The losses are not modeled: the twin
 # warns instead.
 TPX_MAX_RATE = 5e6               # [neutrons/s in the field of view]
 MAX_LOAD = 50.0            # [kN] capacity of the load frame; each sample has its own limit (load: max_kN)
-# Precomputed upstream parts (odin_mcstas.front): (mode, Î´) -> (Î´ in the folder name, neutrons).
-# Î´ only matters in WFM mode (the other modes were computed with Î´ = 0.30, which has no effect without WFM choppers).
+# Precomputed upstream parts (odin_mcstas.front): (mode, δ) -> (δ in the folder name, neutrons).
+# δ only matters in WFM mode (the other modes were computed with δ = 0.30, which has no effect without WFM choppers).
 FRONTS = {("wfm", 0.30): (0.30, 1e10), ("wfm", 0.10): (0.10, 2e8), ("wfm", 0.45): (0.45, 2e8),
           ("natural", None): (0.30, 2e8), ("white", None): (0.30, 1e8)}
-# Wavelength range simulated at the source for each mode [Ã…]
+# Wavelength range simulated at the source for each mode [Å]
 LAM_RANGE = tw.FRONT_LAM
 # Focused diffuser (components/Graphite_Diffuser_focus.comp): aims at a 20 mm square in the detector plane
 # (Z_SAMPLE + DET_DIST), from the diffuser entrance (Z_PINHOLE + 1 mm, as in odin_mcstas.build_back).
@@ -316,9 +316,12 @@ class VirtualOdin:
             Device("diffuser", "in", choices=("in", "out"), nexus="pinhole_diffuser/status",
                    to_nexus=lambda v: 3 if v == "in" else 0,               # assumed convention, to be checked
                    help="graphite diffuser after the pinhole (homogenises the beam)"),
+            Device("detector_distance", tw.DET_DIST, "m", limits=(0.005, 0.10),
+                   help="distance from the sample (rotation axis) to the scintillator of the cameras: closer = less "
+                        "geometric blur (l·D/L); leave room for the sample to turn"),
             Device("position", 1, choices=(1, 2),
                    help="measuring position: the sample stage and the camera at 60.5 m from the source (1: L = 10.5 m "
-                        "after the pinhole) or at 64 m (2: L = 14 m, sharper, larger beam, fewer neutrons per cmÂ²)"),
+                        "after the pinhole) or at 64 m (2: L = 14 m, sharper, larger beam, fewer neutrons per cm²)"),
             Device("lens", "zoom", choices=tw.LENSES,
                    help="lens of the camera: zoom (high magnification, a 14 mm field, fine pixels) or full (the whole "
                         "field of the camera box: 10 cm at position 1, 20 cm at position 2)"),
@@ -429,8 +432,8 @@ class VirtualOdin:
     @staticmethod
     def stream_pulses(nexus_file, block=32):
         """The neutrons of a NeXus file, pulse by pulse, for the live stream (kafka/streamer.py): list of (time of the
-        pulse after the first one [ns], arrival times [ns], pixel ids). The Timepix3 pixels (4096 Ã— 4096) are grouped
-        in blocks of block Ã— block, numbered 1 + ix + n iy (n = 4096 / block: 128 Ã— 128 for 32), so that the live
+        pulse after the first one [ns], arrival times [ns], pixel ids). The Timepix3 pixels (4096 × 4096) are grouped
+        in blocks of block × block, numbered 1 + ix + n iy (n = 4096 / block: 128 × 128 for 32), so that the live
         histograms stay small; the file keeps the full pixel ids."""
         import h5py
         with h5py.File(nexus_file, "r") as f:
@@ -538,6 +541,9 @@ class VirtualOdin:
             draw = lambda dt: model.counts(dt, transmission=T, rng=self.rng, beam_factor=beam_factor)
             counts = self._in_slices(draw, t, progress)
         else:
+            if abs(state.get("detector_distance", tw.DET_DIST) - tw.DET_DIST) > 1e-6:
+                raise ValueError(f"the full McStas mode has its detector at {tw.DET_DIST * 1e3:.0f} mm from the sample: "
+                                 f"move(detector_distance={tw.DET_DIST}) or use the hybrid mode")
             counts = nx.counts_from_mcpl(self.simulate(state), t, field=field, rng=self.rng,
                                          beam_factor=beam_factor, copies=self.copies)
         self._check()                               # stopped while counting: no file, no log
@@ -551,7 +557,7 @@ class VirtualOdin:
                   f"camera loses neutrons above a few million per second (each neutron lights a cluster of pixels, "
                   f"the chip reads about 80 million pixel hits per second); the twin does not model this loss. "
                   f"Close the pinhole or use the choppers (natural or WFM mode) for a realistic rate.")
-        # Detector image of this measurement (128 Ã— 128 pixels: 110 Âµm with the zoom lens), for live displays
+        # Detector image of this measurement (128 × 128 pixels: 110 µm with the zoom lens), for live displays
         self.last_image = np.histogram2d(counts["y"], counts["x"], bins=128,
                                          range=[field[2:], field[:2]])[0].astype(np.uint32)
         if not write:
@@ -565,7 +571,7 @@ class VirtualOdin:
         self.number += 1
         out_file = f"{self.folder}/odin_{self.number:06d}.nxs"
         r = nx.write_nexus(counts, out_file, t, title=title or f"run {self.number}",
-                           sample_name=self._sample_name(state), det_dist=tw.DET_DIST, charge=charge,
+                           sample_name=self._sample_name(state), det_dist=float(state.get("detector_distance", tw.DET_DIST)), charge=charge,
                            pulses_per_frame=ppf,
                            settings=self._nexus_settings() | nx.chopper_settings(state["choppers"], state["wfm_delta"]),
                            field_scale=(field[1] - field[0]) / (FIELD[1] - FIELD[0]),
@@ -588,8 +594,8 @@ class VirtualOdin:
         seconds: one image, no time of flight, no neutron recorded one by one (hybrid model: HybridModel.image).
         Returns the path of the file written (NeXus, entry/instrument/camera/data: counts per pixel, 128 x 128 over
         the field of the Timepix3 camera), or None with write=False (the image is in last_image).
-        pixels: 128 (110 Âµm pixels, a thick bright scintillator) or 512 (27.5 Âµm, the high-resolution setup: a thin
-        scintillator, 20 Âµm of blur: 16 times fewer neutrons per pixel, so longer exposures)."""
+        pixels: 128 (110 µm pixels, a thick bright scintillator) or 512 (27.5 µm, the high-resolution setup: a thin
+        scintillator, 20 µm of blur: 16 times fewer neutrons per pixel, so longer exposures)."""
         self._check()
         if pixels not in (128, 256, 512):
             raise ValueError("camera pixels: 128, 256 or 512")
@@ -640,7 +646,7 @@ class VirtualOdin:
                 d.attrs["units"] = "counts"
                 cam["x_pixel_offset"] = np.linspace(FIELD_[0], FIELD_[1], pixels + 1)[:-1] + (FIELD_[1] - FIELD_[0]) / (2 * pixels)
                 cam["y_pixel_offset"] = np.linspace(FIELD_[2], FIELD_[3], pixels + 1)[:-1] + (FIELD_[3] - FIELD_[2]) / (2 * pixels)
-                cam["distance_from_source"] = float(z_sample_of(state) + tw.DET_DIST)
+                cam["distance_from_source"] = float(z_sample_of(state) + state.get("detector_distance", tw.DET_DIST))
                 cam["distance_from_source"].attrs["units"] = "m"
                 e["instrument/source/proton_charge"] = float(charge.sum())
         self._log("camera", dict(t=t, title=title, file=os.path.basename(out_file) if out_file else None,
@@ -650,9 +656,9 @@ class VirtualOdin:
 
     def polarimetry(self, t, title="", write=True, pixels=128, n_lam=16):
         """Polarized imaging (polarizer "in"): t seconds with the Timepix3 camera, the neutrons sorted by wavelength
-        (n_lam bins from 1.5 to 6 Ã…); the spin enters along spin_in, the analyzer passes the spin along spin_out
+        (n_lam bins from 1.5 to 6 Å); the spin enters along spin_in, the analyzer passes the spin along spin_out
         (odin_polarized.measurement). Returns the file (NeXus, entry/instrument/camera/data: counts (n_lam, y, x),
-        with entry/instrument/camera/wavelength [Ã…]), or None with write=False (counts in last_cube)."""
+        with entry/instrument/camera/wavelength [Å]), or None with write=False (counts in last_cube)."""
         import odin_polarized as pol
         self._check()
         if pixels not in (64, 128):
@@ -720,11 +726,11 @@ class VirtualOdin:
         return out_file
 
     def tof_image(self, t, title="", write=True, pixels=128, lam_range=(2.7, 4.5), lam_bin=0.01):
-        """The Timepix3 camera in histogram mode: counts per pixel and wavelength bin (lam_range, bins of lam_bin Ã…)
+        """The Timepix3 camera in histogram mode: counts per pixel and wavelength bin (lam_range, bins of lam_bin Å)
         for t seconds, computed without drawing the neutrons one by one (HybridModel.tof_image), so that long
         exposures stay fast. The wavelength resolution is that of the chopper mode (WFM: about 0.2 % for discs 0.30 m
         apart; natural: about 2 %). Returns the file (NeXus, entry/instrument/camera/data: counts (wavelength, y, x),
-        entry/instrument/camera/wavelength: the bin edges [Ã…])."""
+        entry/instrument/camera/wavelength: the bin edges [Å])."""
         self._check()
         if pixels not in (64, 128):
             raise ValueError("histogram mode pixels: 64 or 128")
@@ -794,7 +800,7 @@ class VirtualOdin:
         return out_file
 
     def polarization_matrix(self, t, title="", pixels=128, n_lam=16, progress=None):
-        """The 18 measurements of the full polarization matrix: spin in along Â±x, Â±y, Â±z, analyzer along x, y, z, t
+        """The 18 measurements of the full polarization matrix: spin in along ±x, ±y, ±z, analyzer along x, y, z, t
         seconds each (polarizer in). Returns {(spin_in, spin_out): file}. progress(k, 18, file) after each one."""
         files, k = {}, 0
         self.move(polarizer="in", shutter="open")
@@ -808,7 +814,7 @@ class VirtualOdin:
         return files
 
     def camera_spectrum(self, n=80):
-        """(Î» [Ã…], weights) of the neutrons the camera sees in the current beam (chopper mode, pinhole): the spectrum
+        """(λ [Å], weights) of the neutrons the camera sees in the current beam (chopper mode, pinhole): the spectrum
         a white-beam image averages over (odin_radiography.effective_sigma)."""
         from odin_nexus import efficiency
         model = self.model(dict(self.status(), shutter="open"))
@@ -874,7 +880,7 @@ class VirtualOdin:
 
     def _apply_faults(self, counts, t):
         """Hidden detector faults (troubleshooting exercises)."""
-        if "hot_pixels" in self.faults:            # a few noisy pixels: many counts, random times, no Î»
+        if "hot_pixels" in self.faults:            # a few noisy pixels: many counts, random times, no λ
             rng = np.random.default_rng(7)         # always the same pixels
             hot = rng.uniform(self._field[0], self._field[1], (6, 2))
             n = int(2000 * t)
@@ -933,7 +939,9 @@ class VirtualOdin:
                                                cache_dir=f"{RUN_ROOT}/hybrid/{tag}",
                                                lam=LAM_RANGE[state["choppers"]], z_sample=z_sample_of(state),
                                                tag=config_tag(state))
-        return self._models[key]
+        m = self._models[key]
+        m.det_dist = float(state.get("detector_distance", tw.DET_DIST))
+        return m
 
     def _instrument(self, sample, state=None):
         """The McStas instrument of a sample, for the measuring position and lens of the state (default: position 1,
@@ -961,7 +969,7 @@ class VirtualOdin:
         mode = state["choppers"]
         delta = round(float(state["wfm_delta"]), 2) if mode == "wfm" else None
         if (mode, delta) not in FRONTS:
-            raise ValueError(f"no precomputed upstream part for {mode} Î´={delta}; available: {list(FRONTS)}")
+            raise ValueError(f"no precomputed upstream part for {mode} δ={delta}; available: {list(FRONTS)}")
         tw_delta, n = FRONTS[(mode, delta)]
         folder = tw.front_folder(mode, n, tw_delta)
         if not tw.Runner.complete(folder):

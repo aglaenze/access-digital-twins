@@ -40,16 +40,42 @@ environment failed when the pool was empty), the freeze itself not reproduced.
 account the app shows a **recovery code** (once; only its hash is kept); *Forgot your password?* on the sign-in screen
 sets a new password with the email and this code. A student who did not sign out is signed in again at the next start.
 
-**The sample builder** (`../gen_sample_builder.py`) opens from the beamtime notebooks for their instrument and proposal
-(nothing to choose). ODIN: a `samplecraft` recipe (`../samplecraft/README.md`, edited by `../scene_builder.py`): a tree
-of bodies, each of any shape (block, sphere, ellipsoid, cylinder, cone, torus, rounded block, lumpy pebble, sawn piece
-of rock, prism, STL/OBJ mesh, unions, intersections and cuts of them) turned in 3D, inclusions in inclusions, fills
-(grains placed at random without overlapping, Voronoi polycrystals, pores), voxel bodies from a segmented tomogram,
-holders; materials: crystals (NCrystal), rock-forming minerals, a formula and density, mixtures, a material calibrated
-on a measured Σ; the sources and assumptions of the recipe; a preview (two cuts, a radiograph, Σ of each material).
-Start from an example (`odin/templates/`, written by `gen_templates.py`), a model saved by a user (*Save as a model*:
-`TWIN_RUN_ROOT/templates/<instrument>/`), or any library sample (its recipe, or its volumes turned into one). Samples
-with irregular shapes are for the hybrid mode only. LoKI, as many kinds of particles as wanted (their scattering adds up: dilute).
+**The sample builder.** ODIN: a page of the app (`../builder/index.html`, `builder.js`, `builder.css`; three.js
+0.160.0 vendored in `../builder/vendor/`, MIT), served by `../container/twin_app.py` at `/twin/builder` (its JSON
+API at `/twin/builder/api/<what>`, the functions of `../builder_api.py`). Opened from the beamtime notebooks (*Sample
+builder*, *Change the sample*: `nb_tools.builder_url`) with the instrument, the proposal and the sample to start from
+(`?instrument=odin&proposal=1234&start=<sample>&name=..&title=..`). Three steps: **1. Sample** (a gallery to start
+from, with pictures: examples `odin/templates/`, models saved by users `TWIN_RUN_ROOT/templates/odin/`, the samples of
+the library and of the proposal; the parts as a tree; shapes chosen by icons, sizes, position and rotation by
+sliders in mm; materials as cards with their Σ at 3 Å and a search; grains placed at random, components, combined
+shapes and the whole recipe as text under *Advanced*); **2. Holder**, apart from the sample (none, pin, base plate,
+quartz cell, vanadium can, tensile grips: placed from the bounds of the sample, only size and material change; kept
+in the sample file as `holder: {type, ...}` and joined to the scene as bodies `holder: true`); **3. Check & save**
+(traffic lights: in the 14 mm field of view, transmission at 3 Å, no overlap, holder in or out of the beam; Σ of
+the materials; save with the proposal, `sample_library.save`, NICOS: `move(sample_holder, '<name>')`; or as a model;
+or download the recipe). On the right, always: the 3D view (drag to turn; the main material see-through; the part
+selected in the list outlined; the field of view and the beam drawn) and the beam's eye view (radiograph at the
+wavelength chosen, `odin_hybrid.scene_transmission`). The parts an exercise hides (secret fills and bodies of a
+library sample) are sealed: the page gets a placeholder, the part stays on the server
+(`TWIN_RUN_ROOT/builder/sealed/`) and comes back when the sample is saved; the views leave them out. A large sample
+(the meteorite: about a minute to place its grains) is shown without its grains while it is edited.
+LoKI: its own page at the same address (`?instrument=loki`: `../builder/loki.html`, `loki.js`, the same `builder.css`;
+its API `../builder_loki.py`, the same `/twin/builder/api/<what>` with `"instrument": "loki"`). The same three steps:
+**1. Sample** (the gallery: the library samples, models `TWIN_RUN_ROOT/templates/loki/`, the proposal's samples, from
+scratch; the liquid: H2O/D2O mixture or air, its D2O fraction and thickness, a line of scattering length densities;
+any number of kinds of particles: sphere, rod (cylinder), core-shell sphere, their materials as cards with ρ and the
+contrast Δρ against the liquid, sizes in Å by log sliders, volume fraction); **2. Holder** (the quartz cell of
+`sample_library`, windows 2 × 1.25 mm fixed, only the gap = the liquid thickness changes, drawn to scale; or no cell
+for the empty beam); **3. Check & save** (traffic lights from the twin's physics: transmission at 3 and 10 Å from
+`sample_library.loki_sample`, signal over the incoherent background, contrast and match point of each kind, dilute
+regime (Percus-Yevick S(0) of hard spheres), the sizes against LoKI's Q range 0.003–0.6 Å⁻¹ (Guinier plateau, first
+minimum); save with the proposal, `sample_library.save("loki", ...)`, or as a model, or download the YAML). On the
+right: dΣ/dΩ(Q) on log-log axes (`sample_library.loki_cross_section`, exact, no instrument; each kind and the
+background apart, LoKI's Q range shaded), the particles to scale with one another, the cell seen from the side.
+Polydispersity: not in the sample format, so not offered. The properties an exercise hides (`exercise.yml`,
+e.g. the radius and volume fraction of `silica_spheres`) are sealed value by value (keyed hash ids, the values in
+`TWIN_RUN_ROOT/builder/sealed/`): a kind with a sealed value is neither drawn nor checked nor put in a model or a
+download; saved with the proposal, the values come back and stay hidden (`hidden:` in the file).
 
 **Where things are.** Logbooks: `TWIN_RUN_ROOT/progress/<account>/`; measurements of the pages:
 `TWIN_RUN_ROOT/<instrument>/<account>/`; notebooks: `work/<account>/`. NICOS data stay in the proposal folders

@@ -95,9 +95,33 @@ def solenoid_field(n=96, size_m=0.0192, tilt_deg=9.0, length=0.0155, radius=0.00
 @functools.lru_cache(maxsize=1)
 def nwa7034_field():
     """B (80, 80, 80, 3) [T] and the attenuation per voxel (80, 80, 80) of the fragment of NWA 7034 of Qvistgaard et
-    al. (2026), as reconstructed by the authors; axes (x, y, z), y vertical (rotation axis), z the beam at 0°."""
+    al. (2026), as reconstructed by the authors; axes (x, y, z), y vertical (rotation axis), z the beam at 0°.
+    The attenuation is scaled by mu_scale_nwa7034(): the same rock as in the ordinary images."""
     z = np.load(QV_FILE)
-    return z["B"].astype(np.float32), z["mu_voxel"].astype(np.float32), float(z["voxel"])
+    return z["B"].astype(np.float32), (z["mu_voxel"] * mu_scale_nwa7034()).astype(np.float32), float(z["voxel"])
+
+
+@functools.lru_cache(maxsize=1)
+def mu_scale_nwa7034():
+    """The authors' tomogram gives 0.34 cm⁻¹ inside the fragment (averaged over RADEN's spectrum); the matrix of
+    the meteorite (Naver et al. 2026, a calibrated measurement at ICON, 0.45 cm⁻¹ at 1.8 Å) gives 0.52 cm⁻¹ over the
+    same spectrum. Its absolute scale is not documented (the neutrons scattered by hydrogen toward the camera, close
+    to the sample, make a rock look less attenuating), so the twin keeps the shape and the variations of the
+    tomogram and puts it on the scale of the matrix: one attenuation in the polarized and the ordinary images.
+    Returns the factor (about 1.5)."""
+    import sample_library as sl
+    import samplecraft as sc
+    from scipy import ndimage
+    z = np.load(QV_FILE)
+    mu, vox_cm = z["mu_voxel"].astype(float), float(z["voxel"]) * 100
+    s = ndimage.gaussian_filter(mu, 0.7)
+    inside = float(np.median(s[s > 0.5 * s.max()])) / vox_cm                  # [1/cm], as in gen_polarized.py
+    lam, w = z["raden_lam"].astype(float), z["raden_w"].astype(float)
+    cfg = sl.SceneSample(sl.load("odin")["nwa7034_fragment"]).scene.cfg()["matrix"]
+    sig = sc.sigma(cfg, np.clip(lam, 0.3, None))
+    d = 0.2                                                                    # the 2 mm of the fragment [cm]
+    sig_eff = -np.log(np.sum(w * np.exp(-sig * d)) / np.sum(w)) / d
+    return sig_eff / inside
 
 
 def sample_maps(name):
@@ -220,7 +244,7 @@ def measurement(model, field, rot_deg, polarizer, spin_in, spin_out, t, beam_fac
         share = np.ones((n_lam, bins, bins))
     mean = wl[:, None, None] * t * beam_factor * f[None] * T[None] * share
     L = getattr(model, "L", tw.Z_SAMPLE - tw.Z_PINHOLE)
-    sigma = np.hypot(tw.DET_DIST * model.D / L / np.sqrt(12), 0.055e-3) / ((x1 - x0) / bins)      # [pixels]
+    sigma = np.hypot(getattr(model, "det_dist", tw.DET_DIST) * model.D / L / np.sqrt(12), 0.055e-3) / ((x1 - x0) / bins)      # [pixels]
     mean = np.array([gaussian_filter(m, sigma, mode="nearest") for m in mean])
     return rng.poisson(mean), lc
 

@@ -28,7 +28,6 @@ import numpy as np
 
 import odin_paths  # noqa: F401  (sets sys.path)
 import odin_mcstas as tw
-import rock_shapes                # irregular shapes of natural samples: "blob" (grains, clasts), "slab" (a sawn piece)
 
 H_OVER_M = 3956.034            # m·Å/s
 Z_DET = tw.Z_SAMPLE + tw.DET_DIST
@@ -193,10 +192,6 @@ def _path(shape, x, y, center, dims, stage_rot):
         return cylinder_path_length(x, y, center, dims[0], dims[1])
     if shape == "ellipsoid":
         return ellipsoid_path_length(x, y, center, dims, stage_rot + own)
-    if shape == "blob":
-        return rock_shapes.blob_path_length(x, y, center, dims, stage_rot)
-    if shape == "slab":
-        return rock_shapes.slab_path_length(x, y, center, dims, stage_rot)
     return box_path_length(x, y, center, dims, stage_rot + own)
 
 
@@ -269,7 +264,7 @@ def volumes_transmission(volumes, stage_x, stage_rot, lam_grid=np.linspace(0.3, 
         vols.append((sig, center, dims, v[3] if len(v) > 3 else "box"))
         epss.append(eps)
 
-    if len(vols) > 20 or any(v[3] in ("blob", "slab") for v in vols):     # irregular shapes: always on maps
+    if len(vols) > 20:                                                     # many volumes: on maps
         return _mapped_transmission(volumes, vols, stage_rot, lam_grid, epss, grid=map_grid(field_half))
 
     def T(x, y, lam):
@@ -424,36 +419,10 @@ def _write_maps(path, maps):
 def _compute_maps(vols, keys, g, n, stage_rot, step=MAP_STEP):
     """{key: thickness map [m]} of the volumes of each material (and host, strain)."""
     maps = {}
-    # the blobs (a rock: thousands of grains), all at once: the pixels of the map around each one, one ray each
-    bl = [k for k, v in enumerate(vols) if v[3] == "blob"]
-    if bl:
-        key_id = {key: i for i, key in enumerate(dict.fromkeys(keys[k] for k in bl))}
-        cen = np.array([vols[k][1] for k in bl], float)
-        rad = np.array([rock_shapes.blob_bound(vols[k][2]) for k in bl])
-        x0 = np.searchsorted(g, cen[:, 0] - rad - step); x1 = np.searchsorted(g, cen[:, 0] + rad + step, "right")
-        y0 = np.searchsorted(g, cen[:, 1] - rad - step); y1 = np.searchsorted(g, cen[:, 1] + rad + step, "right")
-        nx, ny = np.clip(x1 - x0, 0, None), np.clip(y1 - y0, 0, None)
-        cnt = nx * ny
-        idx = np.repeat(np.arange(len(bl)), cnt)
-        loc = np.arange(cnt.sum()) - np.repeat(np.cumsum(cnt) - cnt, cnt)       # position within each patch
-        jx = np.repeat(x0, cnt) + loc % np.repeat(np.maximum(nx, 1), cnt)
-        jy = np.repeat(y0, cnt) + loc // np.repeat(np.maximum(nx, 1), cnt)
-        L = rock_shapes.blobs_path_length(g[jx], g[jy], idx, cen, [vols[k][2] for k in bl], stage_rot)
-        kid = np.array([key_id[keys[k]] for k in bl])[idx]
-        flat = jy * n + jx
-        for key, i in key_id.items():
-            s = kid == i
-            m = maps.setdefault(key, np.zeros((n, n), np.float32))
-            m += np.bincount(flat[s], weights=L[s], minlength=n * n).reshape(n, n).astype(np.float32)
     for k, (sig, center, dims, shape) in enumerate(vols):
         key = keys[k]
-        if shape == "blob":
-            continue
-        elif shape == "slab":
-            r, hy = rock_shapes.slab_bound(dims)
-        else:
-            r = 0.5 * float(np.sqrt(dims[0] ** 2 + dims[2] ** 2)) if shape in ("box", "ellipsoid") else 0.5 * dims[0]
-            hy = 0.5 * (dims[1] if shape != "sphere" else dims[0])
+        r = 0.5 * float(np.sqrt(dims[0] ** 2 + dims[2] ** 2)) if shape in ("box", "ellipsoid") else 0.5 * dims[0]
+        hy = 0.5 * (dims[1] if shape != "sphere" else dims[0])
         ix = np.where((g >= center[0] - r - step) & (g <= center[0] + r + step))[0]
         iy = np.where((g >= center[1] - hy - step) & (g <= center[1] + hy + step))[0]
         if not len(ix) or not len(iy):
@@ -502,6 +471,7 @@ class HybridModel:
         self.field, self.D = field, D
         self.z_sample = z_sample
         self.L = z_sample - tw.Z_PINHOLE                 # pinhole -> sample: the L of L/D
+        self.det_dist = tw.DET_DIST           # sample -> detector [m]: the blur l·D/L and the flight time (set per count)
         self.S = pinhole_spectrum(front_mcpl, D, cache_dir, z_det=z_sample + tw.DET_DIST)
         name = os.path.join(cache_dir, f"model_D{D:.3f}_{os.path.basename(os.path.dirname(events_ob))}{tag}.npz")
         # the 14 mm field: a degree-2 polynomial; a larger field (more than 2 cm): a smoothed map of the beam
@@ -567,7 +537,7 @@ class HybridModel:
             Tm = sum(wk * transmission(X, Y, np.full(X.size, lk)) for lk, wk in zip(lc, wl)) / wl.sum()
         mean = (wl.sum() * t_exp * beam_factor * f * Tm).reshape(bins, bins)
         L = self.L
-        sigma = np.hypot(tw.DET_DIST * self.D / L / np.sqrt(12), blur_m) / ((x1 - x0) / bins)     # [pixels]
+        sigma = np.hypot(self.det_dist * self.D / L / np.sqrt(12), blur_m) / ((x1 - x0) / bins)     # [pixels]
         mean = gaussian_filter(mean, sigma, mode="nearest")
         return rng.poisson(mean) + rng.poisson(dark_per_s * t_exp, mean.shape)
 
@@ -618,7 +588,7 @@ class HybridModel:
             out[k] = mean[:, idx == k].sum(axis=1)
         out = out.reshape(-1, bins, bins)
         Lp = self.L
-        sigma = np.hypot(tw.DET_DIST * self.D / Lp / np.sqrt(12), blur_m) / ((x1 - x0) / bins)
+        sigma = np.hypot(self.det_dist * self.D / Lp / np.sqrt(12), blur_m) / ((x1 - x0) / bins)
         out = np.array([gaussian_filter(o, sigma, mode="nearest") for o in out])
         return rng.poisson(out)
 
@@ -628,7 +598,8 @@ class HybridModel:
 
         transmission(x, y, lam) -> T: attenuation by the sample at (x, y) in the sample plane (None: open beam).
         Then the L/D geometric blur (the neutron starts from a point of the pinhole, drawn uniformly over D × D, and
-        flies DET_DIST further to the detector), then the scintillator blur.
+        flies det_dist further to the detector), then the scintillator blur. The times of S are at DET_DIST: moved to
+        det_dist.
         """
         from odin_nexus import efficiency, _background
         rng = rng or np.random.default_rng()
@@ -638,6 +609,8 @@ class HybridModel:
         n = rng.poisson(cum[-1])
         idx = np.searchsorted(cum, rng.uniform(0, cum[-1], n))
         lam, t = lamS[idx], self.S["t"][idx]
+        if self.det_dist != tw.DET_DIST:                          # the detector moved: shorter or longer flight
+            t = t + (self.det_dist - tw.DET_DIST) * lam / H_OVER_M
         # Position: profile f(x, y), by rejection
         x0, x1, y0, y1 = self.field
         fmax = (1.05 * float(self.c_f[5].max()) if isinstance(self.c_f, tuple) else
@@ -654,8 +627,8 @@ class HybridModel:
         n = len(x)
         L = self.L
         xs, ys = rng.uniform(-self.D / 2, self.D / 2, n), rng.uniform(-self.D / 2, self.D / 2, n)
-        out = dict(x=(x + tw.DET_DIST * (x - xs) / L + rng.normal(0, blur_m, n)).astype(np.float32),
-                   y=(y + tw.DET_DIST * (y - ys) / L + rng.normal(0, blur_m, n)).astype(np.float32),
+        out = dict(x=(x + self.det_dist * (x - xs) / L + rng.normal(0, blur_m, n)).astype(np.float32),
+                   y=(y + self.det_dist * (y - ys) / L + rng.normal(0, blur_m, n)).astype(np.float32),
                    t=t, lam=lam.astype(np.float32))
         if background > 0:
             out = _background(out, t_exp, self.field, background, background_pixel, rng)

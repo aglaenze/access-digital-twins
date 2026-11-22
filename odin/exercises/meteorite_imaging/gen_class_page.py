@@ -18,9 +18,8 @@ sys.path.insert(0, ROOT)
 from nbfig import figure_cell  # noqa: E402
 from page_texts import transmission_md  # noqa: E402
 
-import yaml  # noqa: E402
-with open(os.path.join(HERE, "..", "..", "samples", "meteorite_nwa7034.yml"), encoding="utf-8") as _f:
-    _Y1 = next(v["center_mm"][1] for v in yaml.safe_load(_f)["volumes"] if v["material"] == "H-Fe-ox clast 1")
+import sample_library as _sl  # noqa: E402
+_Y1 = _sl.body_center(_sl.load("odin")["meteorite_nwa7034"], "H-rich region 1")[1]   # the H-rich core of the largest clast
 Y1S = f"{round(_Y1 / 0.0275) * 0.0275:.2f}"
 WHERE = "near the top" if _Y1 > 2 else ("in the lower part" if _Y1 < -2 else "around the middle")
 _sub = lambda s: s.replace("@Y1@", Y1S).replace("@WHERE@", WHERE)
@@ -73,39 +72,73 @@ q = quiz.Quiz("odin_meteorite_class")
 
 SAMPLE = "meteorite_nwa7034"
 odin = VirtualOdin(session=os.environ.get("ODIN_SESSION", "student"))
-odin.move(sample=SAMPLE)
+odin.move(sample=SAMPLE, detector_distance=0.006)   # the cameras 6 mm from the rotation axis (room to turn)
 EXT = tomo.extent()
-PX, PINHOLE = 512, 0.01                      # the high-resolution setup: 512 x 512 pixels of 27.5 µm, 1 cm pinhole
+PX, PINHOLE = 512, 0.01                      # the high-resolution setup: 512 x 512 pixels of 27.5 µm
+PINHOLE_TOMO, T_TOMO = 0.03, 30.0            # tomography: 3 cm pinhole (blur 17 µm at 6 mm), 30 s per image
 """)
 
 md(r"""
 ## ODIN for X-ray imagers, in five points
 
 The lecture showed the principles (Beer-Lambert, the pinhole camera, the contrasts); here is what they mean on ODIN.
+First the whole instrument, 60 m long:
+""")
+fig("odin_beamline_line.png", "ODIN from the source to the camera (distances of the official McStas model of ODIN).")
 
-1. **Compared with X-rays, the contrast is reversed.** X-rays interact with the electrons, so the heavy elements
-   stand out; neutrons interact with the **nuclei**. **Hydrogen** removes neutrons more than any other element (it
-   scatters them strongly), and lithium, boron, cadmium, gadolinium absorb them; but iron, aluminum, silicon, lead let
-   most of them through. A neutron image shows the water inside a metal or a rock, where X-rays see the heavy
-   elements.
-2. **A pulsed source and the time of flight.** At ESS, protons hit a tungsten target 14 times per second; each pulse
-   (2.86 ms) makes neutrons, slowed down by a moderator. ODIN is 60 m long: the arrival time of a neutron at the camera
-   gives its speed, so its wavelength. Today you use the **white beam**: all the wavelengths together, like a
-   polychromatic X-ray beam (and with a similar "beam hardening").
-3. **No lens, no magnification.** The beam is shaped by a **pinhole** of D = 1 to 4 cm, L = 10.5 m before the sample:
-   an almost parallel beam (L/D up to 1050). Each point of the sample becomes a spot of size $l \cdot D / L$ on the
-   camera, $l$ being the distance from the sample to the camera: the camera sits 5 cm behind the sample. Best blur here
-   about 0.05 mm, not the micrometers of a laboratory micro-CT with a small focal spot.
-4. **Few particles.** Even at ESS there are far fewer neutrons than photons from an X-ray tube: about 10 neutrons per
-   pixel (27.5 µm × 27.5 µm) and second in the high-resolution setup. Exposures last minutes, a tomography hours of beam.
-5. **The detector.** A scintillator containing lithium-6 turns each neutron into a flash of light, filmed by a camera
-   through a mirror, out of the beam: an indirect detector, as in many X-ray setups.
+md(r"""
+**1. Compared with X-rays, the contrast is different.** X-rays interact with the electrons, so the heavy elements
+stand out; neutrons interact with the **nuclei**. **Hydrogen** removes neutrons more than any other element (it
+scatters them strongly), and lithium, boron, cadmium, gadolinium absorb them; but iron, aluminum, silicon, lead let
+most of them through. A neutron image shows the water inside a metal or a rock, where X-rays see the heavy elements.
+""")
+fig("contrast_xray_neutron.png", "The attenuation coefficient of a few materials: X-rays of 100 keV (NIST) and neutrons "
+    "of 1.8 Å (NCrystal, absorption plus scattering). Water is almost transparent to the X-rays and dark for the "
+    "neutrons; lead is the opposite.")
 
+md(r"""
+**2. A pulsed source and the time of flight.** At ESS, protons hit a tungsten target 14 times per second; each pulse
+(2.86 ms) makes neutrons, slowed down by a moderator. ODIN is 60 m long: the arrival time of a neutron at the camera
+gives its speed, so its wavelength. Today you use the **white beam**: all the wavelengths together, like a
+polychromatic X-ray beam.
+""")
+fig("odin_tof.png", "Distance against time for neutrons of one pulse: the slow ones (long wavelength) arrive later. "
+    "The arrival time at the camera gives the wavelength.")
+
+md(r"""
+**3. No lens, no magnification.** The **magnification** is the ratio of the size of the image on the detector to the
+size of the object. In a lab micro-CT it comes from the cone beam: the X-rays leave a focal spot of a few µm and
+spread out, so an object close to the source casts a larger shadow on a far detector, magnification
+$M = (\text{source to detector}) / (\text{source to object})$, often 10 or more: a detector with large pixels then
+sees small details. Neutrons have no small focal spot and cannot be focused well: the beam is shaped by a **pinhole**
+of D = 1 to 4 cm, L = 10.5 m before the sample, an almost parallel beam (L/D up to 1050). The image on the camera has
+the size of the object ($M = 1$): the resolution is set by the camera pixel (27.5 µm here) and by the blur.
+
+Each point of the sample becomes a spot of size $l \cdot D / L$ on the camera, $l$ being the distance from the sample
+to the camera. So the camera is brought **as close as possible**: here 6 mm from the rotation axis, just room for the
+piece to turn. Then the blur is 6 µm with D = 1 cm and 17 µm with D = 3 cm, below the pixel: a wider pinhole gives
+more neutrons at no cost in sharpness.
+""")
+fig("odin_pinhole.png", "The pinhole camera: a point of the sample sees the whole pinhole, so it becomes a spot of "
+    "size l·D/L on the camera.")
+
+md(r"""
+**4. Few particles.** Even at ESS there are far fewer neutrons than photons from an X-ray tube. In the twin (ESS at
+2 MW, its power at the start), with the camera at 6 mm, a pixel of 27.5 µm × 27.5 µm receives about 55 neutrons per
+second with a 3 cm pinhole (L/D = 350), 9 times fewer with 1 cm (L/D = 1050). An image of a rock takes tens of
+seconds, a tomography about half an hour of beam.
+
+**5. The detector.** A scintillator containing lithium-6 turns each neutron into a flash of light, filmed by a camera
+through a mirror, out of the beam: an indirect detector, as in many X-ray setups.
+""")
+fig("odin_detector_6mm.png", "Side view of the detection: the scintillator glows where a neutron is absorbed; a mirror "
+    "sends the light to the camera, out of the beam.")
+
+md(r"""
 Then radiography and tomography work as you know them: $T = I/I_0 = e^{-\Sigma x}$ through a thickness $x$, with
 $\Sigma$ the attenuation coefficient in cm⁻¹ (the $\mu$ of the lecture: absorption plus scattering), and a filtered
 back-projection of parallel projections over 180°.
 """)
-fig("odin_beamline.png", "ODIN from the source to the camera (distances of the official McStas model of ODIN).")
 
 md(r"""
 ## The mission
@@ -203,11 +236,11 @@ display(w.VBox([shut, inout, tcount, title, w.HBox([button, ctl.stop]), ctl.stat
 """)
 
 code(r"""
-q.number("The histogram of the arrival times: a neutron reaches the camera, 60.55 m from the source, **61.2 ms** after "
+q.number("The histogram of the arrival times: a neutron reaches the camera, about 60.5 m from the source, **61.2 ms** after "
          "the pulse. Which wavelength does it have (Å)? (λ [Å] = 3956 / v [m/s])", value=4.0, tol=0.1, unit="Å",
          mistakes=[(989, "that is its speed in m/s; then λ = 3956 / v")],
-         hints=["v = 60.55 m / 0.0612 s.", "v ≈ 989 m/s, λ = 3956 / 989."],
-         explanation="v = 60.55 / 0.0612 = 989 m/s, λ = 3956 / 989 = 4.0 Å. The arrival time is proportional to λ: this "
+         hints=["v = 60.5 m / 0.0612 s.", "v ≈ 989 m/s, λ = 3956 / 989."],
+         explanation="v = 60.5 / 0.0612 = 989 m/s, λ = 3956 / 989 = 4.0 Å. The arrival time is proportional to λ: this "
                      "is how ODIN knows the wavelength of every neutron (here we sum them all: a white-beam radiograph).",
          title="Q3. From the time of flight to the wavelength")
 """)
@@ -216,7 +249,8 @@ md(r"""
 ## 2. Data reduction: from the files to the transmission
 
 Your three files hold **events** (one per neutron: its pixel, its pulse, its time of flight), not images.
-*Reduce* runs the chain of ESS on them:
+*Reduce* processes them with the data-reduction software of ESS (the open-source Python packages that will reduce
+the real data of ODIN), in five steps:
 
 1. **read** the events of each file (`scippnexus`, into `scipp` arrays with units and uncertainties);
 2. **time of flight to wavelength** for each neutron (`essreduce`, in the ESS imaging package `essimaging`, workflow
@@ -276,19 +310,20 @@ display(w.VBox([w.HBox([button_red, ctl_red.stop]), ctl_red.status, img_T, gate_
 """)
 
 md(r"""
-**Reading the radiograph.** About 89 % of the neutrons cross the 2 mm of rock: almost transparent. With 2 s and
+**Reading the radiograph.** About 90 % of the neutrons cross the 2 mm of rock: almost transparent. With 2 s and
 pixels of 110 µm, the clasts (0.1–0.4 mm, a few % of contrast) are lost in the noise and the blur; and a radiograph
 adds up the whole 2 mm along the beam: a speck can be one grain or several, near the front or the back. Hence the
 tomography.
 """)
 
 code(r"""
-q.number("The rock lets through T ≈ 0.89 of the neutrons over its 2 mm thickness. What is its attenuation coefficient "
-         "Σ (cm⁻¹)?", value=0.58, tol=0.06, unit="cm⁻¹",
-         mistakes=[(0.058, "right, but per mm: the answer is asked in cm⁻¹"), (0.11, "this is 1 − T, not −ln T / x")],
-         hints=["T = exp(−Σ x): Σ = −ln T / x.", "x = 0.2 cm; −ln 0.89 = 0.117."],
-         explanation="Σ = −ln 0.89 / 0.2 cm = 0.58 cm⁻¹: the matrix of the meteorite in ODIN's white beam (0.45 cm⁻¹ at "
-                     "ICON, whose beam is warmer: these minerals attenuate slow neutrons more).",
+q.number("The rock lets through T ≈ 0.90 of the neutrons over its 2 mm thickness. What is its attenuation coefficient "
+         "Σ (cm⁻¹)?", value=0.53, tol=0.05, unit="cm⁻¹",
+         mistakes=[(0.053, "right, but per mm: the answer is asked in cm⁻¹"), (0.10, "this is 1 − T, not −ln T / x")],
+         hints=["T = exp(−Σ x): Σ = −ln T / x.", "x = 0.2 cm; −ln 0.90 = 0.105."],
+         explanation="Σ = −ln 0.90 / 0.2 cm = 0.53 cm⁻¹: the matrix of the meteorite in ODIN's white beam (Naver et al.: "
+                     "0.45 cm⁻¹, taken by the twin at 1.8 Å; the neutrons counted on ODIN have a mean wavelength of "
+                     "3.2 Å, and these minerals attenuate slower neutrons more).",
          title="Q4. Σ of the rock")
 """)
 fig("meteorite_tomography.png", "One horizontal slice of the piece (8 mm × 2 mm), seen from above. A radiograph adds "
@@ -299,9 +334,10 @@ md(r"""
 ## 3. The tomography
 
 For the tomography ODIN uses the **integrating camera** in its high-resolution setup (512 × 512 pixels of 27.5 µm,
-thin scintillator): finer pixels than the Timepix3, and no need for the time of flight. It takes its own dark (300 s)
-and open beam (1500 s) first, then turns the sample in steps of 3° over 180° with one image of 300 s at each angle: 60
-images, **5 hours of beam** on ODIN (two or three minutes here). For each row of pixels, the projections $-\ln T$ are filtered (ramp)
+thin scintillator): finer pixels than the Timepix3, and no need for the time of flight. The pinhole is opened to
+3 cm: with the camera 6 mm from the axis, the blur stays below the pixel and 9 times more neutrons arrive. The camera
+takes its own dark (30 s) and open beam (150 s) first, then turns the sample in steps of 3° over 180° with one image of
+30 s at each angle: 60 images, **half an hour of beam** on ODIN (a few minutes here). For each row of pixels, the projections $-\ln T$ are filtered (ramp)
 and back-projected: $\Sigma$ at every point of the slice. For comparison, Naver *et al.* took 1125 images of 4 minutes
 at ICON (75 hours), with pixels of 6.2 µm.
 """)
@@ -330,24 +366,24 @@ def _png(a, lo, hi, size=None):
 
 def run_tomo(_):
     try:
-        odin.move(choppers="white", pinhole=PINHOLE, diffuser="in", stage_rot=0.0, sample=SAMPLE)
+        odin.move(choppers="white", pinhole=PINHOLE_TOMO, diffuser="in", stage_rot=0.0, sample=SAMPLE)
         print("The camera's dark and open beam...")
         odin.move(shutter="closed", stage_x=0.0)
-        cam_dark = odin.camera(300.0, title="camera dark (tomography)", pixels=PX)
+        cam_dark = odin.camera(T_TOMO, title="camera dark (tomography)", pixels=PX)
         D = odin.last_image.astype(float)
         odin.move(shutter="open", stage_x=0.5)
-        cam_open = odin.camera(1500.0, title="camera open beam (tomography)", pixels=PX)
+        cam_open = odin.camera(5 * T_TOMO, title="camera open beam (tomography)", pixels=PX)
         O = odin.last_image.astype(float)
         angles = np.arange(0, 180, 3.0)
         # per second, binned 2 x 2 (256 x 256 pixels: less noise on the screen)
         bin2 = lambda a: a.reshape(PX // 2, 2, PX // 2, 2).sum(axis=(1, 3))
-        d2, o2 = bin2(D) / 300.0, bin2(O) / 1500.0
+        d2, o2 = bin2(D) / T_TOMO, bin2(O) / (5 * T_TOMO)
         row = int(np.clip(round(@Y1@ / (14.1 / (PX // 2)) + (PX // 2 - 1) / 2), 0, PX // 2 - 1))
         sino = np.full((len(angles), PX // 2), np.nan)
 
         def show(k, n, f):
             bar.update(k, n, f)
-            T = (bin2(odin.last_image.astype(float)) / 300.0 - d2) / np.maximum(o2 - d2, 1e-9)
+            T = (bin2(odin.last_image.astype(float)) / T_TOMO - d2) / np.maximum(o2 - d2, 1e-9)
             sino[k - 1] = -np.log(np.clip(T[row], 1e-3, None))
             proj_img.value = _png(T, 0.75, 1.05)
             sino_img.value = _png(sino, 0.0, 0.6, size=(PX // 2, 3 * len(angles)))
@@ -358,7 +394,7 @@ def run_tomo(_):
 
         bar.start(len(angles))
         odin.move(shutter="open", stage_x=0.0)
-        files = odin.tomography(angles, 300.0, title="tomography", pixels=PX, progress=show)
+        files = odin.tomography(angles, T_TOMO, title="tomography", pixels=PX, progress=show)
         print("Filtering and back-projecting...")
         REC["rec"] = tomo.Reconstruction(files, cam_open, cam_dark)
         ctl_tomo.clear()
@@ -460,12 +496,14 @@ md(r"""
 (0.4 to 0.6 mm away). Their **ratio** hardly depends on the spectrum of the beam. Compare with the minerals of
 NWA 7034 without hydrogen (Naver *et al.*, Table S1, at 25 meV; matrix measured at ICON: 0.45 cm⁻¹):
 
-| Mineral | Σ (cm⁻¹) | ratio to the matrix |
-|---|---|---|
-| plagioclase | 0.27 – 0.28 | 0.6 |
-| pyroxenes, chlorapatite | 0.34 – 0.38 | 0.8 |
-| ilmenite | 0.70 | 1.6 |
-| magnetite, maghemite | 0.80 – 0.82 | 1.8 |
+| Mineral | Formula | Σ (cm⁻¹) | ratio to the matrix |
+|---|---|---|---|
+| plagioclase (a feldspar) | (Na,Ca)(Al,Si)₄O₈ | 0.27 – 0.28 | 0.6 |
+| pyroxenes, chlorapatite | (Ca,Mg,Fe)₂Si₂O₆, Ca₅(PO₄)₃Cl | 0.34 – 0.38 | 0.8 |
+| ilmenite | FeTiO₃ | 0.70 | 1.6 |
+| magnetite, maghemite | Fe₃O₄, γ-Fe₂O₃ | 0.80 – 0.82 | 1.8 |
+
+None of them holds hydrogen. Iron oxyhydroxides such as goethite, FeO(OH), do.
 """)
 
 code(r"""
@@ -500,8 +538,8 @@ display(w.VBox([button_s, out_s]))
 """)
 
 md(r"""
-The twin's values are higher than the table's: ODIN's white beam is colder (mean wavelength 3.3 Å) than ICON's
-(1.8 Å), and these materials attenuate slow neutrons more; ratios change much less. A spot of 0.1–0.3 mm is also
+The twin's values are higher than the table's: the table is for neutrons of 1.8 Å (25 meV), the neutrons counted on
+ODIN have a mean wavelength of 3.2 Å, and these materials attenuate slower neutrons more; ratios change much less. A spot of 0.1–0.3 mm is also
 blurred with its surroundings: the value in its middle is lower than the true one.
 
 ## 6. How much water?
@@ -555,15 +593,17 @@ _ = submit.Submit("odin/exercises/meteorite_imaging", "class", quiz=q, title="OD
 
 QS = {
     'water': r'''
-q.number("1 mm of water in the beam, with neutrons of 1.8 Å: Σ = 3.6 cm⁻¹ (mostly the scattering by hydrogen). "
+q.number("1 mm of water in the beam, with neutrons of 3 Å (the middle of ODIN's beam): Σ = 4.9 cm⁻¹ (mostly the "
+         "scattering by hydrogen). "
          "Which fraction of the neutrons does it remove, 1 − T (%)? (For comparison after you answer: X-rays of "
          "60 keV see μ = 0.21 cm⁻¹ for water.)",
-         value=30.4, tol=1.5, unit="%",
+         value=39.0, tol=1.5, unit="%",
          mistakes=[(2.0, "that is the X-ray value (μ = 0.21 cm⁻¹); the question is about neutrons"),
-                   (36, "3.6 cm⁻¹ × 0.1 cm = 0.36 is −ln T, not 1 − T: T = e^(−0.36)")],
-         hints=["T = exp(−Σ d), with d = 0.1 cm.", "1 − exp(−0.36)."],
-         explanation="1 − e^(−0.36) = 30 % with neutrons, 1 − e^(−0.021) = 2 % with X-rays. And 1 mm of iron: neutrons "
-                     "11 % (Σ = 1.2 cm⁻¹), X-rays of 60 keV 61 % (μ = 9.5 cm⁻¹). The contrasts are reversed.",
+                   (49, "4.9 cm⁻¹ × 0.1 cm = 0.49 is −ln T, not 1 − T: T = e^(−0.49)")],
+         hints=["T = exp(−Σ d), with d = 0.1 cm.", "1 − exp(−0.49)."],
+         explanation="1 − e^(−0.49) = 39 % with neutrons, 1 − e^(−0.021) = 2 % with X-rays. And 1 mm of iron: neutrons "
+                     "10 % (Σ = 1.1 cm⁻¹ at 3 Å), X-rays of 60 keV 61 % (μ = 9.5 cm⁻¹). The contrasts are very "
+                     "different: water stands out for neutrons, iron for X-rays.",
          title="Q1. Water, for neutrons and X-rays")
 ''',
     'where': r'''
@@ -600,7 +640,7 @@ q.number("The water by mass in the brightest spot you found (part 6, %):", value
 ''',
     'magnif': r'''
 q.choice("A laboratory micro-CT magnifies by bringing the sample close to a small focal spot (a cone beam). Why does "
-         "ODIN put the camera **5 cm** behind the sample instead, without magnification?",
+         "ODIN put the camera **6 mm** behind the sample instead, without magnification?",
          ["The neutron source seen by the sample is the pinhole, 1 to 4 cm wide: a magnifying geometry would multiply "
           "its blur (l · D / L). ODIN keeps the camera close and the beam almost parallel.",
           "Neutrons have no charge, so they cannot be magnified.",

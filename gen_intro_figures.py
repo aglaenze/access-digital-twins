@@ -5,6 +5,9 @@ by their generators (odin/gen_intro_page.py, loki/gen_intro_page.py).
 
 odin_beamline.png   ODIN from the source to the camera: moderator, choppers, guide, pinhole, sample, detector
                     (distances of the official McStas model and of the ODIN NeXus file).
+odin_beamline_line.png  ODIN on one line, for the class page (white beam, camera 6 mm behind the sample).
+contrast_xray_neutron.png  Attenuation coefficients of a few materials, X-rays (100 keV) and neutrons (1.8 Å).
+odin_detector_6mm.png  odin_detector.png with the camera 6 mm behind the sample (class page).
 odin_tof.png        Time of flight: distance against time for neutrons of several wavelengths leaving in one ESS
                     pulse; the arrival time at the detector gives the wavelength; the next pulse and frame overlap.
 odin_pinhole.png    The pinhole camera: collimation ratio L/D and the blur l·D/L of a point of the sample.
@@ -255,9 +258,74 @@ def odin_pinhole():
     plt.close(fig)
 
 
-def odin_detector():
-    """Side view of the detection: the neutron is absorbed in the scintillator (lithium-6), which glows; a mirror at
-    45° sends the light up to the camera, out of the beam; the neutrons go on through the mirror."""
+def odin_beamline_line():
+    """ODIN on one line, for the class page: source, choppers (all open in white beam), guide, pinhole, the sample and\n    the camera 6 mm behind it (position 1)."""
+    fig, ax = plt.subplots(figsize=(13, 3.3))
+    ax.plot([0, ODIN_GUIDE_END], [0, 0], color="#E8C9A0", lw=12, solid_capstyle="butt", zorder=1)
+    ax.plot([ODIN_PINHOLE, ODIN_SAMPLE + 0.4], [0, 0], color="#F3E2C6", lw=12, solid_capstyle="butt", zorder=1)
+    ax.add_patch(Rectangle((-1.2, -0.55), 1.2, 1.1, color=RED, zorder=3))
+    ax.text(-0.6, 0.75, "source\n(moderator)\n0 m", ha="center", va="bottom", fontsize=10.5, color=INK)
+    for _, z, _, fam in ODIN_CHOPPER_LIST:
+        ax.add_patch(Rectangle((z - 0.12, -0.55), 0.24, 1.1, color=BLUE, zorder=3))
+    ax.annotate("", (34, 0.75), (6.5, 0.75), arrowprops=dict(arrowstyle="-", color=BLUE, lw=1))
+    ax.text(20.2, 0.85, "choppers, 7 to 33 m: they select wavelengths\n(today all open: the white beam)", ha="center",
+            va="bottom", fontsize=10.5, color=BLUE)
+    ax.text(25, -0.62, "neutron guide (0 to 49 m): mirrors that carry the beam", ha="center", va="top", fontsize=10.5,
+            color=ORANGE)
+    ax.add_patch(Rectangle((ODIN_PINHOLE - 0.15, -0.95), 0.3, 0.75, color=INK, zorder=3))
+    ax.add_patch(Rectangle((ODIN_PINHOLE - 0.15, 0.2), 0.3, 0.75, color=INK, zorder=3))
+    ax.text(ODIN_PINHOLE, 1.05, "pinhole D\n50 m", ha="center", va="bottom", fontsize=10.5, color=INK)
+    ax.add_patch(Rectangle((ODIN_SAMPLE - 0.45, -0.35), 0.35, 0.7, color=GREY, ec=INK, zorder=3))
+    ax.add_patch(Rectangle((ODIN_SAMPLE + 0.05, -0.7), 0.25, 1.4, color=TEAL, zorder=3))
+    ax.text(ODIN_SAMPLE + 0.9, 0.0, "sample (60.5 m)\nand the camera,\n6 mm behind it", ha="left", va="center",
+            fontsize=10.5, color=TEAL)
+    ax.annotate("", (ODIN_SAMPLE - 0.3, -1.25), (ODIN_PINHOLE, -1.25), arrowprops=dict(arrowstyle="<->", color=INK))
+    ax.text((ODIN_PINHOLE + ODIN_SAMPLE) / 2, -1.35, "L = 10.5 m", ha="center", va="top", fontsize=10.5, color=INK)
+    ax.set_xlim(-3, 70); ax.set_ylim(-1.9, 1.9)
+    ax.set_xlabel("distance from the source (m)")
+    _clean(ax)
+    fig.tight_layout()
+    _save(fig, "odin_beamline_line.png")
+    plt.close(fig)
+
+
+# Attenuation coefficients for the contrast figure. Neutrons: NCrystal at 1.8 Å (water: LiquidWaterH2O_T293.6K, metals:
+# their ncmat crystals), absorption + scattering. X-rays: 100 keV, NIST XCOM mass attenuation coefficients (with
+# coherent scattering) times the density.
+CONTRAST = (("water (H₂O)", 0.171, 3.62), ("aluminum", 0.460, 0.101), ("silicon", 0.428, 0.111),
+            ("iron", 2.93, 1.20), ("copper", 4.11, 0.93), ("lead", 63.0, 0.354))
+
+
+def contrast_xray_neutron():
+    """The attenuation coefficient of a few materials for X-rays (100 keV) and neutrons (1.8 Å): bars on a log scale,\n    and what 1 cm of each lets through."""
+    fig, ax = plt.subplots(figsize=(12, 4.2))
+    y = np.arange(len(CONTRAST))[::-1]
+    for k, (name, mx, mn) in enumerate(CONTRAST):
+        ax.barh(y[k] + 0.19, mx, height=0.36, color=GREY, left=0.0)
+        ax.barh(y[k] - 0.19, mn, height=0.36, color=TEAL)
+        ax.text(mx * 1.12, y[k] + 0.19, f"{mx:g} cm⁻¹: 1 cm lets {100 * np.exp(-mx):.0f} % through"
+                if np.exp(-mx) > 0.005 else f"{mx:g} cm⁻¹: 1 cm stops everything", va="center", fontsize=9.5,
+                color="#5B6779")
+        ax.text(mn * 1.12, y[k] - 0.19, f"{mn:g} cm⁻¹: 1 cm lets {100 * np.exp(-mn):.0f} % through", va="center",
+                fontsize=9.5, color=TEAL)
+    ax.set_xscale("log"); ax.set_xlim(0.05, 400)
+    ax.set_xticks([0.1, 1, 10, 100]); ax.set_xticklabels(["0.1", "1", "10", "100"])
+    ax.set_yticks(y); ax.set_yticklabels([c[0] for c in CONTRAST], fontsize=11)
+    ax.set_xlabel("attenuation coefficient Σ (cm⁻¹, log scale)")
+    from matplotlib.patches import Patch
+    ax.legend([Patch(color=GREY), Patch(color=TEAL)],
+              ["X-rays, 100 keV: grows with the number of electrons (heavy elements)",
+               "neutrons, 1.8 Å: hydrogen first; the metals let most of them through"],
+              loc="lower center", bbox_to_anchor=(0.5, 1.0), ncol=2, fontsize=10, frameon=False)
+    for s in ("top", "right"):
+        ax.spines[s].set_visible(False)
+    fig.tight_layout()
+    _save(fig, "contrast_xray_neutron.png")
+    plt.close(fig)
+
+
+def odin_detector(gap="5 cm", name="odin_detector.png"):
+    """Side view of the detection: the neutron is absorbed in the scintillator (lithium-6), which glows; a mirror at\n    45° sends the light up to the camera, out of the beam; the neutrons go on through the mirror."""
     fig, ax = plt.subplots(figsize=(13, 4.6))
     ax.plot([-0.4, 1.0], [0, 0], color=TEAL, lw=6, solid_capstyle="butt")
     ax.text(0.25, 0.22, "neutrons", ha="center", va="bottom", fontsize=10.5, color=TEAL)
@@ -267,7 +335,7 @@ def odin_detector():
     ax.add_patch(Rectangle((2.5, -0.8), 0.1, 1.6, color="#7BC8A4", ec=TEAL))     # the scintillator screen
     ax.text(2.55, 0.95, "scintillator\n(lithium-6)", ha="center", va="bottom", fontsize=10.5, color=TEAL)
     ax.annotate("", (2.5, -1.05), (1.35, -1.05), arrowprops=dict(arrowstyle="<->", color=INK))
-    ax.text(1.92, -1.13, "5 cm", ha="center", va="top", fontsize=10, color=INK)
+    ax.text(1.92, -1.13, gap, ha="center", va="top", fontsize=10, color=INK)
     ax.plot(2.55, 0.12, "*", color="#F2B544", ms=17, mec=ORANGE, zorder=5)       # one flash
     for dy in (-0.25, 0.0, 0.25):                                                # its light toward the mirror
         ax.annotate("", (4.0 - 0.05, dy * 0.6), (2.62, 0.12 + dy * 0.2),
@@ -293,7 +361,7 @@ def odin_detector():
     ax.text(7.0, 1.7, steps, ha="left", va="top", fontsize=10.5, color=INK, linespacing=1.45)
     ax.set_xlim(-0.5, 12.4); ax.set_ylim(-1.5, 2.6); ax.axis("off")
     fig.tight_layout()
-    _save(fig, "odin_detector.png")
+    _save(fig, name)
     plt.close(fig)
 
 
@@ -510,6 +578,7 @@ if __name__ == "__main__":
         print(f"ODIN: {lam} Å reaches the camera ({ODIN_DET} m) after {lam * ODIN_DET / H_OVER_M * 1e3:.1f} ms")
     print(f"ODIN: band between two pulses {H_OVER_M * PERIOD / ODIN_DET:.2f} Å; with one pulse in two "
           f"{2 * H_OVER_M * PERIOD / ODIN_DET:.2f} Å; natural resolution {H_OVER_M * TAU / ODIN_DET:.3f} Å")
-    odin_beamline(); odin_tof(); odin_choppers(); odin_pinhole(); odin_detector(); odin_scintillator(); odin_cameras()
+    odin_beamline(); odin_beamline_line(); contrast_xray_neutron(); odin_detector("6 mm (not to scale)", "odin_detector_6mm.png")
+    odin_tof(); odin_choppers(); odin_pinhole(); odin_detector(); odin_scintillator(); odin_cameras()
     loki_beamline(); loki_q(); loki_tof()
     print("written", OUT)

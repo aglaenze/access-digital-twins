@@ -841,6 +841,6 @@ T.on("open-url", (url) => {
     return;
   }
   const name = file === "open_nicos" ? `NICOS · ${({ odin: "ODIN", loki: "LoKI" })[instr] || ""}`
-    : file === "Sample_builder" ? "Sample builder" : file;
+    : u.pathname.endsWith("/twin/builder") ? "Sample builder" : file;
   openTab(p, u.pathname.startsWith("/notebooks/") ? "notebook" : "page", name);
 });

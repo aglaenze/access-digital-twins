@@ -4,6 +4,7 @@
     nb_tools.nicos("odin")                         # the button Open NICOS (MSc: part 0, measure yourself)
     nb_tools.proposal("odin/exercises/iron_bragg_edges/beamtime.md")   # the proposal sheet, folded
     nb_tools.sample_builder("odin", "1234")           # the sample builder of this instrument and proposal
+    nb_tools.proposal_sample("odin/exercises/meteorite_imaging")   # the sample of the proposal, drawn; change it
     nb_tools.imported_samples("odin", "2025123")    # an imported proposal: a button per sample still to build
     nb_tools.need_measurements(FOLDER, "odin")     # stops the notebook, clearly, while there is nothing to analyze
 
@@ -40,13 +41,62 @@ def nicos(instr):
               "NICOS opens in about a minute, logged in.")
 
 
+def builder_url(instr):
+    """The sample builder of an instrument: the page of the app (builder/, served by container/twin_app.py; ODIN:
+    builder/index.html, LoKI: builder/loki.html, chosen by ?instrument=)."""
+    return "/twin/builder"
+
+
 def sample_builder(instr, proposal=""):
     """The button Sample builder (centered), for this instrument and proposal: nothing to choose on the page."""
-    _centered(_button("Sample builder", f"/voila/render/Sample_builder.ipynb?instrument={instr}&proposal={proposal}",
+    _centered(_button("Sample builder", f"{builder_url(instr)}?instrument={instr}&proposal={proposal}",
                       main=True),
               "Design your sample (a piece of any shape, objects in it, grains placed at random; or kinds of particles), "
               "start from an example or a model, then save it "
               "with your proposal: it appears on the sample changer of NICOS.")
+
+
+def proposal_sample(exercise):
+    """Top of a beamtime notebook (expert level): the sample(s) of the proposal of the exercise (exercise.yml:
+    samples, modes.beamtime.proposal), drawn and described as NICOS will mount them (hidden properties not shown);
+    the samples the student made for this proposal too; then the button *Change the sample*, which opens the sample
+    builder starting from it (the new sample is saved with the proposal and appears on the sample changer)."""
+    import sys
+    import datetime
+    from urllib.parse import quote
+    import yaml
+    if ROOT not in sys.path:
+        sys.path.insert(0, ROOT)
+    import sample_library as sl
+    import user_office
+    import matplotlib.pyplot as plt
+    with open(os.path.join(ROOT, exercise, "exercise.yml"), encoding="utf-8") as f:
+        ex = yaml.safe_load(f)
+    instr = ex["instrument"]
+    prop = str(((ex.get("modes") or {}).get("beamtime") or {}).get("proposal", {}).get("id", ""))
+    folder = os.path.join(user_office.run_root(), "data", instr, str(datetime.date.today().year), prop, "raw")
+    lib = sl.load(instr, folder if prop else None)
+    given = list(ex.get("samples") or {})
+    own = [n for n, s in lib.items() if s.get("source") == "student"]
+    for n in given + own:
+        if n not in lib:
+            continue
+        spec = lib[n]
+        hidden = (ex.get("samples") or {}).get(n, {}).get("hidden") or spec.get("hidden") or []
+        who = "the sample of your proposal" if n in given else "a sample you made for this proposal"
+        display(Markdown(f"**{spec.get('name', n)}** (`{n}`, {who}; in NICOS: `move(sample_holder, '{n}')`)"))
+        try:
+            sl.draw(instr, spec, hidden=hidden, fig=plt.figure(figsize=(10, 3.8)))
+            sl.show()
+        except Exception as e:                          # a drawing never stops the notebook
+            display(Markdown(f"(no drawing: {e})"))
+        if spec.get("description"):
+            display(Markdown(spec["description"]))
+    first = (given + own)[0] if (given + own) else ""
+    _centered(_button("Change the sample", f"{builder_url(instr)}?instrument={instr}&proposal={prop}"
+                      f"&start={quote(first)}", main=False),
+              "Your question needs another sample, or this one changed? The sample builder starts from it; what you "
+              "save there goes with your proposal, on the sample changer of NICOS.")
 
 
 def imported_samples(instr, proposal):
@@ -70,7 +120,7 @@ def imported_samples(instr, proposal):
         if s["name"] in built:
             rows.append(f"<li>{label}: built, <code>move(sample_holder, '{s['name']}')</code></li>")
         else:
-            href = (f"/voila/render/Sample_builder.ipynb?instrument={instr}&proposal={proposal}"
+            href = (f"{builder_url(instr)}?instrument={instr}&proposal={proposal}"
                     f"&name={quote(s['name'])}&title={quote(s.get('title') or '')}")
             rows.append(f"<li>{label}: {_button('Build it', href)}</li>")
     display(HTML(f'<div style="margin:0 0 24px"><b>The samples of your proposal {html.escape(str(proposal))}</b> '

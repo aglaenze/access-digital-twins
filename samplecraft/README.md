@@ -4,7 +4,7 @@ samplecraft describes a sample for neutron (or X-ray) imaging and scattering the
 (MCNP, OpenMC, Geant4) describe their cells: a **tree of bodies**, each of one material, each inside its parent, no two
 bodies of the same parent overlapping. What a ray crosses in each material is computed **exactly** (intervals of
 each shape along the ray; a child replaces its parent's material on its part). The ODIN twin uses it for its
-hybrid model (thickness maps, transmission); the sample builder (`../Sample_builder.ipynb`, `../scene_builder.py`)
+hybrid model (thickness maps, transmission); the sample builder (`../builder/`, `../builder_api.py`, `../scene_builder.py`)
 edits its recipes without code.
 
 ```python

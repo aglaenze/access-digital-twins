@@ -31,6 +31,12 @@ free beamtime*, or *Import a proposal* for a real one): its number is in `PROPOS
 """
 
 
+FREE_SAMPLE = ("## 1. Your sample\n\nThe sample changer of {NAME} holds the samples of the library (in NICOS, "
+               "`sample_info()` describes the one mounted). For your own question, design a sample with the sample "
+               "builder; start from an example, a model saved by someone, or a sample of the library. It is saved "
+               "with your free beamtime and appears on the sample changer of NICOS: `move(sample_holder, 'its_name')`.")
+
+
 def main():
     for instr, (name, src, number) in SOURCES.items():
         nb = nbf.read(os.path.join(ROOT, src), as_version=4)
@@ -51,7 +57,9 @@ def main():
             if c.cell_type == "code" and "nb_tools.proposal(" in c.source:
                 c.source = c.source.split("nb_tools.proposal(")[0].rstrip()
                 c.metadata["jupyter"] = {"source_hidden": True}
-            if c.cell_type == "code" and "nb_tools.sample_builder(" in c.source:
+            if c.cell_type == "markdown" and c.source.startswith("## 1. Your sample"):
+                c.source = FREE_SAMPLE.format(instr=instr, NAME=name)
+            if c.cell_type == "code" and "nb_tools.proposal_sample(" in c.source:
                 c.source = (f'nb_tools.sample_builder("{instr}", "1000")\n'
                             f'nb_tools.imported_samples("{instr}", "1000")   # a real proposal: its samples to build')
             if c.cell_type == "markdown" and c.source.startswith("## 2. Your measurements, in NICOS"):
