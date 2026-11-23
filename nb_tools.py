@@ -148,16 +148,19 @@ def proposal_sample(exercise, watch=True):
                             for n in os.listdir(mine_dir) if n.endswith(".yml")))
 
     def items(new=()):
-        """What the section shows, as display objects (made in full before the section is changed)."""
+        """What the section shows, as display objects (made in full before the section is changed): the sample that
+        is the student's choice now (the last one they saved; before that, the sample(s) of the proposal), a line with
+        the others still on the sample changer, and the button Change the sample, which starts from the one shown."""
         lib = sl.load(instr, folder if prop else None)
         own = [n for n, s in lib.items() if s.get("source") == "student"]
+        own.sort(key=lambda n: os.path.getmtime(lib[n]["file"]) if lib[n].get("file") and os.path.exists(lib[n]["file"]) else 0)
+        current = [own[-1]] if own else [n for n in given if n in lib]
+        others = [n for n in given + own if n in lib and n not in current]
         out = []
-        for n in given + own:
-            if n not in lib:
-                continue
+        for n in current:
             spec = lib[n]
             hidden = (ex.get("samples") or {}).get(n, {}).get("hidden") or spec.get("hidden") or []
-            who = "the sample of your proposal" if n in given else "a sample you made for this proposal"
+            who = "the sample of your proposal" if n in given else "the sample you made for this proposal"
             mark = " · **just saved**" if n in new else ""
             out.append(Markdown(f"**{spec.get('name', n)}** (`{n}`, {who}; in NICOS: "
                                 f"`move(sample_holder, '{n}')`){mark}"))
@@ -166,18 +169,21 @@ def proposal_sample(exercise, watch=True):
                 f"*(The drawing of this sample could not be made: {html.escape(err)}. Please tell your teacher.)*"))
             if spec.get("description"):
                 out.append(Markdown(spec["description"]))
-        return out, (given + own)
+        if others:
+            out.append(Markdown("Also on the sample changer of NICOS: " + ", ".join(
+                f"*{lib[n].get('name', n)}* (`{n}`{', the sample of your proposal' if n in given else ''})"
+                for n in others) + "."))
+        start = current[0] if current else ""
+        out.append(HTML(f'<div style="text-align:center; margin:28px 0 30px">'
+                        f'{_button("Change the sample", f"{builder_url(instr)}?instrument={instr}&proposal={prop}&start={quote(start)}")}'
+                        f'<div style="color:#5B6779; font-size:13px; margin-top:6px">Your question needs another sample, '
+                        f'or this one changed? The sample builder starts from it; what you save there goes with your '
+                        f'proposal, on the sample changer of NICOS, and is shown here as soon as it is saved.</div></div>'))
+        return out
 
-    shown, names = items()
     box = w.Output()
-    box.outputs = tuple(_mime(x) for x in shown)
+    box.outputs = tuple(_mime(x) for x in items())
     display(box)
-    first = names[0] if names else ""
-    _centered(_button("Change the sample", f"{builder_url(instr)}?instrument={instr}&proposal={prop}"
-                      f"&start={quote(first)}", main=False),
-              "Your question needs another sample, or this one changed? The sample builder starts from it; what you "
-              "save there goes with your proposal, on the sample changer of NICOS. This section shows it as soon as "
-              "it is saved.")
     if not (watch and mine_dir):
         return
     old = _WATCHERS.pop(exercise, None)               # the cell run again: one watcher only
@@ -193,7 +199,7 @@ def proposal_sample(exercise, watch=True):
                     continue
                 before = dict(last)
                 new = {n[:-4] for n, t in now if before.get(n) != t}
-                shown, _ = items(new)                   # drawn first, then swapped: the section never flickers empty
+                shown = items(new)                      # drawn first, then swapped: the section never flickers empty
                 box.outputs = tuple(_mime(x) for x in shown)
                 last = now
             except Exception:                           # noqa: BLE001  (a sample being written: next time)
