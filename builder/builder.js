@@ -63,7 +63,7 @@ function renderTree() {
     const what = b.use ? `copy of “${b.use}”` : shapeName((b.shape || {}).type);
     const nf = (b.fill || []).filter((f) => !f.sealed).length;
     const li = el("li", { class: samePath(p, S.sel) ? "on" : "", style: `padding-left:${pad}px`,
-      onclick: () => { S.sel = p; renderTree(); renderPart(); highlight(); } },
+      onclick: () => { S.sel = p; selected(); } },
       el("span", { class: "sw", style: `background:${S.colors[b.material] || "#ddd"}` }),
       el("span", { class: "nm" }, b.name || "(unnamed)"),
       el("span", { class: "mt" }, `${what}${b.material ? " · " + b.material : ""}`),
@@ -83,6 +83,13 @@ function otherMaterial(not) {
   const ks = Object.keys(S.recipe.materials || {}).filter((k) => k !== not && !k.startsWith("holder: "));
   if (ks.length) return ks[0];
   S.recipe.materials.copper = { ncrystal: "Cu_sg225.ncmat" }; return "copper";
+}
+// a new part selected (a click in the tree, or a part added, moved or deleted): everything that shows the selected
+// part follows it (the tree, the part with its grains, its highlight in the 3D view; Advanced shows the whole sample,
+// refreshed too since a part may have been added or deleted)
+function selected() {
+  renderTree(); renderPart(); highlight();
+  if ($("advanced").open) renderAdvanced();
 }
 function treeAction(a) {
   const p = S.sel, sib = siblings(p), i = p[p.length - 1], b = body(p);
@@ -111,7 +118,7 @@ function treeAction(a) {
     else S.sel = [...p.slice(0, -1), Math.max(0, i - 1)];
     if (!S.recipe.bodies.length) S.sel = [0];
   }
-  changed();
+  changed(); selected();
 }
 
 // ------------------------------------------------------------------ the selected part
@@ -217,6 +224,7 @@ function renderPart() {
     if (e.some((x) => x)) turn.open = true;
   }
   box.append(turn);
+  box.append(grainsBox(b));
 }
 function matLine(name) {
   const s = S.sig[name];
@@ -258,26 +266,33 @@ function pick(it) {
   const cb = pickCb; closePicker(); if (cb) cb(name);
 }
 
-// ------------------------------------------------------------------ advanced
+// ------------------------------------------------------------------ text sections (YAML), with Apply
+function textSection(title, text, obj, apply, rows = 8) {
+  const ta = el("textarea", { class: "code", rows });
+  api("yaml", { obj }).then((d) => { ta.value = d.text; }).catch(() => {});
+  const msg = el("div", { class: "msg" });
+  const btn = el("button", { onclick: async () => {
+    try { const d = await api("parse", { text: ta.value }); apply(d.obj); msg.className = "msg ok"; msg.textContent = "Applied."; changed(); renderAll(); }
+    catch (e) { msg.className = "msg err"; msg.textContent = e.message; }
+  } }, "Apply");
+  return el("div", { class: "adv-sec" }, title ? el("h2", {}, title) : null, el("p", { class: "lead" }, text), ta, el("div", { class: "toolbar" }, btn), msg);
+}
+// the grains placed at random in a part: in the panel of the selected part (they belong to it)
+function grainsBox(b) {
+  const nf = (b.fill || []).filter((f) => !f.sealed).length;
+  const box = el("details", { class: "sub-box" }, el("summary", {}, `Grains placed at random in it${nf ? ` (${nf} kind${nf > 1 ? "s" : ""})` : ""}`));
+  box.open = !!S.grainsOpen;
+  box.addEventListener("toggle", () => { S.grainsOpen = box.open; });
+  box.append(textSection("", "Populations of grains (count or volume fraction, sizes, shapes, clusters), Voronoi polycrystals, pores. One item per population; hidden ones are not shown. Example: - {material: copper, fraction: 0.02, size_mm: [0.1, 0.3], grain: {type: blob, wobble: 0.1}}",
+    (b.fill || []).filter((f) => !f.sealed), (v) => { const sealed = (b.fill || []).filter((f) => f.sealed); b.fill = [...(Array.isArray(v) ? v : []), ...sealed]; if (!b.fill.length) delete b.fill; }, 6));
+  return box;
+}
+
+// ------------------------------------------------------------------ advanced: the whole sample as text
 async function renderAdvanced() {
   const adv = $("adv"); adv.innerHTML = "";
   if (!S.recipe.bodies.length) return;
-  const b = body(S.sel);
-  const sec = (title, text, obj, apply, rows = 8) => {
-    const ta = el("textarea", { class: "code", rows });
-    api("yaml", { obj }).then((d) => { ta.value = d.text; }).catch(() => {});
-    const msg = el("div", { class: "msg" });
-    const btn = el("button", { onclick: async () => {
-      try { const d = await api("parse", { text: ta.value }); apply(d.obj); msg.className = "msg ok"; msg.textContent = "Applied."; changed(); renderAll(); }
-      catch (e) { msg.className = "msg err"; msg.textContent = e.message; }
-    } }, "Apply");
-    return el("div", { class: "adv-sec" }, el("h2", {}, title), el("p", { class: "lead" }, text), ta, el("div", { class: "toolbar" }, btn), msg);
-  };
-  if (!b.sealed) {
-    adv.append(sec(`Grains placed at random in “${b.name}”`,
-      "Populations of grains (count or volume fraction, sizes, shapes, clusters), Voronoi polycrystals, pores. One item per population; hidden ones are not shown. Example: - {material: copper, fraction: 0.02, size_mm: [0.1, 0.3], grain: {type: blob, wobble: 0.1}}",
-      (b.fill || []).filter((f) => !f.sealed), (v) => { const sealed = (b.fill || []).filter((f) => f.sealed); b.fill = [...(Array.isArray(v) ? v : []), ...sealed]; if (!b.fill.length) delete b.fill; }, 6));
-  }
+  const sec = textSection;
   adv.append(sec("Materials (text)", "Each material: a crystal of NCrystal (ncrystal), minerals by volume (minerals), a formula and density, a mixture of the other materials (mix), or a base calibrated on a measured Σ (calibrate); density_factor below 1 for pores; source: where the numbers come from.",
     Object.fromEntries(Object.entries(S.recipe.materials || {}).filter(([k]) => !k.startsWith("holder: "))),
     (v) => { if (v && typeof v === "object" && !Array.isArray(v)) S.recipe.materials = v; }, 8));
@@ -294,8 +309,14 @@ function renderGallery() {
   const items = [...S.info.starts];
   const draft = loadDraft();
   if (draft) items.unshift({ kind: "draft", ref: "", title: "Your unsaved draft", what: draft.when });
+  const LEVELS = { 1: "1 · Simple shapes", 2: "2 · Several parts, or grains", 3: "3 · Natural samples" };
+  let lastLevel = null;
   for (const s of items) {
     if (q && !(`${s.title} ${s.what}`).toLowerCase().includes(q)) continue;
+    if (s.level && s.level !== lastLevel) {          // the starting points come from the simplest to the most complex
+      g.append(el("div", { class: "glevel" }, LEVELS[s.level] || ""));
+      lastLevel = s.level;
+    }
     const pic = s.kind === "scratch" ? el("div", { class: "ph" }, "+") : s.kind === "draft" ? el("div", { class: "ph" }, "✎")
       : el("img", { loading: "lazy", src: thumbUrl(s), alt: "" });
     g.append(el("button", { class: "card" + (S.start && S.start.kind === s.kind && S.start.ref === s.ref ? " on" : ""),
