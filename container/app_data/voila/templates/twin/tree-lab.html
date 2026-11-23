@@ -67,6 +67,15 @@
     #loading .spin { width: 54px; height: 54px; margin: 0 auto 18px; border-radius: 50%; border: 4px solid var(--line);
                      border-top-color: var(--teal); animation: spin 0.9s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
+    .who { margin: 0 0 18px; padding: 16px 18px; border-radius: 14px; background: var(--panel); border: 1px solid var(--line); }
+    .who label { display: block; margin-bottom: 10px; color: var(--mute); }
+    .who .row { display: flex; gap: 10px; flex-wrap: wrap; }
+    .who input { flex: 1; min-width: 220px; padding: 11px 12px; border-radius: 10px; border: 1px solid var(--line);
+                 background: #0B1626; color: var(--ink); font-size: 15px; }
+    .who [hidden], .who[hidden] { display: none !important; }
+    .who .hello { color: var(--mute); }
+    .who .hello a { color: var(--teal); }
+    .grid.locked { opacity: .35; pointer-events: none; }
     @media (max-width: 640px) { .hero { grid-template-columns: 1fr; } .emblem { display: none; } main { padding-top: 22px; } }
   </style>
 </head>
@@ -92,7 +101,13 @@
       </svg>
     </section>
 
-    <div class="step"><span class="n">★</span> Today's session <span class="bar"></span></div>
+    <div class="step"><span class="n">★</span> <span id="session-title">Today's session</span> <span class="bar"></span></div>
+    <form id="who" class="who" hidden>
+      <label for="who-name"><b>Your name</b> (asked by your teacher for this session)</label>
+      <div class="row"><input id="who-name" autocomplete="name" maxlength="80" required placeholder="First name and last name">
+        <button class="go" type="submit">OK</button></div>
+      <div class="hello" hidden>Signed in as <b id="who-shown"></b> · <a href="#" id="who-change">not you?</a></div>
+    </form>
     <div class="grid">
       <article class="card mission" data-page="odin/exercises/meteorite_imaging/ODIN_meteorite_class.ipynb">
         <div class="top">
@@ -104,7 +119,7 @@
           Naver <i>et al.</i> (2026): a high-resolution radiograph, a tomography, find the clasts that hold hydrogen
           and how much water they contain.</p>
         <div class="tags"><span class="tag">radiography</span><span class="tag">tomography</span><span class="tag">neutrons vs X-rays</span></div>
-        <div class="foot"><button class="go" type="button">▶ Start</button><span class="seen">✓ opened</span><span class="time">30 min</span></div>
+        <div class="foot"><button class="go" type="button">▶ Start</button><span class="seen">✓ opened</span></div>
       </article>
     </div>
 
@@ -134,9 +149,59 @@
         return !!o[page];
       } catch (err) { return false; }
     }
-    // a mission opens in this same tab; the "Missions" link of a page comes back here (target twin-catalogue: this
+    // a mission opens in this same tab; the "Catalogue" button of a page comes back here (target twin-catalogue: this
     // tab, whose name stays while it shows the page)
     window.name = "twin-catalogue";
+    var CLASS = null;
+    function storedName() { try { return localStorage.getItem("twin-name-" + CLASS.code) || ""; } catch (err) { return ""; } }
+    function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text) e.textContent = text; return e; }
+    function classCards(c) {
+      // the pages chosen by the teacher, in their order (no settings of the class here: only what students see)
+      document.getElementById("session-title").textContent = c.title;
+      var grid = document.querySelector(".grid");
+      grid.innerHTML = "";
+      c.cards.forEach(function (p) {
+        var card = el("article", "card" + (p.level === "class" ? " mission" : (p.level === "all" ? " brief" : " mission")));
+        card.setAttribute("data-page", p.page);
+        var top = el("div", "top"), head = el("div");
+        head.appendChild(el("div", "kicker", (p.level_name + " · " + p.instrument).toUpperCase()));
+        head.appendChild(el("h2", "", p.title));
+        top.appendChild(head); card.appendChild(top);
+        card.appendChild(el("p", "", p.mission || p.what));
+        var foot = el("div", "foot"), go = el("button", "go", "▶ Start");
+        go.type = "button"; foot.appendChild(go); foot.appendChild(el("span", "seen", "✓ opened")); card.appendChild(foot);
+        grid.appendChild(card);
+      });
+      var note = document.querySelector(".note");
+      if (c.identity === "named") {
+        note.innerHTML = "<b>Named session:</b> your teacher asked for your name; it goes with your answers. This " +
+          "browser remembers your measurements and answers: come back with the same browser to continue. At the end, " +
+          "leave a comment and submit your work.";
+        var form = document.getElementById("who"), input = document.getElementById("who-name");
+        form.hidden = false;
+        function show() {
+          var n = storedName();
+          form.querySelector(".row").hidden = !!n; form.querySelector("label").hidden = !!n;
+          form.querySelector(".hello").hidden = !n;
+          document.getElementById("who-shown").textContent = n;
+          grid.classList.toggle("locked", !n);
+        }
+        form.addEventListener("submit", function (ev) {
+          ev.preventDefault();
+          var n = input.value.replace(/\s+/g, " ").trim();
+          if (n.length < 2) return;
+          try { localStorage.setItem("twin-name-" + CLASS.code, n); } catch (err) { /* */ }
+          show();
+        });
+        document.getElementById("who-change").addEventListener("click", function (ev) {
+          ev.preventDefault();
+          try { localStorage.removeItem("twin-name-" + CLASS.code); } catch (err) { /* */ }
+          input.value = ""; show(); input.focus();
+        });
+        show();
+      }
+    }
+    function wire() {
     document.querySelectorAll(".card[data-page]").forEach(function (card) {
       var page = card.getAttribute("data-page");
       if (opened(page)) {
@@ -146,10 +211,18 @@
       card.querySelector(".go").addEventListener("click", function () {
         opened(page, true);
         document.getElementById("loading").classList.add("on");
-        // in this same tab (the bar "Missions" of the page comes back here)
-        window.location.href = "{{ base_url }}voila/render/" + page + "?sid=" + sid();
+        // in this same tab (the "Catalogue" button of the page comes back here)
+        var url = "{{ base_url }}voila/render/" + page + "?sid=" + sid();
+        if (CLASS && CLASS.identity === "named") url += "&name=" + encodeURIComponent(storedName());
+        window.location.href = url;
       });
     });
+    }
+    // the class of this server, if any (web_class.py --class); otherwise the cards written in this page
+    fetch("{{ base_url }}voila/templates/twin/static/class.json", {cache: "no-store"})
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .catch(function () { return null; })
+      .then(function (c) { if (c && c.cards) { CLASS = c; classCards(c); } wire(); });
     // back to this page from the mission (the browser may show it from its cache): no loading screen
     window.addEventListener("pageshow", function () { document.getElementById("loading").classList.remove("on"); });
   </script>

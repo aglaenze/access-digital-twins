@@ -16,3 +16,4 @@ work/
 # The app (Electron): dependencies and builds
 app/node_modules/
 app/dist/
+container/app_data/voila/templates/twin/static/class.json

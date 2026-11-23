@@ -1,10 +1,15 @@
 """The online version for a class, served from a teacher's computer (Windows, Linux, macOS), with a free public
 address (a Cloudflare "quick tunnel": no account, the address changes at each start).
 
+    python web_class.py --class <code>                               # a class prepared by the teacher (classes.py)
     python web_class.py --password <class password>                  # in the "mcstas" environment
     python web_class.py --password <class password> --no-tunnel      # this computer / local network only
     python web_class.py --password <class password> --preheat odin/exercises/meteorite_imaging/ODIN_meteorite.ipynb                         odin/exercises/steel_strain/ODIN_steel_strain.ipynb --pool 3
                         # pages of the class opened faster: kernels kept ready, their modules already loaded
+
+With --class, the start page shows only the pages of that class (classes.py: chosen by the teacher, anonymous or
+named), the code of the class is the password, and the address printed for the students already holds it (?token=):
+they just open it. Without --class, the start page of the template (its own cards) and the password given.
 
 The same server as the container (container/start.sh web): Voila alone serves the start page and the guided pages
 (no notebook, no code, no NICOS), behind the class password, each student anonymous (web_user.py). It prints the
@@ -47,7 +52,8 @@ def cloudflared():
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--password", required=True, help="the class password, asked once by the site")
+    ap.add_argument("--class", dest="klass", metavar="CODE", help="a class prepared by the teacher (classes.py)")
+    ap.add_argument("--password", help="the class password, asked once by the site (with --class: the code)")
     ap.add_argument("--port", type=int, default=7860)
     ap.add_argument("--no-tunnel", action="store_true", help="no public address")
     ap.add_argument("--no-warmup", action="store_true", help="do not prepare the beams first")
@@ -57,8 +63,25 @@ def main():
     ap.add_argument("--pool", type=int, default=2, help="kernels kept ready for each page of --preheat (default 2; "
                                                         "about 0.5 GB of memory each)")
     a = ap.parse_args()
+    # the class: its pages for the start page (static/class.json, read by tree-lab.html), its code as the password
+    class_json = os.path.join(HERE, "container", "app_data", "voila", "templates", "twin", "static", "class.json")
+    if os.path.isfile(class_json):
+        os.remove(class_json)                       # no class: the start page of the template
+    cls = None
+    if a.klass:
+        import classes
+        try:
+            cls = classes.load(a.klass)
+        except (OSError, ValueError):
+            sys.exit(f"no class {a.klass!r} (python classes.py list)")
+        with open(class_json, "w", encoding="utf-8") as f:
+            json.dump(classes.student_view(cls), f, indent=1, ensure_ascii=False)
+        a.password = a.password or cls["code"]
+        print(f"Class {cls['code']}: {cls['title']} ({cls['identity']}, {len(cls['pages'])} page(s))")
+    if not a.password:
+        sys.exit("--password or --class is needed")
 
-    env = dict(os.environ, TWIN_WEB="1", PYTHONIOENCODING="utf-8", TWIN_HEAVY_SLOTS=os.environ.get("TWIN_HEAVY_SLOTS", "2"),
+    env = dict(os.environ, TWIN_WEB="1", TWIN_CLASS=cls["code"] if cls else "", PYTHONIOENCODING="utf-8", TWIN_HEAVY_SLOTS=os.environ.get("TWIN_HEAVY_SLOTS", "2"),
                JUPYTER_PATH=os.path.join(HERE, "container", "app_data"),
                PYTHONPATH=os.pathsep.join([os.path.join(HERE, "container")] +
                                           ([os.environ["PYTHONPATH"]] if os.environ.get("PYTHONPATH") else [])))
@@ -106,7 +129,7 @@ def main():
         print("The server did not start: see", log.name)
         voila.terminate()
         return 1
-    print(f"Server ready on this computer: http://localhost:{a.port}/  (password: {a.password})")
+    print(f"Server ready on this computer: http://localhost:{a.port}/?token={a.password}  (password: {a.password})")
     tunnel, url = None, []
     if not a.no_tunnel:
         exe = cloudflared()
@@ -123,8 +146,11 @@ def main():
                     break
                 time.sleep(1)
             if url:
-                print("\n" + "=" * 70 + f"\n  Address for the students:  {url[0]}\n  Class password:            "
-                      f"{a.password}\n" + "=" * 70 + "\n")
+                link = f"{url[0]}/?token={a.password}"
+                print("\n" + "=" * 70 + f"\n  Link for the students:  {link}\n  (or {url[0]} and the password "
+                      f"{a.password})\n" + "=" * 70 + "\n")
+                with open(os.path.join(run_root(), "web_class_link.txt"), "w", encoding="utf-8") as f:
+                    f.write(link + "\n")                      # read by the app (the teacher view shows it)
             else:
                 print("No public address from cloudflared after 60 s: see", log.name)
     print("Results of the class:", os.path.join(run_root(), "web_results"))
@@ -134,6 +160,8 @@ def main():
             time.sleep(2)
     except KeyboardInterrupt:
         pass
+    if os.path.isfile(class_json):
+        os.remove(class_json)
     for p in (tunnel, voila):
         if p is not None and p.poll() is None:
             p.terminate()

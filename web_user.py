@@ -52,11 +52,16 @@ def sign_in():
     if not known:
         sid = secrets.token_hex(5)
     uid = "anon_" + sid
-    os.environ.update(TWIN_USER=uid, TWIN_USER_NAME="", ODIN_SESSION=uid, LOKI_SESSION=uid)
+    q = parse_qs(os.environ.get("QUERY_STRING", ""))
+    # the class of this server (web_class.py --class) and, in a named class, the name the student typed on the start
+    # page (kept by the browser, sent with each page)
+    klass = os.environ.get("TWIN_CLASS", "")
+    name = " ".join((q.get("name") or [""])[0].split())[:80]
+    os.environ.update(TWIN_USER=uid, TWIN_USER_NAME=name, ODIN_SESSION=uid, LOKI_SESSION=uid)
     folder = os.path.join(_run_root(), "progress", uid)
     os.makedirs(folder, exist_ok=True)
     with open(os.path.join(folder, "account.json"), "w", encoding="utf-8") as f:
-        json.dump(dict(id=uid, name="", email=""), f)
+        json.dump(dict(id=uid, name=name, email=""), f)
     # first opening of each page: the start of the exercise (kept over reloads)
     p = os.path.join(folder, "web.json")
     try:
@@ -66,13 +71,17 @@ def sign_in():
         info = {}
     page = _page() or "page"
     now = datetime.datetime.now().isoformat(timespec="seconds")
+    if klass:
+        info["class"] = klass
+    if name:
+        info["name"] = name
     info.setdefault("opened", {}).setdefault(page, now)
     info.setdefault("visits", []).append(dict(page=page, time=now))
     with open(p, "w", encoding="utf-8") as f:
         json.dump(info, f, indent=1)
     try:
         import web_results
-        web_results.send("opened", uid, dict(page=page))
+        web_results.send("opened", uid, dict(page=page, **{"class": klass, "name": name}))
     except Exception:
         pass
     return known

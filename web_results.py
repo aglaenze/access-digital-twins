@@ -19,6 +19,7 @@ The teacher gets the table (one row per student and exercise, one column per que
 
     python web_results.py agrgl/access-twin-results results.xlsx     # needs: pip install huggingface_hub openpyxl
     python web_results.py <local folder web_results> results.csv     # from a copy of the folder
+    python web_results.py <folder> results.csv --class=<code>       # only the students of one class (classes.py)
 
 (the token of the teacher: `hf auth login` once, or HF_TOKEN).
 """
@@ -38,6 +39,10 @@ def send(kind, student, data):
     """Keeps one event (and sends it to the dataset, in the background). Never raises."""
     now = datetime.datetime.now()
     rec = dict(data, kind=kind, student=student, time=now.isoformat(timespec="seconds"))
+    # the class of this server and the name typed by the student, if any (web_class.py --class, web_user.sign_in)
+    for key, env in (("class", "TWIN_CLASS"), ("name", "TWIN_USER_NAME")):
+        if not rec.get(key) and os.environ.get(env):
+            rec[key] = os.environ[env]
     rel = f"{student}/{now:%Y%m%d_%H%M%S}_{now.microsecond:06d}_{kind}.json"
     path = os.path.join(_run_root(), "web_results", *rel.split("/"))
     try:
@@ -85,9 +90,15 @@ def load(source):
     return sorted(events, key=lambda e: e.get("time", ""))
 
 
-def table(events):
-    """One row per student and exercise (the last submission; also the students who opened a page without submitting)."""
-    rows, opened, opens = {}, {}, {}
+def table(events, klass=None):
+    """One row per student and exercise (the last submission; also the students who opened a page without submitting).
+    klass: only the events of this class (classes.py)."""
+    if klass:
+        events = [e for e in events if e.get("class") == klass]
+    rows, opened, opens, names = {}, {}, {}, {}
+    for e in events:
+        if e.get("name"):
+            names[e["student"]] = e["name"]
     for e in events:
         if e.get("kind") == "opened":
             opened.setdefault((e["student"], e.get("page", "")), e["time"])
@@ -95,7 +106,7 @@ def table(events):
     for e in events:
         if e.get("kind") != "submitted":
             continue
-        row = dict(student=e["student"], exercise=e.get("title", e.get("exercise")), opened=e.get("started"),
+        row = dict(student=e["student"], name=names.get(e["student"], ""), exercise=e.get("title", e.get("exercise")), opened=e.get("started"),
                    submitted=e["time"], minutes=e.get("minutes"), active_minutes=e.get("active_minutes"),
                    pages_opened=opens.get(e["student"]), score=e.get("summary"),
                    right=e.get("right"), right_first_try=e.get("first_try"), revealed=e.get("revealed"),
@@ -113,7 +124,7 @@ def table(events):
         rows[(e["student"], e.get("exercise"))] = row
     for (s, page), t in opened.items():
         if not any(r["student"] == s for r in rows.values()):
-            rows[(s, page)] = dict(student=s, exercise=page, opened=t, submitted="(not submitted)")
+            rows[(s, page)] = dict(student=s, name=names.get(s, ""), exercise=page, opened=t, submitted="(not submitted)")
     return list(rows.values())
 
 
@@ -145,7 +156,9 @@ def write(rows, out):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
+    args = [x for x in sys.argv[1:] if not x.startswith("--class=")]
+    klass = next((x.split("=", 1)[1] for x in sys.argv[1:] if x.startswith("--class=")), None)
+    if len(args) != 2:
         sys.exit(__doc__)
-    rows = table(load(sys.argv[1]))
+    rows = table(load(args[0]), klass=klass)
     print(f"{len(rows)} rows -> {write(rows, sys.argv[2])}")

@@ -19,6 +19,14 @@ mission: >-
 status: ready
 samples:
   meteorite_nwa7034: {hidden: [inclusions]}
+class_page:                  # a page for a class (classes.py): not in the catalogue of the app, offered to the teacher
+  title: "ODIN for X-ray imagers: what is hidden inside a Martian meteorite?"
+  what: ODIN in five points for those who know X-ray imaging, then a radiograph, a tomography and the water of the clasts.
+  mission: >-
+    ODIN in five points for those who know X-ray imaging, then the piece of NWA 7034 ("Black Beauty") of Naver et al.
+    (2026): a high-resolution radiograph, a tomography, find the clasts that hold hydrogen and how much water they hold.
+  duration: about 45 min
+  file: odin/exercises/meteorite_imaging/ODIN_meteorite_class.ipynb
 modes:
   bsc:
     label: Guided web page
