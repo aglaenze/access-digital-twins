@@ -209,28 +209,31 @@ def odin_wfm():
             z_end = 10.0 if passes else ODIN_WFM_Z - d / 2
             a.plot([t0, t0 + z_end / v * 1e3], [0, z_end], color=TEAL if passes else GREY, lw=1.6 if passes else 1.0,
                    alpha=1 if passes else 0.6)
+        # fixed axes for every λ: wide enough for the slowest neutrons of the slider
+        t_max = 10.0 / (H_OVER_M / lam.max) * 1e3 + tau_pulse          # ms: the slowest reach 10 m
         if d:
             for z in (ODIN_WFM_Z - d / 2, ODIN_WFM_Z + d / 2):
                 a.axhline(z, color=TEAL, lw=1.2, ls="--")
-            a.text(10.0 / v * 1e3 + tau_pulse + 0.6, ODIN_WFM_Z - 1.6, "two WFM discs\n(dashed): open only\nfor the neutrons\nin teal",
+            a.text(t_max + 0.6, ODIN_WFM_Z - 1.6, "two WFM discs\n(dashed): open only\nfor the neutrons\nin teal",
                    va="top", fontsize=8.5, color=TEAL)
-        a.set_xlim(-0.5, 10.0 / v * 1e3 + tau_pulse + 7.5); a.set_ylim(-2.2, 10.5)
+        a.set_xlim(-0.5, t_max + 7.5); a.set_ylim(-2.2, 10.5)
         a.set_xlabel("time (ms)"); a.set_ylabel("distance from the source (m)")
         a.set_title(f"Neutrons of {l:.1f} Å leaving during the pulse", fontsize=10.5)
         # at the camera: arrival times of these neutrons, and the wavelength they are read as
-        t_cam = ODIN_L / v * 1e3
-        b.add_patch(Rectangle((t_cam - tau_pulse / 2, 0.55), tau_pulse, 0.3, color=GREY, alpha=0.6))
-        b.text(t_cam, 0.92, "without WFM: 2.86 ms", ha="center", va="bottom", fontsize=9, color=INK)
+        # (relative to the mean arrival time, so that the axis stays the same for every λ)
+        t_cam = ODIN_L / v * 1e3 + t_mid                     # mean arrival time (they leave during the pulse)
+        b.add_patch(Rectangle((-tau_pulse / 2, 0.55), tau_pulse, 0.3, color=GREY, alpha=0.6))
+        b.text(0, 0.92, "without WFM: 2.86 ms", ha="center", va="bottom", fontsize=9, color=INK)
         if d:
-            b.add_patch(Rectangle((t_cam - tau / 2, 0.15), tau, 0.3, color=TEAL))
-            b.text(t_cam, 0.08, f"with WFM: {tau:.2f} ms", ha="center", va="top", fontsize=9, color=TEAL)
-        b.set_xlim(t_cam - 3, t_cam + 3); b.set_ylim(-0.15, 1.15); b.set_yticks([])
-        b.set_xlabel("arrival time at the camera (ms)")
-        b.set_title("When they reach the camera", fontsize=10.5)
+            b.add_patch(Rectangle((-tau / 2, 0.15), tau, 0.3, color=TEAL))
+            b.text(0, 0.08, f"with WFM: {tau:.2f} ms", ha="center", va="top", fontsize=9, color=TEAL)
+        b.set_xlim(-3, 3); b.set_ylim(-0.15, 1.15); b.set_yticks([])
+        b.set_xlabel(f"arrival time − {t_cam:.1f} ms (ms)")
+        b.set_title(f"When they reach the camera (around {t_cam:.1f} ms)", fontsize=10.5)
         for ax_ in (a, b):
             for s in ("top", "right"):
                 ax_.spines[s].set_visible(False)
-        fig.tight_layout()
+        fig.subplots_adjust(left=0.07, right=0.98, bottom=0.15, top=0.9, wspace=0.12)   # fixed: the panels do not move
         if d:      # the WFM discs are the new start of the clock: the flight path is L − 7 m
             path = ODIN_L - ODIN_WFM_Z
             dl = H_OVER_M * tau * 1e-3 / path
