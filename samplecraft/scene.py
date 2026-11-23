@@ -365,12 +365,16 @@ class Scene:
     # ------------------------------------------------------------------ checks
     def check(self, n=4000, rng=None):
         """Problems of the tree: a body not entirely inside its parent, two siblings that overlap. Tested on points
-        drawn inside each body (n per body; a problem smaller than about 1/n of its volume can be missed)."""
+        drawn inside each body (n per body; a problem smaller than about 1/n of its volume can be missed).
+        The grains placed by a fill (body.placed) are not tested again: the packer placed each one inside its host and
+        apart from the bodies already there (generators.Packer.fits / touches); a rock has thousands of them, and
+        testing them took most of the time of a build (17 s of 41 for the meteorite, 2026-11-23)."""
         rng = rng or np.random.default_rng(0)
         problems = []
+        placed = lambda x: getattr(x, "placed", False)
         for b, parent, _ in self.walk():
             kids = [k for k in b.children if not isinstance(k, VoxelBody)]   # voxels lie under their siblings
-            if parent is not None and not isinstance(b, VoxelBody):
+            if parent is not None and not isinstance(b, VoxelBody) and not placed(b):
                 pts = sample_points(b.shape, n, rng)
                 if len(pts) and not parent.shape.inside(pts).all():
                     frac = 1 - parent.shape.inside(pts).mean()
@@ -378,12 +382,16 @@ class Scene:
             if len(kids) > 1:
                 bb = np.array([np.r_[k.shape.bounds()] for k in kids])
                 for i in range(len(kids)):
+                    if placed(kids[i]):           # (a placed grain against the others: tested by the packer)
+                        continue
                     meet = np.flatnonzero((np.minimum(bb[i, 3:], bb[i + 1:, 3:]) >
                                            np.maximum(bb[i, :3], bb[i + 1:, :3])).all(axis=1)) + i + 1
                     if not len(meet):
                         continue
                     pts = sample_points(kids[i].shape, max(200, n // 10), rng)
                     for j in meet:
+                        if placed(kids[j]):
+                            continue
                         if len(pts) and kids[j].shape.inside(pts).any():
                             problems.append(f"{kids[i].name} and {kids[j].name} overlap (in {b.name})")
         return problems

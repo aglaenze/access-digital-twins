@@ -495,10 +495,20 @@ def scene_from_volumes(spec):
     an inclusion ("inside": k) a child of its host; boxes and ellipsoids turned about y; materials named as in the
     sample (their NCrystal configuration kept)."""
     named = spec.get("materials") or {}
+    labels = {v: k for k, v in {**ODIN_MATERIALS, **MINERALS}.items()}
+    short = {}                  # a material named by its file (Fe_sg229_Iron-alpha.ncmat): its name of the catalogue of
+    for v in spec.get("volumes") or []:        # the builder (α-iron), as a material picked there is named
+        cfg = named.get(v["material"], v["material"])
+        short.setdefault(v["material"], labels[cfg].split(" (")[0] if cfg in labels else v["material"])
     mats, bodies, roots = {}, {}, []
+    count = {}
+    for v in spec.get("volumes") or []:
+        count[short[v["material"]]] = count.get(short[v["material"]], 0) + 1
+    seen = {}
     for k, v in enumerate(spec.get("volumes") or []):
-        m = v["material"]
-        mats.setdefault(m, {"ncrystal": named.get(m, m)})
+        m = short[v["material"]]
+        mats.setdefault(m, {"ncrystal": named.get(v["material"], v["material"])})
+        seen[m] = seen.get(m, 0) + 1
         shape = v.get("shape", "box")
         size = [float(x) for x in v["size_mm"]]
         pose = {"position": [float(x) for x in v.get("center_mm", (0, 0, 0))]}
@@ -514,7 +524,8 @@ def scene_from_volumes(spec):
             sh = dict(type="cylinder", diameter=size[0], height=size[1])
         else:
             raise ValueError(f"volume {k + 1}: shape {shape!r}")
-        b = dict(name=v.get("name", f"{m} {k + 1}"), material=m, shape=dict(sh, **pose))
+        default = m if count[m] == 1 else f"{m} {seen[m]}"
+        b = dict(name=v.get("name", default), material=m, shape=dict(sh, **pose))
         for f in ("secret", "holder"):
             if v.get(f):
                 b[f] = True

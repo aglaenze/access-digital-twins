@@ -302,6 +302,7 @@ def _grains(body, pops, components, rng, report, base_dir, seed_counter):
         else:
             child = Body(name, pop["material"], make(_grain_shape(pop, a, asp, R, c, seed_counter[0])),
                          secret=pop.get("secret", False))
+        child.placed = True          # placed by the packer: inside its host, apart from its neighbors (Scene.check)
         body.children.append(child)
         r = report[rep0 + i]
         r["placed"] += 1

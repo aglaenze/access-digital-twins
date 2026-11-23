@@ -39,8 +39,9 @@ def _walk(bodies, path=()):
         yield from _walk(b.get("children", []), p)
 
 
-def build(recipe):
-    """(scene, report lines, problems) of a recipe."""
+def build(recipe, check=True):
+    """(scene, report lines, problems) of a recipe; check=False: the problems of the tree are not looked for (a
+    thumbnail)."""
     import samplecraft as sc
     scene = sc.Scene.from_dict(recipe)
     lines = []
@@ -49,7 +50,7 @@ def build(recipe):
         if r.get("target_mm3"):
             line += f", {100 * r['volume_mm3'] / r['target_mm3']:.0f} % of the volume asked"
         lines.append(line)
-    problems = scene.check(n=800)
+    problems = scene.check(n=800) if check else []
     for r in getattr(scene, "report", []):
         if r.get("target_mm3") and r["volume_mm3"] < 0.9 * r["target_mm3"]:
             problems.append(f"{r['population']} in {r['body']}: only {100 * r['volume_mm3'] / r['target_mm3']:.0f} % "

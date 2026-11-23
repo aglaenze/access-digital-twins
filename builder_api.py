@@ -311,11 +311,41 @@ def has_sealed(recipe):
 
 
 # --------------------------------------------------------------------------- starting points
+LEVELS = {1: "Simple shapes", 2: "Several parts, or grains", 3: "Natural samples"}
+NATURAL_SHAPES = {"sawn_piece", "blob", "natural", "pebble", "voxels", "mesh"}
+COMBINED_SHAPES = {"union", "difference", "intersection"}
+
+
+def level(recipe):
+    """How complex a starting point is, for the order of the gallery: 1 simple shapes (at most 3 bodies, no grains),
+    2 several parts or one population of grains (combined shapes, profiles in many slices), 3 natural samples
+    (natural shapes, voxels of a tomogram, several populations of grains, components)."""
+    n, fills, types = 0, 0, set()
+
+    def go(bodies):
+        nonlocal n, fills
+        for b in bodies:
+            if b.get("holder"):
+                continue
+            n += 1
+            fills += len(b.get("fill") or [])
+            types.add((b.get("shape") or {}).get("type") or ("use" if b.get("use") else "voxels"))
+            go(b.get("children", []))
+    go(recipe.get("bodies", []))
+    if types & NATURAL_SHAPES or "use" in types or fills > 1 or recipe.get("components"):
+        return 3
+    if fills == 1 or n > 3 or types & COMBINED_SHAPES:
+        return 2
+    return 1
+
+
 def starts(instrument, proposal):
-    """The starting points of the gallery: from scratch, the examples, the models saved by users, the samples of the
-    library and of the proposal."""
+    """The starting points of the gallery: from scratch, the samples of the proposal, then the examples, the models
+    saved by users and the samples of the library, from the simplest to the most complex (level, LEVELS)."""
     import sample_library as sl
+    import scene_builder as sb
     out = [dict(kind="scratch", ref="", title="From scratch", what="an empty block to shape as you like")]
+    mine, others = [], []
     for folder, kind in ((os.path.join(HERE, instrument, "templates"), "example"),
                          (f"{run_root()}/templates/{instrument}", "model")):
         for f in sorted(glob.glob(os.path.join(folder, "*.yml"))):
@@ -325,14 +355,23 @@ def starts(instrument, proposal):
                 continue
             if "bodies" not in (t.get("recipe") or {}):
                 continue
-            out.append(dict(kind=kind, ref=os.path.basename(f)[:-4], title=t.get("title") or t.get("name"),
-                            what=(f"by {t['author']}" if t.get("author") else kind)))
+            others.append(dict(kind=kind, ref=os.path.basename(f)[:-4], title=t.get("title") or t.get("name"),
+                               what=(f"by {t['author']}" if t.get("author") else kind), level=_level_of(t["recipe"])))
     for n, s in sl.load(instrument, data_folder(instrument, proposal)).items():
         if s.get("source") == "student":
-            out.append(dict(kind="sample", ref=n, title=s.get("name") or n, what="your sample (this proposal)"))
+            mine.append(dict(kind="sample", ref=n, title=s.get("name") or n, what="your sample (this proposal)"))
     for n, s in sl.load(instrument).items():
-        out.append(dict(kind="sample", ref=n, title=s.get("name") or n, what="sample of the library"))
-    return out
+        others.append(dict(kind="sample", ref=n, title=s.get("name") or n, what="sample of the library",
+                           level=_level_of(sb.recipe_of(s))))
+    others.sort(key=lambda s: (s["level"], str(s["title"]).lower()))
+    return out + mine + others
+
+
+def _level_of(recipe):
+    try:
+        return level(recipe)
+    except Exception:                                   # noqa: BLE001
+        return 2
 
 
 def _template_file(instrument, kind, ref):
@@ -423,8 +462,21 @@ def load(instrument, kind, ref, proposal=""):
 
 
 # --------------------------------------------------------------------------- building
+_BOUNDS = {}
+
+
 def _sample_bounds(recipe_view):
-    """Bounds [mm] of the sample alone (its top-level bodies), from a quick build without fills."""
+    """Bounds [mm] of the sample alone (its top-level bodies), from a quick build without fills (cached)."""
+    k = _key(recipe_view)
+    if k not in _BOUNDS:
+        if len(_BOUNDS) > 64:
+            _BOUNDS.clear()
+        _BOUNDS[k] = _sample_bounds_now(recipe_view)
+    lo, hi = _BOUNDS[k]
+    return lo.copy(), hi.copy()
+
+
+def _sample_bounds_now(recipe_view):
     import samplecraft as sc
     r = copy.deepcopy(recipe_view)
     for b in r.get("bodies", []):
@@ -484,10 +536,20 @@ def _b64(a, dt):
     return base64.b64encode(np.ascontiguousarray(a, dtype=dt).tobytes()).decode()
 
 
-def _surfaces(scene, n):
-    """scene_builder.surfaces, the secret bodies left out (a scene of the views has none: sealed parts dropped)."""
+_SURF = {}
+
+
+def _surfaces(scene, n, key=None):
+    """scene_builder.surfaces, the secret bodies left out (a scene of the views has none: sealed parts dropped);
+    cached by the key of the built scene (the same view asked again: the step changed, the page reloaded)."""
     import scene_builder as sb
-    return sb.surfaces(scene, n)
+    if key is None:
+        return sb.surfaces(scene, n)
+    if (key, n) not in _SURF:
+        if len(_SURF) > 8:
+            _SURF.pop(next(iter(_SURF)))
+        _SURF[(key, n)] = sb.surfaces(scene, n)
+    return _SURF[(key, n)]
 
 
 def preview(recipe, holder, n=56, grains=True):
@@ -497,7 +559,7 @@ def preview(recipe, holder, n=56, grains=True):
     import time
     t0 = time.time()
     scene, lines, problems, full, k = built(recipe, holder, view=True, grains=grains)
-    surf = _surfaces(scene, n)
+    surf = _surfaces(scene, n, k)
     names = [s[0] for s in surf if not s[3]]
     colors = _colors(scene, names)
     label = lambda m: sl._rock_label(dict(materials=dict(scene.cfg())), m) if m else m
@@ -664,30 +726,66 @@ def check(recipe, holder):
 
 
 # --------------------------------------------------------------------------- thumbnails
+SHIPPED_THUMBS = os.path.join(HERE, "builder", "thumbs")
+
+
+def thumb_key(instrument, kind, ref, proposal="", size=150):
+    """The name of the thumbnail of a starting point: from the content of its file (not its date, which changes at
+    each copy of the code), and from the proposal only for a sample of the student."""
+    import hashlib
+    stamp, prop = "", ""
+    try:
+        if kind in ("example", "model"):
+            fn = _template_file(instrument, kind, ref)
+        elif kind == "sample":
+            import sample_library as sl
+            s = sl.load(instrument, data_folder(instrument, proposal)).get(ref) or {}
+            fn = s.get("file") or ""
+            prop = proposal if s.get("source") == "student" else ""
+        else:
+            fn = ""
+        if fn and os.path.exists(fn):
+            with open(fn, "rb") as fh:
+                stamp = hashlib.sha1(fh.read()).hexdigest()
+    except (OSError, ValueError):
+        pass
+    return _key(instrument, kind, ref, prop, stamp, size)
+
+
+def make_shipped_thumbs(instrument="odin"):
+    """The thumbnails of the examples and of the samples of the library, made in advance (builder/thumbs/, shipped
+    with the code): the gallery opens at once, even on a new computer (a rock takes 5 to 15 s to build)."""
+    os.makedirs(SHIPPED_THUMBS, exist_ok=True)
+    keep = set()
+    for s in starts(instrument, ""):
+        if s["kind"] in ("example", "sample"):
+            png = thumb(instrument, s["kind"], s["ref"])
+            name = thumb_key(instrument, s["kind"], s["ref"]) + ".png"
+            with open(os.path.join(SHIPPED_THUMBS, name), "wb") as fh:
+                fh.write(png)
+            keep.add(name)
+    for g in glob.glob(os.path.join(SHIPPED_THUMBS, "*.png")):       # thumbnails of files that changed: removed
+        if os.path.basename(g) not in keep:
+            os.remove(g)
+    return sorted(keep)
+
+
 def thumb(instrument, kind, ref, proposal="", size=150):
     """A small picture of a starting point (PNG bytes): the cut through its middle, seen by the beam, colored by
     material (hidden parts left out). Cached on disk."""
     folder = os.path.join(run_root(), "builder", "thumbs")
     os.makedirs(folder, exist_ok=True)
-    stamp = ""
-    try:
-        if kind in ("example", "model"):
-            stamp = str(os.path.getmtime(_template_file(instrument, kind, ref)))
-        elif kind == "sample":
-            import sample_library as sl
-            s = sl.load(instrument, data_folder(instrument, proposal)).get(ref) or {}
-            stamp = str(os.path.getmtime(s["file"])) if s.get("file") and os.path.exists(s["file"]) else ""
-    except OSError:
-        pass
-    f = os.path.join(folder, _key(instrument, kind, ref, proposal if kind == "sample" else "", stamp, size) + ".png")
-    if os.path.exists(f):
-        return open(f, "rb").read()
+    f = os.path.join(folder, thumb_key(instrument, kind, ref, proposal, size) + ".png")
+    shipped = os.path.join(SHIPPED_THUMBS, os.path.basename(f))
+    for g in (shipped, f):               # made in advance for the examples and the library (python builder_api.py
+        if os.path.exists(g):            # --thumbs), else made once here
+            return open(g, "rb").read()
     from PIL import Image
     from matplotlib.colors import to_rgb
     import scene_builder as sb
     d = load(instrument, kind, ref, proposal)
     with THUMB_LOCK:
-        scene = sb.build(compose(d["recipe"], d["holder"], view=True))[0]
+        scene = sb.build(compose(d["recipe"], d["holder"], view=True), check=False)[0]
     lo = np.min([b.shape.bounds()[0] for b in scene.bodies], axis=0)
     hi = np.max([b.shape.bounds()[1] for b in scene.bodies], axis=0)
     c, half = 0.5 * (lo + hi), 0.55 * float(max(hi[0] - lo[0], hi[1] - lo[1]))
@@ -771,3 +869,10 @@ def info(instrument="odin", proposal="", start=""):
         dict(type=t, label=l, fields=[dict(key=a, label=b, n=c, default=d, min=e, max=f_) for a, b, c, d, e, f_ in fs])
         for t, l, fs in SHAPES], holders=holder_catalogue(), materials=material_catalogue(),
         starts=starts(instrument, proposal), start=start)
+
+
+if __name__ == "__main__":
+    import sys
+    if "--thumbs" in sys.argv:          # python builder_api.py --thumbs: the thumbnails shipped with the code (again
+        for name in make_shipped_thumbs("odin"):     # after a change of an example or of a sample of the library)
+            print(name)
