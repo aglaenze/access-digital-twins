@@ -303,6 +303,46 @@ the NeXus file we write: zero speed for stopped choppers (the reduction treats t
 where they are removed), and the position of the WFM discs through the `wfmc_translation` stage.
 Validation: § 9.6.
 
+### 6.1 Chopper settings of the McStas model
+The settings McStas actually uses for each disc, read back from the model by `odin_mcstas.chopper_table(mode,
+wfm_delta)` (one short run with `save_comp_pars`, then `odin_support.analysis.read_comp_pars`; cached as JSON in
+`<RUN_ROOT>/choppers/`, in the format of the ESS `tof` package: `frequency` [Hz], `phase` [deg], `open` / `close`
+[deg] of each window, `distance` [m] from the moderator). WFM mode, δ = 0.30 m:
+
+| Disc | f [Hz] | phase [deg] | distance [m] | windows | in `natural` mode |
+|---|---|---|---|---|---|
+| `wfmc_1` | 56 | 91.93 | 6.85 | 6 | stopped |
+| `wfmc_2` | 56 | 97.67 | 7.15 | 6 | stopped |
+| `fo_chopper_1` | 42 | 81.12 | 8.392 | 6 | stopped |
+| `bp1_chopper` | 7 | 30.73 | 8.442 | 1 | same |
+| `fo_chopper_2` | 42 | 106.57 | 12.2 | 6 | stopped |
+| `bp_chopper2` | 7 | 43.4 | 12.25 | 1 | same |
+| `t0_chopper_alpha` / `beta` | 28 | 179.34 | 13.503 / 13.703 | 1 | same |
+| `fo_chopper_3` | 28 | 92.47 | 16.987 | 6 | stopped |
+| `fo_chopper_4` | 14 | 61.17 | 23.686 | 6 | stopped |
+| `fo_chopper_5` | 14 | 81.94 | 33.005 | 6 | stopped |
+
+δ moves the two WFM discs symmetrically around 7.0 m; the phases stay the same. All phase offsets and jitters of the
+model are 0. These are the McStas settings; the chopper delays written in the NeXus file are those of the real ODIN
+file used as template (§ 5, § 7), validated against the McStas events (§ 9.1, § 9.6).
+
+### 6.2 The upstream MCPL files
+`<RUN_ROOT>/front/<mode>_delta<δ>_N<n>/guide_exit.mcpl.gz`: every neutron reaching the guide exit. The full McStas
+instrument file is embedded in each file (`mcpltool -bmccode_instr_file guide_exit.mcpl.gz > front.instr`).
+
+- **Units** (standard MCPL): x, y, z in cm (x horizontal, y vertical, frame of the model's optical axis; z = 4901 for
+  all neutrons), time in ms from the start of the first simulated pulse, kinetic energy in MeV
+  (λ [Å] = √(81.8042 / (E [MeV] · 10⁹))).
+- **Weights**: divide by the stat-sum `initial_ray_count` (= number of rays simulated) to get neutrons per second, as
+  `read_mcpl` does. Check: the result over 6 × 6 cm reproduces the PSD monitor of the same run (2.96·10¹⁰ n/s white,
+  1.40·10¹⁰ natural, 1.20·10⁹ WFM δ = 0.30).
+- **Pulses**: in natural and WFM modes two pulses are simulated (t = 0 and 71.43 ms); the band-pass choppers at 7 Hz
+  let only the first one through (arrival times 12–116 ms). White mode: one pulse (6–195 ms).
+- **Stray neutrons**: some neutrons are recorded far outside the guide aperture (|x| up to 2.9 m), probably neutrons
+  that missed the guides without being absorbed. Outside |x|, |y| < 3 cm: 27 % of the neutrons and 9 % of the
+  intensity (white), 2.3 % / 1.6 % (natural), 0.2 % / 0.3 % (WFM δ = 0.30). The pinhole of the downstream part stops
+  them, so the twin is not affected; anyone reusing the files for another purpose should cut them.
+
 ## 7. Choices, limits and open questions
 - **Sample** deliberately simple (iron plate): the aim is to test the twin, not a case study.
 - **Scattered neutrons** neglected in hybrid mode: to be checked again with "mcstas" mode for any strongly scattering
