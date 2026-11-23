@@ -64,45 +64,70 @@ def sample_builder(instr, proposal=""):
               "with your proposal: it appears on the sample changer of NICOS.")
 
 
-def draw_error(instr, spec, hidden=(), show=True):
-    """Draws a sample (sample_library.draw) and shows it; returns None, or the error as text (its type, message and
-    the place in the code where it happened), with the figure closed: an empty figure is never left to the page."""
+def sample_picture(instr, spec, hidden=()):
+    """(error, picture) of a sample: the drawing of sample_library.draw as an IPython Image (twice the resolution,
+    shown at its normal size, as sample_library.show), or the error as text (its type, message and the place in the
+    code where it happened). The figure is always closed: an empty figure is never left to the page."""
     import sys
+    import contextlib
+    import io
+    import struct
     import traceback
+    import warnings
     if ROOT not in sys.path:
         sys.path.insert(0, ROOT)
     import sample_library as sl
     import matplotlib.pyplot as plt
-    import contextlib
-    import io
-    import warnings
+    from IPython.display import Image
     fig = plt.figure(figsize=(10, 3.8))
     try:
         # the messages of the libraries (e.g. "NCrystal WARNING: Discarding 52 edges...") are not for the students
-        with warnings.catch_warnings(), contextlib.redirect_stdout(io.StringIO()), \
-                contextlib.redirect_stderr(io.StringIO()):
+        with warnings.catch_warnings(), contextlib.redirect_stdout(io.StringIO()),                 contextlib.redirect_stderr(io.StringIO()):
             warnings.simplefilter("ignore")
             sl.draw(instr, spec, hidden=hidden, fig=fig)
-        if show:
-            sl.show(fig)                                 # (closes the figure)
-        else:
-            plt.close(fig)
-        return None
+            buf = io.BytesIO()
+            fig.savefig(buf, format="png", dpi=2 * fig.dpi, bbox_inches="tight")
+        data = buf.getvalue()
+        return None, Image(data=data, width=struct.unpack(">I", data[16:20])[0] // 2)
     except Exception as e:
-        plt.close(fig)
         where = traceback.extract_tb(e.__traceback__)[-1]
-        return f"{type(e).__name__}: {e} ({os.path.basename(where.filename)}, line {where.lineno})"
+        return f"{type(e).__name__}: {e} ({os.path.basename(where.filename)}, line {where.lineno})", None
+    finally:
+        plt.close(fig)
 
 
-def proposal_sample(exercise):
+def draw_error(instr, spec, hidden=(), show=True):
+    """Draws a sample and shows it (show=True); returns None, or the error as text (sample_picture)."""
+    err, img = sample_picture(instr, spec, hidden)
+    if img is not None and show:
+        display(img)
+    return err
+
+
+def _mime(obj):
+    """An output of an ipywidgets Output (the format of its .outputs) from a display object."""
+    from IPython.core.interactiveshell import InteractiveShell
+    data, metadata = InteractiveShell.instance().display_formatter.format(obj)
+    return dict(output_type="display_data", data=data, metadata=metadata)
+
+
+_WATCHERS = {}                  # {exercise: threading.Event}: the watcher of the samples of each notebook section
+
+
+def proposal_sample(exercise, watch=True):
     """Top of a beamtime notebook (expert level): the sample(s) of the proposal of the exercise (exercise.yml:
     samples, modes.beamtime.proposal), drawn and described as NICOS will mount them (hidden properties not shown);
     the samples the student made for this proposal too; then the button *Change the sample*, which opens the sample
-    builder starting from it (the new sample is saved with the proposal and appears on the sample changer)."""
+    builder starting from it (the new sample is saved with the proposal and appears on the sample changer).
+    watch=True: the section follows the folder of the student's samples (<proposal>/samples, checked every 2 s): a
+    sample saved or changed in the sample builder is drawn at once, marked "just saved", without running the cell
+    again."""
     import sys
     import datetime
+    import threading
     from urllib.parse import quote
     import yaml
+    import ipywidgets as w
     if ROOT not in sys.path:
         sys.path.insert(0, ROOT)
     import sample_library as sl
@@ -112,27 +137,69 @@ def proposal_sample(exercise):
     instr = ex["instrument"]
     prop = str(((ex.get("modes") or {}).get("beamtime") or {}).get("proposal", {}).get("id", ""))
     folder = os.path.join(user_office.run_root(), "data", instr, str(datetime.date.today().year), prop, "raw")
-    lib = sl.load(instr, folder if prop else None)
+    mine_dir = sl.user_folder(folder) if prop else None
     given = list(ex.get("samples") or {})
-    own = [n for n, s in lib.items() if s.get("source") == "student"]
-    for n in given + own:
-        if n not in lib:
-            continue
-        spec = lib[n]
-        hidden = (ex.get("samples") or {}).get(n, {}).get("hidden") or spec.get("hidden") or []
-        who = "the sample of your proposal" if n in given else "a sample you made for this proposal"
-        display(Markdown(f"**{spec.get('name', n)}** (`{n}`, {who}; in NICOS: `move(sample_holder, '{n}')`)"))
-        err = draw_error(instr, spec, hidden)
-        if err:                                          # a drawing never stops the notebook, and says where it broke
-            display(Markdown(f"*(The drawing of this sample could not be made: {html.escape(err)}. Please tell "
-                             f"your teacher.)*"))
-        if spec.get("description"):
-            display(Markdown(spec["description"]))
-    first = (given + own)[0] if (given + own) else ""
+
+    def state():
+        """The student's sample files and their dates: what the section shows depends on nothing else."""
+        if not mine_dir or not os.path.isdir(mine_dir):
+            return ()
+        return tuple(sorted((n, os.path.getmtime(os.path.join(mine_dir, n)))
+                            for n in os.listdir(mine_dir) if n.endswith(".yml")))
+
+    def items(new=()):
+        """What the section shows, as display objects (made in full before the section is changed)."""
+        lib = sl.load(instr, folder if prop else None)
+        own = [n for n, s in lib.items() if s.get("source") == "student"]
+        out = []
+        for n in given + own:
+            if n not in lib:
+                continue
+            spec = lib[n]
+            hidden = (ex.get("samples") or {}).get(n, {}).get("hidden") or spec.get("hidden") or []
+            who = "the sample of your proposal" if n in given else "a sample you made for this proposal"
+            mark = " · **just saved**" if n in new else ""
+            out.append(Markdown(f"**{spec.get('name', n)}** (`{n}`, {who}; in NICOS: "
+                                f"`move(sample_holder, '{n}')`){mark}"))
+            err, img = sample_picture(instr, spec, hidden)
+            out.append(img if img is not None else Markdown(
+                f"*(The drawing of this sample could not be made: {html.escape(err)}. Please tell your teacher.)*"))
+            if spec.get("description"):
+                out.append(Markdown(spec["description"]))
+        return out, (given + own)
+
+    shown, names = items()
+    box = w.Output()
+    box.outputs = tuple(_mime(x) for x in shown)
+    display(box)
+    first = names[0] if names else ""
     _centered(_button("Change the sample", f"{builder_url(instr)}?instrument={instr}&proposal={prop}"
                       f"&start={quote(first)}", main=False),
               "Your question needs another sample, or this one changed? The sample builder starts from it; what you "
-              "save there goes with your proposal, on the sample changer of NICOS.")
+              "save there goes with your proposal, on the sample changer of NICOS. This section shows it as soon as "
+              "it is saved.")
+    if not (watch and mine_dir):
+        return
+    old = _WATCHERS.pop(exercise, None)               # the cell run again: one watcher only
+    if old:
+        old.set()
+    stop = _WATCHERS[exercise] = threading.Event()
+
+    def follow(last):
+        while not stop.wait(2.0):
+            try:
+                now = state()
+                if now == last:
+                    continue
+                before = dict(last)
+                new = {n[:-4] for n, t in now if before.get(n) != t}
+                shown, _ = items(new)                   # drawn first, then swapped: the section never flickers empty
+                box.outputs = tuple(_mime(x) for x in shown)
+                last = now
+            except Exception:                           # noqa: BLE001  (a sample being written: next time)
+                pass
+
+    threading.Thread(target=follow, args=(state(),), daemon=True).start()
 
 
 def imported_samples(instr, proposal):
