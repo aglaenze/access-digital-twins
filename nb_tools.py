@@ -162,13 +162,25 @@ def proposal_sample(exercise, watch=True):
             hidden = (ex.get("samples") or {}).get(n, {}).get("hidden") or spec.get("hidden") or []
             who = "the sample of your proposal" if n in given else "the sample you made for this proposal"
             mark = " · **just saved**" if n in new else ""
-            out.append(Markdown(f"**{spec.get('name', n)}** (`{n}`, {who}; in NICOS: "
-                                f"`move(sample_holder, '{n}')`){mark}"))
+            out.append(Markdown(f"**{spec.get('name', n)}** (`{n}`, {who}){mark}"))
             err, img = sample_picture(instr, spec, hidden)
             out.append(img if img is not None else Markdown(
                 f"*(The drawing of this sample could not be made: {html.escape(err)}. Please tell your teacher.)*"))
             if spec.get("description"):
                 out.append(Markdown(spec["description"]))
+        if current:                  # the first command in NICOS: nothing is mounted until the student mounts it
+            cmds = "".join(f'<div style="font-family:ui-monospace,Consolas,monospace; font-size:15px; background:#fff; '
+                           f'border:1px solid #CBD3DE; border-radius:6px; padding:6px 10px; margin:6px 0; '
+                           f'user-select:all">move(sample_holder, \'{html.escape(n)}\')</div>' for n in current)
+            several = len(current) > 1
+            out.append(HTML(
+                '<div style="background:#E3F2EF; border-radius:10px; padding:12px 16px; margin:14px 0">'
+                f'<b>First step in NICOS: mount your sample{"s, one at a time" if several else ""}.</b> Nothing is '
+                f'on the sample stage until you do it: type{" the command of the sample you want to measure" if several else ""}'
+                f' in the command line of NICOS:{cmds}'
+                '<span style="color:#5B6779; font-size:13px">If you change the sample in the sample builder, this '
+                'command changes here too: mount the new one the same way. <code>sample_info()</code> tells you which '
+                'sample is mounted.</span></div>'))
         if others:
             out.append(Markdown("Also on the sample changer of NICOS: " + ", ".join(
                 f"*{lib[n].get('name', n)}* (`{n}`{', the sample of your proposal' if n in given else ''})"
