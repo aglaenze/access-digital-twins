@@ -205,9 +205,11 @@ def take(_):
     refresh_list()
     rename_update()
 
-ctl = mc.Control(odin, button, lock=[setup, shut, inout, expo, title])
+import source_power                          # the power of the source (fixed by the teacher, or chosen here)
+power = source_power.control(odin)
+ctl = mc.Control(odin, button, lock=[setup, shut, inout, expo, title] + source_power.lockable(power))
 ctl.on_click(take)
-display(w.VBox([setup, shut, inout, expo, title, w.HBox([button, ctl.stop]), ctl.status, img_take]))
+display(w.VBox([setup, shut, inout, expo, power, title, w.HBox([button, ctl.stop]), ctl.status, img_take]))
 """)
 
 md(r"""

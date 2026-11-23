@@ -290,7 +290,13 @@ class VirtualOdin:
         if mode not in ("hybrid", "mcstas"):
             raise ValueError("mode: 'hybrid' or 'mcstas'")
         self.fluctuation, self.outages_per_hour, self.mode = fluctuation, outages_per_hour, mode
-        self.power_mw = 2.0          # power of the source (MW): 2 at the start of ESS, 5 by design; sets the protons per pulse
+        # power of the source (MW): 2 at the start of ESS, 5 by design; sets the protons per pulse. The teacher may fix it
+        # for a class (source_power.py, classes.py)
+        try:
+            import source_power
+            self.power_mw = source_power.default()
+        except ImportError:
+            self.power_mw = 2.0
         self.folder = f"{RUN_ROOT}/{session}"
         os.makedirs(self.folder, exist_ok=True)
         self.mpi, self.repeat, self.focus = mpi, repeat, focus

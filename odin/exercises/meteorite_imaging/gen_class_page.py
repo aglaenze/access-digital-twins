@@ -228,13 +228,8 @@ shut = w.ToggleButtons(options=[("closed", "closed"), ("open", "open")], value=s
 inout = w.ToggleButtons(options=[("in", 0.0), ("out", 0.5)], value=0.0 if abs(st["stage_x"]) < 0.02 else 0.5,
                         description="Sample")
 tcount = w.Dropdown(options=[2, 5], value=2, description="Counting time (s)", style={"description_width": "130px"})
-power = w.Dropdown(options=[("1 MW", 1.0), ("2 MW (ESS at the start)", 2.0), ("5 MW (ESS design)", 5.0)], value=2.0,
-                   description="Source power", style={"description_width": "130px"}, layout=w.Layout(width="360px"))
-import classes                                # the power may be fixed by the teacher for the class (classes.py)
-if classes.setting("power_mw"):
-    _p = float(classes.setting("power_mw"))
-    power.options = [(f"{_p:g} MW (set by your teacher)", _p)]
-    power.value, power.disabled = _p, True
+import source_power                          # the power of the source (fixed by the teacher, or chosen here)
+power = source_power.control(odin)
 title = w.Text(value="", placeholder="dark, open beam, sample", description="Title")
 button = w.Button(description="Count", button_style="primary", icon="play", layout=w.Layout(width="auto"))
 live = viz.LiveView()
@@ -275,7 +270,7 @@ def show_again(ch):
         live.status.value = f"Shown again: {os.path.basename(ch['new'])}  (Play or the slider: replay the count)"
 
 again.observe(show_again, names="value")
-ctl = mc.Control(odin, button, lock=[shut, inout, tcount, title, again] + ([] if power.disabled else [power]))
+ctl = mc.Control(odin, button, lock=[shut, inout, tcount, title, again] + source_power.lockable(power))
 ctl.on_click(count)
 display(w.VBox([shut, inout, tcount, power, title, w.HBox([button, ctl.stop]), ctl.status, again, live.box]))
 """)

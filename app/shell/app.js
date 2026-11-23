@@ -901,10 +901,10 @@ var Classes = (() => {
     if (!open) {
       openHtml = `<div class="cls-acts"><button class="primary" id="cls-open">Open the class</button>
         <label><input type="checkbox" id="cls-tunnel" checked> through the tunnel (students outside this network)</label></div>
-        <p class="hint">Opening starts the pages on this computer: about 2 minutes before the link works (a little more through the tunnel).
+        <p class="hint">Opening starts the pages on this computer: the link works after a few seconds (up to half a minute through the tunnel); the beams are prepared meanwhile.
         ${data.open ? `It closes the class open now (<b>${esc(data.open.title)}</b>).` : ""}</p>`;
     } else if (!open.link) {
-      openHtml = `<p>Starting… the link appears here in a minute.</p><div class="cls-acts"><button class="btn" id="cls-close">Close the class</button></div>`;
+      openHtml = `<p>Starting… the link appears here in a few seconds.</p><div class="cls-acts"><button class="btn" id="cls-close">Close the class</button></div>`;
     } else {
       openHtml = `<div class="cls-open"><div class="qr"><img alt="QR code of the link" src="${qr(open.link)}"></div>
         <div style="flex:1;min-width:260px;display:flex;flex-direction:column;gap:10px">

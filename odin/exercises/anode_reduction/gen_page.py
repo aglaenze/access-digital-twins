@@ -215,10 +215,12 @@ def do_count(_):
     refresh_list()
     update_rename()
 
-ctl = mc.Control(odin, button, lock=[holder, shut, stage, ttime])
+import source_power                          # the power of the source (fixed by the teacher, or chosen here)
+power = source_power.control(odin)
+ctl = mc.Control(odin, button, lock=[holder, shut, stage, ttime] + source_power.lockable(power))
 ctl.on_click(do_count)
 img_m = live_view.FigureImage()
-display(w.VBox([holder, shut, stage, ttime, w.HBox([button, ctl.stop]), ctl.status, img_m]))
+display(w.VBox([holder, shut, stage, ttime, power, w.HBox([button, ctl.stop]), ctl.status, img_m]))
 """)
 
 md(r"""

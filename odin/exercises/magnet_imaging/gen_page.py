@@ -213,8 +213,10 @@ from odin_virtual import Cancelled
 import odin_viz
 # Stop: the measurement ends at its next image; the settings and the other button are locked while it runs
 SERIES_STOPPED = "Stopped: the images already taken stay (they are complete images); the others were not taken."
-ctl0 = mc.Control(odin, button0, lock=[expo, rot, button1], stopped=SERIES_STOPPED)
-ctl1 = mc.Control(odin, button1, lock=[expo, rot, button0], stopped=SERIES_STOPPED)
+import source_power                          # the power of the source (fixed by the teacher, or chosen here)
+power = source_power.control(odin)
+ctl0 = mc.Control(odin, button0, lock=[expo, rot, button1] + source_power.lockable(power), stopped=SERIES_STOPPED)
+ctl1 = mc.Control(odin, button1, lock=[expo, rot, button0] + source_power.lockable(power), stopped=SERIES_STOPPED)
 prog = odin_viz.Progress(18, "images")              # images done, time elapsed, time left
 prog.box.layout.display = "none"
 
@@ -292,7 +294,7 @@ def show_P0():
 rename, update_renames = mc.rename_box(odin)
 ctl0.on_click(measure_empty)
 ctl1.on_click(measure_matrix)
-display(w.VBox([expo, w.HBox([button0, ctl0.stop]), ctl0.status, rot, w.HBox([button1, ctl1.stop]), prog.box,
+display(w.VBox([expo, power, w.HBox([button0, ctl0.stop]), ctl0.status, rot, w.HBox([button1, ctl1.stop]), prog.box,
                 ctl1.status]))
 """
 

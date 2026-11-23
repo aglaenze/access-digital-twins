@@ -56,7 +56,7 @@ def main():
     ap.add_argument("--password", help="the class password, asked once by the site (with --class: the code)")
     ap.add_argument("--port", type=int, default=7860)
     ap.add_argument("--no-tunnel", action="store_true", help="no public address")
-    ap.add_argument("--no-warmup", action="store_true", help="do not prepare the beams first")
+    ap.add_argument("--no-warmup", action="store_true", help="do not prepare the beams")
     ap.add_argument("--preheat", nargs="*", default=[], metavar="PAGE",
                     help="pages (paths below twin/) for which Voila keeps kernels ready, their modules loaded, so "
                          "that they open faster (the page waits for the student in web_user.sign_in)")
@@ -85,9 +85,14 @@ def main():
                JUPYTER_PATH=os.path.join(HERE, "container", "app_data"),
                PYTHONPATH=os.pathsep.join([os.path.join(HERE, "container")] +
                                           ([os.environ["PYTHONPATH"]] if os.environ.get("PYTHONPATH") else [])))
+    # the beams of the pages are prepared while the server starts, not before (they are kept on disk after the first
+    # time: the link is ready in seconds; a student who counts before the end only waits for what is not ready yet)
+    warm = None
     if not a.no_warmup:
-        print("Preparing the beams (a few seconds, or minutes the very first time)...")
-        subprocess.run([sys.executable, os.path.join(HERE, "container", "web_warmup.py")], env=env, check=False)
+        print("Preparing the beams in the background (seconds if done before; minutes the very first time)...")
+        warm = subprocess.Popen([sys.executable, os.path.join(HERE, "container", "web_warmup.py")], env=env,
+                                stdout=open(os.path.join(run_root(), "web_warmup.log"), "w", encoding="utf-8"),
+                                stderr=subprocess.STDOUT)
     extra = []
     if a.preheat:
         # pre-heated kernels for the pages of the class only (none for the others): a configuration file, read by
@@ -162,7 +167,7 @@ def main():
         pass
     if os.path.isfile(class_json):
         os.remove(class_json)
-    for p in (tunnel, voila):
+    for p in (tunnel, voila, warm):
         if p is not None and p.poll() is None:
             p.terminate()
     return 0

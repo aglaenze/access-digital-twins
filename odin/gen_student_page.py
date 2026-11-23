@@ -160,9 +160,11 @@ def do_count(_):
     refresh_list()
     rename_update()
 
-ctl = mc.Control(odin, button, lock=[chop, shut, pinh, diff, stage, ttime, title, smp])
+import source_power                          # the power of the source (fixed by the teacher, or chosen here)
+power = source_power.control(odin)
+ctl = mc.Control(odin, button, lock=[chop, shut, pinh, diff, stage, ttime, title, smp] + source_power.lockable(power))
 ctl.on_click(do_count)
-display(w.VBox([chop, shut, pinh, diff, stage, ttime, title, w.HBox([button, ctl.stop]), ctl.status, live.box]))
+display(w.VBox([chop, shut, pinh, diff, stage, ttime, power, title, w.HBox([button, ctl.stop]), ctl.status, live.box]))
 """)
 
 md(r"""

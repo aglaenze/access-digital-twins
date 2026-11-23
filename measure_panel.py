@@ -190,6 +190,8 @@ class Panel:
                               value=st["choppers"], description="Choppers")
         delta = w.Dropdown(options=[0.10, 0.30, 0.45], value=st["wfm_delta"], description="WFM δ (m)")
         pinhole = w.Dropdown(options=[0.01, 0.02, 0.03, 0.04], value=st["pinhole"], description="Pinhole (m)")
+        import source_power                  # the power of the source (fixed by the teacher, or chosen here)
+        power = source_power.control(odin, width="auto")
         import sample_library as sl
         lib = sl.load("odin")
         max_kN = max((float((lib.get(n) or {}).get("load", {}).get("max_kN", 0)) for n in samples), default=0)
@@ -314,7 +316,8 @@ class Panel:
 
         t.max = 4 * 3600
         actions = [(go, count), (hist, histogram), (cam, image), (tomo, tomography)]     # Control: further down
-        locked = [sample, shutter, stage, choppers, delta, pinhole, *([load] if max_kN else []), t, title, cam_px, step]
+        locked = [sample, shutter, stage, choppers, delta, pinhole, *([load] if max_kN else []), t, title, cam_px, step,
+                  *source_power.lockable(power)]
         # operando samples (a battery on its cycler): the time of the cycle, and a film of the cycle with the camera
         operando = [n for n in samples if (lib.get(n) or {}).get("operando")]
         op_box = []
@@ -410,7 +413,7 @@ class Panel:
         out.children = [w.HBox(stops), *out.children]
         settings_cards = _grid(
             _card("Sample", *_fit(sample, stage, *([load] if max_kN else []))),
-            _card("Beam", *_fit(shutter, choppers, delta, pinhole)),
+            _card("Beam", *_fit(shutter, choppers, delta, pinhole, power)),
             _card("Each measurement", *_fit(t, title), note="One file per measurement, with its title."))
         detector_cards = _grid(
             _card("Timepix3 · time of flight", _row(go, hist), action=True,

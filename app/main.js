@@ -125,7 +125,11 @@ ipcMain.handle("titlebar", (_e, theme) => {
 ipcMain.handle("teacher", async (_e, code, on) => {
   if (!current) return { error: "Sign in first." };
   const r = accounts().setTeacher(current.id, code, on);
-  if (!r.error) current = r.user;
+  if (!r.error) {
+    current = r.user;
+    // the pages opened from now on know it (twin_app.py: TWIN_TEACHER; no gates, the answers shown)
+    try { await backend.request("POST", "/twin/user", current); } catch { /* the next sign-in sends it */ }
+  }
   return r;
 });
 ipcMain.handle("sign-out", async () => { current = null; fs.rmSync(sessionFile(), { force: true }); return true; });

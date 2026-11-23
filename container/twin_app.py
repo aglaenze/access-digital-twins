@@ -5,7 +5,8 @@ container):  jupyter server --ServerApp.jpserver_extensions="{'twin_app': True}"
 All requests need the token of the server (header "Authorization: token ...").
 
     GET  /twin/catalogue           instruments, exercises (exercise.yml), free beamtimes, the progress of the student
-    POST /twin/user {id,name,email} the student who signs in: the kernels started from now on work for them
+    POST /twin/user {id,name,email,teacher} the student who signs in: the kernels started from now on work for them
+                                   (teacher: the teacher view, pages opened from now on show everything)
                                    (TWIN_USER, sessions of the pages, logbooks of the questions); open kernels stop
     POST /twin/open {dir,mode,what} the address to show for one way into an exercise (a page, or the student's own
                                    copy of a notebook, made on first opening) and records that it was opened
@@ -216,7 +217,8 @@ class User(Base):
         if not uid:
             raise web.HTTPError(400, "id needed")
         changed = uid != user()
-        os.environ.update(TWIN_USER=uid, TWIN_USER_NAME=b.get("name", ""), TWIN_USER_EMAIL=b.get("email", ""))
+        os.environ.update(TWIN_USER=uid, TWIN_USER_NAME=b.get("name", ""), TWIN_USER_EMAIL=b.get("email", ""),
+                          TWIN_TEACHER="1" if b.get("teacher") else "")   # teacher view: quiz.teacher_view()
         for v in SESSION_VARS:                       # the pages measure in the session of the student
             os.environ[v] = uid
         os.makedirs(os.path.join(run_root(), "progress", uid), exist_ok=True)

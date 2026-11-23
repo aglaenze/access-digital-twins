@@ -75,14 +75,22 @@ def offer():
         if d.get("class_page"):
             modes["class"] = dict(d["class_page"], open="voila")
         for level, m in modes.items():
-            if (m or {}).get("open") != "voila" or not os.path.isfile(os.path.join(HERE, m.get("file", ""))):
+            if (m or {}).get("open") != "voila":
                 continue
-            out.append(dict(id=f"{instr}/{ex}/{level}", instrument=instr, exercise=ex, level=level,
-                            level_name=LEVEL_NAMES.get(level, level), title=m.get("title") or d.get("title", ex),
-                            short=d.get("short", ""), page=m["file"], what=m.get("what", ""),
-                            mission=" ".join(str(m.get("mission") or d.get("question", "")).split()),
-                            duration=m.get("duration", ""), introduction=d.get("kind") == "introduction",
-                            quiz=_quiz_name(m["file"])))
+            # a page per sample when the exercise offers several (variants: the student chooses on the card of the
+            # app; here the teacher chooses which ones the class gets)
+            variants = m.get("variants") or [dict(label="", file=m.get("file", ""))]
+            for k, v in enumerate(variants):
+                if not os.path.isfile(os.path.join(HERE, v.get("file", ""))):
+                    continue
+                title = m.get("title") or d.get("title", ex)
+                out.append(dict(id=f"{instr}/{ex}/{level}" + (f"-{k + 1}" if len(variants) > 1 else ""),
+                                instrument=instr, exercise=ex, level=level, level_name=LEVEL_NAMES.get(level, level),
+                                title=f"{title}: {v['label']}" if v.get("label") else title,
+                                short=d.get("short", ""), page=v["file"], what=m.get("what", ""),
+                                mission=" ".join(str(m.get("mission") or d.get("question", "")).split()),
+                                duration=m.get("duration", ""), introduction=d.get("kind") == "introduction",
+                                quiz=_quiz_name(v["file"])))
     # the introductions first, then the class pages, then the exercises
     rank = lambda p: (p["instrument"], 0 if p["introduction"] else (1 if p["level"] == "class" else 2), p["exercise"])
     return sorted(out, key=rank)

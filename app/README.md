@@ -152,7 +152,7 @@ whole class: the pages show it locked, "set by your teacher"), and the pages the
 browser can show alone (introductions, guided Trainee pages, class pages; `classes.offer()`). **Open the class**
 starts `../web_class.py --class <code>` on this computer (Voila, and a Cloudflare quick tunnel unless unticked): the
 link for the students (it holds the code: no password to type) and its QR code (`shell/vendor/qrcode.js`,
-qrcode-generator 1.4.4, MIT, Kazuhiko Arase) appear after about 2 minutes; one class open at a time, closed with
+qrcode-generator 1.4.4, MIT, Kazuhiko Arase) appear after a few seconds (the beams are prepared meanwhile, web_warmup.py); one class open at a time, closed with
 **Close the class** (the whole tree of processes). **Live** (every 5 s, `classes.live`): each student (name, or an
 anonymous id), the page, the questions right, right at the first try, the questions tried and still wrong ("stuck"),
 the measurements, the last activity, submitted or not; above, the students, the active ones, the submissions, the

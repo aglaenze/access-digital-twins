@@ -52,6 +52,12 @@ CSS = """<style>
 _css_shown = [False]
 
 
+def teacher_view():
+    """The teacher view of the app (twin_app.py sets TWIN_TEACHER): the answers are shown at once, nothing is recorded
+    as revealed. Never in the online version of the students (TWIN_WEB)."""
+    return os.environ.get("TWIN_TEACHER") == "1" and os.environ.get("TWIN_WEB") != "1"
+
+
 def _css():
     if not _css_shown[0]:
         display(w.HTML(CSS))
@@ -251,7 +257,7 @@ class Quiz:
             reveal.layout.display = ""
 
         def show_answer():
-            good = "; ".join(f"**{options[k]}**" for k in sorted(right))
+            good = "; ".join(f"**{options[k].rstrip('.')}**" for k in sorted(right))     # (". " follows)
             fb.value = _box("ans", f"Answer: {good}. {explanation}")
             reveal.layout.display = "none"
 
@@ -270,7 +276,7 @@ class Quiz:
             elif given and given[0] in options:
                 picker.value = given[0]
             fb.value = _box("ok", "**Right** (answered earlier). " + explanation)
-        elif item["state"] == "revealed":
+        elif item["state"] == "revealed" or teacher_view():
             show_answer()
         elif b and b["tries"]:
             reveal.layout.display = ""
@@ -287,7 +293,10 @@ class Quiz:
         sig = sig or _sig_figures(value, tol * abs(value) if rel else tol)
         u = f" {unit}" if unit else ""
         rule = (f'<div class="twq-fmt">Give your answer with <b>{sig} significant figure{"s" if sig > 1 else ""}</b>'
-                + (f" (accepted within ±{tol * 100:g} %)." if rel else f" (accepted within ±{tol:g}{u}).") + "</div>")
+                + (f" (accepted within ±{tol * 100:g} %)." if rel
+                   # an answer in % with an absolute tolerance: "±6 %" would read as relative
+                   else f" (accepted within ±{tol:g} percentage point{'s' if tol != 1 else ''})." if unit.strip() == "%"
+                   else f" (accepted within ±{tol:g}{u}).") + "</div>")
         head = w.HTMLMath(f'<div class="twq-q">{html.escape(title or item["id"])}</div>{_md(text)}{rule}')
         box = w.Text(placeholder="your value", layout=w.Layout(width="140px"))     # empty at first; 4,05 = 4.05
         check = w.Button(description="Check", button_style="primary", icon="check")
@@ -327,7 +336,7 @@ class Quiz:
         if item["state"] == "right":            # answered right in an earlier session
             box.value = f"{b['answer']:g}" if isinstance(b["answer"], (int, float)) else ""
             fb.value = _box("ok", f"**Right** ({_round(value, sig)} {unit}, answered earlier). " + explanation)
-        elif item["state"] == "revealed":
+        elif item["state"] == "revealed" or teacher_view():
             show_answer()
         elif b and b["tries"]:
             reveal.layout.display = ""

@@ -37,7 +37,9 @@ def _slot(waiting):
 def _read(file, mtime):
     with h5py.File(file, "r") as f:
         e = f["entry"]
+        q = e.get("instrument/source/proton_charge")
         return dict(data=e["instrument/camera/data"][()].astype(float), t=float(e["duration"][()]),
+                    charge=float(q[()]) if q is not None else None,
                     angle=float(e["sample/rotation_angle"][()]), x=float(e["sample/x_translation"][()]),
                     title=e["title"][()].decode() if isinstance(e["title"][()], bytes) else str(e["title"][()]))
 
@@ -47,14 +49,20 @@ def image(file):
     return _read(file, os.path.getmtime(file))
 
 
+def beam_image(file, dark=None):
+    """The image of the beam alone: the dark (no beam: the camera's own signal) scaled to the exposure and subtracted,
+    then divided by the proton charge the measurement received (the neutrons made are proportional to it: images taken
+    at different powers of the source, or during a drop of the beam, compare); per second for a file without charge."""
+    m = image(file)
+    d = image(dark) if dark else None
+    x = m["data"] - (d["data"] * m["t"] / d["t"] if d else 0.0)
+    q = m.get("charge")
+    return x / (q if q and q > 0 else m["t"])
+
+
 def transmission(sample, open_beam, dark=None):
-    """T = (S − D) / (O − D), S, O and D per second of exposure."""
-    I, O = image(sample), image(open_beam)
-    i, o = I["data"] / I["t"], O["data"] / O["t"]
-    if dark:
-        D = image(dark)
-        d = D["data"] / D["t"]
-        i, o = i - d, o - d
+    """T = (S − D) / (O − D), each per proton charge (beam_image)."""
+    i, o = beam_image(sample, dark), beam_image(open_beam, dark)
     with np.errstate(divide="ignore", invalid="ignore"):
         return np.clip(np.where(o > 0, i / o, np.nan), 1e-3, 2.0)
 

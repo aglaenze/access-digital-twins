@@ -226,9 +226,11 @@ def default_title():
         return "dark"
     return "open beam" if abs(stage.value) > 20 else f"steel {load.value:g} kN"
 
-ctl = mc.Control(odin, button, lock=[shut, stage, load, ttime, title])
+import source_power                          # the power of the source (fixed by the teacher, or chosen here)
+power = source_power.control(odin)
+ctl = mc.Control(odin, button, lock=[shut, stage, load, ttime, title] + source_power.lockable(power))
 ctl.on_click(do_count)
-display(w.VBox([shut, stage, load, ttime, title, w.HBox([button, ctl.stop]), ctl.status, live_label, live_img]))
+display(w.VBox([shut, stage, load, ttime, power, title, w.HBox([button, ctl.stop]), ctl.status, live_label, live_img]))
 """)
 
 md(r"""

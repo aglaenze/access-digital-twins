@@ -19,7 +19,13 @@ def gate(text="The rest of the page appears once this step is done."):
     .jp-Cell:has(.twin-gate) ~ .jp-Cell), so that a result is not seen before the student computed it. open(gate)
     removes it. Returns the widget, to display at the end of the cell of the step."""
     import html as _html
+    import os
     import ipywidgets as w
+    if os.environ.get("TWIN_TEACHER") == "1" and os.environ.get("TWIN_WEB") != "1":
+        # the teacher view of the app: the whole page at once (the step is not needed to see what follows)
+        return w.HTML("<div class='twin-teacher-note' style='margin:10px 0;padding:8px 14px;border-radius:10px;"
+                      "border:1px dashed #F59E0B;background:#FFF6E8;color:#8A4A0B;font-size:14px'>Teacher view: the rest of the page is shown without this step "
+                      "(as a student, it appears once the step is done).</div>")
     return w.HTML(f"<div class='twin-gate'>🔒 {_html.escape(text)}</div>")
 
 

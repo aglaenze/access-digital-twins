@@ -220,12 +220,14 @@ def film(_):
     refresh_list()
     update_rename()
 
-ctl1 = mc.Control(odin, button1, lock=[shut, inout, button2, step])
-ctl2 = mc.Control(odin, button2, lock=[shut, inout, button1, step],
+import source_power                          # the power of the source (fixed by the teacher, or chosen here)
+power = source_power.control(odin)
+ctl1 = mc.Control(odin, button1, lock=[shut, inout, button2, step] + source_power.lockable(power))
+ctl2 = mc.Control(odin, button2, lock=[shut, inout, button1, step] + source_power.lockable(power),
                   stopped="Film stopped: the images already taken stay, the next ones were not taken.")
 ctl1.on_click(take)
 ctl2.on_click(film)
-display(w.VBox([shut, inout, w.HBox([button1, ctl1.stop]), ctl1.status, step,
+display(w.VBox([shut, inout, power, w.HBox([button1, ctl1.stop]), ctl1.status, step,
                 w.HBox([button2, bar, ctl2.stop]), ctl2.status, img_live]))
 """)
 
@@ -301,11 +303,11 @@ def profiles():
         return None
     key = tuple(cell.values())
     if PROF.get("key") != key:
-        img = lambda f: tomo.image(f)["data"] / tomo.image(f)["t"]       # counts per second
-        D, O = img(dk), img(ob)
-        n = D.shape[0]
+        img = lambda f: tomo.beam_image(f, dk)          # dark subtracted, per proton charge (any power of the source)
+        O = img(ob)
+        n = O.shape[0]
         c = slice(int(n * 0.305), int(n * 0.695))            # x from −2.75 to 2.75 mm
-        T = {t: np.clip((img(p) - D)[:, c].mean(1) / (O - D)[:, c].mean(1), 1e-6, None) for t, p in cell.items()}
+        T = {t: np.clip(img(p)[:, c].mean(1) / O[:, c].mean(1), 1e-6, None) for t, p in cell.items()}
         y = np.linspace(EXT[2], EXT[3], n + 1)[:-1] + (EXT[3] - EXT[2]) / (2 * n)
         PROF.update(key=key, y=y, times=np.array(sorted(T)), dmu=np.array([-np.log(T[t] / T[0.0]) / CHORD_CM
                                                                            for t in sorted(T)]))
