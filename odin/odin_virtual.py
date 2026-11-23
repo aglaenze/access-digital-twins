@@ -290,6 +290,7 @@ class VirtualOdin:
         if mode not in ("hybrid", "mcstas"):
             raise ValueError("mode: 'hybrid' or 'mcstas'")
         self.fluctuation, self.outages_per_hour, self.mode = fluctuation, outages_per_hour, mode
+        self.power_mw = 2.0          # power of the source (MW): 2 at the start of ESS, 5 by design; sets the protons per pulse
         self.folder = f"{RUN_ROOT}/{session}"
         os.makedirs(self.folder, exist_ok=True)
         self.mpi, self.repeat, self.focus = mpi, repeat, focus
@@ -478,6 +479,11 @@ class VirtualOdin:
         if self._stop.is_set():
             raise Cancelled("measurement stopped: nothing was recorded")
 
+    def charge_per_pulse(self):
+        """Protons per pulse (µC) at the power of the source: 71.4 µC at 2 MW (2 GeV protons, 14 Hz). The neutrons made
+        are proportional to it; the reduction divides each run by its own proton charge, written in the file."""
+        return nx.Q_NOMINAL * self.power_mw / 2.0
+
     def rename(self, file, title):
         """Changes the title of a measurement already taken (a wrong name typed): in the logbook and in the NeXus file
         (entry/title). Only the title: the settings and the data of a measurement cannot be changed."""
@@ -513,7 +519,7 @@ class VirtualOdin:
         # Source: proton charge of each pulse (and possible beam outages)
         n_out = self.rng.poisson(self.outages_per_hour * t / 3600)
         outages = [(self.rng.uniform(0, t), self.rng.uniform(5, 60)) for _ in range(n_out)]
-        charge = nx.pulse_charges(t, self.rng, fluctuation=self.fluctuation, outages=outages)
+        charge = nx.pulse_charges(t, self.rng, nominal=self.charge_per_pulse(), fluctuation=self.fluctuation, outages=outages)
         ppf = nx.PULSES_PER_FRAME[state["choppers"]]
         beam_factor = charge[0::ppf].mean() / nx.Q_NOMINAL          # useful pulses (one in two with the band-pass choppers)
         if progress is not None:
@@ -607,7 +613,7 @@ class VirtualOdin:
         if self.budget_s is not None and state["shutter"] == "open" and self.beam_used() + t > self.budget_s + 1e-9:
             raise ValueError(f"beamtime exhausted: {self.budget_s - self.beam_used():.0f} s left of {self.budget_s:.0f} s")
         ppf = nx.PULSES_PER_FRAME[state["choppers"]]
-        charge = nx.pulse_charges(t, self.rng, fluctuation=self.fluctuation, outages=[])
+        charge = nx.pulse_charges(t, self.rng, nominal=self.charge_per_pulse(), fluctuation=self.fluctuation, outages=[])
         beam_factor = charge[0::ppf].mean() / nx.Q_NOMINAL
         if state["shutter"] == "closed":
             img = self.rng.poisson(2.0 * t * (128 / pixels) ** 2, (pixels, pixels))
@@ -673,7 +679,7 @@ class VirtualOdin:
         if self.mode != "hybrid":
             raise ValueError("polarized imaging is modeled in the hybrid mode only")
         ppf = nx.PULSES_PER_FRAME[state["choppers"]]
-        charge = nx.pulse_charges(t, self.rng, fluctuation=self.fluctuation, outages=[])
+        charge = nx.pulse_charges(t, self.rng, nominal=self.charge_per_pulse(), fluctuation=self.fluctuation, outages=[])
         beam_factor = charge[0::ppf].mean() / nx.Q_NOMINAL
         smp = self.samples()[state["sample"]]
         lams = np.linspace(1.5, 6.0, n_lam + 1)
@@ -750,7 +756,7 @@ class VirtualOdin:
         rel *= (z_det1 - 7.0) / (z_det - 7.0) if state["choppers"] == "wfm" else z_det1 / z_det
         edges = np.arange(lam_range[0], lam_range[1] + lam_bin / 2, lam_bin)
         ppf = nx.PULSES_PER_FRAME[state["choppers"]]
-        charge = nx.pulse_charges(t, self.rng, fluctuation=self.fluctuation, outages=[])
+        charge = nx.pulse_charges(t, self.rng, nominal=self.charge_per_pulse(), fluctuation=self.fluctuation, outages=[])
         beam_factor = charge[0::ppf].mean() / nx.Q_NOMINAL
         smp = self.samples()[state["sample"]]
         if state["shutter"] == "closed":

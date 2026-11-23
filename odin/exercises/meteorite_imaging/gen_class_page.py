@@ -1,4 +1,4 @@
-"""Generates ODIN_meteorite_class.ipynb: a 30-minute session for a class (first use: DTU, MSc course "Advanced X-ray
+"""Generates ODIN_meteorite_class.ipynb: a session of about 45 minutes for a class (first use: DTU, MSc course "Advanced X-ray
 imaging", 23 November 2026, after a lecture on neutron imaging). ODIN in short for X-ray imagers, then the meteorite
 NWA 7034 in a condensed form: one high-resolution radiograph, a tomography, the hydrogen-rich clasts, how much water.
 Not an exercise of the catalogue of the app: the start page of the online version shows it on top.
@@ -30,24 +30,36 @@ code = lambda s: cells.append(nbf.v4.new_code_cell(_sub(s).strip()))
 fig = lambda name, caption: cells.append(figure_cell(name, caption))
 
 md(r"""
-# ODIN in 30 minutes: what is hidden inside a Martian meteorite?
+# ODIN: what is hidden inside a Martian meteorite?
 
 You know X-ray imaging well. Today you image with **neutrons**, on the digital twin of **ODIN**, the imaging
-instrument of the European Spallation Source (ESS): a simulation of the real instrument, which writes its data in the
+instrument of the European Spallation Source (ESS). The twin simulates the real instrument and writes its data in the
 formats of ESS. Everything happens in this page: no code to write.
 
-**Plan of the 30 minutes**
+**What you will learn**
 
-| Time | What you do |
-|---|---|
-| 0–5 min | read *ODIN for X-ray imagers* and the mission |
-| 5–12 min | take the three images with the Timepix3 camera, reduce them: the radiograph (parts 1–2) |
-| 12–20 min | run the tomography, find the bright clasts in the slices (parts 3–4) |
-| 20–27 min | measure Σ, estimate the water (parts 5–6) |
-| 27–30 min | your comment, and *Submit* (part 7) |
+- why neutrons and X-rays see different things in the same sample;
+- how ODIN takes an image: a pulsed source, a pinhole, a camera very close to the sample;
+- the whole chain of a measurement: raw files, data reduction, radiograph, tomography;
+- how to use an attenuation coefficient to find out what a hidden region is made of.
 
-Short questions along the way check each step: answer, then *Check*; a wrong answer is explained, and after a try you
-can show the answer.
+**The steps, one after the other**
+
+1. Read *ODIN for X-ray imagers* and the mission.
+2. Take three images and reduce them: a radiograph (parts 1–2).
+3. Run a tomography and find the bright spots inside the rock (parts 3–4).
+4. Measure Σ in a bright spot and estimate its water (parts 5–6).
+5. Write a comment and click ***Submit*** (part 7).
+
+Each step unlocks the next one. Short questions check each step: answer, then *Check*. A wrong answer is explained;
+after a try you can show the answer.
+
+**Two quantities used everywhere in this page**
+
+- The **transmission** $T = I / I_0$: the fraction of the neutrons that cross the sample (1 = nothing removed).
+- The **attenuation coefficient** $\Sigma$, in cm⁻¹: how strongly a material removes neutrons, by absorption and by
+  scattering. It is the $\mu$ of X-ray imaging. Through a thickness $x$: $T = e^{-\Sigma x}$. Each material has its
+  own $\Sigma$, so measuring $\Sigma$ tells you what a region is made of.
 """)
 
 code(r"""
@@ -97,36 +109,43 @@ fig("contrast_xray_neutron.png", "The attenuation coefficient of a few materials
     "neutrons; lead is the opposite.")
 
 md(r"""
-**2. A pulsed source and the time of flight.** At ESS, protons hit a tungsten target 14 times per second; each pulse
-(2.86 ms) makes neutrons, slowed down by a moderator. ODIN is 60 m long: the arrival time of a neutron at the camera
-gives its speed, so its wavelength. Today you use the **white beam**: all the wavelengths together, like a
-polychromatic X-ray beam.
+**2. A pulsed source and the time of flight.** At ESS, protons hit a tungsten target 14 times per second. Each pulse
+makes neutrons, slowed down by a moderator. ODIN is 60 m long, so the arrival time of a neutron at the camera gives
+its speed, and so its wavelength.
 """)
 fig("odin_tof.png", "Distance against time for neutrons of one pulse: the slow ones (long wavelength) arrive later. "
     "The arrival time at the camera gives the wavelength.")
 
 md(r"""
-**3. No lens, no magnification.** The **magnification** is the ratio of the size of the image on the detector to the
-size of the object. In a lab micro-CT it comes from the cone beam: the X-rays leave a focal spot of a few µm and
-spread out, so an object close to the source casts a larger shadow on a far detector, magnification
-$M = (\text{source to detector}) / (\text{source to object})$, often 10 or more: a detector with large pixels then
-sees small details. Neutrons have no small focal spot and cannot be focused well: the beam is shaped by a **pinhole**
-of D = 1 to 4 cm, L = 10.5 m before the sample, an almost parallel beam (L/D up to 1050). The image on the camera has
-the size of the object ($M = 1$): the resolution is set by the camera pixel (27.5 µm here) and by the blur.
+Today you use the **white beam**: no chopper selects the neutrons, all the wavelengths arrive together, like a
+polychromatic X-ray beam. The images add up all the neutrons, whatever their wavelength.
+
+*To use the wavelength* (other exercises, e.g. Bragg edges), there is a catch. The next pulse comes 71 ms later, and
+neutrons slower than 4.7 Å need more than 71 ms to reach the camera: they mix with the fast neutrons of the next
+pulse. ODIN's choppers then let **only one pulse in two** through, which gives the slow neutrons 143 ms. In white beam
+this does not matter, since we do not sort the neutrons.
+""")
+
+md(r"""
+**3. No lens, no magnification.** The **magnification** is the size of the image on the detector divided by the size
+of the object. In a lab micro-CT, the X-rays leave a focal spot of a few µm and spread out (a cone beam). An object
+close to the source casts a larger shadow on a far detector: the magnification is often 10 or more.
+
+Neutrons have no small focal spot. On ODIN the beam comes through a **pinhole** of diameter D (1 to 4 cm), at
+L = 10.5 m before the sample: an almost parallel beam. The image has the size of the object (no magnification), so the
+resolution is set by the camera pixel (27.5 µm here) and by the blur.
 
 Each point of the sample becomes a spot of size $l \cdot D / L$ on the camera, $l$ being the distance from the sample
-to the camera. So the camera is brought **as close as possible**: here 6 mm from the rotation axis, just room for the
-piece to turn. Then the blur is 6 µm with D = 1 cm and 17 µm with D = 3 cm, below the pixel: a wider pinhole gives
-more neutrons at no cost in sharpness.
+to the camera. So the camera is put **as close as possible**: 6 mm from the rotation axis. Then the blur stays below
+the pixel, even with a wide pinhole that lets more neutrons through.
 """)
 fig("odin_pinhole.png", "The pinhole camera: a point of the sample sees the whole pinhole, so it becomes a spot of "
     "size l·D/L on the camera.")
 
 md(r"""
-**4. Few particles.** Even at ESS there are far fewer neutrons than photons from an X-ray tube. In the twin (ESS at
-2 MW, its power at the start), with the camera at 6 mm, a pixel of 27.5 µm × 27.5 µm receives about 55 neutrons per
-second with a 3 cm pinhole (L/D = 350), 9 times fewer with 1 cm (L/D = 1050). An image of a rock takes tens of
-seconds, a tomography about half an hour of beam.
+**4. Few particles.** Even at ESS there are far fewer neutrons than photons from an X-ray tube. A pixel of the camera
+receives about 55 neutrons per second with the 3 cm pinhole. An image of a rock takes tens of seconds; a tomography
+takes about half an hour of beam.
 
 **5. The detector.** A scintillator containing lithium-6 turns each neutron into a flash of light, filmed by a camera
 through a mirror, out of the beam: an indirect detector, as in many X-ray setups.
@@ -135,8 +154,7 @@ fig("odin_detector_6mm.png", "Side view of the detection: the scintillator glows
     "sends the light to the camera, out of the beam.")
 
 md(r"""
-Then radiography and tomography work as you know them: $T = I/I_0 = e^{-\Sigma x}$ through a thickness $x$, with
-$\Sigma$ the attenuation coefficient in cm⁻¹ (the $\mu$ of the lecture: absorption plus scattering), and a filtered
+Then radiography and tomography work as you know them: $T = e^{-\Sigma x}$ in each pixel, and a filtered
 back-projection of parallel projections over 180°.
 """)
 
@@ -191,9 +209,17 @@ after each pulse (the time of flight: the slow neutrons, of long wavelength, arr
 | 2 | open beam | open | out | 2 s |
 | 3 | sample | open | in | 2 s |
 
-Two seconds are enough here: some 5 million neutrons reach the camera. A count lasts its counting time, as on the
-instrument, plus the time the twin needs to draw these neutrons one by one and write them, one event each, to the
-file (10 to 25 s in all; on the real instrument the file is written while counting). *Stop* cancels a count: nothing of it is recorded.
+Two seconds are enough: some 5 million neutrons reach the camera. A count takes 10 to 25 s here: the twin draws the
+neutrons one by one and writes each of them to the file. *Stop* cancels a count: nothing of it is recorded.
+
+**The power of the source.** ESS starts at **2 MW** and is designed for **5 MW**. The power sets the number of
+protons per pulse (71 µC at 2 MW), and the number of neutrons is proportional to it. Try another power: more neutrons
+in the same time, so less noise. The reduction (part 2) divides each file by its own proton charge, so files taken at
+different powers can be combined. At 5 MW the twin warns you: about 6 million neutrons per second reach the camera, more
+than a real Timepix3 can record without losses. On the instrument you would then close the pinhole a little.
+
+**See a measurement again.** The menu *Show again* lists your files: choose one to see its image and its arrival
+times again, without measuring again.
 """)
 
 code(r"""
@@ -202,10 +228,15 @@ shut = w.ToggleButtons(options=[("closed", "closed"), ("open", "open")], value=s
 inout = w.ToggleButtons(options=[("in", 0.0), ("out", 0.5)], value=0.0 if abs(st["stage_x"]) < 0.02 else 0.5,
                         description="Sample")
 tcount = w.Dropdown(options=[2, 5], value=2, description="Counting time (s)", style={"description_width": "130px"})
+power = w.Dropdown(options=[("1 MW", 1.0), ("2 MW (ESS at the start)", 2.0), ("5 MW (ESS design)", 5.0)], value=2.0,
+                   description="Source power", style={"description_width": "130px"}, layout=w.Layout(width="360px"))
 title = w.Text(value="", placeholder="dark, open beam, sample", description="Title")
 button = w.Button(description="Count", button_style="primary", icon="play", layout=w.Layout(width="auto"))
 live = viz.LiveView()
 TPX = {}                                      # the last file of each kind: dark, open, sample
+TAKEN = []                                    # every file taken: (label, path), for "Show again"
+again = w.Dropdown(options=[("(no file yet)", "")], value="", description="Show again",
+                   style={"description_width": "130px"}, layout=w.Layout(width="460px"))
 
 def kind():
     return "dark" if shut.value == "closed" else ("open" if inout.value > 0.02 else "sample")
@@ -215,12 +246,15 @@ def count(_):
     k = kind()
     name = title.value.strip() or {"dark": "dark", "open": "open beam", "sample": "meteorite 0°"}[k]
     try:
+        odin.power_mw = float(power.value)
         odin.move(choppers="white", pinhole=PINHOLE, diffuser="in", shutter=shut.value, stage_x=inout.value,
                   stage_rot=0.0, sample=SAMPLE)
         live.reset()
         f = odin.count(float(tcount.value), title=name, progress=live.update)
         TPX[k] = f
         live.done(f)
+        TAKEN.append((f"{os.path.basename(f)}: {name}, {tcount.value} s at {odin.power_mw:g} MW", f))
+        again.options = [("(choose a file)", "")] + TAKEN
         print(f"Written: {os.path.basename(f)} ({name}, {odin.last_n_counts:,} neutrons). Taken so far: "
               + ", ".join(x for x in ("dark", "open", "sample") if x in TPX) + ".")
         import odin_reduction
@@ -230,15 +264,22 @@ def count(_):
     except Exception as e:
         print("Error:", e)
 
-ctl = mc.Control(odin, button, lock=[shut, inout, tcount, title])
+def show_again(ch):
+    if ch["new"]:
+        live.done(ch["new"])
+        live.status.value = f"Shown again: {os.path.basename(ch['new'])}  (Play or the slider: replay the count)"
+
+again.observe(show_again, names="value")
+ctl = mc.Control(odin, button, lock=[shut, inout, tcount, power, title, again])
 ctl.on_click(count)
-display(w.VBox([shut, inout, tcount, title, w.HBox([button, ctl.stop]), ctl.status, live.box]))
+display(w.VBox([shut, inout, tcount, power, title, w.HBox([button, ctl.stop]), ctl.status, again, live.box]))
 """)
 
 code(r"""
 q.number("The histogram of the arrival times: a neutron reaches the camera, about 60.5 m from the source, **61.2 ms** after "
          "the pulse. Which wavelength does it have (Å)? (λ [Å] = 3956 / v [m/s])", value=4.0, tol=0.1, unit="Å",
-         mistakes=[(989, "that is its speed in m/s; then λ = 3956 / v")],
+         mistakes=[(989, "that is its speed in m/s; then λ = 3956 / v"),
+                   (64.6, "3956 divided by the time: first compute the speed, v = distance / time (in m/s)")],
          hints=["v = 60.5 m / 0.0612 s.", "v ≈ 989 m/s, λ = 3956 / 989."],
          explanation="v = 60.5 / 0.0612 = 989 m/s, λ = 3956 / 989 = 4.0 Å. The arrival time is proportional to λ: this "
                      "is how ODIN knows the wavelength of every neutron (here we sum them all: a white-beam radiograph).",
@@ -333,13 +374,35 @@ fig("meteorite_tomography.png", "One horizontal slice of the piece (8 mm × 2 mm
 md(r"""
 ## 3. The tomography
 
-For the tomography ODIN uses the **integrating camera** in its high-resolution setup (512 × 512 pixels of 27.5 µm,
-thin scintillator): finer pixels than the Timepix3, and no need for the time of flight. The pinhole is opened to
-3 cm: with the camera 6 mm from the axis, the blur stays below the pixel and 9 times more neutrons arrive. The camera
-takes its own dark (30 s) and open beam (150 s) first, then turns the sample in steps of 3° over 180° with one image of
-30 s at each angle: 60 images, **half an hour of beam** on ODIN (a few minutes here). For each row of pixels, the projections $-\ln T$ are filtered (ramp)
-and back-projected: $\Sigma$ at every point of the slice. For comparison, Naver *et al.* took 1125 images of 4 minutes
-at ICON (75 hours), with pixels of 6.2 µm.
+For the tomography ODIN uses another camera, the **integrating camera**: finer pixels (27.5 µm) than the Timepix3,
+but no time of flight, which we do not need here. The pinhole is opened to 3 cm: 9 times more neutrons, and the blur
+stays below the pixel.
+
+The camera first takes its own dark and open beam. Then it turns the sample over 180°, in steps of 3°, with one image
+of 30 s at each angle: 60 images, **half an hour of beam** on ODIN. For each row of pixels, the projections $-\ln T$
+are filtered and back-projected: this gives $\Sigma$ at every point of the slice. (Naver *et al.* took 1125 images at
+ICON: 75 hours of beam.)
+
+**While it runs (about 2 minutes here)**, read the guide below: it tells you what to do with the slices. You can also
+open the optional section on the raw data.
+
+**Guide to the slices (part 4).** You will get two slices through the rock, colored by $\Sigma$:
+- left, a **horizontal slice** at a height $y$, seen from above;
+- right, a **vertical slice** at a depth $z$.
+
+Three sliders move the slices and a cross (+). The matrix of the rock is purple. **Look for small yellow-white spots**:
+regions that attenuate much more than the matrix. The largest ones are @WHERE@. Put the cross on the brightest spot:
+part 5 measures $\Sigma$ there.
+""")
+
+md(r"""
+**Optional, if you are curious:** what your files contain (the raw data of the NeXus files, event by event or image by
+image) and how they become a radiograph and a tomography, step by step, with the software used. Click to open; you can
+skip it.
+""")
+
+code(r"""
+analysis_chain.section("odin_camera", odin, title="Optional: the raw data and the analysis chain (click to open)")
 """)
 
 code(r"""
@@ -415,23 +478,11 @@ display(w.VBox([w.HBox([button_tomo, ctl_tomo.stop]), bar.box, ctl_tomo.status, 
 """)
 
 md(r"""
-**Optional, if you are curious:** what your files contain (the raw data of the NeXus files, event by event or image by
-image) and how they become a radiograph and a tomography, step by step, with the software used. Click to open; you can
-skip it.
-""")
-
-code(r"""
-analysis_chain.section("odin_camera", odin, title="Optional: the raw data and the analysis chain (click to open)")
-""")
-
-md(r"""
 ## 4. Look inside
 
-Left: a **horizontal slice** at the height $y$ you choose, seen from above ($x$ across, $z$ along the beam at 0°).
-Right: a **vertical slice** at the depth $z$. The color is $\Sigma$ in cm⁻¹. The slices follow the sliders (computed on every
-second pixel, 55 µm, to be quick). The rings around the rotation axis are the
-noise of the open beam, the same in every projection. The largest clasts are @WHERE@: move the cross (+) onto the
-brightest spot.
+The slices below follow the sliders ($x$ across, $z$ along the beam at 0°; the color is $\Sigma$ in cm⁻¹). The
+largest bright spots are @WHERE@: move the cross (+) onto the brightest one. The rings around the rotation axis are
+not in the rock: they come from the noise of the open beam, the same in every projection.
 """)
 
 code(r"""
@@ -492,18 +543,21 @@ show_slices()
 md(r"""
 ## 5. What is in the bright spots?
 
-*Measure Σ* gives the mean $\Sigma$ in a small ball (0.06 mm radius) around the cross, and in the matrix around it
-(0.4 to 0.6 mm away). Their **ratio** hardly depends on the spectrum of the beam. Compare with the minerals of
-NWA 7034 without hydrogen (Naver *et al.*, Table S1, at 25 meV; matrix measured at ICON: 0.45 cm⁻¹):
+*Measure Σ* gives the mean $\Sigma$ in a small ball around the cross, and in the matrix around it. Then it divides
+the two. This **ratio** hardly depends on the wavelengths of the beam, so you can compare it with the table below
+(Naver *et al.*, measured at ICON; matrix: 0.45 cm⁻¹).
 
-| Mineral | Formula | Σ (cm⁻¹) | ratio to the matrix |
+| Material | Formula | Σ (cm⁻¹) | ratio to the matrix |
 |---|---|---|---|
 | plagioclase (a feldspar) | (Na,Ca)(Al,Si)₄O₈ | 0.27 – 0.28 | 0.6 |
 | pyroxenes, chlorapatite | (Ca,Mg,Fe)₂Si₂O₆, Ca₅(PO₄)₃Cl | 0.34 – 0.38 | 0.8 |
 | ilmenite | FeTiO₃ | 0.70 | 1.6 |
 | magnetite, maghemite | Fe₃O₄, γ-Fe₂O₃ | 0.80 – 0.82 | 1.8 |
+| *for comparison:* liquid water | H₂O | 3.6 | 8 |
+| *for comparison:* the H-rich regions found by Naver *et al.* | | 1.9 | 4.2 |
 
-None of them holds hydrogen. Iron oxyhydroxides such as goethite, FeO(OH), do.
+The minerals of the first four rows hold no hydrogen. Water, and minerals with hydrogen such as goethite FeO(OH),
+attenuate much more.
 """)
 
 code(r"""
@@ -538,16 +592,20 @@ display(w.VBox([button_s, out_s]))
 """)
 
 md(r"""
-The twin's values are higher than the table's: the table is for neutrons of 1.8 Å (25 meV), the neutrons counted on
-ODIN have a mean wavelength of 3.2 Å, and these materials attenuate slower neutrons more; ratios change much less. A spot of 0.1–0.3 mm is also
-blurred with its surroundings: the value in its middle is lower than the true one.
+Your values of $\Sigma$ are higher than the table's: ODIN's neutrons are slower than ICON's on average, and slower
+neutrons are attenuated more. The ratios change much less. A small spot is also blurred with its surroundings, so the
+value in its middle is a bit too low.
 
 ## 6. How much water?
 
-As Naver *et al.*: all the excess attenuation is due to hydrogen. Without hydrogen the clasts would show
-$\Sigma_\text{clast}$ = 0.71 cm⁻¹ in ODIN's beam (0.57 cm⁻¹ at ICON), and liquid water 5.4 cm⁻¹. The fraction of the
-volume that water would fill is $f = (\Sigma_\text{spot} - \Sigma_\text{clast}) / \Sigma_\text{water}$, and the water by
-mass $f \times 1.0 / 3.0$ (density of the region about 3.0 g/cm³).
+As Naver *et al.*, assume that all the extra attenuation of the spot comes from hydrogen, held as water:
+
+- without water, the spot would have $\Sigma_\text{clast}$ = 0.71 cm⁻¹ (in ODIN's beam);
+- liquid water has $\Sigma_\text{water}$ = 5.4 cm⁻¹ (in ODIN's beam);
+- the fraction of the volume filled by water is $f = (\Sigma_\text{spot} - \Sigma_\text{clast}) / \Sigma_\text{water}$;
+- water is 3 times lighter than the rock (1.0 against 3.0 g/cm³), so the water by mass is $f / 3$.
+
+*Water in the spot* does this calculation with your $\Sigma$.
 """)
 
 code(r"""
@@ -578,8 +636,8 @@ crystal). The camera is modeled by its mean signal, its noise and its blur.
 
 ## 7. Your results, your comment
 
-Your score on the questions, then a few words on the session (what was clear, what was not, what you would change)
-and *Submit*: it helps us improve it.
+Your score on the questions, then a few words on the session: what was clear, what was not, what you would change.
+**Then click *Submit***: without it, your answers and your comment do not reach us.
 """)
 
 code(r"""
@@ -588,7 +646,7 @@ q.report()
 
 code(r"""
 import submit
-_ = submit.Submit("odin/exercises/meteorite_imaging", "class", quiz=q, title="ODIN in 30 minutes: a Martian meteorite")
+_ = submit.Submit("odin/exercises/meteorite_imaging", "class", quiz=q, title="ODIN: a Martian meteorite")
 """)
 
 QS = {
@@ -598,7 +656,8 @@ q.number("1 mm of water in the beam, with neutrons of 3 Å (the middle of ODIN's
          "Which fraction of the neutrons does it remove, 1 − T (%)? (For comparison after you answer: X-rays of "
          "60 keV see μ = 0.21 cm⁻¹ for water.)",
          value=39.0, tol=1.5, unit="%",
-         mistakes=[(2.0, "that is the X-ray value (μ = 0.21 cm⁻¹); the question is about neutrons"),
+         mistakes=[(0.39, "a fraction: the answer is asked in % (multiply by 100)"),
+                   (2.0, "that is the X-ray value (μ = 0.21 cm⁻¹); the question is about neutrons"),
                    (49, "4.9 cm⁻¹ × 0.1 cm = 0.49 is −ln T, not 1 − T: T = e^(−0.49)")],
          hints=["T = exp(−Σ d), with d = 0.1 cm.", "1 − exp(−0.49)."],
          explanation="1 − e^(−0.49) = 39 % with neutrons, 1 − e^(−0.021) = 2 % with X-rays. And 1 mm of iron: neutrons "
@@ -633,10 +692,14 @@ q.choice("Which material can attenuate **3 to 4 times** more than the matrix?",
          hints=["Compare your ratio of part 5 with the last column of the table."], title="Q3. Which element?")
 ''',
     'howmuch': r'''
-q.number("The water by mass in the brightest spot you found (part 6, %):", value=8, tol=6, unit="%",
-         hints=["Part 6 computes it from your Σ of part 5."],
-         explanation="The model holds about 14 % (Naver et al.: up to 15 wt% OH). The blur lowers Σ in the middle of a "
-                     "small region, so the estimate is lower: a few % to about 12 %.", title="Q4. How much water?")
+q.number("*Water in the spot* printed a line ending with \"water by mass = … %\". Type that number for your "
+         "brightest spot.", value=8, tol=6, unit="%",
+         mistakes=[(0.08, "below the range expected. Is it a fraction (then multiply by 100)? Is the cross on a bright spot?")],
+         hints=["Click *Water in the spot* just above, after *Measure Σ* on a bright spot.",
+                "Copy the number at the end of its line (in %)."],
+         explanation="Every student finds a different spot, so a range is accepted: a few % to about 12 %. The model "
+                     "holds about 14 % in the middle of the regions (Naver et al.: up to 15 %); the blur lowers the "
+                     "value measured in a small spot.", title="Q4. How much water?")
 ''',
     'magnif': r'''
 q.choice("A laboratory micro-CT magnifies by bringing the sample close to a small focal spot (a cone beam). Why does "
