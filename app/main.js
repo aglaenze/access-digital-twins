@@ -311,7 +311,8 @@ async function selftest(out) {
     const until = async (code, s) => { for (let i = 0; i < s; i++) { if (await sb(code).catch(() => false)) return true; await new Promise((r) => setTimeout(r, 1000)); } return false; };
     check("builder: gallery filled", await until(`document.querySelectorAll('#gallery .card').length > 1`, 60), t4);
     await sb(`(() => { const c = [...document.querySelectorAll('#gallery .card')].find(x => !x.querySelector('.ph')); if (c) c.click(); return !!c; })()`);
-    check("builder: a sample loaded, 3D view drawn", await until(`document.querySelectorAll('#tree li').length > 0 && !!document.querySelector('#viewer canvas')`, 120), t4);
+    // the 3D view, or its note when there is no WebGL (the GitHub runners have no GPU)
+    check("builder: a sample loaded, 3D view drawn (or the no-WebGL note)", await until(`document.querySelectorAll('#tree li').length > 0 && !!document.querySelector('#viewer canvas, #viewer .nogl')`, 120), t4);
     await sb(`document.querySelector('#steps [data-step="3"]').click(); true`);
     check("builder: checks computed", await until(`document.querySelectorAll('#checks li').length > 0 && !document.querySelector('#checks li.wait')`, 180), t4);
     await new Promise((r) => setTimeout(r, 2000));
