@@ -11,7 +11,8 @@ import os
 import sys
 
 
-def setup():
+def setup(compiler=True):
+    """compiler=False: the PATH and MCSTAS only, not the C compiler (enough for NCrystal, e.g. to draw a sample)."""
     prefix = sys.prefix
     lib = os.path.join(prefix, "share", "mcstas", "resources")
     if "MCSTAS" not in os.environ and os.path.isdir(lib):
@@ -23,7 +24,7 @@ def setup():
     missing = [d for d in dirs if os.path.isdir(d) and d not in path]
     if missing:
         os.environ["PATH"] = os.pathsep.join(missing + path)
-    if os.name == "nt":
+    if os.name == "nt" and compiler:
         _msvc()
 
 

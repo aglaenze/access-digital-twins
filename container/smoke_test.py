@@ -52,6 +52,27 @@ r = subprocess.CompletedProcess([], 0, "skipped (--no-nicos)", "") if NO_NICOS e
                    capture_output=True, text=True)
 check(r.returncode == 0, f"NICOS environment: {r.stdout.strip() or r.stderr.strip()[-300:]}")
 
+step("the sample of each exercise drawn (top of the beamtime notebooks)")
+try:
+    import glob as _glob
+    import matplotlib
+    matplotlib.use("Agg")
+    import yaml
+    sys.path.insert(0, TWIN)
+    import nb_tools
+    import sample_library as _sl
+    for yml in sorted(_glob.glob(os.path.join(TWIN, "*", "exercises", "*", "exercise.yml"))):
+        with open(yml, encoding="utf-8") as f:
+            ex = yaml.safe_load(f)
+        lib = _sl.load(ex["instrument"])
+        for n, meta in (ex.get("samples") or {}).items():
+            hidden = (meta or {}).get("hidden") or (lib.get(n) or {}).get("hidden") or []
+            err = "not in the sample library" if n not in lib else nb_tools.draw_error(ex["instrument"], lib[n], hidden,
+                                                                                         show=False)
+            check(err is None, f"sample {n} of {os.path.basename(os.path.dirname(yml))} drawn" + (f": {err}" if err else ""))
+except Exception as e:
+    check(False, f"drawing the samples of the exercises: {type(e).__name__}: {e}")
+
 step("upstream part")
 r = subprocess.run([sys.executable, os.path.join(HERE, "fetch_fronts.py"), FRONT])
 check(r.returncode == 0, f"upstream part {FRONT} downloaded")

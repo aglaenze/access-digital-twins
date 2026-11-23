@@ -119,6 +119,15 @@ def odin_material_problem(cfg):
 
 
 _NC_OK = {}
+# The folders of the conda environment on the PATH first: NCrystal finds its library with ncrystal-config (in
+# <env>/bin), absent from the PATH of a Python started without activating the environment (a JupyterLab kernel, the
+# local app). Its import then failed, was silenced below, and left NCrystal broken for the whole kernel: every later
+# use gave "'bool' object is not subscriptable" (seen in the beamtime notebooks, 2026-11-23).
+try:
+    import mcstas_env as _env
+    _env.setup(compiler=False)
+except Exception:
+    pass
 try:                                                    # NCrystal finds the twin's own materials (odin/materials)
     import NCrystal as _NC
     _NC.addCustomSearchDirectory(os.path.join(os.path.dirname(os.path.abspath(__file__)), "odin", "materials"))

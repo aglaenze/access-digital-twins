@@ -18,6 +18,14 @@ import os
 from IPython.display import HTML, Markdown, display
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
+try:                     # the conda environment on the PATH, even in a kernel started without activating it (NCrystal)
+    import sys as _sys
+    if ROOT not in _sys.path:
+        _sys.path.insert(0, ROOT)
+    import mcstas_env as _env
+    _env.setup(compiler=False)
+except Exception:
+    pass
 NAMES = {"odin": "ODIN", "loki": "LoKI"}
 STYLE = ("display:inline-block; padding:9px 16px; margin:4px 8px 4px 0; border-radius:9px; font-weight:600; "
          "font-size:14px; text-decoration:none; font-family:Inter, 'Segoe UI', sans-serif;")
@@ -56,6 +64,36 @@ def sample_builder(instr, proposal=""):
               "with your proposal: it appears on the sample changer of NICOS.")
 
 
+def draw_error(instr, spec, hidden=(), show=True):
+    """Draws a sample (sample_library.draw) and shows it; returns None, or the error as text (its type, message and
+    the place in the code where it happened), with the figure closed: an empty figure is never left to the page."""
+    import sys
+    import traceback
+    if ROOT not in sys.path:
+        sys.path.insert(0, ROOT)
+    import sample_library as sl
+    import matplotlib.pyplot as plt
+    import contextlib
+    import io
+    import warnings
+    fig = plt.figure(figsize=(10, 3.8))
+    try:
+        # the messages of the libraries (e.g. "NCrystal WARNING: Discarding 52 edges...") are not for the students
+        with warnings.catch_warnings(), contextlib.redirect_stdout(io.StringIO()), \
+                contextlib.redirect_stderr(io.StringIO()):
+            warnings.simplefilter("ignore")
+            sl.draw(instr, spec, hidden=hidden, fig=fig)
+        if show:
+            sl.show(fig)                                 # (closes the figure)
+        else:
+            plt.close(fig)
+        return None
+    except Exception as e:
+        plt.close(fig)
+        where = traceback.extract_tb(e.__traceback__)[-1]
+        return f"{type(e).__name__}: {e} ({os.path.basename(where.filename)}, line {where.lineno})"
+
+
 def proposal_sample(exercise):
     """Top of a beamtime notebook (expert level): the sample(s) of the proposal of the exercise (exercise.yml:
     samples, modes.beamtime.proposal), drawn and described as NICOS will mount them (hidden properties not shown);
@@ -69,7 +107,6 @@ def proposal_sample(exercise):
         sys.path.insert(0, ROOT)
     import sample_library as sl
     import user_office
-    import matplotlib.pyplot as plt
     with open(os.path.join(ROOT, exercise, "exercise.yml"), encoding="utf-8") as f:
         ex = yaml.safe_load(f)
     instr = ex["instrument"]
@@ -85,11 +122,10 @@ def proposal_sample(exercise):
         hidden = (ex.get("samples") or {}).get(n, {}).get("hidden") or spec.get("hidden") or []
         who = "the sample of your proposal" if n in given else "a sample you made for this proposal"
         display(Markdown(f"**{spec.get('name', n)}** (`{n}`, {who}; in NICOS: `move(sample_holder, '{n}')`)"))
-        try:
-            sl.draw(instr, spec, hidden=hidden, fig=plt.figure(figsize=(10, 3.8)))
-            sl.show()
-        except Exception as e:                          # a drawing never stops the notebook
-            display(Markdown(f"(no drawing: {e})"))
+        err = draw_error(instr, spec, hidden)
+        if err:                                          # a drawing never stops the notebook, and says where it broke
+            display(Markdown(f"*(The drawing of this sample could not be made: {html.escape(err)}. Please tell "
+                             f"your teacher.)*"))
         if spec.get("description"):
             display(Markdown(spec["description"]))
     first = (given + own)[0] if (given + own) else ""

@@ -355,7 +355,7 @@ al., arXiv:2601.08390 (2026).
 """), md("**Your proposal** (click to open it):"),
     code('import sys, os\nsys.path.insert(0, os.path.abspath("../../.."))\nimport nb_tools\n'
          'nb_tools.proposal("odin/exercises/meteorite_imaging/beamtime.md")'),
-    md("## Your sample\n\nThe sample of your proposal, as NICOS will mount it (what you have to find out is not shown). If your question needs another sample, or this one changed (thicker, another material, an insert...), click *Change the sample*: the sample builder starts from it, and what you save there goes with your proposal, on the sample changer of NICOS."), code('nb_tools.proposal_sample("odin/exercises/meteorite_imaging")'),
+    md("## Your sample\n\nThe sample of your proposal, as NICOS will mount it (what you have to find out is not shown)."), code('nb_tools.proposal_sample("odin/exercises/meteorite_imaging")'),
     code('nb_tools.nicos("odin")'),
     stop(md("## Your files\n\nNICOS writes them to the folder of the proposal; the logbook is read from the files.")),
     code(SETUP.replace('q = quiz.Quiz("odin_meteorite_msc")       # the questions of this notebook', "")),

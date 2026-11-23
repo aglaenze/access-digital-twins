@@ -338,7 +338,7 @@ measure and how to analyze it is your decision, as at a real beamtime.
 """), md("**Your proposal** (click to open it):"),
     code('import sys, os\nsys.path.insert(0, os.path.abspath("../../.."))\nimport nb_tools\n'
          'nb_tools.proposal("odin/exercises/steel_strain/beamtime.md")'),
-    md("## Your sample\n\nThe sample of your proposal, as NICOS will mount it (what you have to find out is not shown). If your question needs another sample, or this one changed (thicker, another material, an insert...), click *Change the sample*: the sample builder starts from it, and what you save there goes with your proposal, on the sample changer of NICOS."), code('nb_tools.proposal_sample("odin/exercises/steel_strain")'),
+    md("## Your sample\n\nThe sample of your proposal, as NICOS will mount it (what you have to find out is not shown)."), code('nb_tools.proposal_sample("odin/exercises/steel_strain")'),
     code('nb_tools.nicos("odin")'),
     stop(md(r"""
 ## Your files
