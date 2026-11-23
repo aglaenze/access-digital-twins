@@ -341,8 +341,9 @@ scintillator, and the pixel. They combine as $\sqrt{a^2 + b^2 + c^2}$. Standard 
 0.1 mm and 0.11 mm, about **0.2 mm** in all. High resolution with the 1 cm pinhole: 0.05 mm, 0.02 mm and 0.03 mm, about
 **0.06 mm**, but with far fewer neutrons per pixel: much longer exposures.
 
-*Try it*: choose the camera and the pinhole, and look at the test pattern. Then choose the high resolution with the
-1 cm pinhole: the 50 µm bars are no longer blurred, but the picture is lost in the noise (3 neutrons per pixel).
+*Try it*: choose the camera (for the integrating camera, also its setup: standard or high resolution) and the pinhole,
+and look at the test pattern. The Timepix3 camera gives the same picture as the standard integrating camera: what it
+adds is the wavelength, not sharpness. Then choose the integrating camera in high resolution with the 1 cm pinhole: the 50 µm bars are no longer blurred, but the picture is lost in the noise (3 neutrons per pixel).
 Count 100 times longer: they appear.
 """)
 code(r"""
@@ -437,8 +438,8 @@ _ = submit.Submit("odin/exercises/introduction", "bsc", quiz=q)
 """)
 
 md(r"""
-**Next.** Open your exercise: the first chapter of your thread on the map of the catalogue (online: the button
-*← Missions* at the top of this page).
+**Next.** Click **Catalogue** at the top left of this page, then open your exercise (the first chapter of your
+thread).
 """)
 
 nb = nbf.v4.new_notebook()

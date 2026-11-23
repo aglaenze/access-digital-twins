@@ -118,13 +118,14 @@ div:has(> .jp-Cell .twin-gate) ~ div:has(> .jp-Cell) { display: none !important;
 .jp-OutputArea-output .widget-vbox, .jp-OutputArea-output .widget-hbox { max-width: 100%; }
 .jp-OutputArea-output .widget-vbox { overflow-x: hidden !important; }
 
-/* the online version: the bar at the top of a page, back to the missions */
+/* the online version: the bar at the top of a page, "Catalogue" button at the top left (as the tab of the app) */
 .twin-webbar { position: sticky; top: 0; z-index: 1000; display: flex; align-items: center; gap: 16px;
   padding: 10px 24px; background: #0F1D31; color: #9FB0C7; font-family: Inter, "Segoe UI", system-ui, sans-serif;
   font-size: 14px; box-shadow: 0 1px 6px rgba(0,0,0,.25); }
-.twin-webbar a { color: #fff; background: #0E7C70; text-decoration: none; font-weight: 600; padding: 6px 14px;
+.twin-webbar a { display: inline-flex; align-items: center; gap: 8px; color: #fff; background: #0E7C70; text-decoration: none; font-weight: 600; padding: 6px 14px;
   border-radius: 8px; }
 .twin-webbar a:hover { background: #12988A; }
+.twin-webbar a svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; }
 .twin-webbar span { margin-left: auto; }
 
 /* the loading spinner of Voila */

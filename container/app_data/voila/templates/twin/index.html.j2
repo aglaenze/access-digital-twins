@@ -28,8 +28,9 @@ window.MathJax = {
 {#- ?v=...: a new address at each page, so that a browser (the app's above all) never keeps an old twin.css: the server
     sends it without a cache rule, and the app went on showing the old look after a change -#}
 <link rel="stylesheet" href="{{ resources.base_url }}voila/templates/twin/static/twin.css?v={{ range(1, 1000000000) | random }}">
-{#- the online version (pages opened from the start page, "?sid=..."): a bar at the top to go back to the missions,
-    as the tabs of the app. In the app (no sid) nothing changes. -#}
+{#- the online version (pages opened from the start page, "?sid=..."): a bar at the top with a "Catalogue" button at
+    the top left, as the "Catalogue" tab of the app (same name, same icon, same place: the pages tell the students to
+    click "Catalogue at the top left", true in both). In the app (no sid) nothing changes. -#}
 <script>
 document.addEventListener("DOMContentLoaded", function () {
   if (!/[?&]sid=/.test(window.location.search)) return;
@@ -38,8 +39,10 @@ document.addEventListener("DOMContentLoaded", function () {
   var back = document.createElement("a");
   back.href = "{{ resources.base_url }}";
   back.target = "twin-catalogue";
-  back.textContent = "← Missions";
-  back.title = "Back to the list of missions (this page stays open in its tab)";
+  back.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"></rect>' +
+    '<rect x="14" y="3" width="7" height="7" rx="1.5"></rect><rect x="3" y="14" width="7" height="7" rx="1.5"></rect>' +
+    '<rect x="14" y="14" width="7" height="7" rx="1.5"></rect></svg>Catalogue';
+  back.title = "Back to the catalogue";
   var name = document.createElement("span");
   name.textContent = "ESS digital twins";
   bar.appendChild(back); bar.appendChild(name);

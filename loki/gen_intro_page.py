@@ -335,8 +335,7 @@ _ = submit.Submit("loki/exercises/introduction", "bsc", quiz=q)
 """)
 
 md(r"""
-**Next.** Open *How big are these nanoparticles?* in the catalogue (online: the button *← Missions* at the top of
-this page).
+**Next.** Click **Catalogue** at the top left of this page, then open *How big are these nanoparticles?*.
 """)
 
 nb = nbf.v4.new_notebook()
