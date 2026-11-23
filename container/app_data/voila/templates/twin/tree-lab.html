@@ -55,6 +55,8 @@
     .card.mission .go { background: var(--amber); }
     .seen { display: none; font-size: 13px; color: var(--teal); font-weight: 600; }
     .card.opened .seen { display: inline; }
+    .again { margin-left: auto; color: var(--mute); font-size: 13px; }
+    .again:hover { color: var(--ink); }
     .time { margin-left: auto; color: var(--mute); font-size: 13px; }
     .note { margin-top: 34px; padding: 16px 18px; border-radius: 14px; border: 1px dashed var(--line); color: var(--mute);
             font-size: 14px; line-height: 1.55; }
@@ -204,18 +206,28 @@
     function wire() {
     document.querySelectorAll(".card[data-page]").forEach(function (card) {
       var page = card.getAttribute("data-page");
-      if (opened(page)) {
-        card.classList.add("opened");
-        card.querySelector(".go").textContent = "▶ Continue";
-      }
-      card.querySelector(".go").addEventListener("click", function () {
+      function go(restart) {
         opened(page, true);
         document.getElementById("loading").classList.add("on");
         // in this same tab (the "Catalogue" button of the page comes back here)
         var url = "{{ base_url }}voila/render/" + page + "?sid=" + sid();
         if (CLASS && CLASS.identity === "named") url += "&name=" + encodeURIComponent(storedName());
+        // start again: the answers of this page put aside on the server (web_user.py), once for this token
+        if (restart) url += "&restart=" + Math.random().toString(36).slice(2, 12);
         window.location.href = url;
-      });
+      }
+      if (opened(page)) {
+        card.classList.add("opened");
+        card.querySelector(".go").textContent = "▶ Continue";
+        var again = document.createElement("a");
+        again.href = "#"; again.className = "again"; again.textContent = "Start again";
+        again.addEventListener("click", function (ev) {
+          ev.preventDefault();
+          if (confirm("Start this page again? Your answers to its questions are put aside (your measurements stay).")) go(true);
+        });
+        card.querySelector(".foot").appendChild(again);
+      }
+      card.querySelector(".go").addEventListener("click", function () { go(false); });
     });
     }
     // the class of this server, if any (web_class.py --class); otherwise the cards written in this page

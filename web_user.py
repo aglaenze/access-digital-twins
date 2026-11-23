@@ -71,6 +71,12 @@ def sign_in():
         info = {}
     page = _page() or "page"
     now = datetime.datetime.now().isoformat(timespec="seconds")
+    # "Start again" on the start page: ?restart=<token>, once per token (a reload of the page does not start again)
+    token = re.sub(r"[^a-z0-9]", "", (q.get("restart") or [""])[0].lower())[:16]
+    if token and token not in info.get("restarts", []):
+        info.setdefault("restarts", []).append(token)
+        _start_again(folder, page)
+        info.get("opened", {}).pop(page, None)          # the time of the exercise counts from now
     if klass:
         info["class"] = klass
     if name:
@@ -85,6 +91,25 @@ def sign_in():
     except Exception:
         pass
     return known
+
+
+def _start_again(folder, page):
+    """Puts aside the answers to the questions of the page (folder _old/ of the student: nothing is deleted, as the
+    "Start again" of the app); the measurements stay."""
+    import shutil
+    try:
+        import classes
+        quiz_name = classes._quiz_name(page)
+    except Exception:
+        quiz_name = None
+    if not quiz_name:
+        return
+    old = os.path.join(folder, "_old", f"{quiz_name}_{datetime.datetime.now():%Y%m%d_%H%M%S}")
+    for ext in (".jsonl", ".meta.json"):
+        f = os.path.join(folder, quiz_name + ext)
+        if os.path.isfile(f):
+            os.makedirs(old, exist_ok=True)
+            shutil.move(f, os.path.join(old, os.path.basename(f)))
 
 
 def opened(page_part):

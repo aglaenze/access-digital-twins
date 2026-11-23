@@ -57,6 +57,8 @@ import analysis_chain                 # the folded "Under the hood" section
 import loki_reduction as red
 import loki_analysis as la
 
+import web_user
+web_user.sign_in()            # the online version: the anonymous student of the start page (nothing to do in the app)
 loki = VirtualLoki(session=os.environ.get("LOKI_SESSION", "student"))
 """)
 

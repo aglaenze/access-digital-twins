@@ -154,7 +154,7 @@ starts `../web_class.py --class <code>` on this computer (Voila, and a Cloudflar
 link for the students (it holds the code: no password to type) and its QR code (`shell/vendor/qrcode.js`,
 qrcode-generator 1.4.4, MIT, Kazuhiko Arase) appear after a few seconds (the beams are prepared meanwhile, web_warmup.py); one class open at a time, closed with
 **Close the class** (the whole tree of processes). **Live** (every 5 s, `classes.live`): each student (name, or an
-anonymous id), the page, the questions right, right at the first try, the questions tried and still wrong ("stuck"),
+anonymous id), the page, the questions answered (of all) and the last one reached, the questions right, right at the first try, the questions tried and still wrong ("stuck"),
 the measurements, the last activity, submitted or not; above, the students, the active ones, the submissions, the
 question most students are stuck on. No server yet: the class runs on the teacher's computer (keep it on and awake);
 the access is a convenience (the code is in the link), not a protection. The local app only (not the container mode).

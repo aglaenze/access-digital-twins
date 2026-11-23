@@ -63,6 +63,8 @@ import odin_reduction as red, odin_viz as viz, odin_games as games
 import measure_control as mc          # Stop button, settings locked during a measurement, renaming a file
 import analysis_chain                 # the folded "Under the hood" section
 
+import web_user
+web_user.sign_in()            # the online version: the anonymous student of the start page (nothing to do in the app)
 odin = VirtualOdin(session=os.environ.get("ODIN_SESSION", "student"))
 """)
 

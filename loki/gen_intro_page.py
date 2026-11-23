@@ -51,6 +51,8 @@ code(r"""
 import sys, os, warnings
 warnings.filterwarnings("ignore")
 sys.path.insert(0, os.path.abspath(".."))
+import web_user
+web_user.sign_in()            # the online version: the anonymous student of the start page (nothing to do in the app)
 import quiz, intro_widgets as iw
 q = quiz.Quiz("loki_intro")
 """)

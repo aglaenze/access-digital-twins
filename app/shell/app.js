@@ -962,12 +962,13 @@ var Classes = (() => {
         <div><b>${active.size}</b><span>active (last 5 min)</span></div>
         <div><b>${done}</b><span>submitted</span></div>
         <div><b>${worst ? esc(worst[0]) : "–"}</b><span>${worst ? `most stuck: ${worst[1]} student(s)` : "nobody stuck"}</span></div></div>
-      <table class="live"><thead><tr><th>Student</th><th>Page</th><th>Questions right</th><th>1st try</th><th>Stuck on</th>
+      <table class="live"><thead><tr><th>Student</th><th>Page</th><th>Answered</th><th>At</th><th>Right</th><th>1st try</th><th>Stuck on</th>
         <th>Measurements</th><th>Last activity</th><th></th></tr></thead><tbody>${rows.map((r) => {
-          const pct = r.questions ? Math.round(100 * r.right / r.questions) : 0;
+          const pct = r.questions ? Math.round(100 * r.answered / r.questions) : 0;
           const cls = (r.idle_min != null && r.idle_min > 10 ? "idle " : "") + (r.stuck.length ? "stuck" : "");
           return `<tr class="${cls}"><td>${esc(r.name || "anonymous " + r.student.slice(5, 9))}</td><td>${esc(r.title)}</td>
-            <td><span class="meter"><i style="width:${pct}%"></i></span>${r.right}/${r.questions || "?"}</td>
+            <td><span class="meter"><i style="width:${pct}%"></i></span>${r.answered}/${r.questions || "?"}</td>
+            <td>${esc(r.last_question || "–")}</td><td>${r.right}</td>
             <td>${r.first_try}</td><td class="tag-stuck">${esc(r.stuck.join(", "))}</td><td>${r.measurements}</td>
             <td>${esc(ago(r.last_activity))}</td><td>${r.submitted ? '<span class="tag-ok">✓ submitted</span>' : ""}</td></tr>`;
         }).join("")}</tbody></table>`;
