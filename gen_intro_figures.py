@@ -407,7 +407,7 @@ def odin_cameras():
     """The same neutrons through an iron disc seen by the two cameras: the Timepix3 camera notes each neutron (x, y, t),
     so the time gives λ and the neutrons can be sorted into pictures per wavelength (the iron lets more through above
     its Bragg edge at 4.05 Å); the integrating camera adds up the light: one picture, all wavelengths mixed."""
-    fig = plt.figure(figsize=(13, 4.8))
+    fig = plt.figure(figsize=(13, 3.6))
     rng = np.random.default_rng(7)
     n = 64
     yy, xx = np.mgrid[:n, :n]
@@ -417,32 +417,50 @@ def odin_cameras():
         img = np.where(disc, trans, 1.0)
         return rng.poisson(img * counts) / counts
 
-    fig.text(0.02, 0.93, "Timepix3 camera (event mode): one line per neutron", fontsize=12, fontweight="bold", color=INK)
+    # one grid for everything: four pictures of the same size on one line, the titles, the table and the captions
+    # on common lines (fig coordinates; the figure is 13 x 3.6 in, so a square picture is w wide and h high)
+    side = 1.75                                         # in
+    w, h = side / 13, side / 3.6
+    y0, top = 0.25, 0.25 + side / 3.6                   # bottom and top of the pictures
+    y_head, y_cap = 0.95, 0.19                          # headings and captions
+    x_tab, x_lam, gap, x_sep, x_int = 0.03, 0.315, 0.012, 0.775, 0.80
+
+    fig.text(x_tab, y_head, "Timepix3 camera (event mode): one line per neutron", fontsize=12, fontweight="bold",
+             color=INK, va="top")
+    fig.text(x_int, y_head, "Integrating camera", fontsize=12, fontweight="bold", color=INK, va="top")
+    fig.add_artist(plt.Line2D([x_sep, x_sep], [0.04, 0.95], color="#D9DDE5", lw=1.5))
+
+    # the list of events, from the top to the bottom of the pictures
     rows = [("x (mm)", "y (mm)", "t (ms)", "→ λ (Å)")]
     for x, y, t in ((3.21, 9.80, 45.9), (7.04, 6.62, 68.9), (11.56, 2.37, 91.8), (5.48, 12.90, 52.1)):
         rows.append((f"{x:.2f}", f"{y:.2f}", f"{t:.1f}", f"{H_OVER_M * t * 1e-3 / ODIN_DET:.2f}"))
+    step = (h - 0.04) / len(rows)
     for i, r in enumerate(rows):
         for j, c in enumerate(r):
-            fig.text(0.03 + j * 0.06, 0.8 - i * 0.065, c, fontsize=10.5, color=ORANGE if j == 3 else INK,
-                     fontweight="bold" if i == 0 else "normal", family="DejaVu Sans Mono")
-    fig.text(0.03, 0.8 - len(rows) * 0.065, "… millions of lines", fontsize=10, color=GREY)
-    fig.text(0.03, 0.27, "λ = 3956 × t / 60.55 m: the time gives\nthe wavelength (part 4), so the neutrons\n"
-             "can be sorted into pictures per wavelength →", fontsize=10.5, color=INK, va="top")
+            fig.text(x_tab + j * 0.055, top - 0.02 - i * step, c, fontsize=10.5, va="center",
+                     color=ORANGE if j == 3 else INK, fontweight="bold" if i == 0 else "normal", family="DejaVu Sans Mono")
+    fig.text(x_tab, top - 0.02 - len(rows) * step, "… millions of lines", fontsize=10, color=GREY, va="center")
+
+    # the pictures: same size, same line, titles at the same height
     for k, (lam, tr) in enumerate(((3.0, 0.45), (4.5, 0.75), (6.0, 0.78))):
-        ax = fig.add_axes([0.30 + k * 0.125, 0.2, 0.115, 0.55])
+        ax = fig.add_axes([x_lam + k * (w + gap), y0, w, h])
         ax.imshow(picture(tr, 150), cmap="gray", vmin=0.2, vmax=1.2)
         ax.set_xticks([]); ax.set_yticks([])
         ax.set_title(f"{lam:g} Å", fontsize=11, color=ORANGE)
-    fig.text(0.30, 0.1, "an iron disc: it lets more neutrons through above 4.05 Å\n(its Bragg edge): seen only "
-             "in the pictures per wavelength", fontsize=10, color=INK)
-    fig.add_artist(plt.Line2D([0.705, 0.705], [0.05, 0.95], color="#D9DDE5", lw=1.5))
-    fig.text(0.725, 0.93, "Integrating camera", fontsize=12, fontweight="bold", color=INK)
-    ax = fig.add_axes([0.74, 0.2, 0.18, 0.6])
+    ax = fig.add_axes([x_int, y0, w, h])
     ax.imshow(picture(0.62, 450), cmap="gray", vmin=0.2, vmax=1.2)
     ax.set_xticks([]); ax.set_yticks([])
     ax.set_title("all wavelengths added", fontsize=11, color=INK)
-    fig.text(0.725, 0.1, "no time, no λ: one picture, smoother\n(all the neutrons in it), but no Bragg edge",
-             fontsize=10, color=INK)
+
+    # the captions under the pictures: each line drawn on its own, on baselines common to the three columns
+    captions = {x_tab: ["λ = 3956 × t / 60.55 m: the time gives", "the wavelength (part 4), so the neutrons",
+                        "can be sorted into pictures per wavelength"],
+                x_lam: ["an iron disc: it lets more neutrons through above 4.05 Å",
+                        "(its Bragg edge): seen only in the pictures per wavelength"],
+                x_int: ["no time, no λ: one picture,", "smoother (all the neutrons in it),", "but no Bragg edge"]}
+    for x, lines in captions.items():
+        for k, line in enumerate(lines):
+            fig.text(x, y_cap - 0.02 - k * 0.06, line, fontsize=10.5, color=INK, va="baseline")
     _save(fig, "odin_cameras.png")
     plt.close(fig)
 

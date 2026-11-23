@@ -80,7 +80,9 @@ def _panel(controls):
         else:
             c.layout = w.Layout(width="440px")
         lab = w.HTML(f"<b>{label}</b>", layout=w.Layout(width="250px", min_width="250px"))
-        rows.append(w.HBox([lab, c], layout=w.Layout(align_items="center")).add_class("tw-ctl-row"))
+        row = w.HBox([lab, c], layout=w.Layout(align_items="center")).add_class("tw-ctl-row")
+        c._tw_row = row                  # (so that a picture can hide the row of a control that does not apply)
+        rows.append(row)
     return w.VBox(rows).add_class("tw-controls")
 
 
@@ -292,13 +294,17 @@ def odin_pinhole():
 
 
 ODIN_CAMERAS = {"standard": (110.0, 100.0), "high resolution": (27.5, 20.0)}   # pixel, scintillator blur (µm)
+ODIN_TIMEPIX = (110.0, 100.0)    # pictures of 128 x 128 pixels of 110 µm; light spread in its scintillator 0.1 mm
 
 
 def odin_resolution():
     """The three blurs of a picture (pinhole l·D/L, scintillator, pixel) and their combination √(a² + b² + c²), with
     the test pattern seen through them: blurred by the pinhole and the screen, cut into pixels, with the counting
-    noise of the neutrons per pixel (∝ D², ∝ pixel area, ∝ counting time)."""
-    cam = w.ToggleButtons(options=list(ODIN_CAMERAS), value="standard", description="integrating camera",
+    noise of the neutrons per pixel (∝ D², ∝ pixel area, ∝ counting time). The camera first (Timepix3 or integrating),
+    then, for the integrating camera only, its setup (standard or high resolution)."""
+    kind = w.ToggleButtons(options=["Timepix3 (event mode)", "integrating"], value="integrating", description="camera",
+                           style={"button_width": "130px", "description_width": "230px"})
+    cam = w.ToggleButtons(options=list(ODIN_CAMERAS), value="standard", description="integrating camera setup",
                           style={"button_width": "130px", "description_width": "230px"})
     d = w.ToggleButtons(options=[("1 cm", 0.01), ("2 cm", 0.02), ("3 cm", 0.03), ("4 cm", 0.04)], value=0.03,
                         description="pinhole D", style={"button_width": "70px", "description_width": "230px"})
@@ -306,8 +312,11 @@ def odin_resolution():
                         description="counting time", style={"button_width": "70px", "description_width": "230px"})
 
     def draw():
-        pix, scint = ODIN_CAMERAS[cam.value]
-        pin = 0.05 * d.value / ODIN_L_PINHOLE * 1e6                       # µm, camera 5 cm behind the sample
+        timepix = kind.value != "integrating"
+        if hasattr(cam, "_tw_row"):                     # the setup row only for the integrating camera
+            cam._tw_row.layout.display = "none" if timepix else ""
+        pix, scint = ODIN_TIMEPIX if timepix else ODIN_CAMERAS[cam.value]
+        pin = 0.05 * d.value / ODIN_L_PINHOLE * 1e6                      # µm, camera 5 cm behind the sample
         total = float(np.sqrt(pin ** 2 + scint ** 2 + pix ** 2))
         # the pattern at 2.5 µm per point: blurred by pinhole and screen, then averaged over each pixel
         step = 2.5
@@ -340,12 +349,17 @@ def odin_resolution():
                  extent=(0, nb * pix / 1000, 0, rows * pix / 1000))
         b.set_yticks([]); b.set_xlabel("position on the camera (mm): bars 400, 200, 100 and 50 µm wide")
         fig.tight_layout()
-        return fig, (f"Pinhole: 5 cm × {d.value * 100:.0f} cm / 10.5 m = <b>{pin:.0f} µm</b>; scintillator "
-                     f"<b>{scint:.0f} µm</b>; pixel <b>{pix:g} µm</b>. They combine as √(a² + b² + c²) = "
-                     f"<b>{total:.0f} µm</b>: the largest dominates. Neutrons per pixel: <b>{counts:.0f}</b> in the "
-                     f"open beam (the noise is about 1/√{counts:.0f} = {100 / np.sqrt(counts):.0f} %).")
+        txt = (f"Pinhole: 5 cm × {d.value * 100:.0f} cm / 10.5 m = <b>{pin:.0f} µm</b>; scintillator "
+               f"<b>{scint:.0f} µm</b>; pixel <b>{pix:g} µm</b>. They combine as √(a² + b² + c²) = "
+               f"<b>{total:.0f} µm</b>: the largest dominates. Neutrons per pixel: <b>{counts:.0f}</b> in the "
+               f"open beam (the noise is about 1/√{counts:.0f} = {100 / np.sqrt(counts):.0f} %).")
+        if timepix:
+            txt += (" The Timepix3 camera notes each position to 3.4 µm, but the light of each neutron spreads by "
+                    "0.1 mm in its screen: the pictures are made of 110 µm pixels, as for the standard integrating "
+                    "camera. What it adds is the time of each neutron, hence its wavelength (part 4).")
+        return fig, txt
 
-    _show([cam, d, t], draw, min_lines=3)
+    _show([kind, cam, d, t], draw, min_lines=4)
 
 
 # --------------------------------------------------------------------------------------------- LoKI
