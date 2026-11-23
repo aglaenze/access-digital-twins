@@ -46,7 +46,10 @@ API at `/twin/builder/api/<what>`, the functions of `../builder_api.py`). Opened
 builder*, *Change the sample*: `nb_tools.builder_url`) with the instrument, the proposal and the sample to start from
 (`?instrument=odin&proposal=1234&start=<sample>&name=..&title=..`). Three steps: **1. Sample** (a gallery to start
 from, with pictures: examples `odin/templates/`, models saved by users `TWIN_RUN_ROOT/templates/odin/`, the samples of
-the library and of the proposal; the parts as a tree; shapes chosen by icons, sizes, position and rotation by
+the library and of the proposal, the student's own first, then from the simplest to the most complex in three levels:
+simple shapes, several parts or grains, natural samples, `builder_api.level`; the pictures of the examples and of the
+library are made in advance and shipped in `../builder/thumbs/`: **after changing an example or a sample of the
+library, run `python builder_api.py --thumbs`**, otherwise its picture is made on first use, 5 to 15 s for a rock; help: *? How to use* (a worked example with pictures of the real page, `../builder/help.js`, pictures in `../builder/help/`, made by `../builder/help/tools/shots.py`) and *Tour* (started by itself at the first visit); the parts as a tree; shapes chosen by icons, sizes, position and rotation by
 sliders in mm; materials as cards with their Σ at 3 Å and a search; grains placed at random, components, combined
 shapes and the whole recipe as text under *Advanced*); **2. Holder**, apart from the sample (none, pin, base plate,
 quartz cell, vanadium can, tensile grips: placed from the bounds of the sample, only size and material change; kept
@@ -139,6 +142,22 @@ window.
 **Teacher view** (every exercise at every level on one page): menu of the account, *Teacher view…*, then the teacher
 code. Only a salted hash of the code is shipped (`teacher_code.json`); change it with `node set_teacher_code.js <code>`
 (or set `TWIN_TEACHER_CODE`). As for the accounts, a convenience, not a protection.
+
+## For the teacher: classes (prepare, open, follow live)
+
+In the teacher view, a tab **Classes** (`shell/app.js`, `Classes`; server side `../classes.py` through
+`/twin/classes` of `../container/twin_app.py`). **New class**: a title, anonymous or named students (a named class
+asks each student a name on the start page, e.g. a graded session), the power of the source (free, or fixed for the
+whole class: the pages show it locked, "set by your teacher"), and the pages the students may open, among those a
+browser can show alone (introductions, guided Trainee pages, class pages; `classes.offer()`). **Open the class**
+starts `../web_class.py --class <code>` on this computer (Voila, and a Cloudflare quick tunnel unless unticked): the
+link for the students (it holds the code: no password to type) and its QR code (`shell/vendor/qrcode.js`,
+qrcode-generator 1.4.4, MIT, Kazuhiko Arase) appear after about 2 minutes; one class open at a time, closed with
+**Close the class** (the whole tree of processes). **Live** (every 5 s, `classes.live`): each student (name, or an
+anonymous id), the page, the questions right, right at the first try, the questions tried and still wrong ("stuck"),
+the measurements, the last activity, submitted or not; above, the students, the active ones, the submissions, the
+question most students are stuck on. No server yet: the class runs on the teacher's computer (keep it on and awake);
+the access is a convenience (the code is in the link), not a protection. The local app only (not the container mode).
 
 ## For the teacher: collecting the work
 

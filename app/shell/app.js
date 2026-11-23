@@ -151,6 +151,9 @@ $("#t-form").onsubmit = async (ev) => {
 };
 function teacherMenu() {
   $("#teach").textContent = user && user.teacher ? "Leave the teacher view" : "Teacher view…";
+  // the classes are part of the teacher view
+  $("#tab-classes").classList.toggle("hidden", !(user && user.teacher));
+  if (!(user && user.teacher) && activeKey === "classes") activate("cat");
 }
 $("#signout").onclick = async () => {
   saveAll();
@@ -615,6 +618,9 @@ function activate(key) {
   activeKey = key;
   $("#tab-cat").classList.toggle("on", key === "cat");
   $("#pane-cat").classList.toggle("on", key === "cat");
+  $("#tab-classes").classList.toggle("on", key === "classes");
+  $("#pane-classes").classList.toggle("on", key === "classes");
+  if (Classes) { if (key === "classes") Classes.show(); else Classes.hide(); }
   for (const [k, t] of tabs) {
     t.btn.classList.toggle("on", k === key);
     t.pane.classList.toggle("on", k === key);
@@ -626,6 +632,7 @@ function activate(key) {
   if (key === "cat" && user) loadCatalogue();
 }
 $("#tab-cat").onclick = () => activate("cat");
+$("#tab-classes").onclick = () => activate("classes");
 
 // MSc "Without code": the notebook shown as a page of the BSc level (clean_view.js: no header, menus or
 // toolbar, outputs only, cells not selectable, a button "Analyze my files"); the choice can change while the tab is open
@@ -844,3 +851,163 @@ T.on("open-url", (url) => {
     : u.pathname.endsWith("/twin/builder") ? "Sample builder" : file;
   openTab(p, u.pathname.startsWith("/notebooks/") ? "notebook" : "page", name);
 });
+
+
+// ------------------------------------------------------------------ the teacher's classes (classes.py, /twin/classes)
+// Prepare a class (its pages, anonymous or named, the power of the source), open it (web_class.py on this computer:
+// the students get one link, also as a QR code), follow it live (where each student is, read every 5 s).
+var Classes = (() => {
+  let data = { classes: [], offer: [], open: null }, selected = null, timer = null, liveRows = [];
+  const esc = (x) => String(x == null ? "" : x).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const ago = (iso) => {
+    if (!iso) return "";
+    const m = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+    return m < 1 ? "now" : m < 60 ? `${m} min ago` : `${Math.floor(m / 60)} h ${m % 60} min ago`;
+  };
+  async function api(method, path, body) {
+    const r = await T.api(method, path, body);
+    if (r && r.error) throw new Error(r.error);
+    return r;
+  }
+  async function load() {
+    try { data = await api("GET", "/twin/classes"); } catch (err) { toast("Classes: " + (err.message || err)); return; }
+    if (!selected && data.classes.length) selected = (data.open && data.open.code) || data.classes[0].code;
+    renderList(); renderDetail(); poll();
+  }
+  function renderList() {
+    const box = $("#cls-list"); box.innerHTML = "";
+    if (!data.classes.length) box.innerHTML = '<p class="hint">No class yet.</p>';
+    for (const c of data.classes) {
+      const b = document.createElement("button");
+      b.className = "cls-item" + (c.code === selected ? " on" : "");
+      const isOpen = data.open && data.open.code === c.code;
+      b.innerHTML = `<b>${isOpen ? '<i class="live-dot"></i>' : ""}${esc(c.title)}</b>` +
+        `<span>${esc(c.created.slice(0, 10))} · ${c.pages.length} page(s) · ${c.identity === "named" ? "named" : "anonymous"}${isOpen ? " · open" : ""}</span>`;
+      b.onclick = () => { selected = c.code; liveRows = []; renderList(); renderDetail(); poll(); };
+      box.appendChild(b);
+    }
+  }
+  function qr(link) {
+    try { const q = qrcode(0, "M"); q.addData(link); q.make(); return q.createDataURL(6, 2); } catch (err) { return ""; }
+  }
+  function renderDetail() {
+    const box = $("#cls-detail");
+    const c = data.classes.find((x) => x.code === selected);
+    if (!c) { box.innerHTML = '<p class="hint">Choose a class, or make a new one.</p>'; return; }
+    const byId = Object.fromEntries(data.offer.map((p) => [p.id, p]));
+    const open = data.open && data.open.code === c.code ? data.open : null;
+    const power = c.settings && c.settings.power_mw ? `${c.settings.power_mw} MW (fixed)` : "free";
+    let openHtml;
+    if (!open) {
+      openHtml = `<div class="cls-acts"><button class="primary" id="cls-open">Open the class</button>
+        <label><input type="checkbox" id="cls-tunnel" checked> through the tunnel (students outside this network)</label></div>
+        <p class="hint">Opening starts the pages on this computer: about 2 minutes before the link works (a little more through the tunnel).
+        ${data.open ? `It closes the class open now (<b>${esc(data.open.title)}</b>).` : ""}</p>`;
+    } else if (!open.link) {
+      openHtml = `<p>Starting… the link appears here in a minute.</p><div class="cls-acts"><button class="btn" id="cls-close">Close the class</button></div>`;
+    } else {
+      openHtml = `<div class="cls-open"><div class="qr"><img alt="QR code of the link" src="${qr(open.link)}"></div>
+        <div style="flex:1;min-width:260px;display:flex;flex-direction:column;gap:10px">
+          <b>Link for the students</b><div class="cls-link">${esc(open.link)}</div>
+          <div class="cls-acts"><button class="btn" id="cls-copy">Copy the link</button>
+            <button class="btn" id="cls-try">Open it here (as a student)</button>
+            <button class="btn danger" id="cls-close">Close the class</button></div>
+          <p class="hint">Open since ${esc(open.started.slice(11, 16))}. ${open.tunnel ? "The tunnel's address changes at each opening." : "Local only: this computer and its network."}
+          Keep this computer on and awake.</p></div></div>`;
+    }
+    box.innerHTML = `<h1>${esc(c.title)}</h1>
+      <div class="cls-meta"><span class="chip ${c.identity === "named" ? "named" : ""}">${c.identity === "named" ? "Named students" : "Anonymous students"}</span>
+        <span class="chip">Power of the source: ${esc(power)}</span><span class="chip">Code ${esc(c.code)}</span></div>
+      <div class="cls-card"><h3>${open ? "Open now" : "Closed"}</h3>${openHtml}</div>
+      <div class="cls-card"><h3>Pages of the class</h3><ol>${c.pages.map((id) => {
+        const p = byId[id];
+        return p ? `<li>${esc(p.title)} <span>· ${esc(p.level_name)} · ${esc(p.instrument.toUpperCase())}</span></li>`
+                 : `<li>${esc(id)} <span>(no longer offered)</span></li>`;
+      }).join("")}</ol></div>
+      <div class="cls-card"><h3>Live</h3><div id="cls-live"><p class="hint">Reading…</p></div></div>
+      <div class="cls-acts"><button class="btn danger" id="cls-delete">Delete this class</button>
+        <span class="hint">Deleting removes the class only: the work of its students stays on this computer.</span></div>`;
+    const on = (id, f) => { const e = document.getElementById(id); if (e) e.onclick = f; };
+    on("cls-open", async () => {
+      try { data.open = await api("POST", "/twin/classes/open", { code: c.code, tunnel: $("#cls-tunnel").checked }); }
+      catch (err) { toast("The class did not open: " + (err.message || err)); return; }
+      renderList(); renderDetail(); poll();
+    });
+    on("cls-close", async () => {
+      if (!confirm("Close the class? The students can no longer open its pages (their work is kept).")) return;
+      await api("POST", "/twin/classes/close", {}); data.open = null; renderList(); renderDetail();
+    });
+    on("cls-copy", () => { navigator.clipboard.writeText(open.link); toast("Link copied."); });
+    on("cls-try", () => T.openExternal(open.link));
+    on("cls-delete", async () => {
+      if (!confirm(`Delete the class "${c.title}"? The work of its students stays on this computer.`)) return;
+      try { await api("DELETE", "/twin/classes?code=" + c.code); } catch (err) { toast(err.message || err); return; }
+      selected = null; load();
+    });
+    renderLive();
+  }
+  function renderLive() {
+    const box = document.getElementById("cls-live");
+    if (!box) return;
+    const rows = liveRows;
+    if (!rows.length) { box.innerHTML = '<p class="hint">No student yet. Their progress appears here as they work (every 5 s).</p>'; return; }
+    const students = new Set(rows.map((r) => r.student));
+    const active = new Set(rows.filter((r) => r.idle_min != null && r.idle_min < 5).map((r) => r.student));
+    const done = rows.filter((r) => r.submitted).length;
+    const stuckCount = {};
+    for (const r of rows) for (const q of r.stuck) stuckCount[q] = (stuckCount[q] || 0) + 1;
+    const worst = Object.entries(stuckCount).sort((a, b) => b[1] - a[1])[0];
+    box.innerHTML = `<div class="cls-summary">
+        <div><b>${students.size}</b><span>students</span></div>
+        <div><b>${active.size}</b><span>active (last 5 min)</span></div>
+        <div><b>${done}</b><span>submitted</span></div>
+        <div><b>${worst ? esc(worst[0]) : "–"}</b><span>${worst ? `most stuck: ${worst[1]} student(s)` : "nobody stuck"}</span></div></div>
+      <table class="live"><thead><tr><th>Student</th><th>Page</th><th>Questions right</th><th>1st try</th><th>Stuck on</th>
+        <th>Measurements</th><th>Last activity</th><th></th></tr></thead><tbody>${rows.map((r) => {
+          const pct = r.questions ? Math.round(100 * r.right / r.questions) : 0;
+          const cls = (r.idle_min != null && r.idle_min > 10 ? "idle " : "") + (r.stuck.length ? "stuck" : "");
+          return `<tr class="${cls}"><td>${esc(r.name || "anonymous " + r.student.slice(5, 9))}</td><td>${esc(r.title)}</td>
+            <td><span class="meter"><i style="width:${pct}%"></i></span>${r.right}/${r.questions || "?"}</td>
+            <td>${r.first_try}</td><td class="tag-stuck">${esc(r.stuck.join(", "))}</td><td>${r.measurements}</td>
+            <td>${esc(ago(r.last_activity))}</td><td>${r.submitted ? '<span class="tag-ok">✓ submitted</span>' : ""}</td></tr>`;
+        }).join("")}</tbody></table>`;
+  }
+  async function poll() {
+    if (!selected) return;
+    try {
+      const r = await api("GET", "/twin/classes/live?code=" + selected);
+      liveRows = r.rows || [];
+      const was = data.open && data.open.link;
+      data.open = r.open;
+      if ((data.open && data.open.link) !== was) { renderList(); renderDetail(); } else renderLive();
+    } catch (err) { /* the next poll tries again */ }
+  }
+  // the form of a new class: the pages offered, grouped by instrument
+  $("#cls-new").onclick = () => {
+    const box = $("#nc-pages"); box.innerHTML = "";
+    let instr = "";
+    for (const p of data.offer) {
+      if (p.instrument !== instr) { instr = p.instrument; box.insertAdjacentHTML("beforeend", `<h4>${esc(instr.toUpperCase())}</h4>`); }
+      box.insertAdjacentHTML("beforeend", `<label><input type="checkbox" value="${esc(p.id)}"> <div>${esc(p.title)}
+        <span>· ${esc(p.level_name)}${p.duration ? " · " + esc(p.duration) : ""}</span></div></label>`);
+    }
+    $("#nc-title").value = ""; $("#nc-power").value = ""; $("#nc-error").textContent = "";
+    document.querySelector('input[name="nc-id"][value="anonymous"]').checked = true;
+    $("#newclass").showModal();
+  };
+  $("#nc-cancel").onclick = () => $("#newclass").close();
+  $("#nc-form").onsubmit = async (ev) => {
+    ev.preventDefault();
+    const pages = [...document.querySelectorAll("#nc-pages input:checked")].map((i) => i.value);
+    if (!pages.length) { $("#nc-error").textContent = "Choose at least one page."; return; }
+    try {
+      const c = await api("POST", "/twin/classes", { title: $("#nc-title").value, pages,
+        identity: document.querySelector('input[name="nc-id"]:checked').value, power_mw: $("#nc-power").value || null });
+      selected = c.code; $("#newclass").close(); toast("Class created. Open it when the students are ready."); load();
+    } catch (err) { $("#nc-error").textContent = err.message || String(err); }
+  };
+  return {
+    show() { load(); clearInterval(timer); timer = setInterval(poll, 5000); },
+    hide() { clearInterval(timer); timer = null; },
+  };
+})();

@@ -71,6 +71,8 @@
     <nav id="tabs" aria-label="Open pages">
       <button id="tab-cat" class="tab on">
         <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"></rect><rect x="14" y="3" width="7" height="7" rx="1.5"></rect><rect x="3" y="14" width="7" height="7" rx="1.5"></rect><rect x="14" y="14" width="7" height="7" rx="1.5"></rect></svg>Catalogue</button>
+      <button id="tab-classes" class="tab hidden">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="8" r="3"></circle><circle cx="16" cy="8" r="3"></circle><path d="M2 20c0-3.3 2.7-6 6-6s6 2.7 6 6M10 20c0-3.3 2.7-6 6-6s6 2.7 6 6"></path></svg>Classes</button>
     </nav>
     <div class="right">
       <span id="saved" class="saved"></span>
@@ -100,6 +102,18 @@
         <div id="free"></div>
       </main>
     </section>
+    <!-- the teacher's classes (classes.py): prepare, open (a link for the students), follow live -->
+    <section id="pane-classes" class="pane">
+      <main class="cls">
+        <aside class="cls-side">
+          <div class="cls-side-head"><h2>Your classes</h2><button id="cls-new" class="primary">+ New class</button></div>
+          <p class="hint">A class gives the students one link: they see only the pages you chose. It runs on this
+            computer (keep it on and awake); the link goes through a free tunnel.</p>
+          <div id="cls-list" class="cls-list"></div>
+        </aside>
+        <section id="cls-detail" class="cls-detail"><p class="hint">Choose a class, or make a new one.</p></section>
+      </main>
+    </section>
   </div>
 </div>
 
@@ -126,7 +140,28 @@
     <input id="t-code" type="password" autocomplete="off" spellcheck="false"></div>
   <p id="t-error" class="error"></p></div>
   <div class="prop-acts"><button type="button" class="btn" id="t-cancel">Cancel</button><button class="primary">Open the teacher view</button></div></form></dialog>
+<dialog id="newclass" class="wide"><form id="nc-form" class="prop-form"><div class="sheet-body"><h2>New class</h2>
+  <div class="field"><label for="nc-title">Title (shown to the students)</label>
+    <input id="nc-title" type="text" autocomplete="off" required placeholder="e.g. Advanced X-ray imaging, 23 November"></div>
+  <div class="nc-row">
+    <fieldset class="nc-box"><legend>Students</legend>
+      <label><input type="radio" name="nc-id" value="anonymous" checked> Anonymous: no name asked</label>
+      <label><input type="radio" name="nc-id" value="named"> Named: each student types a name (e.g. a graded session)</label>
+    </fieldset>
+    <fieldset class="nc-box"><legend>Power of the source</legend>
+      <select id="nc-power"><option value="">Free: the student chooses where the page lets them</option>
+        <option value="1">1 MW</option><option value="2">2 MW (ESS at the start)</option><option value="5">5 MW (ESS design)</option></select>
+    </fieldset>
+  </div>
+  <fieldset class="nc-box"><legend>Pages the students may open (in this order)</legend>
+    <div id="nc-pages" class="nc-pages"></div>
+    <p class="hint">Only the pages a browser can show alone: the introductions, the guided pages (Trainee level) and the
+      class pages. The notebooks (MSc) and the beamtimes (NICOS) need a server per student: later.</p>
+  </fieldset>
+  <p id="nc-error" class="error"></p></div>
+  <div class="prop-acts"><button type="button" class="btn" id="nc-cancel">Cancel</button><button class="primary">Create the class</button></div></form></dialog>
 <div id="toast" role="status"></div>
+<script src="vendor/qrcode.js"></script>
 <script src="clean_view.js"></script>
 <script src="app.js"></script>
 </body>

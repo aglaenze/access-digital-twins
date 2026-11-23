@@ -21,6 +21,12 @@ All requests need the token of the server (header "Authorization: token ...").
                                    _old/ of the student, nothing is deleted); the measurements stay
     POST /twin/nicos {instrument}  opens NICOS of this instrument: windows of this computer (local app), or the control
                                    room of the container (returns the address of the remote screen)
+    GET  /twin/classes             the classes of the teacher (classes.py), the pages that can be given, the open one
+    POST /twin/classes {title, pages, identity, power_mw}   a new class
+    DELETE /twin/classes?code=C    removes a class (the work of its students stays)
+    POST /twin/classes/open {code, tunnel}   opens a class: web_class.py --class (Voila, and the tunnel)
+    POST /twin/classes/close       closes the open class
+    GET  /twin/classes/live?code=C where each student of the class is (classes.live)
     GET  /twin/handin              the work of the student as a zip file (logbooks, notebooks, measurements logbook)
     GET  /twin/builder?instrument=odin|loki&proposal=N[&start=<sample>&name=..&title=..]   the sample builder (a page
                                    of the app: builder/index.html for ODIN, builder/loki.html for LoKI, their files
@@ -590,6 +596,49 @@ class BuilderApi(Base):
         self.finish(json.dumps(out))
 
 
+class Classes(Base):
+    """The classes of the teacher (classes.py): the app shows them in the teacher view."""
+    @staticmethod
+    def classes():
+        import classes
+        return classes
+
+    @web.authenticated
+    def get(self, what=""):
+        C = self.classes()
+        if what == "live":
+            self.finish(json.dumps(dict(rows=C.live(self.get_argument("code")), open=C.open_status())))
+            return
+        self.finish(json.dumps(dict(classes=C.classes(), offer=C.offer(), open=C.open_status())))
+
+    @web.authenticated
+    def post(self, what=""):
+        C, d = self.classes(), self.body()
+        try:
+            if what == "open":
+                out = C.open_class(d["code"], tunnel=bool(d.get("tunnel", True)))
+            elif what == "close":
+                out = dict(closed=C.close_class())
+            else:
+                power = d.get("power_mw")
+                out = C.new(d.get("title", ""), d.get("pages", []), identity=d.get("identity", "anonymous"),
+                            settings=dict(power_mw=float(power) if power not in (None, "") else None),
+                            note=d.get("note", ""))
+        except (ValueError, KeyError, OSError) as e:
+            self.set_status(400)
+            out = dict(error=str(e))
+        self.finish(json.dumps(out))
+
+    @web.authenticated
+    def delete(self, what=""):
+        try:
+            self.classes().delete(self.get_argument("code"))
+            self.finish(json.dumps(dict(deleted=True)))
+        except (ValueError, OSError) as e:
+            self.set_status(400)
+            self.finish(json.dumps(dict(error=str(e))))
+
+
 def _jupyter_server_extension_points():
     return [{"module": "twin_app"}]
 
@@ -598,7 +647,7 @@ def _load_jupyter_server_extension(serverapp):
     base = serverapp.web_app.settings["base_url"]
     serverapp.web_app.add_handlers(".*$", [(url_path_join(base, "twin", p), h) for p, h in [
         ("catalogue", Catalogue), ("user", User), ("open", Open), ("reset", Reset), ("proposal", Proposal),
-        ("nicos", Nicos), ("handin", Handin), ("builder", BuilderPage), (r"builder/api/(\w+)", BuilderApi)]])
+        ("nicos", Nicos), ("handin", Handin), ("classes", Classes), (r"classes/(\w+)", Classes), ("builder", BuilderPage), (r"builder/api/(\w+)", BuilderApi)]])
     serverapp.web_app.add_handlers(".*$", [(url_path_join(base, "twin", "builder", "static", "(.*)"), BuilderStatic,
                                             {"path": os.path.join(os.path.abspath(os.path.expanduser(serverapp.root_dir)),
                                                                   "builder")})])

@@ -128,6 +128,8 @@ def classes():
     """All the classes of this computer, newest first."""
     out = []
     for f in glob.glob(os.path.join(folder(), "*.json")):
+        if os.path.basename(f).startswith("_"):
+            continue
         try:
             with open(f, encoding="utf-8") as fh:
                 out.append(json.load(fh))
@@ -248,6 +250,102 @@ def live(code, now=None):
                              idle_min=round((now - last).total_seconds() / 60, 1) if last else None,
                              submitted=sub))
     return sorted(rows, key=lambda r: r["last_activity"] or "", reverse=True)
+
+
+# --------------------------------------------------------------------------- opening a class from the app
+# One class open at a time on this computer: web_class.py --class <code> (Voila, and the tunnel unless local only),
+# started by the app (twin_app.py, /twin/classes/open). Its process id is kept in classes/_open.json, so that an app
+# started again finds it and can close it.
+def _open_file():
+    return os.path.join(folder(), "_open.json")
+
+
+def _link_file():
+    return os.path.join(run_root(), "web_class_link.txt")
+
+
+def open_status():
+    """The class open on this computer: {code, title, pid, started, tunnel, local, link, running}, or None."""
+    try:
+        with open(_open_file(), encoding="utf-8") as f:
+            st = json.load(f)
+    except (OSError, ValueError):
+        return None
+    import psutil
+    st["running"] = psutil.pid_exists(st.get("pid", -1))
+    if not st["running"]:
+        return None
+    st["link"] = None
+    try:
+        with open(_link_file(), encoding="utf-8") as f:
+            st["link"] = f.read().strip() or None
+    except OSError:
+        pass
+    if not st.get("tunnel"):
+        st["link"] = st["local"]                   # local only: the address on this computer / its network
+    return st
+
+
+def open_class(code, tunnel=True, port=7860):
+    """Starts the server of the class (closing another one first). Returns open_status() at once: the link of the
+    tunnel arrives some seconds later (ask open_status() again)."""
+    import subprocess
+    c = load(code)
+    close_class()
+    try:
+        os.remove(_link_file())                     # the link of an earlier class must not be shown
+    except OSError:
+        pass
+    cmd = [sys.executable, os.path.join(HERE, "web_class.py"), "--class", c["code"], "--port", str(port)]
+    if not tunnel:
+        cmd.append("--no-tunnel")
+    log = open(os.path.join(run_root(), "web_class_app.log"), "a", encoding="utf-8")
+    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+    p = subprocess.Popen(cmd, cwd=HERE, stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
+                         creationflags=flags, env=dict(os.environ, PYTHONUNBUFFERED="1"))
+    st = dict(code=c["code"], title=c["title"], pid=p.pid, tunnel=bool(tunnel), port=port,
+              local=f"http://localhost:{port}/?token={c['code']}",
+              started=datetime.datetime.now().isoformat(timespec="seconds"))
+    os.makedirs(folder(), exist_ok=True)
+    with open(_open_file(), "w", encoding="utf-8") as f:
+        json.dump(st, f, indent=1)
+    return dict(st, running=True, link=None if tunnel else st["local"])
+
+
+def close_class():
+    """Stops the server of the open class (web_class.py, Voila, the tunnel: the whole tree of processes)."""
+    try:
+        with open(_open_file(), encoding="utf-8") as f:
+            st = json.load(f)
+    except (OSError, ValueError):
+        return False
+    import psutil
+    try:
+        p = psutil.Process(st["pid"])
+        procs = p.children(recursive=True) + [p]
+        for q in procs:
+            try:
+                q.terminate()
+            except psutil.Error:
+                pass
+        psutil.wait_procs(procs, timeout=10)
+    except psutil.Error:
+        pass
+    for f in (_open_file(), _link_file(),
+              os.path.join(HERE, "container", "app_data", "voila", "templates", "twin", "static", "class.json")):
+        try:
+            os.remove(f)
+        except OSError:
+            pass
+    return True
+
+
+def delete(code):
+    """Removes a class (its file only: the work of its students stays in progress/ and web_results/)."""
+    st = open_status()
+    if st and st["code"] == code:
+        close_class()
+    os.remove(_path(code))
 
 
 def _main(argv):
