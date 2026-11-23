@@ -1,6 +1,6 @@
 # Container image of the digital twins
 
-One Linux image with everything a student session needs: McStas 3.9.2 and NCrystal, the official McStas models of
+One Linux image with everything a student session needs: McStas 3.10.3 and NCrystal, the official McStas models of
 ODIN and LoKI (ESS/DMSC, fixed commits), the twins of this repository, the ESS reduction software (essimaging, esssans,
 scipp), sasmodels (the engine of SasView), JupyterLab and Voilà, NICOS with its window, Kafka and just-bin-it (live
 data), and the NICOS window shown in the browser. Students do not run it by hand: the app (`../app/`, installers on

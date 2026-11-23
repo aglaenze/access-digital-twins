@@ -157,7 +157,7 @@ python web_results.py ~/McStas_runs/twin/web_results results.csv      # opens in
 
 | Environment | Used by | Key packages |
 |---|---|---|
-| `mcstas` | the twins, the server, the reduction, the pages | McStas 3.9.2, McStasScript, NCrystal, MCPL, essimaging 26.10.1, scipp, voila (numpy 2) |
+| `mcstas` | the twins, the server, the reduction, the pages | McStas 3.10.3, McStasScript, NCrystal, MCPL, essimaging 26.10.1, scipp, voila (numpy 2) |
 | `nicos` | NICOS cache, daemon, GUI | NICOS (sources in `McStas_runs/nicos_src`), nicos-pyctl, PyQt5, gr (numpy 1.26) |
 
 The two environments only talk over HTTP (`twin_server.py`), on this computer.

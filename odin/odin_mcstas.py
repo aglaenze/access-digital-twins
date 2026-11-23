@@ -205,6 +205,15 @@ def front(mode, ncount, wfm_delta=0.3, mpi=12, build_dir=None):
                  n_pulses=FRONT_PULSES[mode])
 
 
+def mcstas_version():
+    """Version of the installed McStas (conda package mcstas-core), part of the compilation cache key: an executable
+    compiled by another McStas version is compiled again. "" if not found."""
+    import glob
+    import sys
+    m = sorted(glob.glob(os.path.join(sys.prefix, "conda-meta", "mcstas-core-*.json")))
+    return os.path.basename(m[-1])[len("mcstas-core-"):].split("-")[0] if m else ""
+
+
 class Runner:
     """Compiles the instrument once, then runs the MPI executable for each simulation, with a disk cache.
 
@@ -227,7 +236,9 @@ class Runner:
         self.instr.write_full_instrument()
         new = open(instr_file, "rb").read()
         strip = lambda b: b"\n".join(l for l in b.splitlines() if b"Date:" not in l)  # dated header
-        if not force and os.path.isfile(self.exe) and hashlib.md5(strip(old)).digest() == hashlib.md5(strip(new)).digest():
+        stamp = self.exe + ".mcstas"
+        same_mcstas = os.path.isfile(stamp) and open(stamp).read() == mcstas_version()
+        if not force and same_mcstas and os.path.isfile(self.exe) and hashlib.md5(strip(old)).digest() == hashlib.md5(strip(new)).digest():
             self._compiled = True
             return
         tmp = os.path.join(self.run_dir, "_compile_test")
@@ -239,6 +250,7 @@ class Runner:
         if not os.path.isfile(self.exe):
             print(p.stdout[-3000:], p.stderr[-3000:])
             raise RuntimeError("McStas compilation failed")
+        open(stamp, "w").write(mcstas_version())
         self._compiled = True
 
     @staticmethod

@@ -48,6 +48,15 @@ def complete(folder):
     return os.path.isfile(f) and "begin data" in open(f, errors="ignore").read()
 
 
+def mcstas_version():
+    """Version of the installed McStas (conda package mcstas-core), part of the compilation cache key: an executable
+    compiled by another McStas version is compiled again. "" if not found."""
+    import glob
+    import sys
+    m = sorted(glob.glob(os.path.join(sys.prefix, "conda-meta", "mcstas-core-*.json")))
+    return os.path.basename(m[-1])[len("mcstas-core-"):].split("-")[0] if m else ""
+
+
 class Runner:
     """Compiles an .instr file once (mcrun -c), then runs the MPI executable, with one cache folder per simulation.
     A complete folder is read back instead of being recomputed; deleting it forces a new computation."""
@@ -63,7 +72,7 @@ class Runner:
 
     def compile(self):
         stamp = self.exe + ".md5"
-        h = hashlib.md5(open(self.instr_file, "rb").read()).hexdigest()
+        h = hashlib.md5(open(self.instr_file, "rb").read() + mcstas_version().encode()).hexdigest()
         if os.path.isfile(self.exe) and os.path.isfile(stamp) and open(stamp).read() == h:
             return
         tmp = f"{self.run_dir}/_compile_test"

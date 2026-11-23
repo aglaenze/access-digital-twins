@@ -67,7 +67,7 @@ contain spaces (McStas command line). Folders, relative to `<TWIN_RUN_ROOT>/odin
 
 ## 2. Requirements and installation
 
-**Environment**: conda `mcstas`: McStas 3.9.2, McStasScript 0.0.91, NCrystal 4.4.6, MCPL, a C compiler (MSVC on
+**Environment**: conda `mcstas`: McStas 3.10.3, McStasScript 0.0.97, NCrystal 4.4.6, MCPL, a C compiler (MSVC on
 Windows) + MPI (MS-MPI on Windows), the `ODIN_instr` and `odin_support` packages of the official ODIN repository
 (https://git.esss.dk/dmsc-instrumentmodels/odin, `pip install -e`), scipp, scippneutron, tof, plopp, mcstastox. In addition for the twin
 (installed 2026-11-03):

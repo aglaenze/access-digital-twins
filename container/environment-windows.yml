@@ -7,8 +7,8 @@ channels:
   - nodefaults
 dependencies:
   - python=3.14
-  - mcstas=3.9.2
-  - mcstasscript=0.0.91
+  - mcstas=3.10.3
+  - mcstasscript=0.0.97
   - ncrystal=4.4.6
   - mcpl=2.2.8
   - msmpi                # mpiexec for McStas (MPI)
