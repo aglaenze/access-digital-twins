@@ -198,6 +198,11 @@ ODIN has two measuring positions (sample stages `spst1`, `spst2` and camera boxe
 file): the sample at 60.5 m (position 1, L = 10.5 m after the pinhole) or 64 m (position 2, L = 14 m; ODIN
 requirement: 20 cm × 20 cm illuminated at L = 14 m). The camera has the high-magnification lens of the template
 (`zoom`, 14.1 mm field) or its full field (`full`: 10 cm at position 1, 20 cm at position 2).
+- **Real ODIN (ESS detector report, TG5/SAR, 2025-12-17)**: CMOS camera (Hamamatsu ORCA-Flash v3, optional gated
+  intensifier, 5 ms gates) with fields of view from 20 × 20 mm² to 300 × 300 mm²; LumaCam (Timepix3, image
+  intensifier) from 20 × 20 mm² to 260 × 260 mm²; screens ⁶LiF/ZnS:Ag and ⁶LiF/ZnO:Zn (100–300 µm), Gd₂O₂S:Tb
+  (10–40 µm). The twin's zoom (14.1 mm, from the ESS file template) is thus a little smaller than ODIN's smallest
+  field; the gated CMOS mode is not modeled. Said in the introduction (part 6).
 - **Default = position 1, zoom**: every exercise; its instruments, simulations, hybrid models and caches keep their
   names (`config_tag` = ''), so nothing is recomputed.
 - **Another setting** is another McStas back end (`ODIN_twin_<sample>_focus_P2full`: sample at `z_sample`, detector

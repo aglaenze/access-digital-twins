@@ -104,8 +104,7 @@ md(r"""
 - the **sample** sits on a stage that moves and turns it, at one of **two measuring positions**: 60.5 m (position 1)
   or 64 m (position 2), that is $L$ = 10.5 m or 14 m after the pinhole (part 3);
 - the **camera** just behind the sample records each neutron: where it arrived (which pixel) and when (part 4). Its
-  lens sets the field of view: the whole beam, **10 cm × 10 cm** at position 1 and **20 cm × 20 cm** at position 2,
-  or a small 14 mm square with finer pixels (part 6).
+  lens sets the field of view, from **2 cm × 2 cm** (fine pixels) to about **30 cm × 30 cm** (part 6).
 """)
 
 code(r"""
@@ -329,14 +328,16 @@ md(r"""
 
 The camera does not look at the neutrons: it photographs the glowing screen, through a lens, as a phone photographs a
 page. Its chip has a fixed number of pixels, say $N$ across. The **lens** decides how much of the screen is projected
-onto that chip:
+onto that chip. ODIN has lenses of several magnifications: its fields of view go from **20 mm × 20 mm** to
+**300 mm × 300 mm** with the integrating camera, and to 260 mm × 260 mm with the event camera (6.3) (ESS detector
+report of ODIN, December 2025). The twin keeps two of them:
 
 - the **full-field lens** films the whole screen: **10 cm × 10 cm** at position 1 (20 cm × 20 cm at position 2,
   where the beam is wider). Each pixel sees 100 mm / $N$ of the screen;
 - the **zoom lens** (a high magnification) films only **14 mm × 14 mm** of it. Each pixel sees 14 mm / $N$: pixels
   7 times smaller on each side.
 """)
-fig("odin_lens.png", "What the lens does. Top: the zoom lens projects a 14 mm square of the screen onto the chip. "
+fig("odin_lens.png", "What the lens does, with the two lenses of the twin. Top: the zoom lens projects a 14 mm square of the screen onto the chip. "
     "Bottom: the full-field lens projects the whole 10 cm screen onto the same chip. Same number of pixels, so the "
     "pixels seen on the screen are 7 times larger with the full field.")
 md(r"""
@@ -358,9 +359,10 @@ md(r"""
   so the counting must be longer for the same noise.
 
 **In the twin's exercises** the lens is the **zoom**, at position 1: a field of view of **14 mm × 14 mm**, 5 cm behind
-the sample. It is the field of the Timepix3 camera of the real ODIN file used as model for the twin's data files:
-its chip has 256 × 256 pixels of 55 µm, 14.1 mm across, and the zoom lens forms the picture of the screen on it at
-its real size. The samples of the exercises are chosen **small enough for this field**, so most are seen whole: the
+the sample. It is the field of the Timepix3 camera in the ESS template of the ODIN data file, used as model for the
+twin's files: its chip has 256 × 256 pixels of 55 µm, 14.1 mm across, and the zoom lens forms the picture of the
+screen on it at its real size. It is a little smaller than the smallest field announced for ODIN (20 mm): the twin
+is slightly more "zoomed" than the real instrument at its strongest magnification. The samples of the exercises are chosen **small enough for this field**, so most are seen whole: the
 iron plate (10 mm × 10 mm), the pieces of the Martian meteorite (12 mm × 8 mm and 10 mm × 13 mm, sawn from a stone of
 several hundred grams), the steel bar (9.8 mm wide). A few are a little larger and overflow the field at their ends:
 the coil (15.5 mm long), the battery (16 mm across), the anode bars (20 mm long); what is measured there lies in the
@@ -385,8 +387,11 @@ Two kinds of camera can be mounted behind the lens. What really tells them apart
 
 - an **integrating camera** (sCMOS, a very sensitive cousin of a phone camera) opens for an exposure, from seconds to
   minutes. Each pixel adds up all the light that falls on it, then the whole picture is read at once. It has many
-  pixels (ODIN's, a Hamamatsu ORCA-Flash4.0, has 2048 × 2048 pixels of 6.5 µm) and does not mind how many neutrons arrive per second; but it does not know **when**
-  each neutron arrived, so it cannot tell their wavelengths apart;
+  pixels (ODIN's, a Hamamatsu ORCA-Flash4.0, has 2048 × 2048 pixels of 6.5 µm) and does not mind how many neutrons
+  arrive per second; but it does not know **when** each neutron arrived, so it cannot tell their wavelengths apart.
+  On ODIN it can be fitted with a **gated image intensifier** that lets the light through only during a few
+  milliseconds after each pulse: the picture then holds only one band of arrival times, so of wavelengths, and a
+  series of such pictures gives a coarse spectrum in every pixel (the twin does not model this option);
 - an **event camera** (a Timepix3 chip; on ODIN, inside the LumaCam camera) has no exposure. Each pixel works on its own: as soon as light falls on it, it sends
   its position and the time, to 1.6 ns. The flash of one neutron lights a few neighboring pixels, and their center
   gives the position 16 times more finely than the pixel (a grid of 4096 × 4096 points of 3.4 µm over 14 mm). The
@@ -399,7 +404,7 @@ In the twin, both cameras see the same 14 mm field:
 | | Timepix3 camera (event mode) | Integrating camera (scintillator + sCMOS) |
 |---|---|---|
 | How it reads | each flash at once, with its time | all the light of one exposure, read at the end |
-| What it records | **each neutron**: where it arrived and when, hence its wavelength (part 4) | a picture, **no time, no wavelength** |
+| What it records | **each neutron**: where it arrived and when, hence its wavelength (part 4) | a picture, **no time, no wavelength** (on ODIN, one band of wavelengths per picture with the gated intensifier) |
 | Pixels of the pictures | positions kept on the 4096 × 4096 grid (3.4 µm); the pictures are made of 128 × 128 pixels of 110 µm (or 64 × 64 of 220 µm for the pictures per wavelength, to keep more neutrons per pixel) | two setups, below: 128 × 128 pixels of 110 µm, or 512 × 512 pixels of 27.5 µm |
 | Limit | a few million neutrons per second | none at ODIN's flux |
 | Used for | Bragg edges, strain, polarized imaging | radiography, tomography, battery |
@@ -415,7 +420,9 @@ md(r"""
   side, so 16 times fewer neutrons per pixel.
 
 Small pixels behind a thick screen are useless (its blur hides them), and so is a thin screen behind large pixels:
-that is why they go together. On the real instrument the screen is changed by hand between measurements.
+that is why they go together. ODIN's screens: lithium-6 fluoride with zinc sulfide, 100 to 300 µm thick (bright),
+or gadolinium oxysulfide, 10 to 40 µm (sharp, gadolinium absorbing the neutron); they are changed by hand between
+measurements.
 
 *What the twin simplifies*: its integrating camera does not give the 2048 × 2048 pixels of the real chip (7 µm each
 over the 14 mm field) but adds them up by blocks, as the real camera can do itself (**binning**): 16 × 16 for the
@@ -452,7 +459,7 @@ iw.odin_resolution()
 md(r"""
 In the exercises, the camera and its setup are **your choice**; the measuring position (1), the lens (zoom, 14 mm),
 the distance from the sample to the camera and the efficiency are **fixed**. The real ODIN has more to choose from:
-the second position, the full-field lens (10 cm and 20 cm), other lenses and screens. *Limits of the twin*: a real
+the second position, lenses for fields from 2 cm to 30 cm, several screens, the gated intensifier. *Limits of the twin*: a real
 Timepix3 camera loses neutrons above a few million per second (in the white beam with a large pinhole); the twin does
 not lose them, it warns you. And the neutrons **scattered** by the sample that still reach the camera, 5 cm behind
 it, are left out: on the real instrument they add a faint halo, which matters for thick samples rich in hydrogen
@@ -521,7 +528,7 @@ What sets a measurement on the twin's ODIN, and who decides: **you** (a setting 
 | | battery cycler | time in the cycle, 0 to 55 h | you (batteries) | state of charge |
 | | polarizer and analyzer | in, out; spin in ±x, ±y, ±z; spin analyzed x, y, z | you | polarized imaging |
 | Detection | distance sample → camera | 5 cm (the stage moves the sample across the beam, not along it; on a real instrument this distance can be changed) | fixed | with L/D, the blur |
-| | lens, field of view | zoom: 14 mm × 14 mm (real ODIN also: full field, 10 cm × 10 cm at position 1, 20 cm × 20 cm at position 2) | fixed | the largest object seen at once, against the pixel size |
+| | lens, field of view | zoom: 14 mm × 14 mm (real ODIN: lenses for fields from 20 mm × 20 mm to 300 mm × 300 mm) | fixed | the largest object seen at once, against the pixel size |
 | | Timepix3 camera | counting time; pictures per wavelength: range, bin (0.01 Å), 128 or 64 pixels | you | wavelength, statistics |
 | | integrating camera | exposure (up to 3600 s); standard (110 µm) or high resolution (27.5 µm) | you | sharpness against neutrons per pixel |
 | | efficiency of the scintillator | 1 − exp(−λ / 8 Å) | fixed | counts at short wavelengths |
