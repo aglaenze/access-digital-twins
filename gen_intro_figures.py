@@ -19,6 +19,8 @@ odin_choppers.png   The band choppers (one pulse in two) and the blur of the lon
 odin_detector.png   Side view of the detection: scintillator (lithium-6), mirror at 45°, camera out of the beam.
 odin_scintillator.png  Thick and thin screens (light spread), and the detection efficiency ε(λ) of the twin.
 odin_cameras.png    The two cameras: events (x, y, t) sorted into pictures per wavelength, or one summed picture.
+odin_lens.png       The lens: zoom (14 mm of the screen on the chip) or full field (the whole 10 cm), same pixels.
+odin_fields.png     A made-up rock seen with the full field (whole, 0.78 mm pixels) and the zoom (14 mm, 0.11 mm).
 
 All numbers are computed here from the constants below (the same as odin/odin_mcstas.py and loki/loki_mcstas.py).
 """
@@ -345,6 +347,7 @@ def odin_detector(gap="5 cm", name="odin_detector.png"):
     ax.annotate("", (4.0, 1.75), (4.0, 0.05), arrowprops=dict(arrowstyle="-|>", color="#E0A030", lw=2))
     ax.add_patch(Rectangle((3.75, 1.75), 0.5, 0.18, color=BLUE))                  # lens
     ax.add_patch(Rectangle((3.6, 1.95), 0.8, 0.45, color=INK))                    # camera body
+    ax.text(3.68, 1.84, "lens", ha="right", va="center", fontsize=10.5, color=BLUE)
     ax.text(4.5, 2.15, "camera, out of the beam: films the screen", ha="left", va="center", fontsize=10.5, color=INK)
     ax.plot([2.6, 6.2], [0, 0], color=TEAL, lw=3, alpha=0.5, ls="--", zorder=0)   # the neutrons not absorbed
     ax.add_patch(Rectangle((6.2, -0.5), 0.3, 1.0, color="#5B6779"))
@@ -357,8 +360,11 @@ def odin_detector(gap="5 cm", name="odin_detector.png"):
              "    a flash of light, at the place where the neutron arrived.\n"
              "2  The light of the flash leaves the screen…\n"
              "3  …and the mirror sends it up to the camera. The camera stays out of\n"
-             "    the beam, where the neutrons cannot damage it.")
-    ax.text(7.0, 1.7, steps, ha="left", va="top", fontsize=10.5, color=INK, linespacing=1.45)
+             "    the beam, where the neutrons cannot damage it.\n"
+             "4  The lens forms a picture of the screen on the chip of the camera:\n"
+             "    it sets how much of the screen is filmed: the field of view.")
+    ax.text(4.32, 1.8, "4", fontsize=12, fontweight="bold", color=ORANGE, ha="left", va="center")
+    ax.text(7.0, 1.95, steps, ha="left", va="top", fontsize=10.5, color=INK, linespacing=1.45)
     ax.set_xlim(-0.5, 12.4); ax.set_ylim(-1.5, 2.6); ax.axis("off")
     fig.tight_layout()
     _save(fig, name)
@@ -400,6 +406,147 @@ def odin_scintillator():
     for s in ("top", "right"):
         ax.spines[s].set_visible(False)
     _save(fig, "odin_scintillator.png")
+    plt.close(fig)
+
+
+def odin_lens():
+    """What the lens does: it forms the picture of the scintillator screen on the chip of the camera. The zoom lens
+    films 14 mm x 14 mm of the screen, the full-field lens the whole 10 cm x 10 cm; the chip and its number of pixels
+    stay the same, so a pixel sees 14 mm / N or 100 mm / N of the screen. The beam and the sample do not change."""
+    from matplotlib.patches import Ellipse
+    fig, ax = plt.subplots(figsize=(13, 5.9))
+    rows = ((3.75, 14.1, "Zoom lens: it films 14 mm × 14 mm of the screen",
+             ["the chip of the camera", "each pixel sees 14 mm / N of the screen:",
+              "fine pixels, but a small field"]),
+            (-0.3, 100.0, "Full-field lens: it films the whole 10 cm × 10 cm",
+             ["the same chip, the same N pixels", "each pixel sees 100 mm / N of the screen:",
+              "7 times larger pixels, but the whole field"]))
+    for yc, field, title, notes in rows:
+        side = 3.0                                                  # the screen, 100 mm
+        ax.add_patch(Rectangle((0.4, yc - side / 2), side, side, color="#BFE5D1", ec=TEAL, lw=1.5))
+        ax.text(0.4, yc + side / 2 + 0.12, title, ha="left", va="bottom", fontsize=12, fontweight="bold",
+                color=INK)
+        ax.text(1.9, yc - side / 2 - 0.1, "screen: 10 cm × 10 cm, all lit by the beam", ha="center", va="top",
+                fontsize=9.5, color=TEAL)
+        h = side * field / 100 / 2                                  # half-side of the filmed square
+        xc = 1.9
+        ax.add_patch(Rectangle((xc - h, yc - h), 2 * h, 2 * h, fill=False, ec=ORANGE, lw=2.5, zorder=4))
+        if field < 50:
+            ax.annotate("filmed: 14 mm", (xc + h, yc + h), (xc + 0.55, yc + 0.95), fontsize=10, color=ORANGE,
+                        arrowprops=dict(arrowstyle="-", color=ORANGE, lw=1))
+        # the light from the filmed square, through the lens, onto the chip (the picture is upside down)
+        xl, xs, cs = 6.2, 8.6, 0.6
+        for y_from, y_lens, y_chip in ((yc + h, yc + 0.75, yc - cs), (yc - h, yc - 0.75, yc + cs)):
+            ax.plot([xc + h, xl], [y_from, y_lens], color="#E0A030", lw=1.3)
+            ax.plot([xl, xs], [y_lens, y_chip], color="#E0A030", lw=1.3)
+        ax.add_patch(Ellipse((xl, yc), 0.35, 1.9, color="#9DB7E3", ec=BLUE, lw=1.5, zorder=3))
+        ax.text(xl, yc - 1.1, "lens", ha="center", va="top", fontsize=10.5, color=BLUE)
+        ax.add_patch(Rectangle((xs, yc - cs), 2 * cs, 2 * cs, color="#2B3445", ec=INK, zorder=3))
+        for k in range(1, 8):                                       # 8 x 8 pixels drawn
+            ax.plot([xs + k * 2 * cs / 8] * 2, [yc - cs, yc + cs], color="#8A94A6", lw=0.6, zorder=4)
+            ax.plot([xs, xs + 2 * cs], [yc - cs + k * 2 * cs / 8] * 2, color="#8A94A6", lw=0.6, zorder=4)
+        for k, line in enumerate(notes):
+            ax.text(xs + 2 * cs + 0.3, yc + 0.45 - k * 0.42, line, ha="left", va="center", fontsize=10.5,
+                    color=INK, fontweight="bold" if k == 2 else "normal")
+    ax.text(0.4, -2.55, "The lens changes neither the beam nor the sample: the whole screen is still lit. It only "
+            "chooses how much of the screen the chip sees.\nN = the number of pixels across the chip (8 drawn here; "
+            "the pictures of the twin have 128).", ha="left", va="top", fontsize=10.5, color=INK, linespacing=1.4)
+    ax.set_xlim(0.2, 13.4); ax.set_ylim(-3.3, 5.75); ax.set_aspect("equal"); ax.axis("off")
+    fig.tight_layout()
+    _save(fig, "odin_lens.png")
+    plt.close(fig)
+
+
+def _rock(x0, y0, size, n):
+    """Transmission of a made-up slice of rock, 7 cm x 5 cm, on an n x n grid covering [x0, x0+size] x [y0, y0+size]
+    (mm): a matrix that lets 50 % through, large inclusions (1-4 mm) and many small grains (0.1-0.35 mm) of a dense
+    mineral, and a thin crack (0.1 mm). Same object whatever the grid, so the two fields show the same rock."""
+    step = size / n
+    c = x0 + step * (np.arange(n) + 0.5)
+    r = y0 + step * (np.arange(n) + 0.5)
+    X, Y = np.meshgrid(c, r)
+    u, v = X / 34.0, Y / 24.0
+    th = np.arctan2(v, u)
+    edge = 1 + 0.08 * np.cos(2 * th + 0.3) + 0.05 * np.cos(3 * th + 1.0) + 0.03 * np.cos(5 * th + 2.0)
+    inside = np.hypot(u, v) < edge
+    T = np.where(inside, 0.5, 1.0)
+    rng = np.random.default_rng(11)
+    big = [(rng.uniform(-28, 28), rng.uniform(-18, 18), rng.uniform(1.0, 4.0), rng.choice([0.45, 1.5]))
+           for _ in range(16)]
+    small = [(rng.uniform(-32, 32), rng.uniform(-22, 22), rng.uniform(0.1, 0.35), 0.35) for _ in range(2500)]
+    for cx, cy, rad, f in big + small:
+        i0, i1 = np.searchsorted(r, [cy - rad, cy + rad])
+        j0, j1 = np.searchsorted(c, [cx - rad, cx + rad])
+        if i1 <= i0 or j1 <= j0:
+            continue
+        sub = (X[i0:i1, j0:j1] - cx) ** 2 + (Y[i0:i1, j0:j1] - cy) ** 2 < rad ** 2
+        sub &= inside[i0:i1, j0:j1]
+        T[i0:i1, j0:j1] = np.where(sub, np.clip(T[i0:i1, j0:j1] * f, 0, 0.95), T[i0:i1, j0:j1])
+    crack = [(2.0, 9.0), (6.0, 6.5), (9.5, 5.2), (13.0, 2.0), (17.0, 0.5)]         # a crack through the zoomed part
+    for (ax_, ay), (bx, by) in zip(crack[:-1], crack[1:]):
+        dx, dy = bx - ax_, by - ay
+        t = np.clip(((X - ax_) * dx + (Y - ay) * dy) / (dx * dx + dy * dy), 0, 1)
+        d = np.hypot(X - ax_ - t * dx, Y - ay - t * dy)
+        T = np.where((d < 0.05) & inside, 0.85, T)
+    return T
+
+
+def odin_fields():
+    """The same rock seen with the full-field lens (10 cm, pixels of 0.78 mm: the whole rock, the large inclusions)
+    and with the zoom lens (14 mm, pixels of 0.11 mm: a small part only, but its grains and its crack). Both pictures
+    128 x 128 pixels, blurred by 0.2 mm (pinhole and screen), with the counting noise of the neutrons per pixel (50
+    times more per pixel in the full field: each pixel is 50 times larger)."""
+    from scipy.ndimage import gaussian_filter
+    rng = np.random.default_rng(5)
+    zx, zy, zs = 3.0, -1.0, 14.1                       # lower-left corner and side of the zoomed field (mm)
+
+    def picture(x0, y0, size, sub, counts):
+        n = 128 * sub
+        T = _rock(x0, y0, size, n)
+        T = gaussian_filter(T, 0.2 / 2.355 / (size / n))
+        T = T.reshape(128, sub, 128, sub).mean(axis=(1, 3))
+        return rng.poisson(T * counts) / counts
+
+    fig = plt.figure(figsize=(13, 5.0))
+    axs = [fig.add_axes([0.02 + k * 0.33, 0.24, 0.3, 0.64]) for k in range(3)]
+    a, b, c = axs
+    truth = _rock(-50, -50, 100, 1000)
+    a.imshow(truth, cmap="gray", vmin=0.1, vmax=1.1, origin="lower", extent=(-50, 50, -50, 50))
+    a.add_patch(Rectangle((-50, -50), 100, 100, fill=False, ec=BLUE, lw=3))
+    a.add_patch(Rectangle((zx, zy), zs, zs, fill=False, ec=ORANGE, lw=2.5))
+    for k in range(-3, 3):                              # the tiles needed with the zoom lens
+        for m in range(-2, 2):
+            a.add_patch(Rectangle((k * zs + zx, m * zs + zy), zs, zs, fill=False, ec=ORANGE,
+                                  lw=0.6, ls=":", alpha=0.8))
+    a.set_title("The rock in the beam (position 1)", fontsize=12, fontweight="bold", color=INK)
+    full = picture(-50, -50, 100, 16, 400 * (100 / zs) ** 2)
+    b.imshow(full, cmap="gray", vmin=0.1, vmax=1.1, origin="lower", extent=(-50, 50, -50, 50),
+             interpolation="nearest")
+    b.add_patch(Rectangle((zx, zy), zs, zs, fill=False, ec=ORANGE, lw=1.5))
+    b.set_title("Full-field lens: 10 cm, pixels of 0.78 mm", fontsize=12, fontweight="bold", color=BLUE)
+    zoom = picture(zx, zy, zs, 10, 400)
+    c.imshow(zoom, cmap="gray", vmin=0.1, vmax=1.1, origin="lower", extent=(0, zs, 0, zs), interpolation="nearest")
+    c.set_title("Zoom lens: 14 mm, pixels of 0.11 mm", fontsize=12, fontweight="bold", color=ORANGE)
+    for ax in axs:
+        ax.set_xticks([]); ax.set_yticks([])
+        for s in ax.spines.values():
+            s.set_visible(False)
+    for ax, mm, col in ((a, 100, INK), (b, 100, INK), (c, zs, "white")):       # scale bars
+        x1, y1 = ax.get_xlim()[1], ax.get_ylim()[0]
+        L = 10.0 if mm > 50 else 2.0
+        ax.plot([x1 - 0.05 * mm - L, x1 - 0.05 * mm], [y1 + 0.05 * mm] * 2, color=col, lw=3)
+        ax.text(x1 - 0.05 * mm - L / 2, y1 + 0.08 * mm, f"{L:g} mm", color=col, ha="center", va="bottom",
+                fontsize=9.5, fontweight="bold")
+    caps = (["blue: the full field (10 cm); orange: the zoom field", "(14 mm). To cover the rock with the zoom,",
+             "the stage moves it under the camera: 6 × 4 pictures."],
+            ["the whole rock in one picture, with its large", "inclusions; the grains of 0.2–0.7 mm and the crack",
+             "are smaller than a pixel: they melt into the gray."],
+            ["only the orange square, but with its grains and its", "crack (0.1 mm wide). Same 128 × 128 pixels: each",
+             "sees 50 times less area, so 50 times fewer neutrons."])
+    for k, lines in enumerate(caps):
+        for i, line in enumerate(lines):
+            fig.text(0.02 + k * 0.33, 0.19 - i * 0.055, line, fontsize=10.5, color=INK, va="top")
+    _save(fig, "odin_fields.png")
     plt.close(fig)
 
 
@@ -597,6 +744,6 @@ if __name__ == "__main__":
     print(f"ODIN: band between two pulses {H_OVER_M * PERIOD / ODIN_DET:.2f} Å; with one pulse in two "
           f"{2 * H_OVER_M * PERIOD / ODIN_DET:.2f} Å; natural resolution {H_OVER_M * TAU / ODIN_DET:.3f} Å")
     odin_beamline(); odin_beamline_line(); contrast_xray_neutron(); odin_detector("6 mm (not to scale)", "odin_detector_6mm.png")
-    odin_tof(); odin_choppers(); odin_pinhole(); odin_detector(); odin_scintillator(); odin_cameras()
+    odin_tof(); odin_choppers(); odin_pinhole(); odin_detector(); odin_scintillator(); odin_lens(); odin_fields(); odin_cameras()
     loki_beamline(); loki_q(); loki_tof()
     print("written", OUT)

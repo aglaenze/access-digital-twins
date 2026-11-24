@@ -41,7 +41,7 @@ About 40 minutes.
 3. how the size of a hole sets the sharpness of the picture;
 4. how ODIN knows the wavelength of each neutron: the time of flight;
 5. what the choppers are for;
-6. how the neutrons are detected, and how sharp the pictures can be;
+6. how the neutrons are detected: the lens and the field of view, the two cameras, the sharpness;
 7. which exercises of the catalogue use which capability;
 8. everything that sets the instrument, in one table: what you choose, what is fixed.
 """)
@@ -104,7 +104,8 @@ md(r"""
 - the **sample** sits on a stage that moves and turns it, at one of **two measuring positions**: 60.5 m (position 1)
   or 64 m (position 2), that is $L$ = 10.5 m or 14 m after the pinhole (part 3);
 - the **camera** just behind the sample records each neutron: where it arrived (which pixel) and when (part 4). Its
-  field of view is **10 cm × 10 cm** at position 1 and **20 cm × 20 cm** at position 2 (part 6).
+  lens sets the field of view: the whole beam, **10 cm × 10 cm** at position 1 and **20 cm × 20 cm** at position 2,
+  or a small 14 mm square with finer pixels (part 6).
 """)
 
 code(r"""
@@ -298,12 +299,19 @@ q.choice("You must measure how much a steel part is stretched: its Bragg edge mo
 md(r"""
 ## 6. Detecting the neutrons
 
+The detector does three things, one after the other: it turns each neutron into a flash of light (6.1); a **lens**
+chooses how much of that light the camera films (6.2); the **camera** records it, either as one picture or neutron by
+neutron (6.3). Together they set how sharp the pictures are (6.4).
+
+### 6.1 From a neutron to a flash of light
+
 A neutron has no electric charge: no camera sees it directly. ODIN turns each neutron into a flash of light in a
 **scintillator**, a thin screen containing lithium-6 that absorbs the neutron and glows; a camera, out of the beam
-behind a mirror, films the light.
+behind a mirror, films the screen through a lens.
 """)
 fig("odin_detector.png", "How a neutron becomes a picture: absorbed in the scintillator, it makes a flash of light, "
-    "which a mirror sends to a camera out of the beam. The neutrons that are not absorbed go on to the beam stop.")
+    "which a mirror sends to the lens and the camera, out of the beam. The neutrons that are not absorbed go on to "
+    "the beam stop.")
 md(r"""
 Two consequences you meet in every exercise:
 
@@ -317,47 +325,138 @@ fig("odin_scintillator.png", "Left: in a thick screen the neutrons are absorbed 
     "each flash spreads on its way out: a larger spot, so a blurred picture; a thin screen keeps the spot small but "
     "stops fewer neutrons. Right: the share of the neutrons detected in the twin, larger for slow neutrons.")
 md(r"""
-**On the real ODIN**, the camera box (scintillator, mirror, camera, lens) stands just behind the sample at either
-measuring position: a field of view of **10 cm × 10 cm** at position 1 (60.5 m) and **20 cm × 20 cm** at position 2
-(64 m). Two kinds of camera can be mounted in it, with several lenses (magnifications) and scintillators: an
-**integrating camera** (CMOS) and an **event camera** (Timepix3).
+### 6.2 The lens: a large field or small pixels
 
-**In the twin's exercises**, the sample and the cameras are at **position 1**, with a high-magnification lens: a
-field of view of **14 mm × 14 mm**, the field of the Timepix3 camera in the real ODIN file used as model for the
-twin's data files (small pixels). Both cameras see this field, 5 cm behind the sample:
+The camera does not look at the neutrons: it photographs the glowing screen, through a lens, as a phone photographs a
+page. Its chip has a fixed number of pixels, say $N$ across. The **lens** decides how much of the screen is projected
+onto that chip:
+
+- the **full-field lens** films the whole screen: **10 cm × 10 cm** at position 1 (20 cm × 20 cm at position 2,
+  where the beam is wider). Each pixel sees 100 mm / $N$ of the screen;
+- the **zoom lens** (a high magnification) films only **14 mm × 14 mm** of it. Each pixel sees 14 mm / $N$: pixels
+  7 times smaller on each side.
+""")
+fig("odin_lens.png", "What the lens does. Top: the zoom lens projects a 14 mm square of the screen onto the chip. "
+    "Bottom: the full-field lens projects the whole 10 cm screen onto the same chip. Same number of pixels, so the "
+    "pixels seen on the screen are 7 times larger with the full field.")
+md(r"""
+**With the zoom lens, the camera sees only the part of the sample inside its 14 mm square.** The beam still lights the whole screen and
+the whole sample, but only the 14 mm square in front of the camera is recorded. To see a larger object with fine
+pixels, the stage moves it under the camera and the pictures are put side by side; otherwise, one takes the full
+field and accepts larger pixels.
+""")
+fig("odin_fields.png", "The same made-up rock, 7 cm wide, with the two lenses. Left: the rock in the beam; blue, the "
+    "10 cm field; orange, the 14 mm field of the zoom (dotted: the 24 positions of the stage needed to cover the rock "
+    "with it). Middle: the full field shows the whole rock but its pixels (0.78 mm) erase the small grains and the "
+    "crack. Right: the zoom shows them, but only in its small square. Both pictures have 128 × 128 pixels.")
+md(r"""
+**Which lens?** Take the field that just holds the region you need, no larger:
+
+- the pixels are one of the blurs of the picture (6.4): they must be smaller than the details you look for, but
+  pixels much smaller than the blur of the pinhole and of the screen (about 0.15 mm) gain nothing;
+- a smaller pixel catches fewer neutrons: pixels 7 times smaller on each side receive 50 times fewer neutrons each,
+  so the counting must be longer for the same noise.
+
+**In the twin's exercises** the lens is the **zoom**, at position 1: a field of view of **14 mm × 14 mm**, 5 cm behind
+the sample. It is the field of the Timepix3 camera of the real ODIN file used as model for the twin's data files:
+its chip has 256 × 256 pixels of 55 µm, 14.1 mm across, and the zoom lens forms the picture of the screen on it at
+its real size. The samples of the exercises are chosen **small enough for this field**, so most are seen whole: the
+iron plate (10 mm × 10 mm), the pieces of the Martian meteorite (12 mm × 8 mm and 10 mm × 13 mm, sawn from a stone of
+several hundred grams), the steel bar (9.8 mm wide). A few are a little larger and overflow the field at their ends:
+the coil (15.5 mm long), the battery (16 mm across), the anode bars (20 mm long); what is measured there lies in the
+middle. For the open beam, the stage moves the sample 50 cm aside, far out of the field.
+""")
+
+code(r"""
+q.number("With the full-field lens at position 1, the pictures of the twin have 128 pixels across the 10 cm field. "
+         "How large is one pixel on the sample?", value=0.78, tol=0.03, unit="mm",
+         mistakes=[(0.11, "that is the zoom lens: 14.1 mm / 128"), (78, "in mm: 100 mm / 128"),
+                   (7.8, "the field is 100 mm, not 1000 mm")],
+         hints=["The 128 pixels share the 100 mm of the field equally.", "100 mm / 128."],
+         explanation="100 mm / 128 = 0.78 mm: larger than the grains of 0.2–0.7 mm of the rock, which is why they "
+                     "melt into the gray in the full field. With the zoom lens, 14.1 mm / 128 = 0.11 mm.",
+         title="Q10. A pixel of the full field")
+""")
+
+md(r"""
+### 6.3 Two kinds of camera: one picture, or every neutron
+
+Two kinds of camera can be mounted behind the lens. What really tells them apart is **how they read their chip**:
+
+- an **integrating camera** (sCMOS, a very sensitive cousin of a phone camera) opens for an exposure, from seconds to
+  minutes. Each pixel adds up all the light that falls on it, then the whole picture is read at once. It has many
+  pixels (ODIN's, a Hamamatsu ORCA-Flash4.0, has 2048 × 2048 pixels of 6.5 µm) and does not mind how many neutrons arrive per second; but it does not know **when**
+  each neutron arrived, so it cannot tell their wavelengths apart;
+- an **event camera** (a Timepix3 chip; on ODIN, inside the LumaCam camera) has no exposure. Each pixel works on its own: as soon as light falls on it, it sends
+  its position and the time, to 1.6 ns. The flash of one neutron lights a few neighboring pixels, and their center
+  gives the position 16 times more finely than the pixel (a grid of 4096 × 4096 points of 3.4 µm over 14 mm). The
+  time gives the **wavelength** of each neutron (part 4). The flash is very faint, so an image intensifier
+  amplifies it in front of the chip. Its limits: a small chip (256 × 256 pixels), and it loses neutrons above a few
+  million per second.
+
+In the twin, both cameras see the same 14 mm field:
 
 | | Timepix3 camera (event mode) | Integrating camera (scintillator + sCMOS) |
 |---|---|---|
-| What it records | **each neutron**: where it arrived and when, hence its wavelength (part 4) | the light summed over the exposure: a picture, **no time, no wavelength** |
-| Pixels | positions kept on a grid of 4096 × 4096 (3.4 µm); the pictures are shown in 128 × 128 pixels of 110 µm (64 × 64 of 220 µm if you choose it for the pictures per wavelength, to keep more neutrons per pixel) | **standard**: 128 × 128 pixels of 110 µm, thick scintillator (blur 0.1 mm); **high resolution**: 512 × 512 pixels of 27.5 µm, thin scintillator (blur 0.02 mm), 16 times fewer neutrons per pixel |
+| How it reads | each flash at once, with its time | all the light of one exposure, read at the end |
+| What it records | **each neutron**: where it arrived and when, hence its wavelength (part 4) | a picture, **no time, no wavelength** |
+| Pixels of the pictures | positions kept on the 4096 × 4096 grid (3.4 µm); the pictures are made of 128 × 128 pixels of 110 µm (or 64 × 64 of 220 µm for the pictures per wavelength, to keep more neutrons per pixel) | two setups, below: 128 × 128 pixels of 110 µm, or 512 × 512 pixels of 27.5 µm |
+| Limit | a few million neutrons per second | none at ODIN's flux |
 | Used for | Bragg edges, strain, polarized imaging | radiography, tomography, battery |
 """)
 fig("odin_cameras.png", "The same neutrons through an iron disc, seen by the two cameras. The Timepix3 camera writes "
     "one line per neutron; its arrival time gives its wavelength, so the neutrons can be sorted into one picture per "
     "wavelength. The integrating camera only adds up the light: one picture, all wavelengths mixed.")
 md(r"""
-**How sharp is the picture?** Three blurs add up, and the largest one wins: the pinhole ($l / (L/D)$, part 3), the
-scintillator, and the pixel. They combine as $\sqrt{a^2 + b^2 + c^2}$. Standard setup with the 3 cm pinhole: 0.14 mm,
-0.1 mm and 0.11 mm, about **0.2 mm** in all. High resolution with the 1 cm pinhole: 0.05 mm, 0.02 mm and 0.03 mm, about
-**0.06 mm**, but with far fewer neutrons per pixel: much longer exposures.
+**The two setups of the integrating camera** are not two cameras: each pairs a screen with a pixel size.
+
+- **standard**: thick screen (bright, blur 0.1 mm), pictures of 128 × 128 pixels of 110 µm;
+- **high resolution**: thin screen (blur 0.02 mm), pictures of 512 × 512 pixels of 27.5 µm: 4 times smaller on each
+  side, so 16 times fewer neutrons per pixel.
+
+Small pixels behind a thick screen are useless (its blur hides them), and so is a thin screen behind large pixels:
+that is why they go together. On the real instrument the screen is changed by hand between measurements.
+
+*What the twin simplifies*: its integrating camera does not give the 2048 × 2048 pixels of the real chip (7 µm each
+over the 14 mm field) but adds them up by blocks, as the real camera can do itself (**binning**): 16 × 16 for the
+standard setup (128 pixels of 110 µm), 4 × 4 for high resolution (512 pixels of 27.5 µm). What this changes in the
+data:
+
+- **the counts: nothing.** A large pixel receives exactly the neutrons of the 16 × 16 small ones it replaces, so the
+  number of neutrons in any region, and the transmission (sample divided by open beam), are the same;
+- **the noise: nothing.** The counting noise of a sum of pixels is that of the sum of their neutrons: a picture added
+  up afterwards from the 2048 pixels would be as noisy as the twin's;
+- **the sharpness: a little.** The large pixel is one more blur: with the 3 cm pinhole, 0.20 mm in the twin's
+  standard setup against 0.17 mm with the 7 µm pixels of the chip; 0.060 mm against 0.054 mm in high resolution with
+  the 1 cm pinhole. The twin is slightly less sharp than the real camera, never sharper. Smaller pixels would gain
+  little more, because the blur of the pinhole and of the screen dominates; they would mostly make pictures 16 to
+  256 times larger, with very few neutrons in each pixel.
+
+### 6.4 How sharp is the picture?
+
+Three blurs add up, and the largest one wins: the pinhole ($l / (L/D)$, part 3), the scintillator, and the pixel.
+They combine as $\sqrt{a^2 + b^2 + c^2}$. Standard setup with the 3 cm pinhole: 0.14 mm, 0.1 mm and 0.11 mm, about
+**0.2 mm** in all. High resolution with the 1 cm pinhole: 0.05 mm, 0.02 mm and 0.03 mm, about **0.06 mm**, but with
+far fewer neutrons per pixel: much longer exposures. (With the full-field lens, the pixel of 0.78 mm would dominate
+everything.)
 
 *Try it*: choose the camera (for the integrating camera, also its setup: standard or high resolution) and the pinhole,
 and look at the test pattern. The Timepix3 camera gives the same picture as the standard integrating camera: what it
-adds is the wavelength, not sharpness. Then choose the integrating camera in high resolution with the 1 cm pinhole: the 50 µm bars are no longer blurred, but the picture is lost in the noise (3 neutrons per pixel).
-Count 100 times longer: they appear.
+adds is the wavelength, not sharpness. Then choose the integrating camera in high resolution with the 1 cm pinhole:
+the 50 µm bars are no longer blurred, but the picture is lost in the noise (3 neutrons per pixel). Count 100 times
+longer: they appear.
 """)
 code(r"""
 iw.odin_resolution()
 """)
 md(r"""
-The pixel size is **your choice** among these settings of the cameras; the measuring position, the field of view,
-the distance from the sample to the camera and the efficiency are **fixed** in the exercises. The real ODIN has more
-to choose from: the second position, the 10 cm and 20 cm fields, other lenses and scintillators. *Limits of the
-twin*: a real Timepix3 camera loses neutrons above a few million per second (in the white beam with a large pinhole);
-the twin does not lose them, it warns you. And the
-neutrons **scattered** by the sample that still reach the camera, 5 cm behind it, are left out: on the real
-instrument they add a faint halo, which matters for thick samples rich in hydrogen (water, plastics) and makes their
-transmission look a little higher.
+In the exercises, the camera and its setup are **your choice**; the measuring position (1), the lens (zoom, 14 mm),
+the distance from the sample to the camera and the efficiency are **fixed**. The real ODIN has more to choose from:
+the second position, the full-field lens (10 cm and 20 cm), other lenses and screens. *Limits of the twin*: a real
+Timepix3 camera loses neutrons above a few million per second (in the white beam with a large pinhole); the twin does
+not lose them, it warns you. And the neutrons **scattered** by the sample that still reach the camera, 5 cm behind
+it, are left out: on the real instrument they add a faint halo, which matters for thick samples rich in hydrogen
+(water, plastics) and makes their transmission look a little higher.
 """)
 
 code(r"""
@@ -373,7 +472,7 @@ q.choice("You want to see details of 0.1 mm in a sample. Which setting do you ch
          explanation="Every blur must be smaller than the details: 1 cm pinhole (0.05 mm), thin scintillator "
                      "(0.02 mm), pixels of 27.5 µm: about 0.06 mm in all. The price: 16 times fewer neutrons per "
                      "pixel, and 9 times fewer through the 1 cm pinhole than the 3 cm one: a much longer exposure.",
-         hints=["Compare each blur with 0.05 mm.", "Part 3: blur = 5 cm / (L/D) = 5 cm × D / 10.5 m."], title="Q10. Sharp enough?")
+         hints=["Compare each blur with 0.05 mm.", "Part 3: blur = 5 cm / (L/D) = 5 cm × D / 10.5 m."], title="Q11. Sharp enough?")
 """)
 
 md(r"""
@@ -422,7 +521,7 @@ What sets a measurement on the twin's ODIN, and who decides: **you** (a setting 
 | | battery cycler | time in the cycle, 0 to 55 h | you (batteries) | state of charge |
 | | polarizer and analyzer | in, out; spin in ±x, ±y, ±z; spin analyzed x, y, z | you | polarized imaging |
 | Detection | distance sample → camera | 5 cm (the stage moves the sample across the beam, not along it; on a real instrument this distance can be changed) | fixed | with L/D, the blur |
-| | field of view | 14 mm × 14 mm (real ODIN: 10 cm × 10 cm at position 1, 20 cm × 20 cm at position 2) | fixed | the largest object seen at once |
+| | lens, field of view | zoom: 14 mm × 14 mm (real ODIN also: full field, 10 cm × 10 cm at position 1, 20 cm × 20 cm at position 2) | fixed | the largest object seen at once, against the pixel size |
 | | Timepix3 camera | counting time; pictures per wavelength: range, bin (0.01 Å), 128 or 64 pixels | you | wavelength, statistics |
 | | integrating camera | exposure (up to 3600 s); standard (110 µm) or high resolution (27.5 µm) | you | sharpness against neutrons per pixel |
 | | efficiency of the scintillator | 1 − exp(−λ / 8 Å) | fixed | counts at short wavelengths |
