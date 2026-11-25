@@ -94,9 +94,9 @@ Why:
 - **detector distance**: at 10 m the same pixel sees a smaller angle (lower $Q$). Only with the 8 m collimation: with
   its wider wavelength band, the slowest neutrons of one pulse would reach the far detector after the fastest of the
   next pulse ("frame overlap"), and the twin refuses it, as an instrument scientist would;
-- **source power**: ESS starts at 2 MW and is designed for 5 MW. The neutrons made, and so the counts, are
-  proportional to it: 5 MW for 60 s gives the neutrons of 2 MW for 150 s. The monitors count more too, so the
-  reduced curve is the same, as for a longer count;
+- **source power** (read-only, as at ESS: your teacher or the app sets it): ESS starts at 2 MW and is designed for
+  5 MW. The neutrons made, and so the counts, are proportional to it: 5 MW for 60 s gives the neutrons of 2 MW for
+  150 s. The monitors count more too, so the reduced curve is the same, as for a longer count;
 - **pulse skipping**: the choppers turn at 7 Hz instead of 14 Hz and let one source pulse in two through. The time
   between two pulses doubles, so the wavelength band can be twice as wide (3–21.4 Å): a wider $Q$ range in one
   measurement, with half of the pulses.
@@ -166,7 +166,7 @@ def do_count(_):
     refresh_list()
     rename_update()
 
-import source_power                          # the power of the source (fixed by the teacher, or chosen here)
+import source_power                          # the power of the source: read-only (the teacher, or the app)
 power = source_power.control(loki)
 ctl = mc.Control(loki, button, lock=[smp, heavy, fast, coll, skip, dist, ttime, title] + source_power.lockable(power))
 ctl.on_click(do_count)

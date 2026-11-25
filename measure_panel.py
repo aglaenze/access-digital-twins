@@ -190,7 +190,7 @@ class Panel:
                               value=st["choppers"], description="Choppers")
         delta = w.Dropdown(options=[0.10, 0.30, 0.45], value=st["wfm_delta"], description="WFM δ (m)")
         pinhole = w.Dropdown(options=[0.01, 0.02, 0.03, 0.04], value=st["pinhole"], description="Pinhole (m)")
-        import source_power                  # the power of the source (fixed by the teacher, or chosen here)
+        import source_power                  # the power of the source: read-only (the teacher, or the app)
         power = source_power.control(odin, width="auto")
         import sample_library as sl
         lib = sl.load("odin")
@@ -454,7 +454,7 @@ class Panel:
                                             description="Detector (m)"),
         }
         _fit(*widgets.values(), label=120)
-        import source_power                  # the power of the source (fixed by the teacher, or chosen here)
+        import source_power                  # the power of the source: read-only (the teacher, or the app)
         power = source_power.control(loki, width="auto")
         t = w.BoundedFloatText(value=60, min=1, max=3600, step=1, description="Time (s)")
         title = w.Text(placeholder="e.g. empty cell", description="Title")

@@ -213,10 +213,11 @@ Two seconds are enough: some 5 million neutrons reach the camera. A count takes 
 neutrons one by one and writes each of them to the file. *Stop* cancels a count: nothing of it is recorded.
 
 **The power of the source.** ESS starts at **2 MW** and is designed for **5 MW**. The power sets the number of
-protons per pulse (71 µC at 2 MW), and the number of neutrons is proportional to it. Try another power: more neutrons
-in the same time, so less noise. The reduction (part 2) divides each file by its own proton charge, so files taken at
-different powers can be combined. At 5 MW the twin warns you: about 6 million neutrons per second reach the camera, more
-than a real Timepix3 can record without losses. On the instrument you would then close the pinhole a little.
+protons per pulse (71 µC at 2 MW), and the number of neutrons is proportional to it: at 5 MW, more neutrons in the
+same time, so less noise. As at ESS you do not choose it: your teacher does (the line *Source power* below says
+which). The reduction (part 2) divides each file by its own proton charge, so files taken at different powers can be
+combined. At 5 MW the twin warns you: about 6 million neutrons per second reach the camera, more than a real Timepix3
+can record without losses. On the instrument you would then close the pinhole a little.
 
 **See a measurement again.** The menu *Show again* lists your files: choose one to see its image and its arrival
 times again, without measuring again.
@@ -228,7 +229,7 @@ shut = w.ToggleButtons(options=[("closed", "closed"), ("open", "open")], value=s
 inout = w.ToggleButtons(options=[("in", 0.0), ("out", 0.5)], value=0.0 if abs(st["stage_x"]) < 0.02 else 0.5,
                         description="Sample")
 tcount = w.Dropdown(options=[2, 5], value=2, description="Counting time (s)", style={"description_width": "130px"})
-import source_power                          # the power of the source (fixed by the teacher, or chosen here)
+import source_power                          # the power of the source: read-only (the teacher, or the app)
 power = source_power.control(odin)
 title = w.Text(value="", placeholder="dark, open beam, sample", description="Title")
 button = w.Button(description="Count", button_style="primary", icon="play", layout=w.Layout(width="auto"))
@@ -246,7 +247,6 @@ def count(_):
     k = kind()
     name = title.value.strip() or {"dark": "dark", "open": "open beam", "sample": "meteorite 0°"}[k]
     try:
-        odin.power_mw = float(power.value)
         odin.move(choppers="white", pinhole=PINHOLE, diffuser="in", shutter=shut.value, stage_x=inout.value,
                   stage_rot=0.0, sample=SAMPLE)
         live.reset()

@@ -110,6 +110,10 @@
           <p class="hint">A class gives the students one link: they see only the pages you chose. It runs on this
             computer (keep it on and awake); the link goes through a free tunnel.</p>
           <div id="cls-list" class="cls-list"></div>
+          <div class="cls-power"><label for="sp-power"><b>Source power of the twin</b></label>
+            <select id="sp-power"></select>
+            <p class="hint">Used by every page and by NICOS on this computer, unless the class fixes it. The students
+              read it but do not choose it, as at ESS where the accelerator delivers it.</p></div>
         </aside>
         <section id="cls-detail" class="cls-detail"><p class="hint">Choose a class, or make a new one.</p></section>
       </main>
@@ -150,8 +154,9 @@
       <label><input type="radio" name="nc-id" value="named"> Named: each student types a name (e.g. a graded session)</label>
     </fieldset>
     <fieldset class="nc-box"><legend>Power of the source</legend>
-      <select id="nc-power"><option value="">Free: the student chooses where the page lets them</option>
-        <option value="1">1 MW</option><option value="2">2 MW (ESS at the start)</option><option value="5">5 MW (ESS design)</option></select>
+      <select id="nc-power"><option value="">Not fixed: the source power of the twin (side panel)</option>
+        <option value="2">2 MW (ESS at the start of its user programme)</option><option value="5">5 MW (ESS design power)</option></select>
+      <p class="hint">The students read it on their pages; they do not choose it.</p>
     </fieldset>
   </div>
   <fieldset class="nc-box"><legend>Pages the students may open (in this order)</legend>

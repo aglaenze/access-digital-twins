@@ -215,7 +215,7 @@ from odin_virtual import Cancelled
 import odin_viz
 # Stop: the measurement ends at its next image; the settings and the other button are locked while it runs
 SERIES_STOPPED = "Stopped: the images already taken stay (they are complete images); the others were not taken."
-import source_power                          # the power of the source (fixed by the teacher, or chosen here)
+import source_power                          # the power of the source: read-only (the teacher, or the app)
 power = source_power.control(odin)
 ctl0 = mc.Control(odin, button0, lock=[expo, rot, button1] + source_power.lockable(power), stopped=SERIES_STOPPED)
 ctl1 = mc.Control(odin, button1, lock=[expo, rot, button0] + source_power.lockable(power), stopped=SERIES_STOPPED)

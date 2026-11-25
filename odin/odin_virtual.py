@@ -290,13 +290,9 @@ class VirtualOdin:
         if mode not in ("hybrid", "mcstas"):
             raise ValueError("mode: 'hybrid' or 'mcstas'")
         self.fluctuation, self.outages_per_hour, self.mode = fluctuation, outages_per_hour, mode
-        # power of the source (MW): 2 at the start of ESS, 5 by design; sets the protons per pulse. The teacher may fix it
-        # for a class (source_power.py, classes.py)
-        try:
-            import source_power
-            self.power_mw = source_power.default()
-        except ImportError:
-            self.power_mw = 2.0
+        # power of the source (MW): 2 at the start of ESS, 5 by design; sets the protons per pulse. Not set by the
+        # student: the teacher or the setting of this computer (source_power.py), read at each measurement
+        self._power_mw = None
         self.folder = f"{RUN_ROOT}/{session}"
         os.makedirs(self.folder, exist_ok=True)
         self.mpi, self.repeat, self.focus = mpi, repeat, focus
@@ -484,6 +480,22 @@ class VirtualOdin:
     def _check(self):
         if self._stop.is_set():
             raise Cancelled("measurement stopped: nothing was recorded")
+
+    @property
+    def power_mw(self):
+        """Power of the source (MW): source_power.current(), read at each use (the teacher's for the class, else the
+        setting of this computer, else 2 MW), unless a script set it (instrument.power_mw = 5)."""
+        if self._power_mw is not None:
+            return self._power_mw
+        try:
+            import source_power
+            return source_power.current()
+        except ImportError:
+            return 2.0
+
+    @power_mw.setter
+    def power_mw(self, v):
+        self._power_mw = None if v is None else float(v)
 
     def charge_per_pulse(self):
         """Protons per pulse (µC) at the power of the source: 71.4 µC at 2 MW (2 GeV protons, 14 Hz). The neutrons made

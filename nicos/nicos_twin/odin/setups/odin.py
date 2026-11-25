@@ -8,10 +8,10 @@ includes = ['system', 'choppers']
 URL = 'http://127.0.0.1:8765'
 
 devices = dict(
-    source_power = device('nicos_twin.devices.TwinSwitch',
-        description = 'power of the ESS source for the simulations (twin only: at ESS the accelerator sets it; '
-                      'locked when the teacher fixed it for the class)',
-        twinurl = URL, twindevice = 'source_power', states = [1.0, 2.0, 5.0], unit = 'MW',
+    source_power = device('nicos_twin.devices.TwinReadable',
+        description = 'power of the ESS source (read-only: the accelerator delivers it; in the twin, the teacher or '
+                      'the setting of the app)',
+        twinurl = URL, twindevice = 'source_power', unit = 'MW',
     ),
     choppers = device('nicos_twin.devices.TwinSwitch',
         description = 'chopper mode: wfm (wavelength frame multiplication), natural (band-pass + T0), white (none)',

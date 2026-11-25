@@ -73,37 +73,21 @@ STREAMER = {}
 FORWARDER = {}
 FW = {}                                             # the ESS file-writer: control, producer, the job running
 RAW = {}                                            # the data folder of the proposal (NICOS), as given
-POWER_CHOICES = [1.0, 2.0, 5.0]                     # the device source_power (MW), source_power.py
 
 
-def _power():
-    """The power of the source for the next simulation: the teacher's value if fixed (read again each time: the
-    teacher may fix it while NICOS runs), otherwise the value set with move(source_power, ...)."""
-    import source_power
-    f = source_power.fixed_here()
-    if f:
-        INSTR.power_mw = f
-    return f
-
-
-def _devices_status():
-    d = dict(INSTR.status())
-    d["source_power"] = float(INSTR.power_mw)
-    return d
+def _readings():
+    """The read-only values of the instrument, and source_power (MW): the power of the source, which the user does not
+    set (source_power.py: the teacher, or the setting of this computer; INSTR.power_mw reads it at each measurement)."""
+    r = dict(INSTR.readings()) if hasattr(INSTR, "readings") else {}
+    r["source_power"] = float(INSTR.power_mw)
+    return r
 
 
 def _move(args):
-    args = dict(args)
     if "source_power" in args:
-        v = float(args.pop("source_power"))
-        f = _power()
-        if f and abs(v - f) > 1e-9:
-            raise ValueError(f"source_power is set by your teacher: {f:g} MW")
-        if not any(abs(v - c) < 1e-9 for c in POWER_CHOICES):
-            raise ValueError(f"source_power: allowed values {POWER_CHOICES} MW")
-        INSTR.power_mw = v
-    if args:
-        INSTR.move(**args)
+        raise ValueError("source_power is read-only: as at ESS, the accelerator delivers the power (in the twin: "
+                         "the teacher, or the setting of the app)")
+    INSTR.move(**args)
 
 
 def _filewriter_mode():
@@ -358,8 +342,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path == "/status":
-            readings = INSTR.readings() if hasattr(INSTR, "readings") else {}
-            return self._reply(200, dict(devices=_devices_status(), readings=_json(readings), busy=LOCK.locked(),
+            readings = _readings()
+            return self._reply(200, dict(devices=INSTR.status(), readings=_json(readings), busy=LOCK.locked(),
                                          running=RUNNING["action"], last_number=INSTR.number, folder=INSTR.folder,
                                          mode=INSTR.mode, ready=READY.is_set()))
         if self.path == "/epics":                              # the PVs of the soft IOC (epics/ioc.py)
@@ -372,15 +356,10 @@ class Handler(BaseHTTPRequestHandler):
             out = {n: dict(value=d.value, unit=d.unit, limits=d.limits,
                            choices=_json(d.choices) if d.choices else None, help=d.help)
                    for n, d in INSTR.devices.items()}
-            if hasattr(INSTR, "readings"):                     # read-only values (chopper speeds...)
-                for n, v in INSTR.readings().items():
-                    unit, hlp = INSTR.readings_help(n)
-                    out[n] = dict(value=_json(v), unit=unit, limits=None, choices=None, help=hlp, readonly=True)
-            f = _power()
-            out["source_power"] = dict(value=float(INSTR.power_mw), unit="MW", limits=None,
-                                       choices=[f] if f else POWER_CHOICES,
-                                       help="power of the ESS source (twin only: at ESS the accelerator sets it)"
-                                            + (" - set by your teacher" if f else ""))
+            for n, v in _readings().items():                   # read-only values (chopper speeds..., source power)
+                unit, hlp = (("MW", "power of the source (read-only: the accelerator delivers it)")
+                             if n == "source_power" else INSTR.readings_help(n))
+                out[n] = dict(value=_json(v), unit=unit, limits=None, choices=None, help=hlp, readonly=True)
             return self._reply(200, out)
         if self.path == "/sample":                             # the mounted sample: description and drawing
             import matplotlib
@@ -418,8 +397,6 @@ class Handler(BaseHTTPRequestHandler):
             return self._reply(409, dict(error=f"instrument busy ({RUNNING['action']})"))
         try:
             RUNNING["action"] = self.path
-            if self.path in ("/count", "/camera", "/tof_histogram", "/polarimetry", "/scan"):
-                _power()                                   # the teacher's power, if fixed (source_power.py)
             if self.path == "/folder":                     # data folder (NICOS proposal): its samples too
                 _use_folder(args.get("folder", ""))
                 return self._reply(200, dict(folder=INSTR.folder))
@@ -432,7 +409,7 @@ class Handler(BaseHTTPRequestHandler):
             if self.path == "/move":
                 _move(args)
                 _forward()
-                return self._reply(200, dict(devices=_devices_status()))
+                return self._reply(200, dict(devices=INSTR.status()))
             if self.path == "/count":
                 if args.get("folder"):
                     _use_folder(args["folder"])

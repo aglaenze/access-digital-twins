@@ -385,6 +385,7 @@ dialog form { padding: 12px 32px 24px; display: flex; justify-content: flex-end;
 .cls { position: absolute; inset: 0; display: flex; gap: 0; overflow: hidden; }
 .cls-side { width: 330px; flex-shrink: 0; border-right: 1px solid var(--line); background: #fff; padding: 22px 18px;
   overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+.cls-power { margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 6px; }
 .cls-side-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .cls-side-head h2 { margin: 0; font-family: var(--head); font-size: 20px; }
 .cls-list { display: flex; flex-direction: column; gap: 8px; }

@@ -104,13 +104,11 @@ class VirtualLoki:
         self.choices = {n: d.choices for n, d in self.devices.items()}
         # power of the source (MW): 2 at the start of ESS, 5 by design. The McStas weights are for 2 MW; the neutron
         # rates (detector and monitors alike) scale with the power, so I(Q), normalized by the incident monitor, does
-        # not change, only the counting noise. The teacher may fix it for a class (source_power.py, classes.py)
-        try:
+        # not change, only the counting noise. Not set by the student: the teacher or the setting of this computer
+        # (source_power.py), read at each measurement
+        if os.path.dirname(HERE) not in sys.path:
             sys.path.insert(0, os.path.dirname(HERE))
-            import source_power
-            self.power_mw = source_power.default()
-        except ImportError:
-            self.power_mw = 2.0
+        self._power_mw = None
         self.folder = None
         self.use_folder(f"{paths.RUN_ROOT}/{session}")
         self.rng = np.random.default_rng(seed)
@@ -268,6 +266,22 @@ class VirtualLoki:
                 e["w"] = e["w"] / (1 + skip)
             phi = phi / (1 + skip)
         return ev, det, phi, tr, lam, thick * 100
+
+    @property
+    def power_mw(self):
+        """Power of the source (MW): source_power.current(), read at each use (the teacher's for the class, else the
+        setting of this computer, else 2 MW), unless a script set it (instrument.power_mw = 5)."""
+        if self._power_mw is not None:
+            return self._power_mw
+        try:
+            import source_power
+            return source_power.current()
+        except ImportError:
+            return 2.0
+
+    @power_mw.setter
+    def power_mw(self, v):
+        self._power_mw = None if v is None else float(v)
 
     def power_factor(self):
         """Neutron rates relative to the McStas model (2 MW): power_mw / 2."""

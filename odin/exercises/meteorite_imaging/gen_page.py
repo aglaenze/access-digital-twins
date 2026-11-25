@@ -207,7 +207,7 @@ def take(_):
     refresh_list()
     rename_update()
 
-import source_power                          # the power of the source (fixed by the teacher, or chosen here)
+import source_power                          # the power of the source: read-only (the teacher, or the app)
 power = source_power.control(odin)
 ctl = mc.Control(odin, button, lock=[setup, shut, inout, expo, title] + source_power.lockable(power))
 ctl.on_click(take)

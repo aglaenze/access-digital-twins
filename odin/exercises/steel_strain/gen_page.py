@@ -228,7 +228,7 @@ def default_title():
         return "dark"
     return "open beam" if abs(stage.value) > 20 else f"steel {load.value:g} kN"
 
-import source_power                          # the power of the source (fixed by the teacher, or chosen here)
+import source_power                          # the power of the source: read-only (the teacher, or the app)
 power = source_power.control(odin)
 ctl = mc.Control(odin, button, lock=[shut, stage, load, ttime, title] + source_power.lockable(power))
 ctl.on_click(do_count)

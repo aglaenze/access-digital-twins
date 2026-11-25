@@ -63,7 +63,7 @@ shut = w.ToggleButtons(options=["closed", "open"], value="closed", description="
 smp = w.Dropdown(options=list(games.CODES), value=games.CODES[0], description="Sample")
 stage = w.Dropdown(options=[("in the beam (0 mm)", 0.0), ("out of the beam (500 mm)", 0.5)], value=0.0, description="Stage")
 ttime = w.Dropdown(options=[5, 10, 20, 30, 60, 90], value=30, description="Time (s)")
-import source_power                          # the power of the source (fixed by the teacher, or chosen here)
+import source_power                          # the power of the source: read-only (the teacher, or the app)
 power = source_power.control(odin)
 title = w.Text(placeholder="e.g. open beam", description="Title")
 budget = w.FloatProgress(min=0, max=mission.data["budget_s"], description="Beamtime", bar_style="success")

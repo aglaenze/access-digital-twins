@@ -873,7 +873,19 @@ var Classes = (() => {
     if (r && r.error) throw new Error(r.error);
     return r;
   }
+  async function loadPower() {        // the source power of the twin on this computer (source_power.py)
+    try {
+      const r = await api("GET", "/twin/source_power"), sel = $("#sp-power");
+      sel.innerHTML = r.choices.map(([label, v]) => `<option value="${v}">${esc(label)}</option>`).join("");
+      sel.value = String(r.power_mw);
+      sel.onchange = async () => {
+        try { await api("POST", "/twin/source_power", { power_mw: Number(sel.value) }); toast(`Source power: ${sel.value} MW (next measurements).`); }
+        catch (err) { toast(err.message || String(err)); }
+      };
+    } catch (err) { /* older server: no setting */ }
+  }
   async function load() {
+    loadPower();
     try { data = await api("GET", "/twin/classes"); } catch (err) { toast("Classes: " + (err.message || err)); return; }
     if (!selected && data.classes.length) selected = (data.open && data.open.code) || data.classes[0].code;
     renderList(); renderDetail(); poll();
@@ -900,7 +912,7 @@ var Classes = (() => {
     if (!c) { box.innerHTML = '<p class="hint">Choose a class, or make a new one.</p>'; return; }
     const byId = Object.fromEntries(data.offer.map((p) => [p.id, p]));
     const open = data.open && data.open.code === c.code ? data.open : null;
-    const power = c.settings && c.settings.power_mw ? `${c.settings.power_mw} MW (fixed)` : "free";
+    const power = c.settings && c.settings.power_mw ? `${c.settings.power_mw} MW (fixed)` : "not fixed (side panel)";
     let openHtml;
     if (!open) {
       openHtml = `<div class="cls-acts"><button class="primary" id="cls-open">Open the class</button>

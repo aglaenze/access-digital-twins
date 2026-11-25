@@ -224,7 +224,7 @@ def film(_):
     refresh_list()
     update_rename()
 
-import source_power                          # the power of the source (fixed by the teacher, or chosen here)
+import source_power                          # the power of the source: read-only (the teacher, or the app)
 power = source_power.control(odin)
 ctl1 = mc.Control(odin, button1, lock=[shut, inout, button2, step] + source_power.lockable(power))
 ctl2 = mc.Control(odin, button2, lock=[shut, inout, button1, step] + source_power.lockable(power),
