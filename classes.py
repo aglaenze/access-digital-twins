@@ -84,13 +84,17 @@ def offer():
                 if not os.path.isfile(os.path.join(HERE, v.get("file", ""))):
                     continue
                 title = m.get("title") or d.get("title", ex)
+                # its client in the story (STORY.md): the entry of this sample, else the first one
+                st = d.get("story") or []
+                st = st if isinstance(st, list) else [st]
+                one = next((x for x in st if x.get("variant") == k), None) or next((x for x in st if "variant" not in x), None)                     or (st[0] if st else {})
                 out.append(dict(id=f"{instr}/{ex}/{level}" + (f"-{k + 1}" if len(variants) > 1 else ""),
                                 instrument=instr, exercise=ex, level=level, level_name=LEVEL_NAMES.get(level, level),
                                 title=f"{title}: {v['label']}" if v.get("label") else title,
                                 short=d.get("short", ""), page=v["file"], what=m.get("what", ""),
                                 mission=" ".join(str(m.get("mission") or d.get("question", "")).split()),
                                 duration=m.get("duration", ""), introduction=d.get("kind") == "introduction",
-                                quiz=_quiz_name(v["file"])))
+                                quiz=_quiz_name(v["file"]), thread=one.get("thread", ""), client=one.get("client", "")))
     # the introductions first, then the class pages, then the exercises
     rank = lambda p: (p["instrument"], 0 if p["introduction"] else (1 if p["level"] == "class" else 2), p["exercise"])
     return sorted(out, key=rank)
@@ -216,9 +220,10 @@ def student_view(c):
     for pid in c["pages"]:
         p = by_id.get(pid)
         if p:
-            cards.append({k: p[k] for k in ("id", "instrument", "level", "level_name", "title", "short", "page",
-                                            "what", "mission")})
-    return dict(code=c["code"], title=c["title"], identity=c["identity"], cards=cards)
+            cards.append({k: p.get(k, "") for k in ("id", "instrument", "level", "level_name", "title", "short", "page",
+                                                    "what", "mission", "introduction", "thread", "client")})
+    return dict(code=c["code"], title=c["title"], identity=c["identity"], cards=cards,
+                power_mw=(c.get("settings") or {}).get("power_mw"))
 
 
 def current():

@@ -1,139 +1,264 @@
 <!DOCTYPE html>
 {# Start page of the online version of the twins (container/start.sh web, web_class.py: Voila alone serves the pages
-   behind the class password, and this template replaces its list of files). Two steps, as a game: the briefing (the
-   introduction to ODIN), then one mission (an exercise). No name is asked: the browser draws an anonymous id once and
-   keeps it (localStorage), each page gets "?sid=..." (web_user.py), so a reload finds the same measurements; the
-   pages opened are remembered in the browser to mark them. In the app this page is never shown. #}
+   behind the class password, and this template replaces its list of files). In the spirit of the app (catalogue of
+   2026-11-25, mockup "G" validated): the top bar of the app, the target and its beamlines with the instrument of the
+   day, the beam status, the client of the day, the message of the instrument scientist, the introduction bar, the
+   table of the requests of the class (the pages chosen by the teacher, in their order: static/class.json, written by
+   web_class.py from classes.student_view). No name is asked unless the class is "named": the browser draws an
+   anonymous id once and keeps it (localStorage), each page gets "?sid=..." (web_user.py), so a reload finds the same
+   measurements; the pages opened are remembered in the browser to mark them. Light or dark: the setting of the
+   computer, or the button of the top bar. In the app this page is never shown. #}
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ESS digital twins</title>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+  <script>
+    // the theme before the page is drawn (no flash): the choice kept in this browser, else the setting of the computer
+    (function () {
+      var t = null;
+      try { t = localStorage.getItem("twin-theme"); } catch (err) { /* private window */ }
+      if (t !== "light" && t !== "dark") t = window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      document.documentElement.dataset.theme = t;
+    })();
+  </script>
   <style>
-    :root { --bg: #0B0F14; --panel: #161C25; --line: #252E3A; --ink: #E3E8EF; --mute: #97A2B3; --teal: #4ADE80;
-            --amber: #FFC94A; --rust: #E07B4F; }
+    :root {
+      --bg: #ECEEE8; --panel: #F4F5F1; --card: #FFFFFF; --ink: #1B1F24; --muted: #566057; --strong: #1B1F24; --soft: #D5D9D1;
+      --line: #E3E6DF; --line2: #BFC5BC; --head: #1B1F24; --head-ink: #ECEEE8; --head-muted: #A4ADA4; --head-line: #3A423B;
+      --chip: #2A302B; --accent: #F2C230; --grey-line: #CBD0C8; --inst-line: #1B1F24; --monolith: #E3E6DF; --target: #1B1F24;
+      --status: #1B1F24; --go: #1B1F24; --go-ink: #FFFFFF; --beam: #4ADE80;
+      --energy: #D9480F; --planets: #7B2D8E; --instrument: #1C64F2;
+      --f-head: "IBM Plex Sans Condensed", "Segoe UI", system-ui, sans-serif; --f-mono: "IBM Plex Mono", Consolas, monospace;
+    }
+    :root[data-theme="dark"] {
+      --bg: #11161D; --panel: #161C25; --card: #1A212B; --ink: #E3E8EF; --muted: #97A2B3; --strong: #4A5668; --soft: #2A3442;
+      --line: #232C38; --line2: #3A4656; --head: #0B0F14; --head-ink: #E3E8EF; --head-muted: #7D8899; --head-line: #2C3644;
+      --chip: #1A212B; --accent: #FFC94A; --grey-line: #283240; --inst-line: #5A6678; --monolith: #141A22; --target: #0B0F14;
+      --status: #0B0F14; --go: #FFC94A; --go-ink: #11161D; --energy: #FF8A4C; --planets: #C792EA; --instrument: #6CB4F0;
+      color-scheme: dark;
+    }
     * { box-sizing: border-box; }
-    body { margin: 0; font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif; color: var(--ink);
-           background: var(--bg);
-           min-height: 100vh; }
-    header { display: flex; align-items: center; gap: 12px; padding: 16px 28px; border-bottom: 1px solid var(--line);
-             font-weight: 700; letter-spacing: .3px; }
-    header .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--teal); box-shadow: 0 0 12px var(--teal); }
-    header .sub { margin-left: auto; font-weight: 500; color: var(--mute); font-size: 14px; }
-    main { max-width: 1060px; margin: 0 auto; padding: 36px 20px 60px; }
-    .hero { display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: center; margin-bottom: 30px; }
-    .badge { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px;
-             background: rgba(255,201,74,.12); color: var(--amber); font-weight: 600; font-size: 13px;
-             border: 1px solid rgba(255,201,74,.35); }
-    h1 { font-family: "IBM Plex Sans Condensed", "Segoe UI", system-ui, sans-serif; font-size: clamp(26px, 4vw, 40px); margin: 14px 0 10px; line-height: 1.15; }
-    .hero p { color: var(--mute); line-height: 1.6; max-width: 640px; margin: 0; font-size: 16px; }
-    .emblem { width: 150px; height: 150px; }
-    .step { display: flex; align-items: center; gap: 12px; margin: 34px 0 14px; color: var(--mute);
-            font-size: 13px; letter-spacing: 1.6px; text-transform: uppercase; font-weight: 700; }
-    .step .n { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; color: var(--bg);
-               background: var(--teal); font-size: 15px; letter-spacing: 0; }
-    .step .bar { flex: 1; height: 1px; background: var(--line); }
-    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; }
-    .card { position: relative; background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,0)), var(--panel);
-            border: 1px solid var(--line); border-radius: 10px; padding: 22px; display: flex; flex-direction: column;
-            gap: 12px; transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease; }
-    .card:hover { transform: translateY(-3px); border-color: #3A4656; box-shadow: 0 14px 34px rgba(0,0,0,.35); }
-    .card.brief { border-color: rgba(43,179,163,.45); }
-    .top { display: flex; align-items: center; gap: 14px; }
-    .icon { width: 52px; height: 52px; border-radius: 14px; display: grid; place-items: center; flex: none; }
-    .kicker { font-size: 12.5px; color: var(--mute); font-weight: 600; letter-spacing: .4px; }
-    .card h2 { margin: 2px 0 0; font-size: 19px; line-height: 1.3; }
-    .card p { margin: 0; color: var(--mute); line-height: 1.55; font-size: 14.5px; }
-    .tags { display: flex; flex-wrap: wrap; gap: 8px; }
-    .tag { font-size: 12.5px; padding: 4px 10px; border-radius: 999px; background: #15263D; color: #C6D3E4;
-           border: 1px solid var(--line); }
-    .foot { margin-top: auto; display: flex; align-items: center; gap: 12px; padding-top: 6px; }
-    .go { appearance: none; border: 0; cursor: pointer; border-radius: 6px; padding: 12px 18px; font-weight: 700;
-          font-size: 15px; color: #0B0F14; background: var(--teal); display: inline-flex; align-items: center; gap: 8px; }
-    .go:hover { filter: brightness(1.1); }
-    .card.mission .go { background: var(--amber); }
-    .seen { display: none; font-size: 13px; color: var(--teal); font-weight: 600; }
-    .card.opened .seen { display: inline; }
-    .again { margin-left: auto; color: var(--mute); font-size: 13px; }
-    .again:hover { color: var(--ink); }
-    .time { margin-left: auto; color: var(--mute); font-size: 13px; }
-    .note { margin-top: 34px; padding: 16px 18px; border-radius: 14px; border: 1px dashed var(--line); color: var(--mute);
-            font-size: 14px; line-height: 1.55; }
-    .note b { color: var(--ink); }
-    /* shown at once when Start is clicked, until the page arrives (the server starts its kernel first) */
-    #loading { position: fixed; inset: 0; z-index: 10; display: none; place-items: center; background: rgba(11,22,38,.92); }
-    #loading.on { display: grid; }
-    #loading .box { text-align: center; color: var(--ink); font-size: 18px; font-weight: 600; line-height: 1.6; }
-    #loading .box small { display: block; color: var(--mute); font-weight: 500; font-size: 14px; }
-    #loading .spin { width: 54px; height: 54px; margin: 0 auto 18px; border-radius: 50%; border: 4px solid var(--line);
-                     border-top-color: var(--teal); animation: spin 0.9s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .who { margin: 0 0 18px; padding: 16px 18px; border-radius: 14px; background: var(--panel); border: 1px solid var(--line); }
-    .who label { display: block; margin-bottom: 10px; color: var(--mute); }
+    body { margin: 0; font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif; color: var(--ink); background: var(--bg); min-height: 100vh; }
+    button { font: inherit; cursor: pointer; }
+    .hidden { display: none !important; }
+    .kick { font-family: var(--f-mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+    :focus-visible { outline: 3px solid #1C64F2; outline-offset: 2px; }
+
+    /* the top bar of the app */
+    header { display: flex; align-items: center; gap: 14px; padding: 10px clamp(16px, 2.4vw, 40px); background: var(--head); color: var(--head-ink); flex-wrap: wrap; }
+    header .name { font-family: var(--f-head); font-weight: 700; font-size: 19px; letter-spacing: .03em; }
+    header .sub { font-family: var(--f-mono); font-size: 12px; color: var(--head-muted); }
+    header .grow { flex: 1; }
+    .chip-beam { display: flex; align-items: center; gap: 9px; height: 34px; padding: 0 14px; border: 1px solid var(--head-line); border-radius: 4px; font-family: var(--f-mono); font-size: 12.5px; }
+    .chip-beam i { width: 9px; height: 9px; border-radius: 50%; background: var(--beam); }
+    .chip-grade { height: 34px; display: flex; align-items: center; padding: 0 12px; border-radius: 17px; background: var(--chip); font-weight: 600; font-size: 13.5px; }
+    .theme-btn { width: 34px; height: 34px; border-radius: 17px; border: 1px solid var(--head-line); background: transparent; color: var(--head-ink); display: flex; align-items: center; justify-content: center; }
+    .theme-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; }
+
+    /* two columns; on a narrow screen they stack */
+    main { display: grid; grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr); gap: clamp(22px, 2.4vw, 40px);
+           padding: clamp(18px, 2.6vh, 32px) clamp(16px, 2.4vw, 40px) 40px; max-width: 1440px; margin: 0 auto; }
+    .col { min-width: 0; display: flex; flex-direction: column; gap: clamp(14px, 2.2vh, 22px); }
+    @media (max-width: 980px) { main { grid-template-columns: minmax(0, 1fr); } }
+    h1 { margin: 4px 0 6px; font-family: var(--f-head); font-weight: 700; font-size: clamp(30px, 3.2vw, 40px); line-height: 1.05; }
+    .lead { margin: 0; font-size: 15px; line-height: 1.5; color: var(--muted); }
+
+    /* the hall: the target, the beamlines, the instrument(s) of the day */
+    .hall { position: relative; height: 290px; background: var(--panel); border: 1.5px solid var(--strong); border-radius: 6px; overflow: hidden; }
+    .hall svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+    .hall .gl { stroke: var(--grey-line); stroke-width: 6; stroke-linecap: round; }
+    .hall .il { stroke: var(--inst-line); stroke-width: 10; stroke-linecap: round; }
+    .hall .fl { stroke: var(--beam); stroke-width: 4; stroke-linecap: round; stroke-dasharray: 12 10; animation: flow 1.1s linear infinite; }
+    @keyframes flow { to { stroke-dashoffset: -44; } }
+    .monolith { position: absolute; left: 50%; top: 58%; transform: translate(-50%, -50%); width: 120px; height: 120px; border-radius: 50%; background: var(--monolith); border: 1.5px dashed var(--grey-line); }
+    .target { position: absolute; left: 50%; top: 58%; transform: translate(-50%, -50%); width: 70px; height: 70px; border-radius: 50%; background: var(--target); color: #F7F8F4;
+              display: flex; flex-direction: column; align-items: center; justify-content: center; animation: breathe 2.6s ease-in-out infinite; }
+    .target b { font-family: var(--f-head); font-size: 12.5px; }
+    .target span { font-family: var(--f-mono); font-size: 9.5px; color: var(--beam); }
+    @keyframes breathe { 0%, 100% { box-shadow: 0 0 0 0 rgba(74, 222, 128, .45); } 50% { box-shadow: 0 0 0 14px rgba(74, 222, 128, 0); } }
+    .hut { position: absolute; transform: translate(-50%, -50%); width: 132px; padding: 9px 12px; border-radius: 6px; display: flex; flex-direction: column; align-items: flex-start;
+           text-align: left; background: var(--card); color: var(--ink); border: 2px solid var(--strong); box-shadow: 4px 4px 0 var(--strong); }
+    .hut b { font-family: var(--f-head); font-size: 24px; line-height: 1; }
+    .hut span { font-family: var(--f-mono); font-size: 11px; }
+    .hut.on { background: #1B1F24; color: #F7F8F4; border-color: var(--beam); box-shadow: 5px 5px 0 var(--beam); }
+    :root[data-theme="dark"] .hut.on { background: #1F2A22; }
+
+    /* the beam status */
+    .beamrow { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; background: var(--status); color: #E3E8EF; border-radius: 6px; padding: 10px 14px; border: 1.5px solid var(--strong); }
+    .beamrow .on { display: flex; align-items: center; gap: 8px; font-family: var(--f-mono); font-weight: 600; font-size: 12.5px; letter-spacing: .1em; color: #4ADE80; }
+    .beamrow .on i { width: 10px; height: 10px; border-radius: 50%; background: #4ADE80; box-shadow: 0 0 8px #4ADE80; }
+    .beamrow .v { display: flex; flex-direction: column; }
+    .beamrow .v b { font-family: var(--f-head); font-size: 22px; line-height: 1; font-variant-numeric: tabular-nums; }
+    .beamrow .v span { font-family: var(--f-mono); font-size: 10px; color: #97A2B3; }
+
+    /* the clients of the day */
+    .clients { display: flex; flex-direction: column; gap: 8px; }
+    .client { display: flex; align-items: center; gap: 12px; text-align: left; background: var(--card); color: var(--ink); border: 1px solid var(--soft); border-radius: 8px; padding: 12px; }
+    .client:hover { border-color: var(--line2); }
+    .client b { flex: 1; font-family: var(--f-head); font-size: 17px; }
+    .client .go-t { font-family: var(--f-mono); font-size: 11.5px; font-weight: 600; }
+    .vig { flex: none; width: 34px; height: 34px; border-radius: 7px; color: #fff; display: flex; align-items: center; justify-content: center; }
+    .vig svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+    .vig.s { width: 24px; height: 24px; border-radius: 6px; } .vig.s svg { width: 14px; height: 14px; stroke-width: 2.2; }
+    .energy-bg { background: var(--energy); } .planets-bg { background: var(--planets); } .instrument-bg { background: var(--instrument); }
+    .energy-fg { color: var(--energy); } .planets-fg { color: var(--planets); } .instrument-fg { color: var(--instrument); }
+
+    /* the right column: the instrument, the message, the introduction, the requests */
+    h2.inst { margin: 0; font-family: var(--f-head); font-weight: 700; font-size: clamp(36px, 4vw, 46px); line-height: 1; }
+    .mentor { display: flex; gap: 12px; align-items: flex-start; }
+    .av { position: relative; flex: none; width: 40px; height: 40px; border-radius: 50%; background: var(--accent); color: #1B1F24; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; }
+    .av i { position: absolute; right: -2px; top: -2px; width: 11px; height: 11px; border-radius: 50%; background: #E5484D; border: 2px solid var(--bg); }
+    .mentor .who-m { font-size: 13px; } .mentor .who-m span { font-family: var(--f-mono); font-size: 11.5px; color: var(--muted); }
+    .bub { margin-top: 3px; background: var(--card); border: 1px solid var(--soft); border-radius: 4px 14px 14px 14px; padding: 9px 14px; font-size: 14.5px; line-height: 1.45; }
+    .ib { display: flex; align-items: center; gap: 12px; background: var(--card); border: 1.5px solid var(--strong); border-radius: 8px; padding: 10px 14px; }
+    .ib-txt { flex: none; display: flex; flex-direction: column; line-height: 1.2; }
+    .ib-txt b { font-size: 15px; } .ib-txt span { font-size: 12.5px; color: var(--muted); } .ib-txt em { font-style: normal; font-family: var(--f-mono); font-size: 11px; }
+    .ib-lw { flex: 1; min-width: 0; display: flex; justify-content: center; padding: 0 40px; container-type: inline-size; }
+    .ib-line { position: relative; width: min(240px, 100%); height: 30px; }
+    @container (max-width: 150px) { .ib-line { display: none; } }
+    .ib-line .rail { position: absolute; left: 0; right: 0; top: 7px; height: 2px; background: var(--line2); }
+    .ib-line .part { position: absolute; top: 4px; width: 8px; height: 8px; margin-left: -4px; border-radius: 2px; background: var(--ink); }
+    .ib-line .lab { position: absolute; top: 15px; transform: translateX(-50%); font-family: var(--f-mono); font-size: 10px; color: var(--muted); white-space: nowrap; }
+    .ib-line .dot { position: absolute; top: 4px; width: 8px; height: 8px; margin-left: -4px; border-radius: 50%; background: #4ADE80; box-shadow: 0 0 8px #4ADE80; animation: travel 2.8s linear infinite; }
+    @keyframes travel { from { left: 0%; } to { left: 100%; } }
+    .acts { flex: none; display: flex; gap: 8px; flex-wrap: wrap; }
+    .btn { font-family: var(--f-mono); font-weight: 600; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; padding: 7px 12px; border-radius: 4px;
+           border: 1px solid var(--strong); background: transparent; color: var(--ink); white-space: nowrap; }
+    .btn.go { background: var(--go); color: var(--go-ink); border-color: var(--go); }
+    .btn:hover { filter: brightness(1.1); }
+    .req-top { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+    .requests { background: var(--card); border: 1.5px solid var(--strong); border-radius: 6px; overflow: hidden; }
+    .r-head, .r-row { display: grid; grid-template-columns: 58px minmax(0, 1.1fr) minmax(0, 2.3fr) 104px; gap: 12px; align-items: center; padding: 0 14px; }
+    .r-head { padding-top: 9px; padding-bottom: 9px; font-family: var(--f-mono); font-size: 11px; letter-spacing: .12em; color: var(--muted); border-bottom: 1.5px solid var(--strong); background: var(--panel); }
+    .r-row { width: 100%; padding-top: 12px; padding-bottom: 12px; border: 0; border-bottom: 1px solid var(--line); background: var(--card); color: var(--ink); text-align: left; }
+    .r-row:hover, .r-row.open { background: var(--panel); }
+    .r-row.open { box-shadow: inset 4px 0 0 var(--accent); }
+    .r-ref { font-family: var(--f-mono); font-size: 12.5px; font-weight: 600; }
+    .r-from { display: flex; align-items: center; gap: 8px; min-width: 0; }
+    .r-from span:last-child { font-family: var(--f-mono); font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .r-title { font-family: var(--f-head); font-weight: 700; font-size: 17px; line-height: 1.15; }
+    .r-title small { display: block; font-family: var(--f-mono); font-weight: 400; font-size: 11.5px; color: var(--muted); }
+    .r-st { justify-self: start; font-family: var(--f-mono); font-weight: 600; font-size: 11px; letter-spacing: .06em; padding: 4px 8px; border-radius: 3px; color: var(--muted); border: 1px solid var(--line2); }
+    .r-st.next { background: var(--accent); color: #1B1F24; border-color: var(--accent); }
+    .r-st.opened { color: var(--ink); border-color: var(--ink); }
+    .r-detail { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; padding: 14px 13px 16px 84px; background: var(--panel); border-bottom: 1px solid var(--line); }
+    .r-detail p { flex: 1 1 320px; margin: 0; font-size: 14.5px; line-height: 1.55; }
+    .r-detail .acts { margin-left: auto; }
+    @media (max-width: 640px) { .r-head, .r-row { grid-template-columns: 48px minmax(0, 1fr) 90px; } .r-from { display: none; } .r-head span:nth-child(2) { display: none; } .r-detail { padding-left: 14px; } }
+    .requests.locked { opacity: .4; pointer-events: none; }
+    details.how { font-size: 13.5px; color: var(--muted); }
+    details.how summary { cursor: pointer; font-family: var(--f-mono); font-size: 12px; letter-spacing: .06em; }
+    details.how p { margin: 8px 0 0; line-height: 1.5; }
+
+    /* a named class: the name first */
+    .who { background: var(--card); border: 1.5px solid var(--strong); border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+    .who label { font-size: 14px; }
     .who .row { display: flex; gap: 10px; flex-wrap: wrap; }
-    .who input { flex: 1; min-width: 220px; padding: 11px 12px; border-radius: 10px; border: 1px solid var(--line);
-                 background: #11161D; color: var(--ink); font-size: 15px; }
-    .who [hidden], .who[hidden] { display: none !important; }
-    .who .hello { color: var(--mute); }
-    .who .hello a { color: var(--teal); }
-    .grid.locked { opacity: .35; pointer-events: none; }
-    @media (max-width: 640px) { .hero { grid-template-columns: 1fr; } .emblem { display: none; } main { padding-top: 22px; } }
+    .who input { flex: 1; min-width: 200px; padding: 9px 12px; border-radius: 4px; border: 1px solid var(--line2); background: var(--card); color: var(--ink); font-size: 15px; }
+    .who .hello { color: var(--muted); font-size: 14px; }
+    .who .hello a { color: var(--ink); }
+
+    /* the story of a client */
+    dialog { border: 0; border-radius: 10px; padding: 0; max-width: 620px; width: 92vw; background: var(--card); color: var(--ink); overflow: hidden; }
+    dialog::backdrop { background: rgba(10, 12, 16, .55); }
+    .t-band { display: flex; align-items: center; gap: 14px; padding: 18px 20px; color: #fff; }
+    .t-band .vig { width: 52px; height: 52px; border-radius: 12px; background: rgba(255, 255, 255, .18); }
+    .t-band .vig svg { width: 32px; height: 32px; }
+    .t-band small { display: block; font-family: var(--f-mono); font-size: 11.5px; letter-spacing: .12em; opacity: .85; }
+    .t-band b { font-family: var(--f-head); font-size: 28px; }
+    .t-body { padding: 18px 20px 6px; display: flex; flex-direction: column; gap: 12px; }
+    .t-body p { margin: 0; font-size: 15px; line-height: 1.6; }
+    .t-help { background: var(--panel); border-radius: 6px; padding: 12px 14px; }
+    dialog form { display: flex; justify-content: flex-end; padding: 10px 20px 18px; }
+
+    /* shown at once when a page is opened, until it arrives (the server starts its kernel first) */
+    #loading { position: fixed; inset: 0; z-index: 10; display: none; place-items: center; background: rgba(11, 15, 20, .92); }
+    #loading.on { display: grid; }
+    #loading .box { text-align: center; color: #E3E8EF; font-size: 18px; font-weight: 600; line-height: 1.6; }
+    #loading .box small { display: block; color: #97A2B3; font-weight: 500; font-size: 14px; }
+    #loading .spin { width: 54px; height: 54px; margin: 0 auto 18px; border-radius: 50%; border: 4px solid #2C3644; border-top-color: #F2C230; animation: spin .9s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) { .hall .fl, .target, .ib-line .dot { animation: none; } }
   </style>
 </head>
 <body>
-  <header><span class="dot"></span> ESS digital twins <span class="sub">ODIN · neutron imaging</span></header>
+  <header>
+    <svg role="img" aria-label="ESS digital twins" width="30" height="30" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#1B1F24" stroke="#3A423B" stroke-width="2"/><g stroke="#4ADE80" stroke-width="3.5" stroke-linecap="round"><path d="M38 34 L55 17"/><path d="M38 34 L58 36"/><path d="M38 34 L53 52"/><path d="M38 34 L34 57"/><path d="M38 34 L40 9"/><path d="M38 34 L19 53"/></g><path d="M7 34 H26" stroke="#F2C230" stroke-width="7" stroke-linecap="round"/><circle cx="36" cy="34" r="9" fill="#F7F8F4"/></svg>
+    <span class="name">ESS DIGITAL TWINS</span><span class="sub">class session</span>
+    <span class="grow"></span>
+    <span class="chip-beam" id="chip-beam" title="The power of the source, set by your teacher for the class"><i></i><span id="chip-power">BEAM 5 MW</span></span>
+    <span class="chip-grade" id="chip-grade">Trainee</span>
+    <button class="theme-btn" id="theme" type="button" aria-label="Light or dark" title="Light or dark"><svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+  </header>
+
   <main>
-    <section class="hero">
+    <section class="col">
       <div>
-        <span class="badge">★ Rank: trainee · Neutron Solutions Team</span>
-        <h1>Your first day at the European Spallation Source</h1>
-        <p>You join a (fictional) team of ESS: companies and research teams bring it their questions, and you answer
-          them with ODIN, the neutron imaging instrument, through its digital twin. You set the instrument, measure,
-          and analyze your own data, in this browser. Nothing to install.</p>
+        <div class="kick">Your class</div>
+        <h1 id="session-title">Today's session</h1>
+        <p class="lead" id="lead">You join the Neutron Solutions Team of ESS for this session: its clients bring questions, you answer them on the digital twin of their instrument.</p>
       </div>
-      <svg class="emblem" viewBox="0 0 120 120" aria-hidden="true">
-        <defs><radialGradient id="g" cx="50%" cy="45%" r="60%"><stop offset="0" stop-color="#4ADE80" stop-opacity=".55"/>
-          <stop offset="1" stop-color="#4ADE80" stop-opacity="0"/></radialGradient></defs>
-        <circle cx="60" cy="60" r="56" fill="url(#g)"/>
-        <circle cx="60" cy="60" r="40" fill="none" stroke="#4ADE80" stroke-width="2" stroke-dasharray="4 6"/>
-        <ellipse cx="60" cy="60" rx="46" ry="16" fill="none" stroke="#FFC94A" stroke-width="2" transform="rotate(30 60 60)"/>
-        <ellipse cx="60" cy="60" rx="46" ry="16" fill="none" stroke="#97A2B3" stroke-width="1.5" transform="rotate(-30 60 60)"/>
-        <circle cx="60" cy="60" r="9" fill="#E3E8EF"/>
-      </svg>
+      <form id="who" class="who hidden">
+        <label for="who-name"><b>Your name</b> (asked by your teacher for this session)</label>
+        <div class="row"><input id="who-name" autocomplete="name" maxlength="80" required placeholder="First name and last name">
+          <button class="btn go" type="submit">OK</button></div>
+        <div class="hello hidden">Signed in as <b id="who-shown"></b> · <a href="#" id="who-change">not you?</a></div>
+      </form>
+      <div class="hall" id="hall" title="The neutrons start at the target and go down the beamlines to the instruments. Schematic, not to scale."></div>
+      <div class="beamrow"><span class="on"><i></i>BEAM ON TARGET</span>
+        <span class="v"><b id="b-power">5.0</b><span>MW · set by your teacher</span></span>
+        <span class="v"><b id="b-pulses">–</b><span>pulses today</span></span></div>
+      <div class="clients" id="clients-box"><div class="kick" id="clients-title">Today's client</div><div class="clients" id="clients"></div></div>
     </section>
 
-    <div class="step"><span class="n">★</span> <span id="session-title">Today's session</span> <span class="bar"></span></div>
-    <form id="who" class="who" hidden>
-      <label for="who-name"><b>Your name</b> (asked by your teacher for this session)</label>
-      <div class="row"><input id="who-name" autocomplete="name" maxlength="80" required placeholder="First name and last name">
-        <button class="go" type="submit">OK</button></div>
-      <div class="hello" hidden>Signed in as <b id="who-shown"></b> · <a href="#" id="who-change">not you?</a></div>
-    </form>
-    <div class="grid">
-      <article class="card mission" data-page="odin/exercises/meteorite_imaging/ODIN_meteorite_class.ipynb">
-        <div class="top">
-          <div class="icon" style="background:rgba(224,123,79,.15)">
-            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#E07B4F" stroke-width="2" stroke-linejoin="round"><path d="M12 3l7 4v6c0 4-3 7-7 8-4-1-7-4-7-8V7z"/><circle cx="10" cy="11" r="1.6" fill="#E07B4F"/><circle cx="14.5" cy="14" r="1.1" fill="#E07B4F"/></svg></div>
-          <div><div class="kicker">START HERE · ODIN FOR X-RAY IMAGERS</div><h2>ODIN: what is hidden inside a Martian meteorite?</h2></div>
-        </div>
-        <p>ODIN in five points for those who know X-ray imaging, then the piece of NWA 7034 ("Black Beauty") of
-          Naver <i>et al.</i> (2026): a high-resolution radiograph, a tomography, find the clasts that hold hydrogen
-          and how much water they contain.</p>
-        <div class="tags"><span class="tag">radiography</span><span class="tag">tomography</span><span class="tag">neutrons vs X-rays</span></div>
-        <div class="foot"><button class="go" type="button">▶ Start</button><span class="seen">✓ opened</span></div>
-      </article>
-    </div>
-
-
-    <div class="note"><b>Anonymous:</b> no name is asked. This browser remembers your measurements and answers while the
-      session is online: come back with the same browser to continue. At the end of a mission, leave a comment and
-      submit your work. A page takes a few seconds to open (up to a minute when many open at once); a measurement may
-      wait for its turn on the server: the page tells you.</div>
+    <section class="col">
+      <h2 class="inst" id="inst">ODIN</h2>
+      <div class="mentor" id="mentor"></div>
+      <div id="intro"></div>
+      <div>
+        <div class="req-top"><span class="kick">Today's requests</span><span class="kick" id="req-count"></span></div>
+        <div class="requests" id="requests"></div>
+      </div>
+      <details class="how"><summary>HOW THIS SESSION WORKS</summary><p id="how"></p></details>
+    </section>
   </main>
+
+  <dialog id="team"><div class="t-band" id="t-band"></div><div class="t-body"><p id="t-life"></p>
+    <div class="t-help"><span class="kick">How ESS helps them</span><p id="t-help"></p></div></div>
+    <form method="dialog"><button class="btn go">Close</button></form></dialog>
   <div id="loading" role="status" aria-live="polite"><div class="box"><div class="spin"></div>Loading the instrument…
     <small>The page takes a few seconds to open (up to a minute when many open at once).</small></div></div>
+
   <script>
+    // ------------------------------------------------------------------ the world of the story (as the catalogue of the app)
+    var INSTR = { odin: { name: "ODIN", kind: "imaging", at: [22, 20], mentor: ["Maja Holm", "MH", "instrument scientist, ODIN"],
+                          parts: [["source", 0], ["choppers", 24], ["pinhole", 56], ["sample", 82], ["camera", 100]] },
+                  loki: { name: "LoKI", kind: "small angles", at: [82, 34], mentor: ["Tomas Berg", "TB", "instrument scientist, LoKI"],
+                          parts: [["source", 0], ["choppers", 20], ["collimation", 50], ["sample", 76], ["detectors", 100]] } };
+    var TEAMS = {
+      energy: { name: "Fyrø Energy Island", kind: "ENERGY CONSORTIUM", prefix: "E", icon: "M12 12v9 M12 12 7 4.5 M12 12l8.5 1.5 M12 12 4.5 16 M10 21h4",
+        life: "Fyrø is an artificial island in the Kattegat. Around it turn the turbines of an offshore wind farm; on the island, part of the power becomes hydrogen, part is stored in batteries, and the old blades and towers are taken apart for recycling. Four departments run it, Structures, Hydrogen plant, Storage and Circularity, and each has a problem it cannot see into.",
+        help: "Neutrons cross centimeters of steel and see light elements such as lithium and hydrogen: ODIN maps the strain inside a loaded steel part and follows the lithium inside a working battery; LoKI measures the nanoparticles of the blade resin." },
+      planets: { name: "The Mars team", kind: "PLANETARY SCIENTISTS", prefix: "M", icon: "M12 5a7 7 0 1 0 0 14 7 7 0 0 0 0-14z M3 14c3 2 15 0 18-4",
+        life: "A small group of planetary scientists and paleomagnetists who keep a collection of Martian meteorites. They want to know what early Mars was like: was there water, where did it go, and did the planet have a magnetic field? Their pieces are rare and precious: they cannot be cut, ground or dissolved to find out.",
+        help: "Neutrons see hydrogen, so water, through a rock without harming it, and a tomography shows where it is held inside. Polarized neutrons see the magnetic field inside a sample." },
+      instrument: { name: "Our own team", kind: "INSIDE ESS", prefix: "I", icon: "M14.5 6.5a3.5 3.5 0 0 0-4.6 4.4L4 16.8 7.2 20l5.9-5.9a3.5 3.5 0 0 0 4.4-4.6l-2.2 2.2-2.4-.6-.6-2.4z",
+        life: "Maja Holm runs ODIN and Tomas Berg runs LoKI: they are instrument scientists, and your mentors. With them works the workshop, which builds sample holders, load frames and coils. Before each user arrives the instruments must be ready, tested and understood.",
+        help: "Their requests are the everyday work of an instrument scientist: check a new coil before it goes on ODIN, find a fault in the data before the next user comes." } };
+    var GREY = [[50, 98], [20, 96], [80, 97], [97, 74], [3, 76], [62, 3]], TARGET = [50, 58];
+    // without a class (the online version alone): the introduction and the class page of ODIN
+    var CLASS = { code: "", title: "Today's session", identity: "anonymous", power_mw: 5, cards: [
+      { instrument: "odin", level: "all", introduction: true, title: "Introduction to ODIN", page: "odin/ODIN_intro.ipynb", what: "how the instrument works" },
+      { instrument: "odin", level: "class", level_name: "Class session", thread: "planets", client: "The Mars team",
+        title: "What is hidden inside a Martian meteorite?", page: "odin/exercises/meteorite_imaging/ODIN_meteorite_class.ipynb",
+        mission: "ODIN in five points for those who know X-ray imaging, then the piece of NWA 7034 of Naver et al. (2026): a radiograph, a tomography, the clasts that hold hydrogen and their water." }] };
+    var instr = "odin", openKey = null;
+
+    function $(id) { return document.getElementById(id); }
+    function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+    function vig(t, small) { var T = TEAMS[t] || TEAMS.instrument; return '<span class="vig ' + (small ? "s " : "") + (TEAMS[t] ? t : "instrument") + '-bg"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="' + T.icon + '"/></svg></span>'; }
     function sid() {
       var s = null;
       try { s = localStorage.getItem("twin-sid"); } catch (err) { /* private window */ }
@@ -151,92 +276,159 @@
         return !!o[page];
       } catch (err) { return false; }
     }
-    // a mission opens in this same tab; the "Catalogue" button of a page comes back here (target twin-catalogue: this
-    // tab, whose name stays while it shows the page)
-    window.name = "twin-catalogue";
-    var CLASS = null;
     function storedName() { try { return localStorage.getItem("twin-name-" + CLASS.code) || ""; } catch (err) { return ""; } }
-    function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text) e.textContent = text; return e; }
-    function classCards(c) {
-      // the pages chosen by the teacher, in their order (no settings of the class here: only what students see)
-      document.getElementById("session-title").textContent = c.title;
-      var grid = document.querySelector(".grid");
-      grid.innerHTML = "";
-      c.cards.forEach(function (p) {
-        var card = el("article", "card" + (p.level === "class" ? " mission" : (p.level === "all" ? " brief" : " mission")));
-        card.setAttribute("data-page", p.page);
-        var top = el("div", "top"), head = el("div");
-        head.appendChild(el("div", "kicker", (p.level_name + " · " + p.instrument).toUpperCase()));
-        head.appendChild(el("h2", "", p.title));
-        top.appendChild(head); card.appendChild(top);
-        card.appendChild(el("p", "", p.mission || p.what));
-        var foot = el("div", "foot"), go = el("button", "go", "▶ Start");
-        go.type = "button"; foot.appendChild(go); foot.appendChild(el("span", "seen", "✓ opened")); card.appendChild(foot);
-        grid.appendChild(card);
+    function named() { return CLASS.identity === "named"; }
+    // a page opens in this same tab; the "Catalogue" button of a page comes back here (target twin-catalogue)
+    window.name = "twin-catalogue";
+    function openPage(page, restart) {
+      if (named() && !storedName()) { $("who-name").focus(); return; }
+      opened(page, true);
+      $("loading").classList.add("on");
+      var url = "{{ base_url }}voila/render/" + page + "?sid=" + sid();
+      if (named()) url += "&name=" + encodeURIComponent(storedName());
+      // start again: the answers of this page put aside on the server (web_user.py), once for this token
+      if (restart) url += "&restart=" + Math.random().toString(36).slice(2, 12);
+      window.location.href = url;
+    }
+    function again(page) {
+      if (confirm("Start this page again? Your answers to its questions are put aside (your measurements stay).")) openPage(page, true);
+    }
+
+    // ------------------------------------------------------------------ the page
+    function cardsOf(k) { return CLASS.cards.filter(function (c) { return (c.instrument || "odin") === k; }); }
+    function render() {
+      var instruments = Object.keys(INSTR).filter(function (k) { return cardsOf(k).length; });
+      if (instruments.indexOf(instr) < 0) instr = instruments[0] || "odin";
+      var I = INSTR[instr], mine = cardsOf(instr);
+      var intro = mine.filter(function (c) { return c.introduction || c.level === "all"; })[0];
+      var reqs = mine.filter(function (c) { return c !== intro; });
+      var next = reqs.filter(function (c) { return !opened(c.page); })[0];
+      $("session-title").textContent = CLASS.title;
+      $("lead").textContent = "You join the Neutron Solutions Team of ESS for this session: its clients bring questions, you answer them on the digital twin of " +
+        instruments.map(function (k) { return INSTR[k].name; }).join(" and ") + ".";
+      var lvls = CLASS.cards.map(function (c) { return c.level; });
+      $("chip-grade").textContent = lvls.indexOf("msc") >= 0 ? "Method scientist" : "Trainee";
+      var p = Number(CLASS.power_mw) || 5;
+      $("chip-power").textContent = "BEAM " + p + " MW";
+      $("b-power").textContent = p.toFixed(1);
+      // the hall
+      var line = function (a, cls) { return '<path class="' + cls + '" d="M' + TARGET[0] + " " + TARGET[1] + " L" + a[0] + " " + a[1] + '" vector-effect="non-scaling-stroke"/>'; };
+      var svg = '<svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">' + GREY.map(function (g) { return line(g, "gl"); }).join("") +
+        Object.keys(INSTR).filter(function (k) { return instruments.indexOf(k) < 0; }).map(function (k) { return line(INSTR[k].at, "gl"); }).join("") +
+        instruments.map(function (k) { return line(INSTR[k].at, "il"); }).join("") + line(I.at, "fl") + "</svg>";
+      $("hall").innerHTML = svg + '<div class="monolith"></div><div class="target"><b>TARGET</b><span>' + p + ' MW</span></div>' +
+        instruments.map(function (k) {
+          return '<button type="button" class="hut' + (k === instr ? " on" : "") + '" data-k="' + k + '" style="left:' + INSTR[k].at[0] + "%;top:" + INSTR[k].at[1] + '%"' +
+            (instruments.length < 2 ? " disabled" : "") + "><b>" + INSTR[k].name + "</b><span>" + INSTR[k].kind + "</span><span>" +
+            (instruments.length < 2 ? "today's instrument" : cardsOf(k).length + " pages") + "</span></button>";
+        }).join("");
+      Array.prototype.forEach.call(document.querySelectorAll(".hut[data-k]"), function (b) { b.onclick = function () { instr = b.dataset.k; openKey = null; render(); }; });
+      // the clients of the day
+      var threads = [];
+      CLASS.cards.forEach(function (c) { if (c.thread && threads.indexOf(c.thread) < 0) threads.push(c.thread); });
+      $("clients-box").classList.toggle("hidden", !threads.length);
+      $("clients-title").textContent = threads.length > 1 ? "Today's clients" : "Today's client";
+      $("clients").innerHTML = threads.map(function (t) {
+        return '<button type="button" class="client" data-t="' + t + '">' + vig(t) + "<b>" + esc((TEAMS[t] || {}).name || t) + '</b><span class="go-t">Meet them ›</span></button>';
+      }).join("");
+      Array.prototype.forEach.call(document.querySelectorAll(".client"), function (b) { b.onclick = function () { meet(b.dataset.t); }; });
+      // the instrument and its scientist
+      $("inst").textContent = I.name;
+      var msg;
+      if (named() && !storedName()) msg = "Welcome to the team! First write your name (on the left): your teacher asked for it.";
+      else if (intro && !opened(intro.page)) msg = "Welcome to the team! Start with the introduction just below: it shows how " + I.name + " works. Then the requests are yours.";
+      else if (next) msg = (next.client || "A client") + " is waiting for you: “" + next.title + "”. Everything is set up on " + I.name + ".";
+      else if (reqs.length) msg = "You have opened every request of today: finish each one, then leave a comment and submit your work at its end.";
+      else msg = "Welcome to the team!";
+      $("mentor").innerHTML = '<div class="av">' + I.mentor[1] + '<i aria-label="new message"></i></div><div style="flex:1;min-width:0"><div class="who-m"><b>' +
+        I.mentor[0] + "</b> <span>" + I.mentor[2] + ' · message</span></div><div class="bub">' + esc(msg) + "</div></div>";
+      // the introduction bar
+      if (intro) {
+        var io = opened(intro.page);
+        $("intro").innerHTML = '<div class="ib"><span class="ib-txt"><b>Introduction</b><span>how the instrument works' + (io ? " <em>· opened</em>" : "") + "</span></span>" +
+          '<span class="ib-lw"><span class="ib-line" aria-hidden="true"><span class="rail"></span>' +
+          I.parts.map(function (x) { return '<span class="part" style="left:' + x[1] + '%"></span><span class="lab" style="left:' + x[1] + '%">' + x[0] + "</span>"; }).join("") +
+          '<span class="dot"></span></span></span><span class="acts"><button type="button" class="btn go" id="intro-go">' + (io ? "CONTINUE ›" : "START HERE ›") + "</button>" +
+          (io ? '<button type="button" class="btn" id="intro-again">START AGAIN</button>' : "") + "</span></div>";
+        $("intro-go").onclick = function () { openPage(intro.page); };
+        if (io) $("intro-again").onclick = function () { again(intro.page); };
+      } else $("intro").innerHTML = "";
+      // the requests: REF, FROM, REQUEST, STATUS; a click opens the briefing under the row
+      var num = {};
+      if (openKey === null && next) openKey = next.page;
+      $("req-count").textContent = reqs.filter(function (c) { return opened(c.page); }).length + " / " + reqs.length + " OPENED";
+      $("requests").innerHTML = '<div class="r-head"><span>REF</span><span>FROM</span><span>REQUEST</span><span>STATUS</span></div>' +
+        (reqs.length ? reqs.map(function (c) {
+          var t = TEAMS[c.thread] ? c.thread : "instrument";
+          num[t] = (num[t] || 0) + 1;
+          var o = opened(c.page), st = o ? "opened" : (c === next ? "next" : "new");
+          var title = c.title.split(": "), main = title.length > 1 && /\(/.test(title[title.length - 1]) ? title.slice(0, -1).join(": ") : c.title;
+          var sub = main !== c.title ? title[title.length - 1] : "";
+          var isOpen = openKey === c.page;
+          return '<button type="button" class="r-row' + (isOpen ? " open" : "") + '" data-page="' + esc(c.page) + '" aria-expanded="' + isOpen + '">' +
+            '<span class="r-ref ' + t + '-fg">' + TEAMS[t].prefix + "-" + ("0" + num[t]).slice(-2) + "</span>" +
+            '<span class="r-from">' + vig(t, true) + "<span>" + esc(TEAMS[t].name) + "</span></span>" +
+            '<span class="r-title">' + esc(main) + (sub ? "<small>" + esc(sub) + "</small>" : "") + "</span>" +
+            '<span class="r-st ' + st + '">' + st.toUpperCase() + "</span></button>" +
+            (isOpen ? '<div class="r-detail"><p>' + esc(c.mission || c.what || "") + '</p><span class="acts"><button type="button" class="btn go" data-go="' + esc(c.page) + '">' +
+              (o ? "CONTINUE ›" : "START ›") + "</button>" + (o ? '<button type="button" class="btn" data-again="' + esc(c.page) + '">START AGAIN</button>' : "") + "</span></div>" : "");
+        }).join("") : '<div class="r-detail"><p>No request for this instrument in this class.</p></div>');
+      $("requests").classList.toggle("locked", named() && !storedName());
+      Array.prototype.forEach.call(document.querySelectorAll(".r-row"), function (b) {
+        b.onclick = function () { openKey = openKey === b.dataset.page ? "" : b.dataset.page; render(); };
       });
-      var note = document.querySelector(".note");
-      if (c.identity === "named") {
-        note.innerHTML = "<b>Named session:</b> your teacher asked for your name; it goes with your answers. This " +
-          "browser remembers your measurements and answers: come back with the same browser to continue. At the end, " +
-          "leave a comment and submit your work.";
-        var form = document.getElementById("who"), input = document.getElementById("who-name");
-        form.hidden = false;
-        function show() {
-          var n = storedName();
-          form.querySelector(".row").hidden = !!n; form.querySelector("label").hidden = !!n;
-          form.querySelector(".hello").hidden = !n;
-          document.getElementById("who-shown").textContent = n;
-          grid.classList.toggle("locked", !n);
-        }
-        form.addEventListener("submit", function (ev) {
-          ev.preventDefault();
-          var n = input.value.replace(/\s+/g, " ").trim();
-          if (n.length < 2) return;
-          try { localStorage.setItem("twin-name-" + CLASS.code, n); } catch (err) { /* */ }
-          show();
-        });
-        document.getElementById("who-change").addEventListener("click", function (ev) {
-          ev.preventDefault();
-          try { localStorage.removeItem("twin-name-" + CLASS.code); } catch (err) { /* */ }
-          input.value = ""; show(); input.focus();
-        });
-        show();
-      }
+      Array.prototype.forEach.call(document.querySelectorAll("[data-go]"), function (b) { b.onclick = function () { openPage(b.dataset.go); }; });
+      Array.prototype.forEach.call(document.querySelectorAll("[data-again]"), function (b) { b.onclick = function () { again(b.dataset.again); }; });
+      $("how").textContent = named()
+        ? "Your teacher asked for your name: it goes with your answers. This browser remembers your measurements and answers: come back with the same browser to continue. At the end of a request, leave a comment and submit your work."
+        : "No name is asked. This browser remembers your measurements and answers while the session is open: come back with the same browser to continue. At the end of a request, leave a comment and submit your work. A page takes a few seconds to open (up to a minute when many open at once); a measurement may wait for its turn on the server: the page tells you.";
     }
-    function wire() {
-    document.querySelectorAll(".card[data-page]").forEach(function (card) {
-      var page = card.getAttribute("data-page");
-      function go(restart) {
-        opened(page, true);
-        document.getElementById("loading").classList.add("on");
-        // in this same tab (the "Catalogue" button of the page comes back here)
-        var url = "{{ base_url }}voila/render/" + page + "?sid=" + sid();
-        if (CLASS && CLASS.identity === "named") url += "&name=" + encodeURIComponent(storedName());
-        // start again: the answers of this page put aside on the server (web_user.py), once for this token
-        if (restart) url += "&restart=" + Math.random().toString(36).slice(2, 12);
-        window.location.href = url;
-      }
-      if (opened(page)) {
-        card.classList.add("opened");
-        card.querySelector(".go").textContent = "▶ Continue";
-        var again = document.createElement("a");
-        again.href = "#"; again.className = "again"; again.textContent = "Start again";
-        again.addEventListener("click", function (ev) {
-          ev.preventDefault();
-          if (confirm("Start this page again? Your answers to its questions are put aside (your measurements stay).")) go(true);
-        });
-        card.querySelector(".foot").appendChild(again);
-      }
-      card.querySelector(".go").addEventListener("click", function () { go(false); });
+    function meet(t) {
+      var T = TEAMS[t]; if (!T) return;
+      $("t-band").className = "t-band " + t + "-bg";
+      $("t-band").innerHTML = vig(t) + "<div><small>" + T.kind + "</small><b>" + esc(T.name) + "</b></div>";
+      $("t-life").textContent = T.life; $("t-help").textContent = T.help;
+      $("team").showModal();
+    }
+    // a named class: the name first (kept in this browser for the class)
+    function whoForm() {
+      var form = $("who"), input = $("who-name");
+      form.classList.toggle("hidden", !named());
+      if (!named()) return;
+      var n = storedName();
+      form.querySelector(".row").classList.toggle("hidden", !!n); form.querySelector("label").classList.toggle("hidden", !!n);
+      form.querySelector(".hello").classList.toggle("hidden", !n);
+      $("who-shown").textContent = n;
+    }
+    $("who").addEventListener("submit", function (ev) {
+      ev.preventDefault();
+      var n = $("who-name").value.replace(/\s+/g, " ").trim();
+      if (n.length < 2) return;
+      try { localStorage.setItem("twin-name-" + CLASS.code, n); } catch (err) { /* */ }
+      whoForm(); render();
     });
+    $("who-change").addEventListener("click", function (ev) {
+      ev.preventDefault();
+      try { localStorage.removeItem("twin-name-" + CLASS.code); } catch (err) { /* */ }
+      $("who-name").value = ""; whoForm(); render(); $("who-name").focus();
+    });
+    $("theme").addEventListener("click", function () {
+      var t = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+      document.documentElement.dataset.theme = t;
+      try { localStorage.setItem("twin-theme", t); } catch (err) { /* */ }
+    });
+    function tick() {
+      var now = new Date(), midnight = new Date(now); midnight.setHours(0, 0, 0, 0);
+      $("b-pulses").textContent = Math.floor((now - midnight) / 1000 * 14).toLocaleString("en-US");
     }
-    // the class of this server, if any (web_class.py --class); otherwise the cards written in this page
-    fetch("{{ base_url }}voila/templates/twin/static/class.json", {cache: "no-store"})
+    tick(); setInterval(tick, 1000);
+    // the class of this server, if any (web_class.py --class); otherwise the pages written in this page
+    fetch("{{ base_url }}voila/templates/twin/static/class.json", { cache: "no-store" })
       .then(function (r) { return r.ok ? r.json() : null; })
       .catch(function () { return null; })
-      .then(function (c) { if (c && c.cards) { CLASS = c; classCards(c); } wire(); });
-    // back to this page from the mission (the browser may show it from its cache): no loading screen
-    window.addEventListener("pageshow", function () { document.getElementById("loading").classList.remove("on"); });
+      .then(function (c) { if (c && c.cards) CLASS = c; whoForm(); render(); });
+    // back to this page from a page (the browser may show it from its cache): no loading screen, the marks again
+    window.addEventListener("pageshow", function () { $("loading").classList.remove("on"); if (CLASS) render(); });
   </script>
 </body>
 </html>

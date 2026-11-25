@@ -585,6 +585,9 @@ def fit_params(state):
         vf = float(k.get("volume_fraction", 0))
         out.append(dict(key=f"{i}.volume_fraction", label=f"{who}: volume fraction", value=vf, min=0.0,
                         max=round(min(0.5, max(vf * 5, 0.01)), 4)))
+    if out:     # the resolution of the instrument smooths the minima of the curve: fitted too (ticked at first)
+        out.append(dict(key="resolution", label="instrument: Q resolution, σQ/Q", value=0.05, min=0.0, max=0.3,
+                        checked=True))
     return out
 
 
@@ -629,18 +632,29 @@ def fit_run(proposal, state, sample, solvent, empty_beam, params):
         raise ValueError("too few points in I(Q): longer counts, or check the files")
     base = copy.deepcopy(state)                        # (the hidden kinds stay out of the model, as in the views)
     keys = [p["key"] for p in params]
-    x0 = [min(max(float(next(q_["value"] for q_ in fit_params(base) if q_["key"] == k)), p["min"]), p["max"])
-          for k, p in zip(keys, params)]
+    start = {q_["key"]: q_["value"] for q_ in fit_params(base)}
+    x0 = [min(max(float(start.get(k, 0.0)), p["min"]), p["max"]) for k, p in zip(keys, params)]
+    # the Q resolution: a Gaussian of relative width σQ/Q (Gauss-Hermite nodes), fitted if chosen, else none
+    z, wz = np.polynomial.hermite_e.hermegauss(7)
+    wz = wz / wz.sum()
     lo = [float(p["min"]) for p in params] + [-abs(I).max()]
     hi = [float(p["max"]) for p in params] + [abs(I).max()]
 
     def model(x):
         st = copy.deepcopy(base)
+        res = 0.0
         for k, v in zip(keys, x[:-1]):
-            _set(st, k, v)
+            if k == "resolution":
+                res = float(v)
+            else:
+                _set(st, k, v)
         spec = spec_of(st, "open")
-        r = sl.loki_cross_section(spec, q)
-        return r[1] - float(r[2].get("background", 0.0)) + x[-1]
+        qe = (q[:, None] * (1 + res * z[None, :])).ravel() if res > 0 else q
+        r = sl.loki_cross_section(spec, qe)
+        i = (r[1] - float(r[2].get("background", 0.0)))
+        if res > 0:
+            i = (i.reshape(len(q), -1) * wz[None, :]).sum(axis=1)
+        return i + x[-1]
 
     # (the page rounds the sizes to 0.001 Å: the steps of the derivatives must be larger, 0.1 %)
     fit = least_squares(lambda x: (model(x) - I) / dI, x0 + [0.0], bounds=(lo, hi), x_scale="jac", diff_step=1e-3)

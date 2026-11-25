@@ -390,8 +390,8 @@ async function renderFit() {
   if (!params.length) { pbox.append(el("p", { class: "note-box" }, "No particles to fit: add a kind of particles in step 1.")); return; }
   for (const p of params) {
     pbox.append(el("div", { class: "fit-param", "data-key": p.key, "data-label": p.label },
-      el("label", { class: "fit-tick" }, el("input", { type: "checkbox" }), el("span", {}, p.label)),
-      el("span", { class: "small" }, `now ${+p.value.toPrecision(4)}`),
+      el("label", { class: "fit-tick" }, el("input", p.checked ? { type: "checkbox", checked: "" } : { type: "checkbox" }), el("span", {}, p.label)),
+      el("span", { class: "small" }, p.key === "resolution" ? "start 0.05" : `now ${+p.value.toPrecision(4)}`),
       el("label", { class: "small" }, "from ", el("input", { type: "number", class: "fit-min", value: p.min, step: "any" })),
       el("label", { class: "small" }, "to ", el("input", { type: "number", class: "fit-max", value: p.max, step: "any" }))));
   }
@@ -418,6 +418,7 @@ async function runFit() {
 function applyFit() {
   if (!FIT) return;
   for (const v of FIT.values) {
+    if (v.key === "resolution") continue;           // (the instrument's, not the sample's)
     const [i, ...rest] = v.key.split(".");
     let node = S.state.kinds[Number(i)];
     for (const r of rest.slice(0, -1)) node = node[r];
