@@ -27,10 +27,10 @@ try:                     # the conda environment on the PATH, even in a kernel s
 except Exception:
     pass
 NAMES = {"odin": "ODIN", "loki": "LoKI"}
-STYLE = ("display:inline-block; padding:9px 16px; margin:4px 8px 4px 0; border-radius:9px; font-weight:600; "
-         "font-size:14px; text-decoration:none; font-family:Inter, 'Segoe UI', sans-serif;")
-MAIN = STYLE + "background:#0E7C70; color:#fff; border:1px solid #0E7C70;"
-SECOND = STYLE + "background:#fff; color:#142033; border:1px solid #CBD3DE;"
+STYLE = ("display:inline-block; padding:9px 16px; margin:4px 8px 4px 0; border-radius:6px; font-weight:600; "
+         "font-size:14px; text-decoration:none; font-family:'IBM Plex Sans', 'Segoe UI', sans-serif;")
+MAIN = STYLE + "background:#1B1F24; color:#fff; border:1px solid #1B1F24;"
+SECOND = STYLE + "background:#fff; color:#1B1F24; border:1px solid #BFC5BC;"
 
 
 def _button(label, href, main=False):
@@ -39,7 +39,7 @@ def _button(label, href, main=False):
 
 def _centered(button, note):
     display(HTML(f'<div style="text-align:center; margin:28px 0 30px">{button}'
-                 f'<div style="color:#5B6779; font-size:13px; margin-top:6px">{html.escape(note)}</div></div>'))
+                 f'<div style="color:#566057; font-size:13px; margin-top:6px">{html.escape(note)}</div></div>'))
 
 
 def nicos(instr):
@@ -169,16 +169,16 @@ def proposal_sample(exercise, watch=True):
             if spec.get("description"):
                 out.append(Markdown(spec["description"]))
         if current:                  # the first command in NICOS: nothing is mounted until the student mounts it
-            cmds = "".join(f'<div style="font-family:ui-monospace,Consolas,monospace; font-size:15px; background:#fff; '
-                           f'border:1px solid #CBD3DE; border-radius:6px; padding:6px 10px; margin:6px 0; '
+            cmds = "".join(f'<div style="font-family:&quot;IBM Plex Mono&quot;,Consolas,monospace; font-size:15px; background:#fff; '
+                           f'border:1px solid #BFC5BC; border-radius:6px; padding:6px 10px; margin:6px 0; '
                            f'user-select:all">move(sample_holder, \'{html.escape(n)}\')</div>' for n in current)
             several = len(current) > 1
             out.append(HTML(
-                '<div style="background:#E3F2EF; border-radius:10px; padding:12px 16px; margin:14px 0">'
+                '<div style="background:#FFF4D6; border-radius:10px; padding:12px 16px; margin:14px 0">'
                 f'<b>First step in NICOS: mount your sample{"s, one at a time" if several else ""}.</b> Nothing is '
                 f'on the sample stage until you do it: type{" the command of the sample you want to measure" if several else ""}'
                 f' in the command line of NICOS:{cmds}'
-                '<span style="color:#5B6779; font-size:13px">If you change the sample in the sample builder, this '
+                '<span style="color:#566057; font-size:13px">If you change the sample in the sample builder, this '
                 'command changes here too: mount the new one the same way. <code>sample_info()</code> tells you which '
                 'sample is mounted.</span></div>'))
         if others:
@@ -188,7 +188,7 @@ def proposal_sample(exercise, watch=True):
         start = current[0] if current else ""
         out.append(HTML(f'<div style="text-align:center; margin:28px 0 30px">'
                         f'{_button("Change the sample", f"{builder_url(instr)}?instrument={instr}&proposal={prop}&start={quote(start)}")}'
-                        f'<div style="color:#5B6779; font-size:13px; margin-top:6px">Your question needs another sample, '
+                        f'<div style="color:#566057; font-size:13px; margin-top:6px">Your question needs another sample, '
                         f'or this one changed? The sample builder starts from it; what you save there goes with your '
                         f'proposal, on the sample changer of NICOS, and is shown here as soon as it is saved.</div></div>'))
         return out
@@ -246,7 +246,7 @@ def imported_samples(instr, proposal):
             rows.append(f"<li>{label}: {_button('Build it', href)}</li>")
     display(HTML(f'<div style="margin:0 0 24px"><b>The samples of your proposal {html.escape(str(proposal))}</b> '
                  f'(the twin needs a model of each one: what it is made of, its shape):<ul>{"".join(rows)}</ul>'
-                 f'<span style="color:#5B6779; font-size:13px">Save each one under the short name given: NICOS then '
+                 f'<span style="color:#566057; font-size:13px">Save each one under the short name given: NICOS then '
                  f'mounts the first one when you apply the proposal. Run this cell again to see what is built.</span>'
                  f'</div>'))
 
@@ -266,7 +266,7 @@ def proposal(path):
             import mistune
             with open(os.path.join(ROOT, path), encoding="utf-8") as f:
                 sheet = mistune.html(f.read())
-            display(HTML('<details style="margin-top:8px; border:1px solid #E2E7EE; border-radius:10px; padding:8px 14px">'
+            display(HTML('<details style="margin-top:8px; border:1px solid #D5D9D1; border-radius:10px; padding:8px 14px">'
                          '<summary style="cursor:pointer; font-weight:600">Your proposal (click to open)</summary>'
                          f'{sheet}</details>'))
         except OSError:

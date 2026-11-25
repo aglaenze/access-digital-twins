@@ -26,10 +26,10 @@ HIDE_NICOS = "<style>.jp-Cell:has(.twin-nicos), .jp-Notebook-cell:has(.twin-nico
 # the look of the panel: cards of settings, the detectors with their buttons, the colors of the app
 PANEL_CSS = """<style>
 .tw-panel {gap: 14px; margin-top: 6px}
-.tw-intro {color: #3B4658; line-height: 1.5}
+.tw-intro {color: #3A423B; line-height: 1.5}
 .tw-grid {display: grid !important; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; width: 100%;
   overflow: visible !important}
-.tw-card {background: #fff; border: 1px solid #E2E7EE; border-radius: 12px; padding: 12px 14px 14px; gap: 6px;
+.tw-card {background: #fff; border: 1px solid #D5D9D1; border-radius: 12px; padding: 12px 14px 14px; gap: 6px;
   box-shadow: 0 1px 3px rgba(11, 22, 38, .05); min-width: 0; overflow: visible !important}
 .tw-card .widget-inline-hbox {width: auto !important; max-width: 100%; min-width: 0}
 .tw-card .widget-inline-hbox input, .tw-card .widget-inline-hbox select {min-width: 0}
@@ -39,23 +39,23 @@ PANEL_CSS = """<style>
   width: var(--tw-label, 110px); margin-right: 8px}
 .tw-card .widget-toggle-buttons > div {display: flex; flex: 1 1 auto; flex-wrap: nowrap; min-width: 0}
 .tw-card .widget-toggle-buttons .widget-toggle-button {width: auto; min-width: 72px; padding: 0 12px}
-.tw-card.tw-act {border-top: 3px solid #0E7C70}
-.tw-h {font-weight: 700; font-size: 14px; letter-spacing: .6px; text-transform: uppercase; color: #0E7C70}
-.tw-note {font-size: 15px; color: #5B6779; line-height: 1.45; margin-top: 2px}
-.tw-panel .widget-label {color: #3B4658}
-.tw-panel input, .tw-panel select {border: 1px solid #CBD3DE !important; border-radius: 8px !important; background: #fff}
-.tw-panel .widget-toggle-buttons .widget-toggle-button {border: 1px solid #CBD3DE; background: #fff; color: #5B6779;
+.tw-card.tw-act {border-top: 3px solid #F2C230}
+.tw-h {font-weight: 700; font-size: 14px; letter-spacing: .6px; text-transform: uppercase; color: #1B1F24}
+.tw-note {font-size: 15px; color: #566057; line-height: 1.45; margin-top: 2px}
+.tw-panel .widget-label {color: #3A423B}
+.tw-panel input, .tw-panel select {border: 1px solid #BFC5BC !important; border-radius: 8px !important; background: #fff}
+.tw-panel .widget-toggle-buttons .widget-toggle-button {border: 1px solid #BFC5BC; background: #fff; color: #566057;
   font-weight: 600; border-radius: 8px; box-shadow: none; margin-right: 6px}
-.tw-panel .widget-toggle-buttons .widget-toggle-button.mod-active {background: #E7F5F3; border-color: #0E7C70;
-  color: #0A5F56; box-shadow: inset 0 -2px 0 #0E7C70}
+.tw-panel .widget-toggle-buttons .widget-toggle-button.mod-active {background: #FFF4D6; border-color: #1B1F24;
+  color: #1B1F24; box-shadow: inset 0 -2px 0 #F2C230}
 .tw-panel .jupyter-button:not(.widget-toggle-button) {height: 40px; border-radius: 10px; font-weight: 600; padding: 0 16px;
-  border: 1px solid #CBD3DE; background: #fff; color: #142033; box-shadow: none}
-.tw-panel .jupyter-button.mod-primary {background: #0E7C70; border-color: #0E7C70; color: #fff}
+  border: 1px solid #BFC5BC; background: #fff; color: #1B1F24; box-shadow: none}
+.tw-panel .jupyter-button.mod-primary {background: #1B1F24; border-color: #1B1F24; color: #fff}
 .tw-panel .jupyter-button:disabled {opacity: .55}
-.tw-panel .progress-bar {background-color: #0E7C70 !important}
+.tw-panel .progress-bar {background-color: #2FB862 !important}
 .tw-row {gap: 10px; align-items: center; flex-wrap: wrap}
-.tw-out {background: #F5F7FA; border-left: 4px solid #0E7C70; border-radius: 8px; padding: 2px 12px}
-.tw-loading {padding: 18px; text-align: center; color: #5B6779; font-weight: 600}
+.tw-out {background: #F4F5F1; border-left: 4px solid #F2C230; border-radius: 8px; padding: 2px 12px}
+.tw-loading {padding: 18px; text-align: center; color: #566057; font-weight: 600}
 </style>"""
 
 

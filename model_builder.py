@@ -35,7 +35,7 @@ def _slider(desc, value, lo, hi, step, fmt=".3f"):
 
 
 def _pre(code):
-    return w.HTML("<pre style='background:#F6F4EE;padding:8px;font-size:12px;line-height:1.35'>"
+    return w.HTML("<pre style='background:#F4F5F1;padding:8px;font-size:12px;line-height:1.35'>"
                   + html.escape(code) + "</pre>")
 
 
@@ -340,7 +340,7 @@ class GuinierBuilder(_Builder):
             a, b = self.window.value
             self.history.append({"range [Å⁻¹]": f"{a:.3f}–{b:.3f}", "Rg [Å]": f"{rg:.1f} ± {drg:.1f}",
                                  "I(0) [cm⁻¹]": f"{i0:.2f}", "Q_max·Rg": f"{qrg:.2f}", "χ²/n": f"{chi2:.2f}"})
-            warn = ("<span style='color:#B4501F'><b>Outside the validity of the law:</b> Q_max·Rg = "
+            warn = ("<span style='color:#B4562B'><b>Outside the validity of the law:</b> Q_max·Rg = "
                     f"{qrg:.2f} > 1.3. Lower the upper limit of the range, then fit again.</span>" if qrg > 1.3 else
                     f"Q_max·Rg = {qrg:.2f} ≤ 1.3: inside the validity of the law.")
             display(w.HTML(f"<p><b>Fit</b> ({int(m.sum())} points): Rg = <b>{rg:.1f} ± {drg:.1f} Å</b>, "

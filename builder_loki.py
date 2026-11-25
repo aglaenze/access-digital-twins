@@ -208,8 +208,9 @@ def _template_file(kind, ref):
     return os.path.join(folder, ref + ".yml")
 
 
-def load(kind, ref, proposal=""):
-    """What the page needs to start from a starting point: {state (sealed), title, description, name}."""
+def load(kind, ref, proposal="", text=""):
+    """What the page needs to start from a starting point: {state (sealed), title, description, name}; kind "file":
+    the text of a sample file downloaded before (download())."""
     if kind == "scratch":
         return dict(state=dict(medium="liquid", d2o=1.0, holder=dict(type="cell", gap_mm=1.0), kinds=[default_kind()]),
                     title="", description="", name="")
@@ -217,6 +218,17 @@ def load(kind, ref, proposal=""):
         t = yaml.safe_load(open(_template_file(kind, ref), encoding="utf-8"))
         return dict(state=state_of(t["spec"]), title=t.get("title") or "", description=t.get("description") or "",
                     name="")
+    if kind == "file":
+        spec = yaml.safe_load(text or "")
+        bad = ValueError(f"{ref or 'the file'}: not a sample file of the LoKI sample builder")
+        if not isinstance(spec, dict) or not ({"model", "populations", "solvent", "empty", "empty_cell"} & set(spec)):
+            raise bad
+        try:
+            state = state_of(spec)
+        except Exception as e:
+            raise ValueError(f"{bad} ({e})") from None
+        title = spec.get("name") or os.path.splitext(ref)[0]
+        return dict(state=state, title=title, description=spec.get("description") or "", name="")
     if kind == "sample":
         lib = sl.load("loki", B.data_folder("loki", proposal))
         if ref not in lib:

@@ -154,7 +154,7 @@ def queue_banner():
     except ImportError:
         return None
     style = ("position:fixed;right:18px;bottom:18px;z-index:1000;max-width:340px;padding:12px 16px;border-radius:10px;"
-             "background:#0F1D31;color:#F8FAFC;box-shadow:0 6px 24px rgba(0,0,0,.25);font:14px/1.4 system-ui,sans-serif")
+             "background:#1B1F24;color:#ECEEE8;box-shadow:0 6px 24px rgba(0,0,0,.25);font:14px/1.4 'IBM Plex Sans','Segoe UI',system-ui,sans-serif")
     banner = w.HTML("")
 
     def show(state):

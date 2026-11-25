@@ -12,7 +12,7 @@ tab of the app, comes back to the catalogue, and submits each exercise at its en
 | `accounts.js` | accounts on this computer (`accounts.json` in the data folder of the app): name, email, salted scrypt hash of the password |
 | `preload.js` | what the shell may ask the main process |
 | `shell/` | the interface (sign in, catalogue, tabs): `index.html`, `style.css`, `app.js` |
-| `../container/twin_app.py` | the API on the server side (`/twin/catalogue`, `/twin/user`, `/twin/open`, `/twin/nicos`, `/twin/handin`) |
+| `../container/twin_app.py` | the API on the server side (`/twin/catalogue`, `user`, `open`, `reset`, `proposal`, `nicos`, `handin`, `classes`, `source_power`, `builder`: all listed in its docstring) |
 | `../container/app_data/voila/templates/twin/static/twin.css` | the look of the app on the Voilà pages |
 
 **What the student gets.** An account (name, email, password, at least 8 characters) that stays on this computer. The
@@ -116,7 +116,7 @@ Linux; light on the sign-in screen, dark in the app; macOS: its three buttons on
   (`PROPOSAL`); without files the notebook stops there with a message (`nb_tools.need_measurements`), no hidden
   simulation.
 - **Beamtime and free beamtime**: the proposal (folded), *Open NICOS* and *Sample builder* are at the top of the starter
-  notebook; the catalogue only opens the notebook. The card of the free beamtime makes proposals in the twin's user
+  notebook; the catalogue only opens the notebook. The free beamtime block (under the requests) makes proposals in the twin's user
   office (`../user_office.py`, `POST /twin/proposal`): *New free beamtime* (a new number each time, the question as
   title), *Import a proposal* (a real one: number, title, samples); the student's proposals are listed, each with its
   own copy of the starter notebook (`work/<user>/<instr>_free_beamtime_<proposal>/`). In NICOS: Experiment, Find my proposal.

@@ -37,9 +37,11 @@ All requests need the token of the server (header "Authorization: token ...").
                                    of the app: builder/index.html for ODIN, builder/loki.html for LoKI, their files
                                    under /twin/builder/static/)
     GET|POST /twin/builder/api/<what>   what the page asks. ODIN (builder_api.py): info, load, preview, radiograph,
-                                   check, sigmas, catalogue_sigmas, thumb (PNG), yaml, parse, save, save_model.
-                                   LoKI ("instrument": "loki", builder_loki.py): info, load, view, check, thumb, save,
-                                   save_model, download
+                                   check, sigmas, catalogue_sigmas, thumb (PNG), yaml, parse, save, save_model;
+                                   the fit to the measurements (step 4): fit_files, fit_params, fit_run, fit_image.
+                                   LoKI ("instrument": "loki", builder_loki.py): info, load (also kind "file": a sample
+                                   file downloaded before), view, check, thumb, save, save_model, download, fit_files,
+                                   fit_params, fit_run
 
 The student's things: notebooks in work/<user>/, logbooks in TWIN_RUN_ROOT/progress/<user>/, measurements of the
 pages in the sessions TWIN_RUN_ROOT/<instrument>/<user>/. Accounts and passwords stay in the app (twin/app/accounts.js).
@@ -589,7 +591,7 @@ class BuilderApi(Base):
             if what == "info":
                 out = await self._run(L.info, prop, d.get("start", ""))
             elif what == "load":
-                out = await self._run(L.load, d.get("kind", "scratch"), d.get("ref", ""), prop)
+                out = await self._run(L.load, d.get("kind", "scratch"), d.get("ref", ""), prop, d.get("text", ""))
             elif what == "view":
                 out = await self._run(L.view, st)
             elif what == "check":

@@ -84,8 +84,8 @@ window.__twinCleanView = function (on) {
     b.id = "twin-analyze";
     b.textContent = "▶  Analyze my files";
     b.title = "Runs the notebook again: your newest files, your model, your answers";
-    b.style.cssText = "position:fixed;right:24px;bottom:24px;z-index:1000;background:#0E7C70;color:#fff;border:0;" +
-      "border-radius:10px;padding:11px 18px;font:600 14px system-ui,sans-serif;box-shadow:0 4px 14px rgba(0,0,0,.2);cursor:pointer";
+    b.style.cssText = "position:fixed;right:24px;bottom:24px;z-index:1000;background:#1B1F24;color:#fff;border:0;" +
+      "border-radius:6px;padding:11px 18px;font:600 14px 'IBM Plex Sans','Segoe UI',system-ui,sans-serif;box-shadow:0 4px 14px rgba(27,31,36,.25);cursor:pointer";
     b.onclick = async () => {
       b.disabled = true; b.textContent = "Analyzing…";
       try { await window.jupyterapp.commands.execute("notebook:run-all-cells"); }

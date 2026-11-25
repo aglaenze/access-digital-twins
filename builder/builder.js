@@ -123,15 +123,15 @@ function treeAction(a) {
 
 // ------------------------------------------------------------------ the selected part
 const ICONS = {
-  box: '<rect x="8" y="6" width="22" height="18" fill="#C9D3DF" stroke="#142033"/><path d="M8 6l6-4h22l-6 4M30 24l6-4V2" fill="none" stroke="#142033"/>',
-  cylinder: '<ellipse cx="19" cy="6" rx="10" ry="3.5" fill="#C9D3DF" stroke="#142033"/><path d="M9 6v18a10 3.5 0 0 0 20 0V6" fill="#C9D3DF" stroke="#142033"/>',
-  sphere: '<circle cx="19" cy="15" r="11" fill="#C9D3DF" stroke="#142033"/><ellipse cx="19" cy="15" rx="11" ry="3.5" fill="none" stroke="#8090A4"/>',
-  ellipsoid: '<ellipse cx="19" cy="15" rx="15" ry="9" fill="#C9D3DF" stroke="#142033"/>',
-  cone: '<path d="M10 26L19 3l9 23z" fill="#C9D3DF" stroke="#142033"/><ellipse cx="19" cy="26" rx="9" ry="2.5" fill="#C9D3DF" stroke="#142033"/>',
-  torus: '<ellipse cx="19" cy="15" rx="15" ry="9" fill="#C9D3DF" stroke="#142033"/><ellipse cx="19" cy="15" rx="7" ry="3.5" fill="#fff" stroke="#142033"/>',
-  superellipsoid: '<rect x="6" y="5" width="26" height="20" rx="7" fill="#C9D3DF" stroke="#142033"/>',
-  blob: '<path d="M7 16c0-8 7-12 13-11s12 4 11 11-6 10-12 9-12-2-12-9z" fill="#C9D3DF" stroke="#142033"/>',
-  sawn_piece: '<path d="M9 3h18l3 4-1 19H11l-3-5z" fill="#C9D3DF" stroke="#142033"/>',
+  box: '<rect x="8" y="6" width="22" height="18" fill="#D5D9D1" stroke="#1B1F24"/><path d="M8 6l6-4h22l-6 4M30 24l6-4V2" fill="none" stroke="#1B1F24"/>',
+  cylinder: '<ellipse cx="19" cy="6" rx="10" ry="3.5" fill="#D5D9D1" stroke="#1B1F24"/><path d="M9 6v18a10 3.5 0 0 0 20 0V6" fill="#D5D9D1" stroke="#1B1F24"/>',
+  sphere: '<circle cx="19" cy="15" r="11" fill="#D5D9D1" stroke="#1B1F24"/><ellipse cx="19" cy="15" rx="11" ry="3.5" fill="none" stroke="#8A938A"/>',
+  ellipsoid: '<ellipse cx="19" cy="15" rx="15" ry="9" fill="#D5D9D1" stroke="#1B1F24"/>',
+  cone: '<path d="M10 26L19 3l9 23z" fill="#D5D9D1" stroke="#1B1F24"/><ellipse cx="19" cy="26" rx="9" ry="2.5" fill="#D5D9D1" stroke="#1B1F24"/>',
+  torus: '<ellipse cx="19" cy="15" rx="15" ry="9" fill="#D5D9D1" stroke="#1B1F24"/><ellipse cx="19" cy="15" rx="7" ry="3.5" fill="#fff" stroke="#1B1F24"/>',
+  superellipsoid: '<rect x="6" y="5" width="26" height="20" rx="7" fill="#D5D9D1" stroke="#1B1F24"/>',
+  blob: '<path d="M7 16c0-8 7-12 13-11s12 4 11 11-6 10-12 9-12-2-12-9z" fill="#D5D9D1" stroke="#1B1F24"/>',
+  sawn_piece: '<path d="M9 3h18l3 4-1 19H11l-3-5z" fill="#D5D9D1" stroke="#1B1F24"/>',
 };
 function sliderRow(label, value, min, max, step, onset, unit = "mm") {
   const rng = el("input", { type: "range", min, max, step, value });
@@ -247,7 +247,7 @@ function renderPicker() {
     const cards = el("div", { class: "mcards" });
     for (const it of shown) {
       cards.append(el("button", { class: "mcard", onclick: () => pick(it) },
-        el("span", { class: "sw", style: `background:${it.color || "#E7EBF0"}` }),
+        el("span", { class: "sw", style: `background:${it.color || "#E6E9E2"}` }),
         el("span", {}, el("div", { class: "t" }, it.label),
           el("div", { class: "s" }, [it.formula, it.sigma != null ? `Σ(3 Å) = ${Number(it.sigma).toFixed(3)} cm⁻¹` : ""].filter(Boolean).join(" · ")))));
     }
@@ -334,6 +334,7 @@ function renderGallery() {
   const items = [...S.info.starts];
   const draft = loadDraft();
   if (draft) items.unshift({ kind: "draft", ref: "", title: "Your unsaved draft", what: draft.when });
+  items.unshift({ kind: "file", ref: "", title: "Open a recipe file", what: "a recipe you downloaded before (YAML)" });
   const LEVELS = { 1: "1 · Simple shapes", 2: "2 · Several parts, or grains", 3: "3 · Natural samples" };
   let lastLevel = null;
   for (const s of items) {
@@ -343,10 +344,21 @@ function renderGallery() {
       lastLevel = s.level;
     }
     const pic = s.kind === "scratch" ? el("div", { class: "ph" }, "+") : s.kind === "draft" ? el("div", { class: "ph" }, "✎")
+      : s.kind === "file" ? el("div", { class: "ph" }, "⇪")
       : el("img", { loading: "lazy", src: thumbUrl(s), alt: "" });
     g.append(el("button", { class: "card" + (S.start && S.start.kind === s.kind && S.start.ref === s.ref ? " on" : ""),
-      title: s.title, onclick: () => startFrom(s) }, pic, el("div", { class: "t" }, s.title), el("div", { class: "w" }, s.what)));
+      title: s.title, onclick: () => s.kind === "file" ? pickRecipeFile() : startFrom(s) }, pic, el("div", { class: "t" }, s.title), el("div", { class: "w" }, s.what)));
   }
+}
+// a recipe file downloaded before (step 3): opened from the gallery, as a starting point
+function pickRecipeFile() {
+  const inp = el("input", { type: "file", accept: ".yml,.yaml,text/yaml" });
+  inp.addEventListener("change", async () => {
+    const f = inp.files[0]; if (!f) return;
+    const text = await f.text();
+    startFrom({ kind: "file", ref: f.name, title: f.name.replace(/\.ya?ml$/i, ""), text });
+  });
+  inp.click();
 }
 async function startFrom(s) {
   if (S.recipe && S.dirty && !confirm("Start again from this one? Your changes are lost (unless saved).")) return;
@@ -354,7 +366,12 @@ async function startFrom(s) {
     status("Loading…");
     let d;
     if (s.kind === "draft") d = loadDraft();
-    else d = await api("load", { kind: s.kind, ref: s.ref });
+    else if (s.kind === "file") {          // the file of step 3 (title, description, holder, recipe), or a recipe alone
+      const o = (await api("parse", { text: s.text })).obj || {};
+      d = o.recipe ? o : { recipe: o };
+      if (!d.recipe || !Array.isArray(d.recipe.bodies)) throw new Error(`${s.ref}: not a recipe of the sample builder (no parts under bodies:)`);
+      if (d.title === undefined) d.title = s.title;
+    } else d = await api("load", { kind: s.kind, ref: s.ref });
     S.recipe = d.recipe; S.holder = d.holder || { type: "none" }; S.sel = [0]; S.start = s;
     if (d.title !== undefined) $("f-title").value = d.title || "";
     if (d.description !== undefined) $("f-desc").value = d.description || "";
@@ -369,13 +386,13 @@ async function startFrom(s) {
 
 // ------------------------------------------------------------------ holder (step 2)
 const HOLDER_PICS = {
-  none: '<rect x="62" y="16" width="36" height="44" fill="#9AA6B6" stroke="#142033"/>',
-  pin: '<rect x="62" y="10" width="36" height="40" fill="#9AA6B6" stroke="#142033"/><rect x="75" y="50" width="10" height="30" fill="#D5DCE5" stroke="#142033"/>',
-  base: '<rect x="62" y="16" width="36" height="40" fill="#9AA6B6" stroke="#142033"/><rect x="50" y="56" width="60" height="12" fill="#D5DCE5" stroke="#142033"/>',
-  cell: '<rect x="54" y="8" width="52" height="66" rx="3" fill="#E8F1F8" stroke="#5B87A8" stroke-width="3"/><rect x="62" y="18" width="36" height="48" fill="#9AA6B6" stroke="#142033"/>',
-  can: '<path d="M52 14v58a28 7 0 0 0 56 0V14" fill="#EEF0F4" stroke="#6B7689" stroke-width="2"/><ellipse cx="80" cy="14" rx="28" ry="7" fill="#F7F8FA" stroke="#6B7689" stroke-width="2"/><rect x="66" y="22" width="28" height="44" fill="#9AA6B6" stroke="#142033"/>',
-  grips: '<rect x="20" y="22" width="36" height="40" fill="#B9C1CC" stroke="#142033"/><rect x="104" y="22" width="36" height="40" fill="#B9C1CC" stroke="#142033"/><rect x="56" y="32" width="48" height="20" fill="#9AA6B6" stroke="#142033"/>',
-  custom: '<rect x="62" y="16" width="36" height="40" fill="#9AA6B6" stroke="#142033"/><path d="M58 56h44l-6 18H64z" fill="#D5DCE5" stroke="#142033"/>',
+  none: '<rect x="62" y="16" width="36" height="44" fill="#A4ADA4" stroke="#1B1F24"/>',
+  pin: '<rect x="62" y="10" width="36" height="40" fill="#A4ADA4" stroke="#1B1F24"/><rect x="75" y="50" width="10" height="30" fill="#D5D9D1" stroke="#1B1F24"/>',
+  base: '<rect x="62" y="16" width="36" height="40" fill="#A4ADA4" stroke="#1B1F24"/><rect x="50" y="56" width="60" height="12" fill="#D5D9D1" stroke="#1B1F24"/>',
+  cell: '<rect x="54" y="8" width="52" height="66" rx="3" fill="#E8F1F8" stroke="#5B87A8" stroke-width="3"/><rect x="62" y="18" width="36" height="48" fill="#A4ADA4" stroke="#1B1F24"/>',
+  can: '<path d="M52 14v58a28 7 0 0 0 56 0V14" fill="#ECEEE8" stroke="#566057" stroke-width="2"/><ellipse cx="80" cy="14" rx="28" ry="7" fill="#F4F5F1" stroke="#566057" stroke-width="2"/><rect x="66" y="22" width="28" height="44" fill="#A4ADA4" stroke="#1B1F24"/>',
+  grips: '<rect x="20" y="22" width="36" height="40" fill="#BFC5BC" stroke="#1B1F24"/><rect x="104" y="22" width="36" height="40" fill="#BFC5BC" stroke="#1B1F24"/><rect x="56" y="32" width="48" height="20" fill="#A4ADA4" stroke="#1B1F24"/>',
+  custom: '<rect x="62" y="16" width="36" height="40" fill="#A4ADA4" stroke="#1B1F24"/><path d="M58 56h44l-6 18H64z" fill="#D5D9D1" stroke="#1B1F24"/>',
 };
 function renderHolders() {
   const g = $("holders"); g.innerHTML = "";
@@ -634,7 +651,7 @@ function init3d() {
 function b64(s, T) { const bin = atob(s); const u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return new T(u.buffer); }
 function textSprite(text, color, height) {
   const c = document.createElement("canvas"); c.width = 512; c.height = 64;
-  const g = c.getContext("2d"); g.font = "600 30px Segoe UI, sans-serif"; g.fillStyle = color; g.fillText(text, 4, 42);
+  const g = c.getContext("2d"); g.font = "600 30px 'IBM Plex Sans', 'Segoe UI', sans-serif"; g.fillStyle = color; g.fillText(text, 4, 42);
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthTest: false }));
   s.center.set(0, 0.5); s.scale.set(8 * height, height, 1); return s;
 }
@@ -668,7 +685,7 @@ function drawMeshes(d) {
   // legend
   const leg = $("legend"); leg.innerHTML = "";
   for (const m of d.meshes) leg.append(el("span", {}, el("span", { class: "sw", style: `background:${m.color};${m.holder ? "opacity:.6" : ""}` }), (m.holder ? "holder: " : "") + (m.label || m.material).replace(/^holder: /, "")));
-  leg.append(el("span", {}, el("span", { class: "sw", style: "border:1.5px dashed #2A7D6F;background:none" }), "field of view of the camera (14 mm)"));
+  leg.append(el("span", {}, el("span", { class: "sw", style: "border:1.5px dashed #1E7B4E;background:none" }), "field of view of the camera (14 mm)"));
 }
 function fit(d) {
   const [lo, hi] = d.sample_bounds;

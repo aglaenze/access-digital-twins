@@ -151,8 +151,6 @@ div:has(> .jp-Cell .twin-gate) ~ div:has(> .jp-Cell) { display: none !important;
 .widget-radio-box { height: auto !important; }
 .twq .widget-checkbox, .twq .widget-checkbox label { height: auto !important; white-space: normal !important; line-height: 1.45; }
 .twq .widget-button.mod-primary { align-self: flex-start; }
-/* icon-only buttons (remove a volume of the sample builder) */
-.jupyter-button[title="remove"] { padding: 0 !important; min-width: 40px; width: 40px !important; }
 
 /* One scroll bar only, the page's, at the right edge of the window. Voila lays the cells out in a box of fixed height
    (#rendered_cells, inside #jp-main-content-panel, inside #main) that scrolls by itself, inside a page that can scroll

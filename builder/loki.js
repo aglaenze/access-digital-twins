@@ -42,8 +42,8 @@ function status(msg, err = false) { const s = $("status"); s.textContent = msg |
 const fmt = (x, n = 3) => String(Number(Number(x).toPrecision(n)));
 const sup = (n) => String(n).replace(/-/g, "⁻").replace(/\d/g, (d) => "⁰¹²³⁴⁵⁶⁷⁸⁹"[d]);
 const MAT_COLORS = { silica: "#DCD3C0", polystyrene: "#F4B183", "deuterated polystyrene": "#E07A5F", gold: "#E3B21C",
-  silver: "#C3CAD2", "iron oxide (magnetite)": "#4B4B55", "protein (average)": "#8DBF7F", "lipid (tails)": "#EBCB6B", PMMA: "#A8D8DC" };
-const matColor = (m) => MAT_COLORS[m] || "#CBD3DE";
+  silver: "#BFC5BC", "iron oxide (magnetite)": "#4B4B55", "protein (average)": "#8DBF7F", "lipid (tails)": "#EBCB6B", PMMA: "#A8D8DC" };
+const matColor = (m) => MAT_COLORS[m] || "#BFC5BC";
 const kindColor = (i) => S.info.colors[i % S.info.colors.length];
 const solventSld = () => { const x = S.state.d2o; return x * S.info.sld.D2O + (1 - x) * S.info.sld.H2O; };
 const model = (t) => S.info.models.find((m) => m.type === t);
@@ -102,8 +102,8 @@ function renderSldScale() {
   const rs = solventSld(), x = S.state.d2o;
   const bg = x * S.info.solvent_inc.D2O + (1 - x) * S.info.solvent_inc.H2O;
   const W = 520, lo = -1.2, hi = 7.4, X = (v) => 20 + (v - lo) / (hi - lo) * (W - 40);
-  let s = `<line x1="20" y1="44" x2="${W - 20}" y2="44" stroke="#9AA6B6"/>`;
-  for (let v = -1; v <= 7; v++) s += `<line x1="${X(v)}" y1="41" x2="${X(v)}" y2="47" stroke="#9AA6B6"/><text x="${X(v)}" y="60" class="ax">${v}</text>`;
+  let s = `<line x1="20" y1="44" x2="${W - 20}" y2="44" stroke="#A4ADA4"/>`;
+  for (let v = -1; v <= 7; v++) s += `<line x1="${X(v)}" y1="41" x2="${X(v)}" y2="47" stroke="#A4ADA4"/><text x="${X(v)}" y="60" class="ax">${v}</text>`;
   s += `<text x="${W - 4}" y="74" style="font-size:11px;fill:var(--mute);text-anchor:end">ρ [10⁻⁶ Å⁻²]</text>`;
   s += `<text x="${X(S.info.sld.H2O)}" y="30" class="lb">H2O</text><text x="${X(S.info.sld.D2O)}" y="30" class="lb">D2O</text>`;
   const anchor = X(rs) > W - 70 ? "end" : X(rs) < 70 ? "start" : "middle";
@@ -124,9 +124,9 @@ function renderSldScale() {
 
 // ------------------------------------------------------------------ step 1: the kinds of particles
 const MODEL_ICONS = {
-  sphere: '<circle cx="19" cy="15" r="11" fill="#C9D3DF" stroke="#142033"/>',
-  cylinder: '<rect x="4" y="10" width="30" height="10" rx="2" fill="#C9D3DF" stroke="#142033"/>',
-  core_shell_sphere: '<circle cx="19" cy="15" r="12" fill="#E7EDF4" stroke="#142033"/><circle cx="19" cy="15" r="7" fill="#9AA6B6" stroke="#142033"/>',
+  sphere: '<circle cx="19" cy="15" r="11" fill="#D5D9D1" stroke="#1B1F24"/>',
+  cylinder: '<rect x="4" y="10" width="30" height="10" rx="2" fill="#D5D9D1" stroke="#1B1F24"/>',
+  core_shell_sphere: '<circle cx="19" cy="15" r="12" fill="#E7EDF4" stroke="#1B1F24"/><circle cx="19" cy="15" r="7" fill="#A4ADA4" stroke="#1B1F24"/>',
 };
 function renderKinds() {
   const host = $("kinds"); host.innerHTML = "";
@@ -202,7 +202,7 @@ function matCard(k, field, role) {
 }
 function contrastBar(d) {
   const w = Math.min(100, (d * d) / 49 * 100);   // Δρ² against 7² (the most the H2O/D2O line allows)
-  const c = Math.abs(d) < 0.3 ? "var(--red)" : Math.abs(d) < 1 ? "#E9A23B" : "var(--green)";
+  const c = Math.abs(d) < 0.3 ? "var(--red)" : Math.abs(d) < 1 ? "#F2C230" : "var(--green)";
   return el("div", { class: "cbar", title: "contrast Δρ²: what sets the brightness" }, el("span", { style: `width:${Math.max(1.5, w)}%;background:${c}` }));
 }
 
@@ -231,18 +231,29 @@ function renderGallery() {
   const items = [...S.info.starts];
   const draft = loadDraft();
   if (draft) items.unshift({ kind: "draft", ref: "", title: "Your unsaved draft", what: draft.when });
+  items.unshift({ kind: "file", ref: "", title: "Open a sample file", what: "a sample you downloaded before (YAML)" });
   for (const s of items) {
     if (q && !(`${s.title} ${s.what}`).toLowerCase().includes(q)) continue;
-    const pic = s.kind === "draft" ? el("div", { class: "ph" }, "✎") : el("img", { loading: "lazy", src: thumbUrl(s), alt: "" });
+    const pic = s.kind === "draft" ? el("div", { class: "ph" }, "✎") : s.kind === "file" ? el("div", { class: "ph" }, "⇪") : el("img", { loading: "lazy", src: thumbUrl(s), alt: "" });
     g.append(el("button", { class: "card" + (S.start && S.start.kind === s.kind && S.start.ref === s.ref ? " on" : ""),
-      title: s.title, onclick: () => startFrom(s) }, pic, el("div", { class: "t" }, s.title), el("div", { class: "w" }, s.what)));
+      title: s.title, onclick: () => s.kind === "file" ? pickRecipeFile() : startFrom(s) }, pic, el("div", { class: "t" }, s.title), el("div", { class: "w" }, s.what)));
   }
+}
+// a recipe file downloaded before (step 3): opened from the gallery, as a starting point
+function pickRecipeFile() {
+  const inp = el("input", { type: "file", accept: ".yml,.yaml,text/yaml" });
+  inp.addEventListener("change", async () => {
+    const f = inp.files[0]; if (!f) return;
+    const text = await f.text();
+    startFrom({ kind: "file", ref: f.name, title: f.name.replace(/\.ya?ml$/i, ""), text });
+  });
+  inp.click();
 }
 async function startFrom(s) {
   if (S.state && S.dirty && !confirm("Start again from this one? Your changes are lost (unless saved).")) return;
   try {
     status("Loading…");
-    const d = s.kind === "draft" ? loadDraft() : await api("load", { kind: s.kind, ref: s.ref });
+    const d = s.kind === "draft" ? loadDraft() : await api("load", { kind: s.kind, ref: s.ref, text: s.text || "" });
     S.state = d.state; S.start = s;
     if (d.title !== undefined) $("f-title").value = d.title || "";
     if (d.description !== undefined) $("f-desc").value = d.description || "";
@@ -267,21 +278,21 @@ function cellSvg(gap, big) {
   s += `<line x1="8" y1="${y0 + h / 2}" x2="${cx - 6}" y2="${y0 + h / 2}" stroke="#B4562B" stroke-width="2.5" marker-end="url(#ar${big ? 1 : 0})"/>`;
   s += `<text x="8" y="${y0 + h / 2 - 8}" font-size="${fs}" fill="#B4562B">neutrons</text>`;
   s += `<rect x="${cx}" y="${y0}" width="${w * k}" height="${h}" fill="#DCEBF6" stroke="#5B87A8"/>`;
-  s += `<rect x="${cx + w * k}" y="${y0}" width="${gap * k}" height="${h}" fill="${liq}" stroke="#334155" stroke-width=".8"/>`;
+  s += `<rect x="${cx + w * k}" y="${y0}" width="${gap * k}" height="${h}" fill="${liq}" stroke="#3A423B" stroke-width=".8"/>`;
   s += `<rect x="${cx + (w + gap) * k}" y="${y0}" width="${w * k}" height="${h}" fill="#DCEBF6" stroke="#5B87A8"/>`;
   s += `<line x1="${cx + tot * k + 4}" y1="${y0 + h / 2}" x2="${W - 8}" y2="${y0 + h / 2}" stroke="#B4562B" stroke-width="2.5" stroke-dasharray="5 4" marker-end="url(#ar${big ? 1 : 0})"/>`;
   const yb = y0 + h + (big ? 22 : 16);
   if (big) {
-    s += `<text x="${cx + w * k / 2}" y="${yb}" font-size="${fs}" text-anchor="middle" fill="#5B6779">${w}</text>`;
-    s += `<text x="${cx + (1.5 * w + gap) * k}" y="${yb}" font-size="${fs}" text-anchor="middle" fill="#5B6779">${w}</text>`;
-    s += `<text x="${cx + (w + gap / 2) * k}" y="${yb + 16}" font-size="${fs}" text-anchor="middle" font-weight="600" fill="#142033">${fmt(gap, 3)} mm</text>`;
+    s += `<text x="${cx + w * k / 2}" y="${yb}" font-size="${fs}" text-anchor="middle" fill="#566057">${w}</text>`;
+    s += `<text x="${cx + (1.5 * w + gap) * k}" y="${yb}" font-size="${fs}" text-anchor="middle" fill="#566057">${w}</text>`;
+    s += `<text x="${cx + (w + gap / 2) * k}" y="${yb + 16}" font-size="${fs}" text-anchor="middle" font-weight="600" fill="#1B1F24">${fmt(gap, 3)} mm</text>`;
   } else {
-    s += `<text x="${cx + (w + gap / 2) * k}" y="${yb}" font-size="${fs}" text-anchor="middle" fill="#142033"><tspan font-weight="600">${fmt(gap, 3)} mm</tspan> of ${liquid() ? "liquid" : "air"}</text>`;
+    s += `<text x="${cx + (w + gap / 2) * k}" y="${yb}" font-size="${fs}" text-anchor="middle" fill="#1B1F24"><tspan font-weight="600">${fmt(gap, 3)} mm</tspan> of ${liquid() ? "liquid" : "air"}</text>`;
     s += `<text x="${cx + (w + gap / 2) * k}" y="${y0 - 5}" font-size="${fs}" text-anchor="middle" fill="#5B87A8">quartz windows ${w} mm</text>`;
   }
   if (big) {
     s += `<text x="${cx + w * k / 2}" y="${y0 - 8}" font-size="12" text-anchor="middle" fill="#5B87A8">quartz</text>`;
-    s += `<text x="${cx + (w + gap / 2) * k}" y="${y0 - 8}" font-size="12" text-anchor="middle" fill="#142033">${liquid() ? "liquid" : "air"}</text>`;
+    s += `<text x="${cx + (w + gap / 2) * k}" y="${y0 - 8}" font-size="12" text-anchor="middle" fill="#1B1F24">${liquid() ? "liquid" : "air"}</text>`;
     s += `<text x="${cx + (1.5 * w + gap) * k}" y="${y0 - 8}" font-size="12" text-anchor="middle" fill="#5B87A8">quartz</text>`;
   }
   return s;
@@ -289,7 +300,7 @@ function cellSvg(gap, big) {
 function renderHolders() {
   const g = $("holders"); g.innerHTML = "";
   const opts = [["cell", "Quartz cell", "Fused quartz windows, 1.25 mm each; the liquid between them (the gap). As the usual SANS cells.",
-    '<rect x="58" y="12" width="10" height="60" fill="#DCEBF6" stroke="#5B87A8"/><rect x="68" y="12" width="24" height="60" fill="#D5E6F7" stroke="#334155"/><rect x="92" y="12" width="10" height="60" fill="#DCEBF6" stroke="#5B87A8"/>'],
+    '<rect x="58" y="12" width="10" height="60" fill="#DCEBF6" stroke="#5B87A8"/><rect x="68" y="12" width="24" height="60" fill="#D5E6F7" stroke="#3A423B"/><rect x="92" y="12" width="10" height="60" fill="#DCEBF6" stroke="#5B87A8"/>'],
   ["none", "No cell", "Nothing on the sample position: the empty beam (only with air: a liquid needs its cell).", ""]];
   for (const [k, t, x, pic] of opts) {
     const off = k === "none" && liquid();
@@ -440,7 +451,7 @@ function drawPlot() {
   const xl = [Math.log10(v.q[0]), Math.log10(v.q[v.q.length - 1])];
   let s = "";
   if (v.empty) {
-    svg.innerHTML = `<text x="${W / 2}" y="${H / 2}" text-anchor="middle" font-size="15" fill="#5B6779">Empty beam: nothing on the sample position, nothing scattered.</text>`;
+    svg.innerHTML = `<text x="${W / 2}" y="${H / 2}" text-anchor="middle" font-size="15" fill="#566057">Empty beam: nothing on the sample position, nothing scattered.</text>`;
     return;
   }
   const curves = [v.total, ...(v.kinds || []).map((k) => k.curve)];
@@ -455,44 +466,44 @@ function drawPlot() {
   S.plotMap = { X, Y, L, R, T, B, W, H, xl, yl, pw, ph };
   // LoKI's range
   const [qa, qb] = v.q_range;
-  s += `<rect x="${X(qa)}" y="${T}" width="${X(qb) - X(qa)}" height="${ph}" fill="#E3F2EF" opacity=".75"/>`;
-  s += `<text x="${(X(qa) + X(qb)) / 2}" y="${T + 14}" text-anchor="middle" font-size="11.5" fill="#0E7C70">LoKI's Q range (${qa}–${qb} Å⁻¹)</text>`;
+  s += `<rect x="${X(qa)}" y="${T}" width="${X(qb) - X(qa)}" height="${ph}" fill="#E3F2E9" opacity=".75"/>`;
+  s += `<text x="${(X(qa) + X(qb)) / 2}" y="${T + 14}" text-anchor="middle" font-size="11.5" fill="#1E7B4E">LoKI's Q range (${qa}–${qb} Å⁻¹)</text>`;
   // grid and axes
   for (let e = Math.ceil(xl[0]); e <= Math.floor(xl[1]); e++) {
     for (let m = 1; m < 10; m++) { const q = m * 10 ** e; if (Math.log10(q) > xl[1] + 1e-9) break; if (Math.log10(q) < xl[0]) continue;
-      s += `<line x1="${X(q)}" x2="${X(q)}" y1="${T}" y2="${T + ph}" stroke="${m === 1 ? "#D5DBE3" : "#EEF1F5"}"/>`; }
+      s += `<line x1="${X(q)}" x2="${X(q)}" y1="${T}" y2="${T + ph}" stroke="${m === 1 ? "#D5D9D1" : "#E6E9E2"}"/>`; }
     s += `<text x="${X(10 ** e)}" y="${T + ph + 16}" text-anchor="middle" class="ax">10${sup(e)}</text>`;
   }
   for (let e = yl[0]; e <= yl[1]; e++) {
-    s += `<line x1="${L}" x2="${L + pw}" y1="${Y(10 ** e)}" y2="${Y(10 ** e)}" stroke="#D5DBE3"/>`;
+    s += `<line x1="${L}" x2="${L + pw}" y1="${Y(10 ** e)}" y2="${Y(10 ** e)}" stroke="#D5D9D1"/>`;
     s += `<text x="${L - 6}" y="${Y(10 ** e) + 4}" text-anchor="end" class="ax">10${sup(e)}</text>`;
   }
-  s += `<rect x="${L}" y="${T}" width="${pw}" height="${ph}" fill="none" stroke="#9AA6B6"/>`;
+  s += `<rect x="${L}" y="${T}" width="${pw}" height="${ph}" fill="none" stroke="#A4ADA4"/>`;
   s += `<text x="${L + pw / 2}" y="${H - 8}" text-anchor="middle" class="axl">Q [Å⁻¹]</text>`;
   s += `<text transform="translate(16 ${T + ph / 2}) rotate(-90)" text-anchor="middle" class="axl">dΣ/dΩ [cm⁻¹ sr⁻¹]</text>`;
   const path = (ys) => "M" + v.q.map((q, i) => `${X(q).toFixed(1)},${Y(ys[i]).toFixed(1)}`).join("L");
   // background, kinds, total
   const leg = [];
   if (v.background && !v.empty_cell) {
-    s += `<line x1="${L}" x2="${L + pw}" y1="${Y(v.background)}" y2="${Y(v.background)}" stroke="#7C8796" stroke-dasharray="6 4" stroke-width="1.4"/>`;
-    leg.push(["#7C8796", "incoherent background of the liquid", "6 4"]);
+    s += `<line x1="${L}" x2="${L + pw}" y1="${Y(v.background)}" y2="${Y(v.background)}" stroke="#8A938A" stroke-dasharray="6 4" stroke-width="1.4"/>`;
+    leg.push(["#8A938A", "incoherent background of the liquid", "6 4"]);
   }
   for (const k of v.kinds || []) {
     s += `<path d="${path(k.curve)}" fill="none" stroke="${k.color}" stroke-width="1.6" opacity=".9"/>`;
     leg.push([k.color, `kind ${k.index + 1}`, ""]);
   }
-  s += `<path d="${path(v.total)}" fill="none" stroke="#142033" stroke-width="2.4"/>`;
-  leg.unshift(["#142033", v.empty_cell ? "the empty cell (almost nothing)" : "your sample (all together)", ""]);
-  for (const i of v.hidden || []) leg.push(["#9CA3AF", `kind ${i + 1}: hidden properties, not drawn`, "2 3"]);
+  s += `<path d="${path(v.total)}" fill="none" stroke="#1B1F24" stroke-width="2.4"/>`;
+  leg.unshift(["#1B1F24", v.empty_cell ? "the empty cell (almost nothing)" : "your sample (all together)", ""]);
+  for (const i of v.hidden || []) leg.push(["#A4ADA4", `kind ${i + 1}: hidden properties, not drawn`, "2 3"]);
   // the legend, bottom left (where a SANS curve seldom goes: high intensities are at low Q, the background at high Q)
   const lw = Math.max(...leg.map((l) => l[1].length)) * 6.3 + 36, lh = leg.length * 17 + 8;
   const lx = L + 8 + lw; let ly = T + ph - lh - 8 + 14;
-  s += `<rect x="${lx - lw}" y="${ly - 14}" width="${lw}" height="${lh}" rx="6" fill="#fff" opacity=".92" stroke="#E2E7EE"/>`;
+  s += `<rect x="${lx - lw}" y="${ly - 14}" width="${lw}" height="${lh}" rx="6" fill="#fff" opacity=".92" stroke="#D5D9D1"/>`;
   for (const [c, t, da] of leg) {
     s += `<line x1="${lx - lw + 8}" x2="${lx - lw + 28}" y1="${ly - 4}" y2="${ly - 4}" stroke="${c}" stroke-width="2.4" ${da ? `stroke-dasharray="${da}"` : ""}/>`;
-    s += `<text x="${lx - lw + 34}" y="${ly}" font-size="11.5" fill="#142033">${esc(t)}</text>`; ly += 17;
+    s += `<text x="${lx - lw + 34}" y="${ly}" font-size="11.5" fill="#1B1F24">${esc(t)}</text>`; ly += 17;
   }
-  s += `<line id="cross" x1="0" x2="0" y1="${T}" y2="${T + ph}" stroke="#0E7C70" stroke-width="1" opacity="0"/>`;
+  s += `<line id="cross" x1="0" x2="0" y1="${T}" y2="${T + ph}" stroke="#1E7B4E" stroke-width="1" opacity="0"/>`;
   svg.innerHTML = s;
 }
 function hover(e) {
@@ -519,9 +530,9 @@ function drawNumbers() {
 function drawScale() {
   const svg = $("scale"); const W = Math.max(200, svg.clientWidth || 260), H = 120;
   svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
-  if (!liquid()) { svg.innerHTML = `<text x="${W / 2}" y="60" text-anchor="middle" font-size="12" fill="#5B6779">no particles (air)</text>`; return; }
+  if (!liquid()) { svg.innerHTML = `<text x="${W / 2}" y="60" text-anchor="middle" font-size="12" fill="#566057">no particles (air)</text>`; return; }
   const kinds = S.state.kinds || [];
-  if (!kinds.length) { svg.innerHTML = `<text x="${W / 2}" y="60" text-anchor="middle" font-size="12" fill="#5B6779">no particles: the liquid alone</text>`; return; }
+  if (!kinds.length) { svg.innerHTML = `<text x="${W / 2}" y="60" text-anchor="middle" font-size="12" fill="#566057">no particles: the liquid alone</text>`; return; }
   // the extent (Å) of each kind: width x height of its drawing
   const ext = kinds.map((k) => {
     if (kindSealed(k)) return null;
@@ -536,11 +547,11 @@ function drawScale() {
     const cx = 5 + slotW * (i + 0.5), cy = 46, col = kindColor(i);
     const e = ext[i];
     if (!e) {
-      s += `<circle cx="${cx}" cy="${cy}" r="18" fill="#E5E7EB" stroke="#9CA3AF" stroke-dasharray="3 3"/><text x="${cx}" y="${cy + 5}" text-anchor="middle" font-size="15" fill="#6B7280">?</text>`;
-      s += `<text x="${cx}" y="${H - 14}" text-anchor="middle" font-size="11" fill="#5B6779">kind ${i + 1}: hidden</text>`;
+      s += `<circle cx="${cx}" cy="${cy}" r="18" fill="#E6E9E2" stroke="#A4ADA4" stroke-dasharray="3 3"/><text x="${cx}" y="${cy + 5}" text-anchor="middle" font-size="15" fill="#566057">?</text>`;
+      s += `<text x="${cx}" y="${H - 14}" text-anchor="middle" font-size="11" fill="#566057">kind ${i + 1}: hidden</text>`;
       return;
     }
-    const p = kd.parameters, mc = sealed(kd.particle) ? "#E5E7EB" : matColor(kd.particle);
+    const p = kd.parameters, mc = sealed(kd.particle) ? "#E6E9E2" : matColor(kd.particle);
     if (kd.model === "cylinder") {
       const w = Math.max(2, p.length * k), h = Math.max(1.5, 2 * p.radius * k);
       s += `<rect x="${cx - w / 2}" y="${cy - h / 2}" width="${w}" height="${h}" rx="${Math.min(h / 4, 3)}" fill="${mc}" stroke="${col}" stroke-width="2"/>`;
@@ -559,14 +570,14 @@ function drawScale() {
   if (isFinite(k)) {
     const target = 60 / k; const p10 = 10 ** Math.floor(Math.log10(target));
     const bar = [1, 2, 5, 10].map((m) => m * p10).filter((b) => b <= target).pop() || p10;
-    s += `<line x1="8" x2="${8 + bar * k}" y1="${H - 3}" y2="${H - 3}" stroke="#142033" stroke-width="2"/>`;
-    s += `<text x="${12 + bar * k}" y="${H - 0}" font-size="10" fill="#142033">${fmt(bar / 10, 3)} nm</text>`;
+    s += `<line x1="8" x2="${8 + bar * k}" y1="${H - 3}" y2="${H - 3}" stroke="#1B1F24" stroke-width="2"/>`;
+    s += `<text x="${12 + bar * k}" y="${H - 0}" font-size="10" fill="#1B1F24">${fmt(bar / 10, 3)} nm</text>`;
   }
   svg.innerHTML = s;
 }
 function drawCell() {
   const svg = $("cell");
-  if (S.state.holder.type !== "cell") { svg.innerHTML = `<text x="130" y="60" text-anchor="middle" font-size="12" fill="#5B6779">no cell: the empty beam</text>`; return; }
+  if (S.state.holder.type !== "cell") { svg.innerHTML = `<text x="130" y="60" text-anchor="middle" font-size="12" fill="#566057">no cell: the empty beam</text>`; return; }
   svg.innerHTML = cellSvg(S.state.holder.gap_mm, false);
 }
 function drawAll() { drawPlot(); drawNumbers(); drawScale(); drawCell(); }

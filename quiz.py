@@ -38,16 +38,15 @@ import warnings as _warnings
 _logging.getLogger("asyncio").setLevel(_logging.CRITICAL)
 _warnings.filterwarnings("ignore", message="coroutine .* was never awaited", category=RuntimeWarning)
 
-GREEN, RED, GREY = "#E3F1EC", "#F8E5E1", "#F2F2F2"
 CSS = """<style>
-.twq {border: 1px solid #D9DDE5; border-radius: 10px; padding: 10px 16px; margin: 10px 0; background: #FBFBFD}
+.twq {border: 1px solid #D5D9D1; border-radius: 8px; padding: 10px 16px; margin: 10px 0; background: #FFFFFF}
 .twq-q {font-weight: 600; margin-bottom: 4px}
-.twq-fmt {font-size: 92%; color: #4A5568; margin: 6px 0 2px}
+.twq-fmt {font-size: 92%; color: #566057; margin: 6px 0 2px}
 .twq-fb {border-radius: 8px; padding: 8px 12px; margin-top: 6px; line-height: 1.45}
-.twq-ok {background: #E3F1EC; border-left: 4px solid #2A7D6F}
-.twq-no {background: #F8E5E1; border-left: 4px solid #B4562B}
-.twq-ans {background: #EEF1F7; border-left: 4px solid #1D2433}
-.twq-sol pre {background: #F5F5F5; padding: 8px; border-radius: 6px; overflow-x: auto}
+.twq-ok {background: #E3F2E9; border-left: 4px solid #1E7B4E}
+.twq-no {background: #FDF0EE; border-left: 4px solid #B3261E}
+.twq-ans {background: #ECEEE8; border-left: 4px solid #1B1F24}
+.twq-sol pre {background: #F4F5F1; padding: 8px; border-radius: 6px; overflow-x: auto}
 </style>"""
 _css_shown = [False]
 

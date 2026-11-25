@@ -20,10 +20,10 @@ def main():
     app = QApplication(sys.argv)
     w = QWidget()
     w.setWindowTitle("ESS control room")
-    w.setStyleSheet("QWidget {background: #1D2433; color: #F2EFE6; font-family: 'DejaVu Sans';}"
-                    "QPushButton {background: #2A7D6F; color: white; border-radius: 12px; padding: 22px;"
+    w.setStyleSheet("QWidget {background: #0B0F14; color: #E3E8EF; font-family: 'IBM Plex Sans', 'DejaVu Sans';}"
+                    "QPushButton {background: #FFC94A; color: #11161D; border-radius: 8px; padding: 22px; font-weight: 600;"
                     " font-size: 22px; text-align: left;}"
-                    "QPushButton:hover {background: #33968A;}")
+                    "QPushButton:hover {background: #FFD66E;}")
     lay = QVBoxLayout(w)
     windowed = bool(os.environ.get("CONTROL_ROOM_WINDOWED"))
     lay.setContentsMargins(*((40, 30, 40, 30) if windowed else (200, 120, 200, 120)))
@@ -33,7 +33,7 @@ def main():
     sub = QLabel("Choose the control room you walk into. NICOS, the control program of the ESS instruments, opens for "
                  "it. Close the NICOS window to come back here.")
     sub.setWordWrap(True)
-    sub.setStyleSheet("font-size: 18px; color: #C9CFDA;")
+    sub.setStyleSheet("font-size: 18px; color: #97A2B3;")
     lay.addWidget(title)
     lay.addWidget(sub)
     choice = {}

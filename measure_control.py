@@ -102,13 +102,13 @@ def rename_box(instrument, refresh=None):
             if not pick.value:
                 raise ValueError("no measurement to rename yet")
             instrument.rename(pick.value, new.value)
-            msg.value = f"<span style='color:#0E7C70'>Renamed: {html.escape(pick.value)} is now “{html.escape(new.value.strip())}”.</span>"
+            msg.value = f"<span style='color:#1E7B4E'>Renamed: {html.escape(pick.value)} is now “{html.escape(new.value.strip())}”.</span>"
             new.value = ""
             update()
             if refresh:
                 refresh()
         except Exception as e:
-            msg.value = f"<span style='color:#9B2C1C'>{html.escape(str(e))}</span>"
+            msg.value = f"<span style='color:#B3261E'>{html.escape(str(e))}</span>"
 
     go.on_click(do)
     update()

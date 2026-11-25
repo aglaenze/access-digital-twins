@@ -435,7 +435,6 @@ function chapterProgress(s, m) {
   return (s.variant !== undefined && m.variants ? (m.variants[s.variant] || {}).progress : m.progress) ||
          { status: "new", text: "Not started", pct: 0 };
 }
-const ICON_PLAY = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg>';
 
 // the requests of one instrument at one level: one per exercise, or one per sample when its samples belong to two
 // threads (exercise 7); numbered along their thread; the next one is marked
@@ -952,11 +951,11 @@ function openTab(url, kind, label, { clean = false } = {}) {
           --jp-brand-color1: #1B1F24; --jp-brand-color0: #000; --jp-brand-color2: #566057; }
         .jp-RenderedHTMLCommon h1, .jp-RenderedHTMLCommon h2, .jp-RenderedHTMLCommon h3 {
           font-family: "IBM Plex Sans Condensed", "Segoe UI", system-ui, sans-serif; font-weight: 700; }`).catch(() => {});
-      view.insertCSS(`.jp-InputArea-editor.jp-mod-readOnly { background: #EEF0F3 !important; position: relative; }
+      view.insertCSS(`.jp-InputArea-editor.jp-mod-readOnly { background: #E6E9E2 !important; position: relative; }
         .jp-InputArea-editor.jp-mod-readOnly .cm-content { caret-color: transparent; cursor: default; }
         .jp-Cell-inputWrapper:has(.jp-InputPlaceholder) { display: none !important; }   /* hidden code (questions, buttons): not even its folded bar */
         .jp-InputArea-editor.jp-mod-readOnly::after { content: "\\1F512  locked"; position: absolute; top: 3px; right: 8px;
-          font-size: 11px; color: #7A8190; pointer-events: none; }`).catch(() => {});
+          font-size: 11px; color: #566057; pointer-events: none; }`).catch(() => {});
       t.running = true;
       if (tabs.get(activeKey) === t) $("#saved").textContent = "Running the notebook…";
       cover.querySelector("span").textContent = `Preparing ${label}: its first cells are running…`;

@@ -16,15 +16,16 @@ teacher). Installers: GitHub release `app-latest` (app.yml). Teachers can also r
 (local mode).
 
 **For a course: the catalogue of exercises** (in the app; read from the `exercise.yml` files by `container/twin_app.py`):
-choose the instrument, then an exercise, then the way in: BSc guided web page, MSc notebook with tasks and automatic
+choose the instrument on the hall, then a grade (the level), then a request in the table, whose briefing opens the
+way in: BSc guided web page, MSc notebook with tasks and automatic
 checks (the student measures first in NICOS, from the notebook), or a beamtime with NICOS (proposal, sample builder,
 NICOS, all from the starter notebook). NICOS is for the MSc level
 and the free beamtime only: BSc students use the web pages and never see NICOS. Each exercise is one folder
 `<instrument>/exercises/<name>/` with an `exercise.yml`; its MSc and beamtime notebooks are generated from the guided
 analysis notebook of the instrument (`gen_notebooks.py`). Exercises planned: `catalogue_planned.yml`.
-Each instrument starts with an **introduction** (first card of the catalogue, all levels, about 40 min, no code): how the instrument works and what it is used for, with interactive pictures and questions (`<instrument>/gen_intro_page.py`, `exercises/introduction/exercise.yml`, `kind: introduction`).
+Each instrument starts with an **introduction** (the bar above the requests, all levels, about 40 min, no code): how the instrument works and what it is used for, with interactive pictures and questions (`<instrument>/gen_intro_page.py`, `exercises/introduction/exercise.yml`, `kind: introduction`).
 Rules for every exercise: the student has a **role and a mission** that say why the measurement matters (field
-`mission` of `exercise.yml`, shown on the card, in the page and in the notebooks, with a final verdict); every
+`mission` of `exercise.yml`, shown in the briefing of the request, in the page and in the notebooks, with a final verdict); every
 question is **interactive** (`quiz.py`: multiple choice or a value checked with a tolerance, a wrong answer is
 explained, the answer can be shown), so that the exercises work without a teacher. **No code to write** at the BSc
 and MSc levels: the MSc analysis is developed with model builders (`model_builder.py`: a model chosen from pictures,
