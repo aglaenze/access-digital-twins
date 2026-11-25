@@ -852,6 +852,143 @@ def save_model(instrument, proposal, model, title, description, recipe, holder):
     return dict(path=path.replace(os.sep, "/"))
 
 
+# ------------------------------------------------------------------ step 4: fit the sample to the measurements
+# The numbers of the recipe chosen by the student (densities, fractions, sizes) are fitted to the transmission
+# spectrum T(λ) measured in a region of the image (samplecraft/fit.py), from the files of the proposal: a sample, an
+# open beam and a dark measured with the Timepix3 and the choppers (time of flight: the wavelength of each neutron).
+FIT_LAM = (1.5, 6.0, 91)           # wavelength bins of the measured spectrum [Å]: edges from, to, number
+
+
+def fit_files(instrument, proposal):
+    """The measurements of the proposal a fit can use (Timepix3 with time of flight), with their kind."""
+    folder = data_folder(instrument, proposal)
+    if instrument != "odin":
+        raise ValueError("the fit to measurements is for ODIN only, for now")
+    if not folder or not os.path.isdir(folder):
+        return dict(folder=folder, rows=[])
+    import odin_reduction as red
+    rows = [r for r in red.measurements(folder) if "detector" not in r and r.get("kind") in ("sample", "open beam", "dark")]
+    for r in rows:
+        r["usable"] = r["kind"] == "dark" or r.get("choppers") in ("wfm", "natural")
+    return dict(folder=folder, rows=rows)
+
+
+def _leaves(node, path, out):
+    if isinstance(node, bool):
+        return
+    if isinstance(node, (int, float)):
+        out.append((path, float(node)))
+    elif isinstance(node, dict):
+        for k, v in node.items():
+            if k not in ("source", "seed", "color", "name", "sealed", "ncrystal"):
+                _leaves(v, f"{path}.{k}" if path else str(k), out)
+    elif isinstance(node, list):
+        for i, v in enumerate(node):
+            _leaves(v, f"{path}.{i}", out)
+
+
+def fit_params(recipe):
+    """The numbers of the sample a fit can change (not those of the holder, nor the hidden parts), with a label and
+    bounds to start from: materials (fast: the path lengths are computed once) and the shapes and positions of the
+    parts (slow: the sample is rebuilt at each step of the fit)."""
+    out = []
+    for name, spec in (recipe.get("materials") or {}).items():
+        if name.startswith("holder: "):
+            continue
+        leaves = []
+        _leaves(spec, "", leaves)
+        if isinstance(spec, dict) and "density_factor" not in spec:     # always offered: 1 when not written
+            leaves.append(("density_factor", 1.0))
+        for p, v in leaves:
+            frac = p.startswith(("mix.", "minerals.")) or p.endswith("fraction")
+            lo, hi = (0.0, 1.0) if frac or p == "density_factor" else (round(v * 0.5, 6), round(v * 1.5, 6) or 1.0)
+            if p == "density_factor":            # (samplecraft: between 0 and 1, the pores of a porous material)
+                lo, hi = 0.05, 1.0
+            out.append(dict(path=f"materials.{name}.{p}", label=f"{name}: {p.replace('.', ' ')}", value=v,
+                            min=min(lo, v), max=max(hi, v), kind="material"))
+
+    def walk(bodies, base, trail):
+        for i, b in enumerate(bodies or []):
+            if b.get("sealed"):
+                continue
+            nm = b.get("name") or f"part {'.'.join(map(str, trail + [i + 1]))}"
+            here = f"{base}.{i}"
+            for key in ("shape", "position"):
+                leaves = []
+                _leaves(b.get(key), "", leaves)
+                for p, v in leaves:
+                    if key == "shape" and p in ("type",):
+                        continue
+                    lo, hi = (v - 2.0, v + 2.0) if key == "position" else (round(v * 0.5, 6), round(v * 1.5, 6) or 1.0)
+                    out.append(dict(path=f"{here}.{key}.{p}", label=f"{nm}: {key} {p.replace('.', ' ')} (mm)", value=v,
+                                    min=min(lo, v), max=max(hi, v), kind="geometry"))
+            walk(b.get("children"), f"{here}.children", trail + [i + 1])
+    walk(recipe.get("bodies"), "bodies", [])
+    return out
+
+
+def fit_run(instrument, proposal, recipe, holder, sample, open_beam, dark, roi, params):
+    """Fits the chosen numbers to the spectrum measured in roi = (x0, x1, y0, y1) [mm]: values, errors, χ²/dof, a
+    picture of the data and of the model, and the fitted values to put in the recipe."""
+    import scipp as sc
+    import matplotlib.pyplot as plt
+    import odin_reduction as red
+    from samplecraft import fit as F
+    folder = data_folder(instrument, proposal)
+    if not folder:
+        raise ValueError("no proposal: open the builder from a beamtime notebook (or give its number)")
+
+    def path(f, what):
+        if not f:
+            if what == "dark":
+                return None
+            raise ValueError(f"choose the {what}")
+        p = os.path.join(folder, os.path.basename(str(f)))
+        if not os.path.isfile(p):
+            raise ValueError(f"{f}: not in the folder of proposal {proposal}")
+        return p
+    if not params:
+        raise ValueError("choose at least one number to fit")
+    x0, x1, y0, y1 = (float(v) for v in roi)
+    if not (x1 > x0 and y1 > y0):
+        raise ValueError("the region: x from < x to, y from < y to")
+    lam = sc.linspace("wavelength", FIT_LAM[0], FIT_LAM[1], FIT_LAM[2], unit="angstrom")
+    r = red.reduce(path(sample, "sample"), path(open_beam, "open beam"), path(dark, "dark"), lam=lam, roi=(x0, x1, y0, y1))
+    spec = r["spectrum"]
+    T, var = np.asarray(spec.values, float), np.asarray(spec.variances, float)
+    e = lam.values
+    lc = 0.5 * (e[1:] + e[:-1])
+    ok = np.isfinite(T) & np.isfinite(var) & (var > 0) & (T > 0)
+    if ok.sum() < 5:
+        raise ValueError("too few wavelengths with neutrons in this region: a larger region, or longer counts")
+    full = compose(recipe, holder, view=False)
+    for p in params:                           # a density factor not written in the recipe: 1 (the full density)
+        parts = p["path"].split(".")
+        if len(parts) == 3 and parts[0] == "materials" and parts[2] == "density_factor":
+            (full.get("materials") or {}).get(parts[1], {}).setdefault("density_factor", 1.0)
+    P = []
+    for p in params:
+        q = F.Parameter(p["path"], float(p["min"]), float(p["max"]), name=p.get("label") or p["path"])
+        q.value = float(F.get_value(full, p["path"]))
+        q.value = min(max(q.value, q.min), q.max)
+        P.append(q)
+    o, d = F.image_rays(1, 1, (x0, x1, y0, y1), z0=-500.0, rays_per_pixel=256)
+    res = F.fit(full, P, o, d, lc[ok], T[ok][None, :], np.sqrt(var[ok])[None, :])
+    fig, ax = plt.subplots(figsize=(6.2, 3.4), dpi=110)
+    ax.errorbar(lc[ok], T[ok], yerr=np.sqrt(var[ok]), fmt="o", ms=3, color="#1B1F24", ecolor="#9AA39A", label="measured")
+    ax.plot(lc[ok], res.model[0], color="#D9480F", lw=2, label="fitted sample")
+    ax.set(xlabel="wavelength λ [Å]", ylabel="transmission T")
+    ax.set_title(f"Region x {x0:g} to {x1:g} mm, y {y0:g} to {y1:g} mm · χ²/dof = {res.chi2_red:.2f}", fontsize=9)
+    ax.legend(fontsize=8)
+    fig.tight_layout()
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png")
+    plt.close(fig)
+    return dict(png=base64.b64encode(buf.getvalue()).decode(), report=res.report(), chi2_red=float(res.chi2_red),
+                n_points=int(res.n_points), success=bool(res.success),
+                values=[dict(path=q.path, label=q.name, value=q.value, error=q.error, min=q.min, max=q.max) for q in P])
+
+
 def to_yaml(obj):
     return yaml.safe_dump(obj, sort_keys=False, allow_unicode=True, width=110, default_flow_style=None)
 

@@ -498,7 +498,7 @@ class BuilderStatic(web.StaticFileHandler):
 class BuilderApi(Base):
     """What the builder page asks: one function of builder_api.py per name, run in a thread (builds take seconds)."""
     POST = ("info", "load", "preview", "radiograph", "check", "sigmas", "catalogue_sigmas", "yaml", "parse", "save",
-            "save_model")
+            "save_model", "fit_files", "fit_params", "fit_run")
 
     async def _run(self, f, *a, **k):
         import functools
@@ -556,6 +556,13 @@ class BuilderApi(Base):
             elif what == "save":
                 out = await self._run(B.save, ins, prop, d.get("name", ""), d.get("title", ""), d.get("description", ""),
                                       rec, hol)
+            elif what == "fit_files":
+                out = await self._run(B.fit_files, ins, prop)
+            elif what == "fit_params":
+                out = dict(params=B.fit_params(rec))
+            elif what == "fit_run":
+                out = await self._run(B.fit_run, ins, prop, rec, hol, d.get("sample"), d.get("open_beam"), d.get("dark"),
+                                      d.get("roi", (-2, 2, -2, 2)), d.get("params", []))
             else:
                 out = await self._run(B.save_model, ins, prop, d.get("model", ""), d.get("title", ""),
                                       d.get("description", ""), rec, hol)

@@ -86,8 +86,12 @@ const HOW = `
     <li>Your work is kept in this browser as a <b>draft</b> until you save it: it is first in <i>Start from</i>.</li>
     <li>The 3D view is drawn on a grid, so the finest details look smoothed; the model itself, used by the twin,
       is exact.</li>
-    <li><b>Advanced: the whole sample as text</b> shows its materials, its components and the whole recipe,
-      also what has no button (combined shapes, meshes, rotations about any axis, the sources of the numbers).</li>
+    <li><b>Advanced: the whole sample as text</b>, in three boxes that do not overlap: its materials, its components,
+      and its parts with the rest (also what has no button: combined shapes, meshes, rotations about any axis, the
+      sources of the numbers). Each box has its own <i>Apply</i>; <i>Copy the whole recipe</i> gives it as one text.</li>
+    <li><b>4. Fit to my data</b>: numbers of the sample (a density, a fraction, a thickness) adjusted to the
+      transmission you measured, wavelength by wavelength, in a region of the image (files of your proposal, Timepix3
+      with the choppers). The values come with their uncertainties; <i>Put these values in my sample</i> keeps them.</li>
   </ul>
 </section>`;
 
@@ -109,11 +113,11 @@ function openHow() {
 
 // ------------------------------------------------------------------ "Tour"
 const STOPS = [
-  ["#steps", "Three steps", "Make your sample in three steps: 1. the sample, 2. what holds it, 3. check and save. You can go back and forth."],
+  ["#steps", "The steps", "Make your sample: 1. the sample, 2. what holds it, 3. check and save; 4. fit it to your measurements, once you have some. You can go back and forth."],
   ["#gallery-box", "Start from", "Start from the closest example or sample, from the simplest to the most complex, then change it."],
   [".box:has(#tree)", "The parts", "Your sample is a tree of parts, each one shape of one material. Click a part to change it; + Inside puts a new part inside it (an inclusion, a hole)."],
   ["#part-box", "The selected part", "Its material (Change: the materials with their Σ), its shape (the icons), its size and position in mm; at the bottom, the grains placed at random in it."],
-  ["#advanced", "Advanced", "The whole sample as text: its materials, its components and the whole recipe, also what has no button."],
+  ["#advanced", "Advanced", "The whole sample as text, in three boxes that do not overlap: the materials, the components, the parts and the rest (also what has no button)."],
   [".vtabs", "The views", "The 3D view, and the Beam's eye view: what the camera of ODIN would see, at the wavelength you choose."],
   ["#grains-box", "Grains", "A sample with many grains is slow to build: untick this while you change its shape."],
   ["#help-btn", "Help", "How to use: a worked example with pictures. You can take this tour again from there."],

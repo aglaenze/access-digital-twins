@@ -447,7 +447,7 @@ function renderCatalogue() {
   renderHall(count, lvl);
   renderBeamRow();
   renderTeams();
-  $("#inst-head").innerHTML = `<h1>${esc(I.name)}</h1><span>${esc(I.text)}</span>`;
+  $("#inst-head").innerHTML = `<h1 title="${esc(I.text)}">${esc(I.name)}</h1>`;
   renderMentor(intro, lvl);
   $("#intro").innerHTML = intro ? introBar(intro) : "";
   const live = cards.filter((x) => x.live);
@@ -488,7 +488,7 @@ function renderHall(count, lvl) {
       aria-pressed="${k === instr}"><b>${esc(c.instruments[k].name)}</b><span>${esc(c.instruments[k].kind.toLowerCase())}</span>
       <span>${esc(progress(k))}</span></button>`).join("")}
     ${later.map((k) => `<span class="later" style="left:${HALL[k][0]}%;top:${HALL[k][1]}%">${esc(c.instruments[k].name)} · later</span>`).join("")}
-    <span class="legend">grey: the other instruments of ESS, not in the twin yet · schematic</span>`;
+`;
   $("#hall").querySelectorAll(".hut").forEach((b) => b.onclick = () => {
     instr = b.dataset.k; localStorage.setItem("instr", instr); renderCatalogue();
   });
@@ -512,8 +512,7 @@ setInterval(() => {
 function renderTeams() {
   const c = catalogue;
   $("#teams").innerHTML = Object.entries(c.threads || {}).map(([k, t]) => `<button type="button" class="team" data-t="${k}">
-      <span class="t-top">${vig(k)}<b>${esc(t.client)}</b></span><span class="t-what">${esc((TEAMS[k] || {}).short || t.text)}</span>
-      <span class="t-go">Meet them ›</span></button>`).join("");
+      <span class="t-top">${vig(k)}<b>${esc(t.client)}</b></span><span class="t-go">Meet them ›</span></button>`).join("");
   $("#teams").querySelectorAll(".team").forEach((b) => b.onclick = () => openTeam(b.dataset.t));
 }
 function openTeam(k) {
@@ -562,8 +561,8 @@ function introBar(e) {
        title="Your answers and the state of this introduction are put aside: you start from the beginning.">START AGAIN</button>`;
   const state = p.status === "done" ? "done ✓" : p.status === "started" ? `started · ${p.pct || 0} %` : "";
   return `<div class="ib-main"><button type="button" class="ib-open" data-act="open" ${d}>
-      <span class="ib-txt"><b>Introduction${durOf(m) ? " · " + esc(durOf(m)) : ""}${state ? ` <em>${state}</em>` : ""}</b><span>how the instrument works</span></span>
-      <span class="ib-line" aria-hidden="true"><span class="rail"></span>${parts}<span class="dot"></span></span></button>
+      <span class="ib-txt"><b>Introduction${durOf(m) ? " · " + esc(durOf(m)) : ""}</b><span>how the instrument works${state ? ` <em>· ${state}</em>` : ""}</span></span>
+      <span class="ib-lw"><span class="ib-line" aria-hidden="true"><span class="rail"></span>${parts}<span class="dot"></span></span></span></button>
       <span class="ib-acts"><button type="button" class="ib-badge ${badge[0]}" data-act="open" ${d}>${badge[1]}</button>${again}</span></div>`;
 }
 
@@ -625,10 +624,10 @@ function detail(x, lvl) {
     const other = Object.keys(e.modes || {})[0];
     const om = (e.modes || {})[other] || {};
     const label = `${catalogue.instruments[e.instrument].name} · ${short(e.title)} · ${LEVEL[other] || other}`;
-    return `<p class="b-mission">${esc(mission)}</p>
+    return `<div class="b-row"><div class="b-text"><p class="b-mission">${esc(mission)}</p>
       <div class="b-intel"><span><i>Format</i>${esc(om.label || "Guided page")}</span>${durSpan(om)}
-        <span><i>Level</i>Only as a ${esc(LEVEL[other] || other)} page</span></div>
-      <div class="b-acts"><button class="btn go" data-act="open" data-dir="${esc(e.dir)}" data-mode="${other}" data-label="${esc(label)}">${ICON_PLAY}Open</button></div>`;
+        <span><i>Level</i>Only as a ${esc(LEVEL[other] || other)} page</span></div></div>
+      <div class="b-acts"><button class="btn go" data-act="open" data-dir="${esc(e.dir)}" data-mode="${other}" data-label="${esc(label)}">Open ›</button></div></div>`;
   }
   const p = x.p;
   const vlabel = s.variant !== undefined && m.variants ? (m.variants[s.variant] || {}).label : "";
@@ -638,20 +637,20 @@ function detail(x, lvl) {
             (s.variant !== undefined && m.variants ? ` data-variant="${s.variant}"` : "");
   const go = p.status === "new" ? "Start" : (p.status === "done" ? "Open again" : "Continue");
   let acts;
-  if (lvl === "bsc") acts = `<button class="btn go" data-act="open" ${d}>${ICON_PLAY}${go}</button>`;
+  if (lvl === "bsc") acts = `<button class="btn go" data-act="open" ${d}>${go} ›</button>`;
   else if (lvl === "msc") {
     const view = pref("mscview") === "clean" ? "clean" : "code";
-    acts = `<button class="btn go" data-act="open" data-view="${view}" ${d}>${ICON_PLAY}${go}</button>`;
-  } else acts = `<button class="btn go" data-act="open" data-what="analysis" ${d}>${ICON_PLAY}Starter notebook</button>
+    acts = `<button class="btn go" data-act="open" data-view="${view}" ${d}>${go} ›</button>`;
+  } else acts = `<button class="btn go" data-act="open" data-what="analysis" ${d}>Starter notebook ›</button>
       <button class="btn" data-act="sheet" data-dir="${esc(e.dir)}" data-k="${lvl}">Your proposal</button>`;
   const again = p.status === "new" ? "" :
     `<button class="btn" data-act="reset" ${d} data-file="${esc(lvl === "beamtime" ? m.analysis || "" : m.file || "")}"
        data-page="${m.open === "voila" ? 1 : 0}" title="Your notebook, your answers and the state of this exercise are put aside: you start from the beginning. Your measurements stay.">Start again</button>`;
   const where = p.submitted ? `Submitted on ${esc(p.submitted)}` : p.status === "new" ? "" :
     esc(String(p.text || "").replace(/^Started /, "Started on "));
-  return `<p class="b-mission">${esc(mission)}</p>${durSpan(m) ? `<div class="b-intel">${durSpan(m)}</div>` : ""}
-    ${where ? `<span class="b-where">${where}</span>` : ""}
-    <div class="b-acts">${acts}${again}</div>`;
+  return `<div class="b-row"><div class="b-text"><p class="b-mission">${esc(mission)}</p>${durSpan(m) ? `<div class="b-intel">${durSpan(m)}</div>` : ""}
+    ${where ? `<span class="b-where">${where}</span>` : ""}</div>
+    <div class="b-acts">${acts}${again}</div></div>`;
 }
 
 function renderAll(ex) {

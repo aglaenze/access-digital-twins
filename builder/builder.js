@@ -269,10 +269,14 @@ function pick(it) {
 // ------------------------------------------------------------------ text sections (YAML), with Apply
 function textSection(title, text, obj, apply, rows = 8) {
   const ta = el("textarea", { class: "code", rows });
-  api("yaml", { obj }).then((d) => { ta.value = d.text; }).catch(() => {});
+  api("yaml", { obj }).then((d) => { ta.value = d.text; ta.dataset.orig = d.text; }).catch(() => {});
   const msg = el("div", { class: "msg" });
+  ta.addEventListener("input", () => { ta.classList.toggle("dirty", ta.value !== ta.dataset.orig); msg.textContent = ta.classList.contains("dirty") ? "Not applied yet." : ""; msg.className = "msg"; });
   const btn = el("button", { onclick: async () => {
-    try { const d = await api("parse", { text: ta.value }); apply(d.obj); msg.className = "msg ok"; msg.textContent = "Applied."; changed(); renderAll(); }
+    // another box of Advanced with changes not applied: it is written again after this one (its changes would be lost)
+    const others = [...document.querySelectorAll("#adv textarea.dirty")].filter((x) => x !== ta);
+    if (others.length && !confirm("Another box has changes that are not applied yet: they will be lost. Apply this box anyway?")) return;
+    try { const d = await api("parse", { text: ta.value }); apply(d.obj); ta.classList.remove("dirty"); msg.className = "msg ok"; msg.textContent = "Applied."; changed(); renderAll(true); }
     catch (e) { msg.className = "msg err"; msg.textContent = e.message; }
   } }, "Apply");
   return el("div", { class: "adv-sec" }, title ? el("h2", {}, title) : null, el("p", { class: "lead" }, text), ta, el("div", { class: "toolbar" }, btn), msg);
@@ -289,17 +293,38 @@ function grainsBox(b) {
 }
 
 // ------------------------------------------------------------------ advanced: the whole sample as text
-async function renderAdvanced() {
-  const adv = $("adv"); adv.innerHTML = "";
+// three boxes that do not overlap (each one changes only its part of the recipe): the materials, the components, the
+// parts and the rest; the whole recipe is copied (here) or downloaded (step 3), not edited in a fourth box
+async function renderAdvanced(force) {
+  const adv = $("adv");
+  // the sample changed elsewhere while a box holds changes not applied: they are kept, and the boxes are marked old
+  if (!force && adv.querySelector("textarea.dirty")) {
+    if (!adv.querySelector(".adv-old")) adv.prepend(el("div", { class: "note-box adv-old" },
+      "The sample has changed since these boxes were written: apply your changes, or ",
+      el("button", { class: "small-btn", onclick: () => renderAdvanced(true) }, "write the boxes again"), " (your changes not applied are then lost)."));
+    return;
+  }
+  adv.innerHTML = "";
   if (!S.recipe.bodies.length) return;
   const sec = textSection;
-  adv.append(sec("Materials (text)", "Each material: a crystal of NCrystal (ncrystal), minerals by volume (minerals), a formula and density, a mixture of the other materials (mix), or a base calibrated on a measured Σ (calibrate); density_factor below 1 for pores; source: where the numbers come from.",
+  const rest = () => Object.fromEntries(Object.entries(S.recipe).filter(([k]) => k !== "materials" && k !== "components"));
+  adv.append(sec("Materials", "Each material: a crystal of NCrystal (ncrystal), minerals by volume (minerals), a formula and density, a mixture of the other materials (mix), or a base calibrated on a measured Σ (calibrate); density_factor below 1 for pores; source: where the numbers come from.",
     Object.fromEntries(Object.entries(S.recipe.materials || {}).filter(([k]) => !k.startsWith("holder: "))),
-    (v) => { if (v && typeof v === "object" && !Array.isArray(v)) S.recipe.materials = v; }, 8));
+    (v) => { if (!v || typeof v !== "object" || Array.isArray(v)) throw new Error("materials: a list of name: material");
+             const holder = Object.fromEntries(Object.entries(S.recipe.materials || {}).filter(([k]) => k.startsWith("holder: ")));
+             S.recipe.materials = { ...v, ...holder }; }, 8));
   adv.append(sec("Components", "Bodies with their own parts, used several times (by a part with use: <name>, or by a population of grains).",
-    S.recipe.components || {}, (v) => { if (v && typeof v === "object" && !Array.isArray(v)) S.recipe.components = v; }, 6));
-  adv.append(sec("The whole recipe (text)", "Everything: every shape (also combined shapes: union, difference, intersection; meshes), rotation, material, grains, the sources and assumptions. Hidden parts stay hidden (sealed).",
-    S.recipe, (v) => { if (v && Array.isArray(v.bodies)) { S.recipe = v; S.sel = [0]; } }, 14));
+    S.recipe.components || {}, (v) => { if (v && typeof v === "object" && !Array.isArray(v)) S.recipe.components = v; else throw new Error("components: a list of name: body"); }, 6));
+  adv.append(sec("Parts, and the rest", "The tree of parts (bodies): every shape, also combined shapes (union, difference, intersection) and meshes, rotations, materials by name, grains; and the sources and assumptions of the sample. Hidden parts stay hidden (sealed).",
+    rest(), (v) => { if (!v || !Array.isArray(v.bodies)) throw new Error("the parts: a list under bodies:");
+                     S.recipe = { ...v, materials: S.recipe.materials, components: S.recipe.components }; S.sel = [0]; }, 14));
+  const copyMsg = el("span", { class: "small" });
+  adv.append(el("div", { class: "adv-sec" }, el("h2", {}, "The whole recipe"),
+    el("p", { class: "lead" }, "The three boxes above together, as one text: to copy it here, or to download it as a file at step 3 (Download the recipe)."),
+    el("div", { class: "toolbar" }, el("button", { onclick: async () => {
+      try { const d = await api("yaml", { obj: S.recipe }); await navigator.clipboard.writeText(d.text); copyMsg.textContent = "Copied."; }
+      catch (e) { copyMsg.textContent = "Could not copy: " + e.message; }
+    } }, "Copy the whole recipe"), copyMsg)));
 }
 
 // ------------------------------------------------------------------ gallery
@@ -423,11 +448,99 @@ async function download() {
 // ------------------------------------------------------------------ steps
 function go(n) {
   S.step = n;
-  for (const k of [1, 2, 3]) $(`step${k}`).classList.toggle("hidden", k !== n);
+  for (const k of [1, 2, 3, 4]) $(`step${k}`).classList.toggle("hidden", k !== n);
   document.querySelectorAll("#steps button").forEach((b) => b.classList.toggle("on", Number(b.dataset.step) === n));
   $("panel").scrollTop = 0;
   if (n === 2) renderHolders();
   if (n === 3) { if (!$("f-proposal").value) $("f-proposal").value = S.proposal; renderChecks(); }
+  if (n === 4) renderFit();
+}
+
+// ------------------------------------------------------------------ step 4: fit the sample to the measurements
+// builder_api.fit_files / fit_params / fit_run (samplecraft/fit.py): the spectrum T(λ) measured in a region of the
+// image, from the files of the proposal (Timepix3, time of flight), against the transmission of the sample
+const FIT = { last: null };
+function setPath(obj, path, value) {             // as samplecraft/fit.set_value: keys, list indices or names
+  const keys = path.split(".");
+  let node = obj;
+  const step = (n, k) => Array.isArray(n) ? (/^-?\d+$/.test(k) ? Number(k) : n.findIndex((x) => x && x.name === k)) : k;
+  for (const k of keys.slice(0, -1)) { const i = step(node, k); if (node[i] === undefined) node[i] = {}; node = node[i]; }
+  node[step(node, keys[keys.length - 1])] = value;
+}
+async function renderFit() {
+  const box = $("fit-files");
+  $("fit-result").classList.add("hidden");
+  if (INSTR !== "odin") { box.innerHTML = "<p class='note-box'>The fit to measurements is for ODIN only, for now.</p>"; return; }
+  if (!S.proposal) { box.innerHTML = "<p class='note-box'>Open the builder from a beamtime notebook: the fit uses the files measured for your proposal.</p>"; return; }
+  box.innerHTML = "<p class='small'>Reading the files of your proposal…</p>";
+  let rows;
+  try { rows = (await api("fit_files")).rows; } catch (e) { box.innerHTML = ""; box.append(el("p", { class: "msg err" }, e.message)); return; }
+  const use = rows.filter((r) => r.usable);
+  if (!use.some((r) => r.kind === "sample") || !use.some((r) => r.kind === "open beam")) {
+    box.innerHTML = "";
+    box.append(el("p", { class: "note-box" }, `No measurement to fit yet in proposal ${S.proposal}: measure a sample and an open beam`
+      + " (and a dark) with the Timepix3 and the choppers in WFM or natural mode, in NICOS. The images of the integrating camera"
+      + " (white beam) have no wavelength: they cannot be used here."));
+    return;
+  }
+  const pick = (kind, id, none) => {
+    const opts = use.filter((r) => r.kind === kind);
+    const sel = el("select", { id }, none ? el("option", { value: "" }, "(no dark)") : null,
+      ...opts.map((r) => el("option", { value: r.file }, `${r.file} · ${r.title} · ${r.choppers || ""} · ${r.t_s} s`)));
+    if (opts.length) sel.value = opts[opts.length - 1].file;
+    return el("label", { class: "fit-file" }, el("span", {}, kind === "sample" ? "Sample" : kind === "open beam" ? "Open beam" : "Dark"), sel);
+  };
+  box.innerHTML = "";
+  box.append(pick("sample", "fit-sample"), pick("open beam", "fit-open"), pick("dark", "fit-dark", true));
+  // the numbers of the sample that can be fitted
+  const pbox = $("fit-params");
+  pbox.innerHTML = "<p class='small'>Reading the numbers of your sample…</p>";
+  let params;
+  try { params = (await api("fit_params", { recipe: S.recipe })).params; } catch (e) { pbox.innerHTML = ""; pbox.append(el("p", { class: "msg err" }, e.message)); return; }
+  pbox.innerHTML = "";
+  for (const [kind, title] of [["material", "Materials (fast)"], ["geometry", "Shapes and positions (slower)"]]) {
+    const mine = params.filter((p) => p.kind === kind);
+    if (!mine.length) continue;
+    pbox.append(el("div", { class: "fit-group" }, title));
+    for (const p of mine) {
+      const row = el("div", { class: "fit-param", "data-path": p.path, "data-label": p.label },
+        el("label", { class: "fit-tick" }, el("input", { type: "checkbox" }), el("span", {}, p.label)),
+        el("span", { class: "small" }, `now ${r4(p.value)}`),
+        el("label", { class: "small" }, "from ", el("input", { type: "number", class: "fit-min", value: r4(p.min), step: "any" })),
+        el("label", { class: "small" }, "to ", el("input", { type: "number", class: "fit-max", value: r4(p.max), step: "any" })));
+      pbox.append(row);
+    }
+  }
+}
+async function runFit() {
+  const params = [...document.querySelectorAll("#fit-params .fit-param")].filter((r) => r.querySelector("input[type=checkbox]").checked)
+    .map((r) => ({ path: r.dataset.path, label: r.dataset.label, min: Number(r.querySelector(".fit-min").value), max: Number(r.querySelector(".fit-max").value) }));
+  const msg = $("fit-msg");
+  if (!$("fit-sample")) { msg.className = "msg err"; msg.textContent = "No measurement to fit (above)."; return; }
+  if (!params.length) { msg.className = "msg err"; msg.textContent = "Tick at least one number to fit."; return; }
+  const roi = ["fit-x0", "fit-x1", "fit-y0", "fit-y1"].map((k) => Number($(k).value));
+  $("fit-run").disabled = true;
+  msg.className = "msg"; msg.textContent = params.some((p) => !p.path.startsWith("materials.")) ?
+    "Fitting… the sample is rebuilt at each step: one or a few minutes." : "Fitting… about half a minute.";
+  try {
+    const d = await api("fit_run", { recipe: S.recipe, holder: S.holder, sample: $("fit-sample").value, open_beam: $("fit-open").value,
+      dark: $("fit-dark").value, roi, params });
+    FIT.last = d;
+    $("fit-plot").src = "data:image/png;base64," + d.png;
+    $("fit-report").textContent = d.report + (d.chi2_red > 3 ? "\n\nχ²/dof well above 1: the model does not describe the data within"
+      + " their errors (another material, a part not fitted, a region not uniform?)." : "");
+    $("fit-result").classList.remove("hidden");
+    $("fit-apply-msg").textContent = "";
+    msg.className = "msg ok"; msg.textContent = d.success ? "Done." : "The fit stopped before converging: see the result.";
+  } catch (e) { msg.className = "msg err"; msg.textContent = e.message; }
+  $("fit-run").disabled = false;
+}
+function applyFit() {
+  if (!FIT.last) return;
+  for (const v of FIT.last.values) setPath(S.recipe, v.path, Number(v.value.toPrecision(6)));
+  changed(); renderAll(true);
+  const m = $("fit-apply-msg"); m.className = "msg ok";
+  m.textContent = "Done: your sample has the fitted values. Look at it (step 1), then save it (step 3).";
 }
 
 // ------------------------------------------------------------------ 3D view
@@ -567,7 +680,7 @@ function saveDraft() { try { localStorage.setItem(DRAFT, JSON.stringify({ recipe
 function loadDraft() { try { return JSON.parse(localStorage.getItem(DRAFT) || "null"); } catch { return null; } }
 function clearDraft() { try { localStorage.removeItem(DRAFT); } catch { /* no storage */ } }
 
-function renderAll() { renderTree(); renderPart(); if ($("advanced").open) renderAdvanced(); if (S.step === 2) renderHolders(); }
+function renderAll(force) { renderTree(); renderPart(); if ($("advanced").open) renderAdvanced(force); if (S.step === 2) renderHolders(); }
 
 // ------------------------------------------------------------------ start
 async function main() {
@@ -583,6 +696,8 @@ async function main() {
   $("picker").addEventListener("click", (e) => { if (e.target.id === "picker") closePicker(); });
   $("advanced").addEventListener("toggle", () => { if ($("advanced").open) renderAdvanced(); });
   $("save").addEventListener("click", save);
+  $("fit-run").addEventListener("click", runFit);
+  $("fit-apply").addEventListener("click", applyFit);
   $("save-model").addEventListener("click", saveModel);
   $("download").addEventListener("click", download);
   $("grains").addEventListener("change", () => { S.grains = $("grains").checked; refreshViews(); });

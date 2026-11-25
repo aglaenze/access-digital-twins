@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Sample builder</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&amp;family=IBM+Plex+Sans+Condensed:wght@500;600;700&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap">
 <link rel="stylesheet" href="builder/static/builder.css">
 <script type="importmap">{"imports": {"three": "./builder/static/vendor/three.module.min.js"}}</script>
 </head>
@@ -17,6 +18,7 @@
     <button data-step="1" class="on"><span class="n">1</span>Sample</button>
     <button data-step="2"><span class="n">2</span>Holder</button>
     <button data-step="3"><span class="n">3</span>Check &amp; save</button>
+    <button data-step="4" title="Fit numbers of the sample to your measurements"><span class="n">4</span>Fit to my data</button>
   </nav>
 </header>
 
@@ -110,7 +112,47 @@
           <div class="msg" id="model-msg"></div>
         </details>
       </div>
-      <div class="next"><button data-go="2">← The holder</button><span></span></div>
+      <div class="next"><button data-go="2">← The holder</button><button data-go="4">Fit it to my data →</button></div>
+    </div>
+
+    <!-- ============ step 4: fit the sample to the measurements (samplecraft/fit.py) ============ -->
+    <div class="step hidden" id="step4">
+      <div class="box">
+        <h2>Fit the sample to your measurements</h2>
+        <p class="lead">Some numbers of your sample (a density, a fraction, a thickness) are adjusted until the
+          transmission it predicts matches the one you measured, wavelength by wavelength, in a region of the image:
+          the values come with their uncertainties. It uses the files of your proposal measured with the Timepix3 and
+          the choppers (time of flight).</p>
+        <div id="fit-files"></div>
+      </div>
+      <div class="box">
+        <h2>The region of the image</h2>
+        <p class="lead">Where the transmission is measured (mm, the center of the field is 0): a region crossed by the
+          part you fit, the same everywhere inside it.</p>
+        <div class="fit-roi">
+          <label>x from <input type="number" id="fit-x0" value="-2" step="0.5"></label>
+          <label>to <input type="number" id="fit-x1" value="2" step="0.5"></label>
+          <label>y from <input type="number" id="fit-y0" value="-2" step="0.5"></label>
+          <label>to <input type="number" id="fit-y1" value="2" step="0.5"></label>
+        </div>
+      </div>
+      <div class="box">
+        <h2>What to fit</h2>
+        <p class="lead">Tick the numbers to fit, between the bounds. Materials are fast (about half a minute); shapes
+          and positions are slower (the sample is rebuilt at each step). Two numbers that do the same thing (the
+          thickness and the density of one part) cannot both be fitted: the fit says when they are correlated.</p>
+        <div id="fit-params"></div>
+        <div class="toolbar"><button class="primary" id="fit-run">Fit</button></div>
+        <div class="msg" id="fit-msg"></div>
+      </div>
+      <div class="box hidden" id="fit-result">
+        <h2>The result</h2>
+        <img id="fit-plot" alt="The measured transmission and the transmission of the fitted sample" class="fit-plot">
+        <pre id="fit-report" class="fit-report"></pre>
+        <div class="toolbar"><button class="primary" id="fit-apply">Put these values in my sample</button></div>
+        <div class="msg" id="fit-apply-msg"></div>
+      </div>
+      <div class="next"><button data-go="3">← Check and save</button><span></span></div>
     </div>
   </section>
 

@@ -350,8 +350,9 @@ dialog { background: var(--card); color: var(--text); }
 .hall svg { position: absolute; inset: 0; width: 100%; height: 100%; }
 .hall .gl { stroke: var(--grey-line); stroke-width: 6; stroke-linecap: round; }
 .hall .il { stroke: var(--inst-line); stroke-width: 10; stroke-linecap: round; }
-.hall .fl { stroke: var(--beam); stroke-width: 4; stroke-linecap: round; stroke-dasharray: 3 3; animation: flow 1s linear infinite; }
-@keyframes flow { to { stroke-dashoffset: -12; } }
+/* the beam on the chosen beamline: dashes running from the target to the instrument (as on the mimic panel) */
+.hall .fl { stroke: var(--beam); stroke-width: 4; stroke-linecap: round; stroke-dasharray: 12 10; animation: flow 1.1s linear infinite; }
+@keyframes flow { to { stroke-dashoffset: -44; } }
 .hall .monolith { position: absolute; left: 50%; top: 56%; transform: translate(-50%, -50%); width: 150px; height: 150px; border-radius: 50%;
   background: var(--monolith); border: 1.5px dashed var(--grey-line); }
 .hall .target { position: absolute; left: 50%; top: 56%; transform: translate(-50%, -50%); width: 84px; height: 84px; border-radius: 50%;
@@ -432,7 +433,7 @@ dialog { background: var(--card); color: var(--text); }
 .ib-open { flex: 1; min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 16px; text-align: left;
   background: transparent; border: 0; color: inherit; padding: 0; }
 .ib-open:hover .ib-txt b { text-decoration: underline; text-underline-offset: 3px; }
-.ib-txt b em { font-style: normal; font-family: var(--mono); font-size: 11px; font-weight: 400; color: #B9C2B9; margin-left: 6px; }
+.ib-txt em { font-style: normal; font-family: var(--mono); font-size: 11px; color: #B9C2B9; white-space: nowrap; }
 .ib-acts { flex: none; display: flex; gap: 8px; }
 .ib-badge { border: 0; cursor: pointer; }
 .ib-badge.again2 { background: transparent; color: #E3E8EF; border: 1px solid #4A524B; }
@@ -580,3 +581,55 @@ dialog.beam::backdrop { background: rgba(5, 8, 12, .6); }
 .beam-note { color: #97A2B3; }
 .beam-foot { color: #7D8899; }
 .src-dot { background: #4ADE80; }
+
+/* the introduction bar: the line of the parts only when there is room for it (never under the text or the buttons) */
+.ib-txt { white-space: nowrap; }
+
+/* the teacher view (every exercise at every level): the cards in the style of the catalogue, light and dark */
+.r-scroll .ex { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 18px 20px; gap: 12px; }
+.r-scroll .ex .tech { font-family: var(--mono); font-size: 11.5px; font-weight: 400; letter-spacing: .08em; color: var(--muted); }
+.r-scroll .ex h3 { font-family: var(--head); font-weight: 700; font-size: 21px; color: var(--text); }
+.r-scroll .ex .q, .r-scroll .ex.planned .smp { color: var(--muted); }
+.r-scroll .ex.planned .tech { color: var(--muted); }
+.r-scroll .mission { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 6px; }
+.r-scroll .mission b { color: var(--text); }
+.r-scroll .mission svg { stroke: var(--accent); }
+.r-scroll .level { border: 1px solid var(--line); border-radius: 6px; background: var(--panel); }
+.r-scroll .level .label { color: var(--text); }
+.r-scroll .level .what, .r-scroll .level .dur, .r-scroll .prog .row { color: var(--muted); }
+.r-scroll .level .variant select { background: var(--card); color: var(--text); border: 1px solid var(--line2); border-radius: 4px; }
+.r-scroll .chip { font-family: var(--mono); font-weight: 600; font-size: 11px; letter-spacing: .06em; border-radius: 3px; color: #fff; }
+.r-scroll .chip.bsc { background: #1E7B4E; } .r-scroll .chip.msc { background: #B4562B; } .r-scroll .chip.beamtime { background: #3A4656; }
+.r-scroll .chip.all { background: var(--ink3); }
+.r-scroll .prog .track { background: var(--soft); }
+.r-scroll .fill.bsc, .r-scroll .fill.all { background: var(--beam); } .r-scroll .fill.msc { background: #FF9A5C; } .r-scroll .fill.beamtime { background: #93B4FF; }
+.r-scroll .again { color: var(--text); }
+.r-scroll .free { background: var(--ink2); }
+:root[data-theme="dark"] .r-scroll .free { background: #0B0F14; border: 1px solid var(--line); }
+.r-scroll .levels { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+.r-scroll .level .acts { flex-wrap: wrap; }
+.r-scroll .level .acts .btn { overflow: visible; text-overflow: clip; flex: 0 0 auto; }
+
+/* the briefing of a request: the text on the left, its buttons on the right (aligned with those of the introduction) */
+.r-detail { padding-right: 13px; }
+.b-row { display: flex; align-items: center; gap: 20px; }
+.b-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.b-row > .b-acts { flex: none; justify-content: flex-end; flex-wrap: nowrap; }
+@media (max-width: 700px) { .b-row { flex-direction: column; align-items: stretch; } .b-row > .b-acts { justify-content: flex-start; } }
+
+/* the buttons of a request: the type of those of the introduction (mono, capitals) */
+.b-acts .btn { height: auto; padding: 7px 12px; border-radius: 4px; font-family: var(--mono); font-weight: 600; font-size: 12px;
+  letter-spacing: .06em; text-transform: uppercase; border: 1px solid var(--strong); background: transparent; color: var(--text); }
+.b-acts .btn.go { background: var(--go); color: var(--go-ink); border-color: var(--go); }
+
+/* the cards of the clients: the name and Meet them only (a lighter catalogue) */
+.team { min-height: 0; gap: 10px; }
+.team .t-go { margin-top: 0; }
+
+/* the line of the parts in its own zone, with a fixed margin on both sides (its labels stick out of its ends): never
+   against the text or the buttons; hidden when the zone is too narrow */
+.ib-open { display: flex; align-items: center; gap: 0; }
+.ib-txt { flex: none; }
+.ib-lw { flex: 1; min-width: 0; display: flex; justify-content: center; padding: 0 40px; container-type: inline-size; }
+.ib-lw .ib-line { width: min(240px, 100%); margin: 0; justify-self: auto; }
+@container (max-width: 150px) { .ib-line { display: none; } }

@@ -229,6 +229,19 @@ async function selftest(out) {
     check("a client of the story, its card opened", await js(`document.querySelector("#team").open && document.querySelector("#team-life").textContent.length > 40`), Date.now());
     await shot("2d_team");
     await js(`document.querySelector("#team").close(); true`);
+    if (process.env.TWIN_TEACHER_CODE) {        // the teacher view, light and dark (only when a teacher code is given)
+      const tv = await js(`T.teacher(${JSON.stringify(process.env.TWIN_TEACHER_CODE)}, true).then((r) => { if (!r.user) return false;
+        user = r.user; pref("level", "all"); teacherMenu(); renderMenu(); renderCatalogue(); return true; })`);
+      check("teacher view opened", tv === true, Date.now());
+      await new Promise((r) => setTimeout(r, 1200));
+      await shot("2e_teacher_light");
+      await js(`pref("theme", "dark"); applyTheme("dark"); renderMenu(); true`);
+      await new Promise((r) => setTimeout(r, 800));
+      await shot("2f_teacher_dark");
+      await js(`pref("theme", "light"); applyTheme("light"); T.teacher("", false).then((r) => { if (r.user) user = r.user;
+        pref("level", "bsc"); teacherMenu(); renderMenu(); renderCatalogue(); return true; })`);
+      await new Promise((r) => setTimeout(r, 800));
+    }
     await shot("2b_catalogue_bsc");
     const t1 = Date.now();
     await js(`document.querySelector('[data-act="open"][data-mode="bsc"]').click(); true`);
@@ -337,6 +350,10 @@ async function selftest(out) {
     check("builder: checks computed", await until(`document.querySelectorAll('#checks li').length > 0 && !document.querySelector('#checks li.wait')`, 180), t4);
     await new Promise((r) => setTimeout(r, 2000));
     await shot("6_sample_builder");
+    // step 4, fit to the measurements: this proposal has none yet, the page says what to measure first
+    await sb(`document.querySelector('#steps [data-step="4"]').click(); true`);
+    check("builder: step 4 (fit to my data) shown, no measurement yet", await until(`!!document.querySelector('#fit-files .note-box')`, 60), t4);
+    await shot("6a_sample_builder_fit");
     const tLoki = Date.now();
     await js(`openTab("/twin/builder?instrument=loki&proposal=3001", "page", "Sample builder"); true`);
     check("LoKI builder: gallery filled", await until(`document.querySelectorAll('#gallery .card').length > 1`, 90), tLoki);
