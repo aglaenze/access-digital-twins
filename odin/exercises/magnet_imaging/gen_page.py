@@ -16,7 +16,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 sys.path.insert(0, ROOT)
 from nbgen import distribute  # noqa: E402
-from page_texts import measurement_table  # noqa: E402
+from page_texts import beam_tof_md, learn_md, measurement_table  # noqa: E402
 
 # the measurements of part 2, in order (the meteorite adds its side view, at 90°)
 _MEAS_HEADER = ("Step", "Images", "Button", "Sample", "Rotation", "Spin in", "Analyzer", "Each image")
@@ -84,6 +84,8 @@ INTRO = r"""
 
 You are operating the ODIN imaging instrument at ESS. Behind this page, a simulation of the instrument produces your
 measurements, in the formats of the real instrument.
+
+""" + learn_md(['how the spin of a neutron turns in a magnetic field (Larmor precession);', 'how polarized imaging measures this turn in every pixel;', 'how the turn at several wavelengths gives the field, added up along the line of sight;', 'what the method can and cannot tell about a sample.']) + r"""
 @@MISSION@@
 
 **Why neutrons.** A neutron has no charge, so it goes through matter, but it is a small magnet: it has a **spin**,
@@ -653,7 +655,7 @@ same in both images: it cancels in $P$.
     code(SAMPLE_CELL)
     md(r"""
 ### Your measurements
-
+""" + beam_tof_md("natural") + r"""
 ODIN is set for you: choppers in the *natural* mode (the band of wavelengths of one pulse, 1.5 to 6 Å, sorted by time
 of flight), pinhole 2 cm, polarizer and analyzer in. **First** measure without the sample (stage out): spin in along
 $+y$ and $-y$, analyzer along $y$. This gives $P_0$. **Then** the 18 images of the sample. At RADEN each image took

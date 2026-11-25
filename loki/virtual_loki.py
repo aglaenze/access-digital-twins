@@ -102,6 +102,15 @@ class VirtualLoki:
             Device("sample", "empty_beam", tuple(sl.load("loki")), "sample in the beam (sample changer)"),
         ]}
         self.choices = {n: d.choices for n, d in self.devices.items()}
+        # power of the source (MW): 2 at the start of ESS, 5 by design. The McStas weights are for 2 MW; the neutron
+        # rates (detector and monitors alike) scale with the power, so I(Q), normalized by the incident monitor, does
+        # not change, only the counting noise. The teacher may fix it for a class (source_power.py, classes.py)
+        try:
+            sys.path.insert(0, os.path.dirname(HERE))
+            import source_power
+            self.power_mw = source_power.default()
+        except ImportError:
+            self.power_mw = 2.0
         self.folder = None
         self.use_folder(f"{paths.RUN_ROOT}/{session}")
         self.rng = np.random.default_rng(seed)
@@ -260,6 +269,10 @@ class VirtualLoki:
             phi = phi / (1 + skip)
         return ev, det, phi, tr, lam, thick * 100
 
+    def power_factor(self):
+        """Neutron rates relative to the McStas model (2 MW): power_mw / 2."""
+        return float(self.power_mw) / 2.0
+
     def beam_on(self):
         return self.state["heavy_shutter"] == "open" and self.state["shutter"] == "open"
 
@@ -330,7 +343,8 @@ class VirtualLoki:
         if sim is not None:
             sc_ = self._scattered
             beam = lm.read_mcpl(lm.mcpl_path(self._front, "beam_at_sample"))
-            rate = 1.0 / (1 + skip)                    # McStas weights: every pulse; pulse skipping uses one in two
+            # McStas weights: every pulse at 2 MW; pulse skipping uses one in two; the power scales the rate
+            rate = self.power_factor() / (1 + skip)
             sampling = lnx.sampling_fraction(sc_, beam, t, rate)
             if self._back is not None:
                 lam_m, i_inc, _, _ = lm.monitor(self._back, "incident_lambda")
@@ -375,6 +389,7 @@ class VirtualLoki:
         _, _, thick, _, _ = self.samples()[st["sample"]]
         info = {k: float(v) for k, v in cfg.items()}                  # configuration (finds the wavelength table)
         info.update(pulseskip=int(self.pulseskip(st)), sample_thickness_m=float(thick), sample_model=st["sample"],
+                    source_power_mw=float(self.power_mw),
                     proposal=os.path.basename(os.path.dirname(self.folder)))
         return {**({k: str(v) for k, v in st.items()} if settings else {}), **info}
 
@@ -413,7 +428,7 @@ class VirtualLoki:
         cols = self.image_shape()[1]
         e = next(ev[p.name] for p in det.panels if p.bank == "rear")
         m = (e["lam"] >= lo) & (e["lam"] < hi)
-        expected = e["w"][m] * t
+        expected = e["w"][m] * t * self.power_factor()
         total = expected.sum()
         k = min(1.0, self.STREAM_MAX_RATE * t / total, self.STREAM_MAX_EVENTS / total) if total > 0 else 0.0
         self.stream_fraction = k
@@ -439,11 +454,11 @@ class VirtualLoki:
             m = (e["lam"] >= lo) & (e["lam"] < hi)
             if p.bank == "rear":
                 expected = np.zeros(shape)
-                np.add.at(expected, (e["iy"][m], e["ix"][m]), e["w"][m] * t)
+                np.add.at(expected, (e["iy"][m], e["ix"][m]), e["w"][m] * t * self.power_factor())
                 self.last_image = self.rng.poisson(expected).astype(np.uint32)
                 self.last_n_counts += int(self.last_image.sum())
             else:
-                self.last_n_counts += int(self.rng.poisson(e["w"][m].sum() * t))
+                self.last_n_counts += int(self.rng.poisson(e["w"][m].sum() * t * self.power_factor()))
 
     def _log(self, action, details):
         with open(self.log_file, "a", encoding="utf-8") as f:

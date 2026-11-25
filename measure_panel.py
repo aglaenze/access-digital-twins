@@ -454,13 +454,15 @@ class Panel:
                                             description="Detector (m)"),
         }
         _fit(*widgets.values(), label=120)
+        import source_power                  # the power of the source (fixed by the teacher, or chosen here)
+        power = source_power.control(loki, width="auto")
         t = w.BoundedFloatText(value=60, min=1, max=3600, step=1, description="Time (s)")
         title = w.Text(placeholder="e.g. empty cell", description="Title")
         go = w.Button(description="Count", button_style="primary", icon="play", layout=w.Layout(width="auto"))
         import measure_control as mc
         from virtual_loki import Cancelled
         # Stop and locked settings (measure_control): the count stops once its simulation is done, before writing
-        ctl = mc.Control(loki, go, lock=[*widgets.values(), t, title])
+        ctl = mc.Control(loki, go, lock=[*widgets.values(), t, title, *source_power.lockable(power)])
         out = w.VBox([ctl.stop, ctl.status]).add_class("tw-out")
 
         def count(_):
@@ -480,7 +482,8 @@ class Panel:
         return _layout(
             f"The instrument, as in NICOS: set the devices, then count. Your files go to the folder of proposal "
             f"{self.proposal}.",
-            _grid(_card("Sample and beam", *[widgets[n] for n in k if n in ("sample", "heavy_shutter", "shutter")]),
+            _grid(_card("Sample and beam", *[widgets[n] for n in k if n in ("sample", "heavy_shutter", "shutter")],
+                        power),
                   _card("Collimation and detector", *[widgets[n] for n in k if n not in ("sample", "heavy_shutter",
                                                                                        "shutter")]),
                   _card("Each measurement", *_fit(t, title, label=120), _row(go), action=True,

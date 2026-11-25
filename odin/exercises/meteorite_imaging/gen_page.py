@@ -14,7 +14,7 @@ ROOT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 sys.path.insert(0, ROOT)
 from nbfig import figure_cell, insert_after_mission  # noqa: E402
 from nbgen import distribute  # noqa: E402
-from page_texts import measurement_table, transmission_md  # noqa: E402
+from page_texts import BEAM_WHITE, learn_md, measurement_table, transmission_md  # noqa: E402
 
 # where the largest H-Fe-ox clast of the sample is (odin/samples/gen_nwa7034.py draws it at random): the sliders start
 # at its height, the texts say where to look (@Y1@: its height in mm, @WHERE@: "near the top"...)
@@ -34,6 +34,8 @@ md(r"""
 
 You are operating the ODIN imaging instrument at ESS. Behind this page, a simulation of the instrument produces your
 measurements, in the formats of the real instrument.
+
+""" + learn_md(['why neutrons see the water in a rock, which X-rays hardly see;', 'how a radiograph is made from three images (sample, open beam, dark);', 'how a tomography gives the attenuation coefficient $\\Sigma$ at every point inside;', 'how $\\Sigma$ tells what a hidden region is made of, and how much water it holds.']) + r"""
 
 **Your mission.** A request for the Neutron Solutions Team of ESS, where you are a trainee, from the Mars team:
 planetary scientists who study the **water of early Mars**. Mars once had rivers and lakes; part of that water was
@@ -142,10 +144,10 @@ are taken with a camera that integrates the light of a scintillator screen. Two 
 
 | Setup | Camera | Pinhole D | Blur | Neutrons per pixel and second |
 |---|---|---|---|---|
-| **standard** | 128 × 128 pixels of 110 µm, thick bright scintillator | 3 cm | about 0.15 mm | about 900 |
+| **standard** | 128 × 128 pixels of 110 µm, thick bright scintillator | 3 cm | about 0.17 mm | about 900 |
 | **high resolution** | 512 × 512 pixels of 27.5 µm, thin scintillator | 1 cm | about 0.05 mm | about 10 |
-
-The blur comes mostly from the pinhole: seen from the camera, 5 cm behind the sample, the pinhole 10.5 m away makes
+""" + BEAM_WHITE + r"""
+The blur comes mostly from the pinhole (the scintillator adds its own, 0.1 mm or 0.02 mm): seen from the camera, 5 cm behind the sample, the pinhole 10.5 m away makes
 each point of the sample a spot of size $l \cdot D / L$ (part 3 of the introduction to ODIN). The clasts you are
 looking for are 0.1 to 0.4 mm.
 """ + transmission_md("sample out: stage at 500 mm") + r"""
@@ -343,6 +345,8 @@ angle: 60 images, **5 hours of beam** (the twin computes them in a few minutes).
 pixels, the projections $-\ln T$ at all the angles are **filtered** and **smeared back** along the direction they were
 taken in (filtered back-projection): this gives $\Sigma$ at each point of the slice. For comparison, Naver *et al.*
 took 1125 images of 4 minutes at ICON (75 hours), with pixels of 6.2 µm.
+
+**While it runs** (a few minutes here), read *Look inside* below: it tells you what to do with the slices.
 """)
 
 code(r"""
@@ -468,7 +472,7 @@ display(w.VBox([button_s, out_s]))
 
 md(r"""
 **Reading the numbers.** The values of the twin are higher than those of the table: the table is for neutrons
-of 1.8 Å (25 meV), the neutrons counted on ODIN have a mean wavelength of 3.2 Å, and these materials attenuate slower
+of 1.8 Å (25 meV), the neutrons counted on ODIN have a mean wavelength of 3.3 Å, and these materials attenuate slower
 neutrons more. Ratios change much
 less. The tomography also blurs a spot of 0.1 to 0.3 mm with its surroundings (the blur, about 0.05 mm, and the
 pixels, 0.0275 mm): the value in the middle of a small spot is lower than the true one.
@@ -476,8 +480,8 @@ pixels, 0.0275 mm): the value in the middle of a small spot is lower than the tr
 ## 6. How much water?
 
 Naver *et al.* "assume that all excess measured neutron attenuation results from the presence of hydrogen". The
-parts of the clasts without hydrogen show $\Sigma_\text{clast}$ = 0.57 cm⁻¹ at ICON, that is **0.71 cm⁻¹** in ODIN's
-beam (the same minerals, computed with the spectrum of the twin), and liquid water **5.4 cm⁻¹**. The fraction of the
+parts of the clasts without hydrogen show $\Sigma_\text{clast}$ = 0.57 cm⁻¹ at ICON, that is **0.69 cm⁻¹** in ODIN's
+beam (the same minerals, computed with the spectrum of the twin), and liquid water **4.9 cm⁻¹**. The fraction of the
 volume of the spot that water would fill is then
 
 $$f = \frac{\Sigma_\text{spot} - \Sigma_\text{clast}}{\Sigma_\text{water}}$$
@@ -488,7 +492,7 @@ and, with the density of the region (about 3.0 g/cm³), the water by mass is $f 
 code(r"""
 button_w = w.Button(description="Water in the spot", button_style="success", icon="tint", layout=w.Layout(width="auto"))
 out_w = w.Output()
-SIG_CLAST, SIG_WATER, RHO = 0.71, 5.4, 3.0     # effective_sigma in the camera spectrum
+SIG_CLAST, SIG_WATER, RHO = 0.69, 4.9, 3.0     # effective_sigma in the camera spectrum (white, 1 cm pinhole)
 
 def water(_=None):
     with out_w:
@@ -528,6 +532,54 @@ with collapsed("Bonus round: for X-ray experts (click to open)"):
     BONUS
 """)
 
+code(r"""
+from page_output import collapsed
+from IPython.display import Markdown
+with collapsed("Going further: harder questions (click to open)"):
+    display(Markdown("**Going further (harder, optional).** Three questions that go beyond the page: the noise of an image, the reduction of ESS, the number of angles of a tomography. They count in your score like the others."))
+    q.number("**Noise.** In one image of the tomography, a pixel of the open beam collects about 9.5 neutrons per second; "
+             "the rock lets 90 % of them through. Each image lasts 300 s and the open beam 1500 s. Counting noise: "
+             "N counted neutrons fluctuate by √N. What is the relative noise of T = S / O in one pixel (%)? (Neglect the dark.)",
+             value=2.1, tol=0.1, unit="%",
+             mistakes=[(2.0, "that is the noise of the sample image alone; the open beam is counted too, and its noise adds"),
+                       (1.9, "the rock lets only 90 % through: the sample image has 0.9 × 9.5 × 300 neutrons"),
+                       (0.8, "that is the open beam alone; the sample image is noisier")],
+             hints=["The relative noise of N counts is 1/√N. For a ratio, the relative noises add in quadrature.",
+                    "√(1/N_S + 1/N_O), with N_S = 0.9 × 9.5 × 300 and N_O = 9.5 × 1500."],
+             explanation="N_S = 2565, N_O = 14250: √(1/2565 + 1/14250) = 2.1 %. A clast of 0.3 mm lowers T by "
+                         "about 6 % in ODIN's white beam: only 2.8 times the noise of one pixel, hardly visible. But it covers about 100 pixels: the "
+                         "tomography, which combines all the pixels and all the angles, lowers the noise about 10 times. "
+                         "This is why a long open beam matters: its noise is in every image.",
+             title="X7. The noise of one pixel")
+    q.number("**Reduction.** By mistake, the open beam was taken at 2 MW and the radiograph of the rock at 5 MW, with the "
+             "same exposure. The rock lets 90 % through. If you divide each image by its exposure time only, which "
+             "transmission do you find?",
+             value=2.25, tol=0.05, unit="",
+             mistakes=[(0.36, "the other way round: the sample image got 2.5 times more neutrons, not fewer"),
+                       (0.9, "that is the true value, the one the ESS reduction finds: it divides by the proton charge, not "
+                             "by the time. Here you divide by the time only")],
+             hints=["At 5 MW each pulse carries 2.5 times more protons than at 2 MW, so 2.5 times more neutrons.",
+                    "0.9 × 5 / 2."],
+             explanation="0.9 × 2.5 = 2.25: a transmission above 1, impossible. The number of neutrons follows the protons on "
+                         "the target, not the clock: the power changes, and even at constant power the pulses vary by about "
+                         "1 % and the beam sometimes stops. So the ESS reduction (and the twin) divides each image by the "
+                         "proton charge it received, written in the file: then T = 0.90 whatever the power.",
+             title="X8. Per second or per proton?")
+    q.number("**Tomography.** A rule of thumb: a tomography needs about (π/2) × N projections over 180°, N the number of "
+             "pixels across the object, to sample the edge of the slices as finely as their middle. The piece is 8 mm wide "
+             "and the pixels 27.5 µm. How many projections?",
+             value=457, tol=15, unit="",
+             mistakes=[(291, "that is N, the pixels across the piece; multiply by π/2"),
+                       (914, "π × N: the rule is (π/2) × N over 180°"),
+                       (60, "that is what you took; the question asks for the rule")],
+             hints=["N = 8 mm / 27.5 µm.", "N = 291; then × π/2."],
+             explanation="N = 8 / 0.0275 = 291, × π/2 = 457 projections. You took 60, to keep 5 hours of beam; 457 would take "
+                         "38 hours. With too few angles the gaps between them show far from the rotation axis: streaks, "
+                         "and fine details smeared at the edges of the slices, while the middle stays good. It is the usual "
+                         "trade between beam time and quality; Naver et al. took 1125 images at ICON.",
+             title="X9. How many angles?")
+""")
+
 md(r"""
 ## 8. Your results
 
@@ -536,7 +588,7 @@ Your score on the questions of the page, and a report to download.
 
 code(r"""
 q.choice("With the **standard** setup, can the radiograph show the clasts of 0.1 to 0.4 mm?",
-         ["Hardly: they are as small as the blur (0.15 mm) and the pixels (0.11 mm), and their contrast of a few % is "
+         ["Hardly: they are as small as the blur (0.17 mm) and the pixels (0.11 mm), and their contrast of a few % is "
           "lost in the noise.",
           "Yes, clearly: neutrons see hydrogen very well.",
           "No: neutrons do not see rocks.",
@@ -553,8 +605,8 @@ q.number("The blur of the high-resolution setup: $l \\cdot D / L$ with $l$ = 5 c
          "L = 10.5 m. How many micrometers?", value=48, tol=3, unit="µm",
          mistakes=[(143, "this is the blur with the 3 cm pinhole"), (0.048, "right, but in mm; the answer is asked in µm")],
          hints=["5 cm × 1 cm / 1050 cm, in cm; then × 10 000 for µm."],
-         explanation="0.05 m × 0.01 m / 10.5 m = 4.8·10⁻⁵ m = 48 µm. Three times sharper than with 3 cm, but 9 times "
-                     "fewer neutrons (the area of the pinhole): longer exposures.", title="Q2. The blur")
+         explanation="0.05 m × 0.01 m / 10.5 m = 4.8·10⁻⁵ m = 48 µm. Three times sharper than with 3 cm, but 6 times "
+                     "fewer neutrons (9 by the area of the pinhole; but the guide focuses the beam onto it, brightest at the center, so the edge of the 3 cm hole is weakly lit): longer exposures.", title="Q2. The blur")
 q.choice("Why must the **open beam** be measured much longer than each image of the tomography?",
          ["Every image is divided by the same open beam: its noise is printed identically on all of them and becomes "
           "rings around the rotation axis.",

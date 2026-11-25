@@ -14,7 +14,7 @@ ROOT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 sys.path.insert(0, ROOT)
 from nbfig import figure_cell, insert_after_mission  # noqa: E402
 from nbgen import distribute  # noqa: E402
-from page_texts import insert_bragg_edges, transmission_md  # noqa: E402
+from page_texts import QUANTITIES_MD, beam_tof_md, insert_bragg_edges, learn_md, transmission_md  # noqa: E402
 
 cells = []
 md = lambda s: cells.append(nbf.v4.new_markdown_cell(s.strip()))
@@ -26,6 +26,8 @@ md(r"""
 You are operating the ODIN imaging instrument at ESS. Behind this page, a simulation of the instrument produces your
 measurements; the files are in the ESS NeXus format, and the wavelength of each neutron is computed with the official
 ESS software.
+
+""" + learn_md(['how the position of a Bragg edge gives the distance between planes of atoms;', 'how a shift of the edge by one part in ten thousand measures the strain inside the steel;', "how to compare a measurement with Hooke's law, with its uncertainty;", 'how long ODIN needs, compared with the test beamline V20.']) + QUANTITIES_MD + r"""
 
 **Your mission.** You are a trainee in the Neutron Solutions Team of ESS. The structures department of Fyrø Energy
 Island comes back (after its steel plates). Steel parts of its wind turbines (bolts, flanges, welded joints) carry
@@ -146,7 +148,7 @@ display(smp_out)
 
 md(r"""
 ## 1. Operate the instrument
-""" + transmission_md("stage at 500 mm: the specimen and its load frame out of the field", per_wavelength=True) + r"""
+""" + beam_tof_md("wfm") + r"""""" + transmission_md("stage at 500 mm: the specimen and its load frame out of the field", per_wavelength=True) + r"""
 **The measurements to take.** Set the controls, then click *Count*: the detector image and the spectrum of arrival
 times fill up during the count, as on the instrument. A strain of $10^{-3}$ moves the edge by only 0.004 Å, so you need
 many neutrons: **repeat** each measurement of the specimen and of the open beam **4 times** (60 s each); the analysis

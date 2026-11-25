@@ -132,8 +132,8 @@ of the object. In a lab micro-CT, the X-rays leave a focal spot of a few µm and
 close to the source casts a larger shadow on a far detector: the magnification is often 10 or more.
 
 Neutrons have no small focal spot. On ODIN the beam comes through a **pinhole** of diameter D (1 to 4 cm), at
-L = 10.5 m before the sample: an almost parallel beam. The image has the size of the object (no magnification), so the
-resolution is set by the camera pixel (27.5 µm here) and by the blur.
+L = 10.5 m before the sample: an almost parallel beam. The image on the scintillator screen has the size of the object (no lens can bend neutrons into an
+enlarged image; the lens of the camera only films the light of the screen), so the resolution is set by the camera pixel (27.5 µm here) and by the blur.
 
 Each point of the sample becomes a spot of size $l \cdot D / L$ on the camera, $l$ being the distance from the sample
 to the camera. So the camera is put **as close as possible**: 6 mm from the rotation axis. Then the blur stays below
@@ -375,7 +375,7 @@ md(r"""
 ## 3. The tomography
 
 For the tomography ODIN uses another camera, the **integrating camera**: finer pixels (27.5 µm) than the Timepix3,
-but no time of flight, which we do not need here. The pinhole is opened to 3 cm: 9 times more neutrons, and the blur
+but no time of flight, which we do not need here. The pinhole is opened to 3 cm: 6 times more neutrons (not 9: the beam is brightest at the center of the hole), and the blur
 stays below the pixel.
 
 The camera first takes its own dark and open beam. Then it turns the sample over 180°, in steps of 3°, with one image
@@ -600,8 +600,8 @@ value in its middle is a bit too low.
 
 As Naver *et al.*, assume that all the extra attenuation of the spot comes from hydrogen, held as water:
 
-- without water, the spot would have $\Sigma_\text{clast}$ = 0.71 cm⁻¹ (in ODIN's beam);
-- liquid water has $\Sigma_\text{water}$ = 5.4 cm⁻¹ (in ODIN's beam);
+- without water, the spot would have $\Sigma_\text{clast}$ = 0.68 cm⁻¹ (in ODIN's beam);
+- liquid water has $\Sigma_\text{water}$ = 4.9 cm⁻¹ (in ODIN's beam);
 - the fraction of the volume filled by water is $f = (\Sigma_\text{spot} - \Sigma_\text{clast}) / \Sigma_\text{water}$;
 - water is 3 times lighter than the rock (1.0 against 3.0 g/cm³), so the water by mass is $f / 3$.
 
@@ -611,7 +611,7 @@ As Naver *et al.*, assume that all the extra attenuation of the spot comes from 
 code(r"""
 button_w = w.Button(description="Water in the spot", button_style="success", icon="tint", layout=w.Layout(width="auto"))
 out_w = w.Output()
-SIG_CLAST, SIG_WATER, RHO = 0.71, 5.4, 3.0
+SIG_CLAST, SIG_WATER, RHO = 0.68, 4.9, 3.0     # effective_sigma in the camera spectrum (white, 3 cm pinhole)
 
 def water(_=None):
     with out_w:
@@ -628,6 +628,54 @@ display(w.VBox([button_w, out_w]))
 """)
 
 
+
+code(r"""
+from page_output import collapsed
+from IPython.display import Markdown
+with collapsed("Going further: harder questions (click to open)"):
+    display(Markdown("**Going further (harder, optional).** Three questions that go beyond the page: the noise of an image, the reduction of ESS, the number of angles of a tomography. They count in your score like the others."))
+    q.number("**Noise.** In one image of the tomography, a pixel of the open beam collects about 56 neutrons per second; "
+             "the rock lets 90 % of them through. Each image lasts 30 s and the open beam 150 s. Counting noise: "
+             "N counted neutrons fluctuate by √N. What is the relative noise of T = S / O in one pixel (%)? (Neglect the dark.)",
+             value=2.8, tol=0.1, unit="%",
+             mistakes=[(2.6, "that is the noise of the sample image alone; the open beam is counted too, and its noise adds"),
+                       (2.4, "the rock lets only 90 % through: the sample image has 0.9 × 56 × 30 neutrons"),
+                       (1.1, "that is the open beam alone; the sample image is noisier")],
+             hints=["The relative noise of N counts is 1/√N. For a ratio, the relative noises add in quadrature.",
+                    "√(1/N_S + 1/N_O), with N_S = 0.9 × 56 × 30 and N_O = 56 × 150."],
+             explanation="N_S = 1512, N_O = 8400: √(1/1512 + 1/8400) = 2.8 %. A clast of 0.3 mm lowers T by "
+                         "about 6 % in ODIN's white beam: only 2.1 times the noise of one pixel, hardly visible. But it covers about 100 pixels: the "
+                         "tomography, which combines all the pixels and all the angles, lowers the noise about 10 times. "
+                         "This is why a long open beam matters: its noise is in every image.",
+             title="X1. The noise of one pixel")
+    q.number("**Reduction.** By mistake, the open beam was taken at 2 MW and the radiograph of the rock at 5 MW, with the "
+             "same exposure. The rock lets 90 % through. If you divide each image by its exposure time only, which "
+             "transmission do you find?",
+             value=2.25, tol=0.05, unit="",
+             mistakes=[(0.36, "the other way round: the sample image got 2.5 times more neutrons, not fewer"),
+                       (0.9, "that is the true value, the one the ESS reduction finds: it divides by the proton charge, not "
+                             "by the time. Here you divide by the time only")],
+             hints=["At 5 MW each pulse carries 2.5 times more protons than at 2 MW, so 2.5 times more neutrons.",
+                    "0.9 × 5 / 2."],
+             explanation="0.9 × 2.5 = 2.25: a transmission above 1, impossible. The number of neutrons follows the protons on "
+                         "the target, not the clock: the power changes, and even at constant power the pulses vary by about "
+                         "1 % and the beam sometimes stops. So the ESS reduction (and the twin) divides each image by the "
+                         "proton charge it received, written in the file: then T = 0.90 whatever the power.",
+             title="X2. Per second or per proton?")
+    q.number("**Tomography.** A rule of thumb: a tomography needs about (π/2) × N projections over 180°, N the number of "
+             "pixels across the object, to sample the edge of the slices as finely as their middle. The piece is 8 mm wide "
+             "and the pixels 27.5 µm. How many projections?",
+             value=457, tol=15, unit="",
+             mistakes=[(291, "that is N, the pixels across the piece; multiply by π/2"),
+                       (914, "π × N: the rule is (π/2) × N over 180°"),
+                       (60, "that is what you took; the question asks for the rule")],
+             hints=["N = 8 mm / 27.5 µm.", "N = 291; then × π/2."],
+             explanation="N = 8 / 0.0275 = 291, × π/2 = 457 projections. You took 60, to keep half an hour of beam; 457 would take "
+                         "almost 4 hours. With too few angles the gaps between them show far from the rotation axis: streaks, "
+                         "and fine details smeared at the edges of the slices, while the middle stays good. It is the usual "
+                         "trade between beam time and quality; Naver et al. took 1125 images at ICON.",
+             title="X3. How many angles?")
+""")
 
 md(r"""
 **Limits of the twin.** The piece is a model built from the published numbers (sizes, amounts and attenuations of

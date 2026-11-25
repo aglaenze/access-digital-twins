@@ -149,6 +149,10 @@ $("#t-form").onsubmit = async (ev) => {
   teacherMenu(); renderCatalogue();
   toast("Teacher view: every exercise at every level. Choose a role to see the catalogue as a student does.", 8000);
 };
+// the expected durations: for the teacher only (class of 2026-11-23: a duration on the page puts the students under
+// pressure, and they rarely match; the teacher needs them to plan)
+function durOf(m, fallback = "") { return user && user.teacher ? (m.duration || fallback) : ""; }
+function durSpan(m) { const d = durOf(m); return d ? `<span><i>Duration</i>${esc(d)}</span>` : ""; }
 function teacherMenu() {
   $("#teach").textContent = user && user.teacher ? "Leave the teacher view" : "Teacher view…";
   // the classes are part of the teacher view
@@ -399,7 +403,7 @@ function brief(key, lvl) {
     const om = (e.modes || {})[other] || {};
     const label = `${catalogue.instruments[e.instrument].name} · ${short(e.title)} · ${LEVEL[other] || other}`;
     box.innerHTML = `${head}<p class="b-mission">${esc(mission)}</p>
-      <div class="b-intel"><span><i>Format</i>${esc(om.label || "Guided page")}</span><span><i>Duration</i>${esc(om.duration || "")}</span>
+      <div class="b-intel"><span><i>Format</i>${esc(om.label || "Guided page")}</span>${durSpan(om)}
         <span><i>Level</i>Only as a ${esc(LEVEL[other] || other)} page</span></div>
       <div class="b-acts"><button class="btn go" data-act="open" data-dir="${esc(e.dir)}" data-mode="${other}" data-label="${esc(label)}">${ICON_PLAY}Open</button></div>`;
     wire(box, key, lvl);
@@ -424,7 +428,7 @@ function brief(key, lvl) {
        data-page="${m.open === "voila" ? 1 : 0}" title="Your notebook, your answers and the state of this exercise are put aside: you start from the beginning. Your measurements stay.">Start again</button>`;
   const first = p.total && (p.right || p.revealed) ? `<span><i>First try</i>${p.first || 0} of ${p.total} questions</span>` : "";
   box.innerHTML = `${head}<p class="b-mission">${esc(mission)}</p>
-    <div class="b-intel"><span><i>Format</i>${esc(m.label || "")}</span><span><i>Duration</i>${esc(m.duration || "")}</span>
+    <div class="b-intel"><span><i>Format</i>${esc(m.label || "")}</span>${durSpan(m)}
       ${first}${p.submitted ? `<span><i>Submitted</i>${esc(p.submitted)}</span>` : ""}</div>
     <div class="prog"><div class="row"><span>${esc(p.text)}</span>${again}</div>
       <div class="track"><div class="fill" style="width:${p.pct}%"></div></div></div>
@@ -502,7 +506,7 @@ function level(e, k, m, i) {
   // an exercise with a choice of samples: a menu above the buttons (the buttons open the sample chosen)
   const variants = m.variants && k !== "beamtime" ? `<label class="variant">Sample <select class="variant-pick">${
     m.variants.map((v, n) => `<option value="${n}">${esc(v.label)}</option>`).join("")}</select></label>` : "";
-  return `<div class="level"><div class="row"><span class="chip ${k}">${LEVEL[k] || k}</span><span class="dur">${esc(m.duration || "")}${again}</span></div>
+  return `<div class="level"><div class="row"><span class="chip ${k}">${LEVEL[k] || k}</span><span class="dur">${esc(durOf(m))}${again}</span></div>
     <span class="label">${esc(m.label)}</span><span class="what" title="${esc(m.what)}">${esc(m.what)}</span>
     <div class="prog">${variants}<div class="row"><span>${esc(p.text)}</span><b>${p.pct ? p.pct + " %" : ""}</b></div>
       <div class="track"><div class="fill ${k}" style="width:${p.pct}%"></div></div></div>
@@ -519,7 +523,7 @@ function introCard(e, i) {
   const again = p.status === "new" ? "" :
     `<button class="again" data-act="reset" ${d} data-file="${esc(m.file || "")}" data-page="${m.open === "voila" ? 1 : 0}"
        title="Your answers and the state of this introduction are put aside: you start from the beginning.">Start again</button>`;
-  return `<article class="ex intro-card"><div class="intro-txt"><span class="tech">${esc(e.technique)} · ${esc(m.duration || "40 min")}</span>
+  return `<article class="ex intro-card"><div class="intro-txt"><span class="tech">${esc(e.technique)}${durOf(m, "40 min") ? " · " + esc(durOf(m, "40 min")) : ""}</span>
       <h3>${esc(e.title)}</h3><p class="q">${esc(m.what || e.question)}</p></div>
     <div class="intro-act"><span class="st">${esc(p.text)}${p.pct ? " · " + p.pct + " %" : ""} ${again}</span>
       <button class="btn go" data-act="open" ${d}>${go}</button></div></article>`;

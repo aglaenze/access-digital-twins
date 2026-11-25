@@ -79,3 +79,39 @@ def measurement_table(rows, header):
     lines = ["| " + " | ".join(header) + " |", "|" + "---|" * len(header)]
     lines += ["| " + " | ".join(str(x) for x in r) + " |" for r in rows]
     return "\n".join(lines)
+
+
+# --------------------------------------------------------------------------- the opening of every page (class of
+# 2026-11-23: the objectives first, T and Σ defined at the start, the beam explained, no duration on the page)
+def learn_md(points):
+    """'What you will learn': the objectives of the page, at its top."""
+    return "**What you will learn**\n\n" + "\n".join(f"- {p}" for p in points) + "\n"
+
+
+QUANTITIES_MD = r"""
+**Two quantities used everywhere in this page**
+
+- The **transmission** $T = I / I_0$: the fraction of the neutrons that cross the sample (1 = nothing removed).
+- The **attenuation coefficient** $\Sigma$, in cm⁻¹: how strongly a material removes neutrons, by absorption and by
+  scattering. It is the $\mu$ of X-ray imaging. Through a thickness $x$: $T = e^{-\Sigma x}$. Each material has its
+  own $\Sigma$, so measuring $\Sigma$ tells you what a region is made of.
+"""
+
+BEAM_WHITE = r"""
+**White beam.** No chopper selects the neutrons: all the wavelengths arrive together, as in a polychromatic X-ray
+beam, and the camera adds them up. That gives the most neutrons, so the shortest exposures; the price is that the
+images do not know the wavelength ($\Sigma$ is an average over the spectrum). Sorting the neutrons by wavelength (the
+time of flight, used in other exercises) needs the choppers: they keep the slow neutrons of one pulse from mixing with
+the fast ones of the next, and let far fewer neutrons through.
+"""
+
+
+def beam_tof_md(mode="wfm"):
+    """Why this page uses the time of flight, not the white beam (mode: 'wfm' or 'natural')."""
+    how = ("the WFM choppers cut each long ESS pulse (2.86 ms) into short slices, so that the time tells the wavelength "
+           "precisely, at the price of about 97 % of the neutrons of the white beam" if mode == "wfm" else
+           "the choppers let through the band of wavelengths of one pulse and keep the slow neutrons of one pulse from "
+           "mixing with the fast ones of the next")
+    return (f"\n**Time of flight, not white beam.** This measurement needs the wavelength of each neutron. The Timepix3 "
+            f"camera notes when each neutron arrives, and the time since the pulse gives its wavelength (introduction to "
+            f"ODIN, part 4); {how}. So the counts are longer than in white beam.\n")

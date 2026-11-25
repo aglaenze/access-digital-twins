@@ -13,7 +13,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 sys.path.insert(0, ROOT)
 from nbgen import distribute  # noqa: E402
-from page_texts import insert_bragg_edges, measurement_table, transmission_md  # noqa: E402
+from page_texts import QUANTITIES_MD, beam_tof_md, insert_bragg_edges, learn_md, measurement_table, transmission_md  # noqa: E402
 
 cells = []
 md = lambda s: cells.append(nbf.v4.new_markdown_cell(s.strip()))
@@ -25,6 +25,8 @@ md(r"""
 You are operating the ODIN imaging instrument at ESS. Behind this page, a simulation of the instrument produces your
 measurements; the files are in the ESS NeXus format, and the wavelength of each neutron is computed with the official
 ESS software.
+
+""" + learn_md(['what a Bragg edge is, and how it tells which crystal is in the beam;', 'why ODIN sorts the neutrons by wavelength (the time of flight, the WFM choppers);', 'how the heights of the edges give the share of each phase, pixel by pixel;', 'how to map a reaction inside a part without cutting it.']) + QUANTITIES_MD + r"""
 
 **Your mission.** You are a trainee in the Neutron Solutions Team of ESS. The request comes from the hydrogen plant
 of Fyrø Energy Island, which turns wind power into hydrogen with stacks of solid-oxide cells (the same cells turn
@@ -160,7 +162,7 @@ md(r"""
 Choose a holder, set the controls, then click *Measure*. The Timepix3 camera counts the neutrons of each pixel by
 wavelength (time of flight). The edges are only 1 to 3 % of the transmission, and a reduction degree to a few % needs
 the edge heights to a few thousandths: **one hour** for the open beam and for each holder.
-""" + transmission_md("the holder out of the field: stage x = 500 mm", per_wavelength=True) + r"""
+""" + beam_tof_md("wfm") + r"""""" + transmission_md("the holder out of the field: stage x = 500 mm", per_wavelength=True) + r"""
 **The measurements to take**, in this order (set the controls below, then *Measure*):
 
 """ + measurement_table([

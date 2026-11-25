@@ -34,7 +34,7 @@ LoKI is a **small-angle neutron scattering** (SANS) instrument of the European S
 the size and the shape of objects of 1 to 100 nm: nanoparticles, proteins, polymers, the pores of a membrane. These
 objects are far too small for a microscope picture of a whole sample, and LoKI does not take a picture: it measures
 how the sample **deflects** neutrons. This page explains how, before you measure with it. No code, nothing to compute
-by hand: read, try the pictures, answer the questions. About 40 minutes.
+by hand: read, try the pictures, answer the questions.
 
 **What you will know at the end**
 1. why small angles tell large sizes;

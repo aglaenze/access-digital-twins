@@ -26,6 +26,10 @@ H_OVER_M = 3956.034            # m·Å/s
 PERIOD_MS = 1000 / 14          # ms between two ESS pulses
 ODIN_L = 60.55                 # m, source to camera (sample at 60.5 m, camera 5 cm behind)
 ODIN_L_PINHOLE = 10.5          # m, pinhole to sample
+# neutrons through the pinhole, relative to the 3 cm one: measured on the twin (white beam, diffuser in, open beam
+# in the 14 mm field, 2026-11-24). Not the area D²: the guide focuses the beam to a spot of a few cm on the pinhole,
+# brightest at its center, so the outer ring of a wide hole is weakly lit (1 cm: 152, 2 cm: 529, 3 cm: 892, 4 cm: 1120 counts per 110 µm pixel and second)
+PINHOLE_FLUX = {0.01: 0.17, 0.02: 0.59, 0.03: 1.0, 0.04: 1.26}
 STYLE = {"description_width": "230px"}
 LAYOUT = w.Layout(width="560px")
 # LoKI: neutrons per second on the sample and rms divergence (horizontal) of the recorded beams of the twin
@@ -279,7 +283,7 @@ def odin_pinhole():
     def draw():
         ratio = ODIN_L_PINHOLE / d.value
         blur = l.value * 1e-2 * d.value / ODIN_L_PINHOLE * 1e6          # µm
-        flux = (d.value / 0.03) ** 2
+        flux = PINHOLE_FLUX[d.value]
         img = _pattern(blur, flux, np.random.default_rng(1))
         fig, ax = plt.subplots(figsize=(8.2, 2.4))
         ax.imshow(img, cmap="gray", vmin=0.1, vmax=1.25, aspect="auto", extent=(0, img.shape[1] * 0.01, 0, 1))
@@ -287,7 +291,7 @@ def odin_pinhole():
         fig.tight_layout()
         return fig, (f"L/D = 10.5 m / {d.value * 100:.0f} cm = <b>{ratio:.0f}</b>. Blur = l × D / L = "
                      f"<b>{blur:.0f} µm</b>. Neutrons through the pinhole: <b>{flux:.2f} ×</b> those of the 3 cm "
-                     f"pinhole (the area of the hole), so the image is {'noisier' if flux < 1 else 'smoother' if flux > 1 else 'the reference'}"
+                     f"pinhole (measured on the twin), so the image is {'noisier' if flux < 1 else 'smoother' if flux > 1 else 'the reference'}"
                      f"{'' if flux == 1 else ' for the same counting time'}.")
 
     _show([d, l], draw)
@@ -300,7 +304,7 @@ ODIN_TIMEPIX = (110.0, 100.0)    # pictures of 128 x 128 pixels of 110 µm; ligh
 def odin_resolution():
     """The three blurs of a picture (pinhole l·D/L, scintillator, pixel) and their combination √(a² + b² + c²), with
     the test pattern seen through them: blurred by the pinhole and the screen, cut into pixels, with the counting
-    noise of the neutrons per pixel (∝ D², ∝ pixel area, ∝ counting time). The camera first (Timepix3 or integrating),
+    noise of the neutrons per pixel (PINHOLE_FLUX, ∝ pixel area, ∝ counting time). The camera first (Timepix3 or integrating),
     then, for the integrating camera only, its setup (standard or high resolution)."""
     kind = w.ToggleButtons(options=["Timepix3 (event mode)", "integrating"], value="integrating", description="camera",
                            style={"button_width": "130px", "description_width": "230px"})
@@ -330,7 +334,7 @@ def odin_resolution():
         m = max(int(round(pix / step)), 1)
         nb = len(row) // m
         pixels = row[:nb * m].reshape(nb, m).mean(axis=1)
-        counts = 400 * (d.value / 0.03) ** 2 * (pix / 110.0) ** 2 * t.value    # per pixel, open beam
+        counts = 400 * PINHOLE_FLUX[d.value] * (pix / 110.0) ** 2 * t.value    # per pixel, open beam
         rows = max(int(round(700 / pix)), 2)                                  # 0.7 mm high
         rng = np.random.default_rng(1)
         img = rng.poisson(np.tile(pixels, (rows, 1)) * counts) / counts

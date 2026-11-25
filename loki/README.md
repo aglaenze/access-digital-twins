@@ -148,6 +148,7 @@ configuration already simulated, ~1 min for a new one; peak memory 4.4–5.6 GB 
 | Reduction | `loki_reduction` (esssans) | I(Q) in absolute units per bank, solvent subtracted; lookup table, masks, direct-beam calibration provided by the twin |
 | Analysis | `loki_analysis` | Guinier fit, sphere model of sasmodels (scale = volume fraction) |
 | Instrument | `virtual_loki.VirtualLoki` | devices (`heavy_shutter`, `shutter`, `collimation`, `pulse_skipping`, `detector_distance`, `sample`), `move`, `count(t)` → NeXus file, live image of the rear panel, logbook `log.jsonl`; same interface as `VirtualOdin`, so the twin server and NICOS drive it |
+| Source power | `VirtualLoki.power_mw`, `source_power.py` | 2 MW by default (the McStas weights), 1 or 5 MW from the menu of the pages, or fixed by the teacher for a class: detector and monitor rates scale together (`power_factor()`), so I(Q) is unchanged; written in `entry/twin/source_power_mw`. Like a longer count: the file still holds at most MAX_EVENTS events (a smaller `event_sampling`). Not a NICOS device (at ESS the instrument does not set the accelerator power) |
 
 ## Files
 

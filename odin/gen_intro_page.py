@@ -33,7 +33,6 @@ the instrument.
 ODIN is the **neutron imaging** instrument of the European Spallation Source (ESS). It takes pictures *through*
 objects, as an X-ray machine does, but with neutrons. This page explains how it works and what it is used for, before
 you measure with it. There is nothing to compute by hand and no code: read, try the pictures, answer the questions.
-About 40 minutes.
 
 **What you will know at the end**
 1. what a neutron picture shows that an X-ray picture does not;
@@ -128,8 +127,12 @@ fig("odin_pinhole.png", "Why a point of the sample becomes a spot on the camera:
     "pinhole cross at the point and spread apart behind it.")
 md(r"""
 The ratio $L/D$ is the **collimation ratio**: the larger, the sharper the picture. But the neutrons that reach the
-sample are those that pass the hole: their number goes with its **area**, $D^2$. A small pinhole gives a sharp but
-dark, hence noisy, picture. Try it: the picture below is a test pattern of bars of four widths.
+sample are those that pass the hole. If the beam were equally bright over the whole hole, their number would go
+with its **area**, $D^2$: three times wider, nine times more neutrons. On ODIN the beam is not uniform: the guide
+focuses it onto the pinhole, so it is brightest at the center of the hole and fainter toward the edge. Opening the hole
+adds an outer ring where the beam is weak, which brings fewer neutrons than its area suggests. In the twin, the 1 cm
+pinhole lets through 6 times fewer neutrons than the 3 cm one (9 times by area), and the 4 cm one only 1.26 times more
+(1.8 by area). Either way, a small pinhole gives a sharp but dark, hence noisy, picture. Try it: the picture below is a test pattern of bars of four widths.
 
 **The two measuring positions.** Moving the sample and the camera from position 1 ($L$ = 10.5 m) to position 2
 ($L$ = 14 m) is the other way to change $L/D$. The beam leaving the pinhole spreads over a larger area: the field
@@ -149,15 +152,17 @@ q.number("With the 3 cm pinhole (L = 10.5 m), what is the collimation ratio L/D?
          explanation="1050 cm / 3 cm = 350. With the camera 5 cm behind the sample the blur is 5 cm / 350 = 0.14 mm.",
          title="Q3. Collimation ratio")
 q.choice("You change the pinhole from 3 cm to 1 cm, and count for the same time. What happens to the picture?",
-         ["3 times sharper, with 9 times fewer neutrons: noisier.",
+         ["3 times sharper, with about 6 times fewer neutrons: noisier.",
           "3 times sharper, with 3 times fewer neutrons.",
           "9 times sharper, with 3 times fewer neutrons.",
           "Sharper and brighter: a smaller hole concentrates the beam."],
-         answer=0, why={1: "The blur goes with D (3 times), but the neutrons go with the area of the hole, D²: 9 times.",
-                        2: "The other way round: the blur goes with D, the number of neutrons with D².",
+         answer=0, why={1: "The blur goes with D (3 times), but the neutrons go with the area of the hole lit by the beam: about 6 times on ODIN (9 for an evenly lit hole).",
+                        2: "The other way round: the blur goes with D, the number of neutrons with the area of the hole (less on ODIN, where the beam is brightest at its center).",
                         3: "A hole only lets through what falls on it: a smaller hole means fewer neutrons."},
-         explanation="Blur = l·D/L: 3 times smaller. Neutrons through the hole ∝ D²: 9 times fewer. To keep the same "
-                     "noise you would have to count 9 times longer.",
+         explanation="Blur = l·D/L: 3 times smaller. Neutrons through the hole: 9 times fewer for an evenly lit hole (its "
+                     "area), 5.9 times fewer on the twin of ODIN: the guide focuses the beam onto the pinhole, brightest at its "
+                     "center, so the outer part of the 3 cm hole is weakly lit. To "
+                     "keep the same noise you would have to count about 6 times longer.",
          hints=["How does the blur depend on D?", "How does the area of a square hole depend on its side?"],
          title="Q4. Sharp or bright?")
 """)
@@ -450,7 +455,7 @@ everything.)
 *Try it*: choose the camera (for the integrating camera, also its setup: standard or high resolution) and the pinhole,
 and look at the test pattern. The Timepix3 camera gives the same picture as the standard integrating camera: what it
 adds is the wavelength, not sharpness. Then choose the integrating camera in high resolution with the 1 cm pinhole:
-the 50 µm bars are no longer blurred, but the picture is lost in the noise (3 neutrons per pixel). Count 100 times
+the 50 µm bars are no longer blurred, but the picture is lost in the noise (4 neutrons per pixel). Count 100 times
 longer: they appear.
 """)
 code(r"""
@@ -478,7 +483,7 @@ q.choice("You want to see details of 0.1 mm in a sample. Which setting do you ch
                            "screen: the sharpness is that of the blur, not of the grid."},
          explanation="Every blur must be smaller than the details: 1 cm pinhole (0.05 mm), thin scintillator "
                      "(0.02 mm), pixels of 27.5 µm: about 0.06 mm in all. The price: 16 times fewer neutrons per "
-                     "pixel, and 9 times fewer through the 1 cm pinhole than the 3 cm one: a much longer exposure.",
+                     "pixel, and 6 times fewer through the 1 cm pinhole than the 3 cm one: a much longer exposure.",
          hints=["Compare each blur with 0.05 mm.", "Part 3: blur = 5 cm / (L/D) = 5 cm × D / 10.5 m."], title="Q11. Sharp enough?")
 """)
 

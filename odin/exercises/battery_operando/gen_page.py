@@ -13,7 +13,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 sys.path.insert(0, ROOT)
 from nbgen import distribute  # noqa: E402
-from page_texts import measurement_table, transmission_md  # noqa: E402
+from page_texts import BEAM_WHITE, QUANTITIES_MD, learn_md, measurement_table, transmission_md  # noqa: E402
 
 cells = []
 md = lambda s: cells.append(nbf.v4.new_markdown_cell(s.strip()))
@@ -24,6 +24,10 @@ md(r"""
 
 You are operating the ODIN imaging instrument at ESS. Behind this page, a simulation of the instrument produces your
 measurements, in the formats of the real instrument.
+
+""" + learn_md(['why neutrons see lithium, which X-rays hardly see;', 'how to follow a process inside a working cell, image after image (operando imaging);', 'how a change of transmission gives the amount of lithium, depth by depth;', 'how much lithium is lost for good after one cycle, and how to tell.']) + QUANTITIES_MD + r"""
+The change of $\Sigma$ caused by the lithium is written $\Delta\mu$ in this page, as in the article it comes from.
+
 
 **Your mission.** You are a trainee in the Neutron Solutions Team of ESS. The request comes from Fyrø Energy Island,
 which stores the power of its wind farm in batteries for the calm days. A thicker electrode stores more energy in the
@@ -148,7 +152,7 @@ md(r"""
 
 The electrode is 0.4 mm thick: you need small pixels. ODIN is set for **white-beam imaging with the high-resolution
 camera** (512 × 512 pixels of 27.5 µm, pinhole 1 cm: blur about 0.05 mm), images of **60 s**.
-""" + transmission_md("the cell out: stage at 500 mm") + r"""
+""" + BEAM_WHITE + r"""""" + transmission_md("the cell out: stage at 500 mm") + r"""
 **The measurements to take**, in this order (set the controls below, then click the button):
 
 """ + measurement_table([
