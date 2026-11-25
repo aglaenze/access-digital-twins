@@ -42,6 +42,26 @@ matplotlib.use("Agg")
 FIELD_MM = 14.0                 # the field of view of ODIN's cameras (14 mm square around the beam axis)
 LOCK = threading.Lock()         # one build at a time (memory)
 THUMB_LOCK = threading.Lock()   # the thumbnails: one at a time, apart (they never wait for the views, nor these for them)
+_WARM_LOCK = threading.Lock()
+_warm = []
+
+
+def warm():
+    """The heavy modules imported once, one thread at a time, before any request is computed. The page asks for its
+    preview, checks, attenuations and thumbnails at once, each in a thread of the server: two threads importing the
+    same modules (they import each other) made Python stop one of them ("deadlock detected by _ModuleLock")."""
+    if _warm:
+        return
+    with _WARM_LOCK:
+        if _warm:
+            return
+        import importlib
+        for m in ("matplotlib.pyplot", "sample_library", "scene_builder", "samplecraft", "odin_hybrid"):
+            try:
+                importlib.import_module(m)
+            except Exception:                  # noqa: BLE001 (imported again where used: its error shows there)
+                pass
+        _warm.append(True)
 _CACHE = {}                     # {key: built scene}, a few only
 
 
@@ -528,8 +548,12 @@ def blocking(problems):
 
 
 def _colors(scene, names):
+    """{material: color}: the materials taken in the order of the recipe (as sigmas() does), so that a material without
+    a color of its own gets the same one in the 3D view, its legend, the thumbnails and the table of attenuations."""
     import sample_library as sl
-    return sl._rock_colors(dict(materials=dict(scene.cfg())), names)
+    cfg = dict(scene.cfg())
+    order = [n for n in cfg if n in set(names)] + [n for n in names if n not in cfg]
+    return sl._rock_colors(dict(materials=cfg), order)
 
 
 def _b64(a, dt):

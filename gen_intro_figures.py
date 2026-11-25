@@ -34,9 +34,9 @@ from matplotlib.patches import FancyArrowPatch, Rectangle
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "figures")
-INK, TEAL, ORANGE, GREY, RED, BLUE = "#142033", "#0E7C70", "#C7711A", "#8A94A6", "#B4562B", "#2F5FB3"
-plt.rcParams.update({"font.family": "DejaVu Sans", "font.size": 11, "axes.edgecolor": "#5B6779",
-                     "axes.labelcolor": INK, "xtick.color": INK, "ytick.color": INK})
+INK, GREEN, ORANGE, GREY, RED, BLUE = "#1B1F24", "#1E7B4E", "#C7711A", "#8A938A", "#B4562B", "#2F5FB3"
+import plot_style  # noqa: E402
+plot_style.use()                     # the font and palette of the app
 
 H_OVER_M = 3956.034        # m·Å/s: λ[Å] = 3956 / v[m/s]
 PERIOD = 1 / 14            # s between two ESS pulses
@@ -70,7 +70,7 @@ def _clean(ax):
     ax.set_yticks([])
 
 
-CHOPPER_COLORS = {"wfm": TEAL, "fo": BLUE, "bp": "#7A3FB0", "t0": INK}
+CHOPPER_COLORS = {"wfm": GREEN, "fo": BLUE, "bp": "#7A3FB0", "t0": INK}
 
 
 def odin_beamline():
@@ -92,13 +92,13 @@ def odin_beamline():
     for k, (zs, txt, xt) in enumerate(((ODIN_SAMPLE, "position 1: 60.5 m\nfield 10 × 10 cm²", 57.5),
                                        (ODIN_SAMPLE_2, "position 2: 64 m\nfield 20 × 20 cm²", 69.0))):
         ax.add_patch(Rectangle((zs - 0.35, -0.4), 0.3, 0.8, color=GREY, ec=INK, zorder=3))
-        ax.add_patch(Rectangle((zs + 0.1, -0.7), 0.25, 1.4, color=TEAL, zorder=3))
-        ax.annotate(txt, (zs, 0.75), (xt, 1.35), ha="center", va="bottom", fontsize=10, color=TEAL,
-                    arrowprops=dict(arrowstyle="-|>", color=TEAL, lw=1.1, shrinkA=2, shrinkB=2))
+        ax.add_patch(Rectangle((zs + 0.1, -0.7), 0.25, 1.4, color=GREEN, zorder=3))
+        ax.annotate(txt, (zs, 0.75), (xt, 1.35), ha="center", va="bottom", fontsize=10, color=GREEN,
+                    arrowprops=dict(arrowstyle="-|>", color=GREEN, lw=1.1, shrinkA=2, shrinkB=2))
     for zs, L, y in ((ODIN_SAMPLE, 10.5, -1.2), (ODIN_SAMPLE_2, 14.0, -1.9)):
         ax.annotate("", (zs - 0.2, y), (ODIN_PINHOLE, y), arrowprops=dict(arrowstyle="<->", color=INK))
         ax.text(ODIN_PINHOLE - 0.5, y, f"L = {L:g} m", ha="right", va="center", fontsize=10.5, color=INK)
-    ax.text(66, -0.95, "at each position: the sample\n(gray), the camera (teal)\njust behind it", ha="left",
+    ax.text(66, -0.95, "at each position: the sample\n(gray), the camera (green)\njust behind it", ha="left",
             va="center", fontsize=9.5, color=INK)
     ax.set_xlim(-3, 75); ax.set_ylim(-2.4, 2.6)
     ax.set_xlabel("distance from the source (m)")
@@ -141,7 +141,7 @@ def odin_tof():
     """Distance against time: neutrons of several wavelengths leaving in one pulse; arrival at the camera."""
     L = ODIN_DET
     fig, ax = plt.subplots(figsize=(12, 5.2))
-    lams = [(1.0, "#7A3FB0"), (2.0, BLUE), (4.0, TEAL), (6.0, ORANGE), (8.0, RED)]
+    lams = [(1.0, "#7A3FB0"), (2.0, BLUE), (4.0, GREEN), (6.0, ORANGE), (8.0, RED)]
     tmax = 150.0
     for k in range(3):                                        # three source pulses
         t0 = k * PERIOD * 1e3
@@ -185,7 +185,7 @@ def odin_choppers():
     per = PERIOD * 1e3
     for k in range(3):
         kept = k != 1
-        ax.add_patch(Rectangle((k * per, -1.5), TAU * 1e3, 1.5, color=RED if kept else "#D9DDE5"))
+        ax.add_patch(Rectangle((k * per, -1.5), TAU * 1e3, 1.5, color=RED if kept else "#D5D9D1"))
         ax.text(k * per + 1.4, -4.2, f"pulse {k + 1}" + ("" if kept else "\n(stopped)"), ha="center", va="top",
                 fontsize=9.5, color=INK if kept else GREY)
     for k in (0, 2):                                           # the band 1-9 Å of the pulses kept
@@ -194,13 +194,13 @@ def odin_choppers():
             t = t0 + lam * L / H_OVER_M * 1e3
             ax.plot([t0, t], [0, L], color=c, lw=2)
         ax.fill_between([t0 + 1.0 * L / H_OVER_M * 1e3, t0 + 9.0 * L / H_OVER_M * 1e3], L - 1.2, L + 1.2,
-                        color=TEAL, alpha=0.35, lw=0)
+                        color=GREEN, alpha=0.35, lw=0)
     ax.plot([per, per + 1.0 * L / H_OVER_M * 1e3], [0, 8.4], color=GREY, lw=1.5, ls=":")
     ax.plot([0, 180], [8.4, 8.4], color=BLUE, lw=1, ls="--")
     ax.text(178, 9.5, "band chopper (7 turns/s)", ha="right", va="bottom", fontsize=9.5, color=BLUE)
     ax.axhline(L, color=INK, lw=1)
     ax.text(178, L + 2, "camera: 1 Å to 9 Å of pulse 1 arrive before those of pulse 3", ha="right", va="bottom",
-            fontsize=9.5, color=TEAL)
+            fontsize=9.5, color=GREEN)
     ax.set_xlim(-3, 180); ax.set_ylim(-11, 70)
     ax.set_xlabel("time (ms)"); ax.set_ylabel("distance from the source (m)")
     ax.set_title("Problem 1: one pulse in two, so the pulses never mix", color=INK, fontsize=12, fontweight="bold")
@@ -209,13 +209,13 @@ def odin_choppers():
     ax2 = fig.add_axes([0.64, 0.22, 0.34, 0.66])               # the long pulse: two 4 Å neutrons, zoom on the arrival
     t4 = 4.0 * L / H_OVER_M * 1e3
     for t0, ls, lab in ((0.0, "-", "left at the start of the pulse"), (TAU * 1e3, "--", "left at its end (2.86 ms later)")):
-        ax2.plot([t0, t0 + t4], [0, L], color=TEAL, lw=2.2, ls=ls, label=lab)
+        ax2.plot([t0, t0 + t4], [0, L], color=GREEN, lw=2.2, ls=ls, label=lab)
     ax2.axhline(L, color=INK, lw=1)
     ax2.text(t4 - 4.6, L + 0.5, "camera", ha="left", va="bottom", fontsize=9.5, color=INK)
     ax2.annotate("", (t4 + TAU * 1e3, L - 4), (t4, L - 4), arrowprops=dict(arrowstyle="<->", color=RED))
     ax2.text(t4 + 1.43, L - 5, "2.86 ms", ha="center", va="top", fontsize=10, color=RED)
     ax2.text(t4 + 4.2, L - 1.2, "read as\n4.19 Å", ha="left", va="top", fontsize=10, color=RED)
-    ax2.text(t4 - 4.6, L - 1.2, "read as\n4.00 Å", ha="left", va="top", fontsize=10, color=TEAL)
+    ax2.text(t4 - 4.6, L - 1.2, "read as\n4.00 Å", ha="left", va="top", fontsize=10, color=GREEN)
     ax2.set_xlim(t4 - 5, t4 + 7.5); ax2.set_ylim(L - 14, L + 3)
     ax2.set_xlabel("time (ms), zoom on the arrival at the camera"); ax2.set_ylabel("distance (m)")
     ax2.legend(loc="lower right", fontsize=9, frameon=False, title="two neutrons of 4 Å", title_fontsize=9.5)
@@ -223,7 +223,7 @@ def odin_choppers():
     for s_ in ("top", "right"):
         ax2.spines[s_].set_visible(False)
     fig.text(0.64, 0.015, "WFM choppers: six short openings instead of one long pulse,\nso λ is known to 0.2 to 0.8 %",
-             fontsize=9.5, color=TEAL, va="bottom")
+             fontsize=9.5, color=GREEN, va="bottom")
     _save(fig, "odin_choppers.png")
     plt.close(fig)
 
@@ -244,8 +244,8 @@ def odin_pinhole():
     ax.text(zs, 2.05, "sample", ha="center", fontsize=10.5, color=INK)
     ax.text(zs - 0.3, y + 0.75, "one point\nof the sample", ha="right", va="bottom", fontsize=10, color=INK)
     ax.text(5.25, -3.0, "(not to scale: the blur is exaggerated)", ha="center", va="top", fontsize=9.5, color=GREY)
-    ax.plot([zd, zd], [-1.7, 1.7], color=TEAL, lw=5)
-    ax.text(zd, 2.05, "camera", ha="center", fontsize=10.5, color=TEAL)
+    ax.plot([zd, zd], [-1.7, 1.7], color=GREEN, lw=5)
+    ax.text(zd, 2.05, "camera", ha="center", fontsize=10.5, color=GREEN)
     ya = D / 2 + (y - D / 2) / zs * zd
     yb = -D / 2 + (y + D / 2) / zs * zd
     ax.annotate("", (zd + 0.35, max(ya, yb)), (zd + 0.35, min(ya, yb)), arrowprops=dict(arrowstyle="<->", color=RED))
@@ -278,9 +278,9 @@ def odin_beamline_line():
     ax.add_patch(Rectangle((ODIN_PINHOLE - 0.15, 0.2), 0.3, 0.75, color=INK, zorder=3))
     ax.text(ODIN_PINHOLE, 1.05, "pinhole D\n50 m", ha="center", va="bottom", fontsize=10.5, color=INK)
     ax.add_patch(Rectangle((ODIN_SAMPLE - 0.45, -0.35), 0.35, 0.7, color=GREY, ec=INK, zorder=3))
-    ax.add_patch(Rectangle((ODIN_SAMPLE + 0.05, -0.7), 0.25, 1.4, color=TEAL, zorder=3))
+    ax.add_patch(Rectangle((ODIN_SAMPLE + 0.05, -0.7), 0.25, 1.4, color=GREEN, zorder=3))
     ax.text(ODIN_SAMPLE + 0.9, 0.0, "sample (60.5 m)\nand the camera,\n6 mm behind it", ha="left", va="center",
-            fontsize=10.5, color=TEAL)
+            fontsize=10.5, color=GREEN)
     ax.annotate("", (ODIN_SAMPLE - 0.3, -1.25), (ODIN_PINHOLE, -1.25), arrowprops=dict(arrowstyle="<->", color=INK))
     ax.text((ODIN_PINHOLE + ODIN_SAMPLE) / 2, -1.35, "L = 10.5 m", ha="center", va="top", fontsize=10.5, color=INK)
     ax.set_xlim(-3, 70); ax.set_ylim(-1.9, 1.9)
@@ -304,18 +304,18 @@ def contrast_xray_neutron():
     y = np.arange(len(CONTRAST))[::-1]
     for k, (name, mx, mn) in enumerate(CONTRAST):
         ax.barh(y[k] + 0.19, mx, height=0.36, color=GREY, left=0.0)
-        ax.barh(y[k] - 0.19, mn, height=0.36, color=TEAL)
+        ax.barh(y[k] - 0.19, mn, height=0.36, color=GREEN)
         ax.text(mx * 1.12, y[k] + 0.19, f"{mx:g} cm⁻¹: 1 cm lets {100 * np.exp(-mx):.0f} % through"
                 if np.exp(-mx) > 0.005 else f"{mx:g} cm⁻¹: 1 cm stops everything", va="center", fontsize=9.5,
-                color="#5B6779")
+                color="#566057")
         ax.text(mn * 1.12, y[k] - 0.19, f"{mn:g} cm⁻¹: 1 cm lets {100 * np.exp(-mn):.0f} % through", va="center",
-                fontsize=9.5, color=TEAL)
+                fontsize=9.5, color=GREEN)
     ax.set_xscale("log"); ax.set_xlim(0.05, 400)
     ax.set_xticks([0.1, 1, 10, 100]); ax.set_xticklabels(["0.1", "1", "10", "100"])
     ax.set_yticks(y); ax.set_yticklabels([c[0] for c in CONTRAST], fontsize=11)
     ax.set_xlabel("attenuation coefficient Σ (cm⁻¹, log scale)")
     from matplotlib.patches import Patch
-    ax.legend([Patch(color=GREY), Patch(color=TEAL)],
+    ax.legend([Patch(color=GREY), Patch(color=GREEN)],
               ["X-rays, 100 keV: grows with the number of electrons (heavy elements)",
                "neutrons, 1.8 Å: hydrogen first; the metals let most of them through"],
               loc="lower center", bbox_to_anchor=(0.5, 1.0), ncol=2, fontsize=10, frameon=False)
@@ -329,13 +329,13 @@ def contrast_xray_neutron():
 def odin_detector(gap="5 cm", name="odin_detector.png"):
     """Side view of the detection: the neutron is absorbed in the scintillator (lithium-6), which glows; a mirror at\n    45° sends the light up to the camera, out of the beam; the neutrons go on through the mirror."""
     fig, ax = plt.subplots(figsize=(13, 4.6))
-    ax.plot([-0.4, 1.0], [0, 0], color=TEAL, lw=6, solid_capstyle="butt")
-    ax.text(0.25, 0.22, "neutrons", ha="center", va="bottom", fontsize=10.5, color=TEAL)
+    ax.plot([-0.4, 1.0], [0, 0], color=GREEN, lw=6, solid_capstyle="butt")
+    ax.text(0.25, 0.22, "neutrons", ha="center", va="bottom", fontsize=10.5, color=GREEN)
     ax.add_patch(Rectangle((1.0, -0.45), 0.35, 0.9, color=GREY, ec=INK))
     ax.text(1.175, -0.6, "sample", ha="center", va="top", fontsize=10.5, color=INK)
-    ax.plot([1.35, 2.5], [0, 0], color=TEAL, lw=4, solid_capstyle="butt", alpha=0.8)
-    ax.add_patch(Rectangle((2.5, -0.8), 0.1, 1.6, color="#7BC8A4", ec=TEAL))     # the scintillator screen
-    ax.text(2.55, 0.95, "scintillator\n(lithium-6)", ha="center", va="bottom", fontsize=10.5, color=TEAL)
+    ax.plot([1.35, 2.5], [0, 0], color=GREEN, lw=4, solid_capstyle="butt", alpha=0.8)
+    ax.add_patch(Rectangle((2.5, -0.8), 0.1, 1.6, color="#7BC8A4", ec=GREEN))     # the scintillator screen
+    ax.text(2.55, 0.95, "scintillator\n(lithium-6)", ha="center", va="bottom", fontsize=10.5, color=GREEN)
     ax.annotate("", (2.5, -1.05), (1.35, -1.05), arrowprops=dict(arrowstyle="<->", color=INK))
     ax.text(1.92, -1.13, gap, ha="center", va="top", fontsize=10, color=INK)
     ax.plot(2.55, 0.12, "*", color="#F2B544", ms=17, mec=ORANGE, zorder=5)       # one flash
@@ -349,8 +349,8 @@ def odin_detector(gap="5 cm", name="odin_detector.png"):
     ax.add_patch(Rectangle((3.6, 1.95), 0.8, 0.45, color=INK))                    # camera body
     ax.text(3.68, 1.84, "lens", ha="right", va="center", fontsize=10.5, color=BLUE)
     ax.text(4.5, 2.15, "camera, out of the beam: films the screen", ha="left", va="center", fontsize=10.5, color=INK)
-    ax.plot([2.6, 6.2], [0, 0], color=TEAL, lw=3, alpha=0.5, ls="--", zorder=0)   # the neutrons not absorbed
-    ax.add_patch(Rectangle((6.2, -0.5), 0.3, 1.0, color="#5B6779"))
+    ax.plot([2.6, 6.2], [0, 0], color=GREEN, lw=3, alpha=0.5, ls="--", zorder=0)   # the neutrons not absorbed
+    ax.add_patch(Rectangle((6.2, -0.5), 0.3, 1.0, color="#566057"))
     ax.text(6.35, -0.62, "beam stop", ha="center", va="top", fontsize=10, color=INK)
     ax.text(2.75, 0.32, "1", fontsize=12, fontweight="bold", color=ORANGE)
     ax.text(3.2, -0.42, "2", fontsize=12, fontweight="bold", color=ORANGE)
@@ -380,10 +380,10 @@ def odin_scintillator():
             (0.04, 0.6, "Thick screen", "more neutrons stopped (bright)\nlight spreads: blur 0.1 mm"),
             (0.27, 0.15, "Thin screen", "fewer neutrons stopped\nlittle spread: blur 0.02 mm"))):
         ax = fig.add_axes([x0, 0.12, 0.2, 0.74])
-        ax.add_patch(Rectangle((0, -1.6), thick, 3.2, color="#BFE5D1", ec=TEAL))
+        ax.add_patch(Rectangle((0, -1.6), thick, 3.2, color="#BFE5D1", ec=GREEN))
         for y in np.linspace(-1.1, 1.1, 5):
             depth = rng.uniform(0.15, 0.85) * thick
-            ax.annotate("", (depth, y), (-0.9, y), arrowprops=dict(arrowstyle="-|>", color=TEAL, lw=1.2))
+            ax.annotate("", (depth, y), (-0.9, y), arrowprops=dict(arrowstyle="-|>", color=GREEN, lw=1.2))
             ax.plot(depth, y, "*", color="#F2B544", mec=ORANGE, ms=11, zorder=5)
             spread = (thick - depth) * 0.45 + 0.03            # half-width of the light spot at the exit face
             ax.fill([depth, thick, thick], [y, y - spread, y + spread], color="#F2B544", alpha=0.45, lw=0)
@@ -394,7 +394,7 @@ def odin_scintillator():
         ax.set_xlim(-1.0, 1.6); ax.set_ylim(-2.7, 2.5); ax.axis("off")
     ax = fig.add_axes([0.6, 0.17, 0.37, 0.7])
     lam = np.linspace(0.5, 12, 200)
-    ax.plot(lam, 100 * (1 - np.exp(-lam / 8)), color=TEAL, lw=2.2)
+    ax.plot(lam, 100 * (1 - np.exp(-lam / 8)), color=GREEN, lw=2.2)
     for l in (2, 4, 8):
         e = 100 * (1 - np.exp(-l / 8))
         ax.plot(l, e, "o", color=ORANGE, ms=7, zorder=4)
@@ -423,11 +423,11 @@ def odin_lens():
               "7 times larger pixels, but the whole field"]))
     for yc, field, title, notes in rows:
         side = 3.0                                                  # the screen, 100 mm
-        ax.add_patch(Rectangle((0.4, yc - side / 2), side, side, color="#BFE5D1", ec=TEAL, lw=1.5))
+        ax.add_patch(Rectangle((0.4, yc - side / 2), side, side, color="#BFE5D1", ec=GREEN, lw=1.5))
         ax.text(0.4, yc + side / 2 + 0.12, title, ha="left", va="bottom", fontsize=12, fontweight="bold",
                 color=INK)
         ax.text(1.9, yc - side / 2 - 0.1, "screen: 10 cm × 10 cm, all lit by the beam", ha="center", va="top",
-                fontsize=9.5, color=TEAL)
+                fontsize=9.5, color=GREEN)
         h = side * field / 100 / 2                                  # half-side of the filmed square
         xc = 1.9
         ax.add_patch(Rectangle((xc - h, yc - h), 2 * h, 2 * h, fill=False, ec=ORANGE, lw=2.5, zorder=4))
@@ -443,8 +443,8 @@ def odin_lens():
         ax.text(xl, yc - 1.1, "lens", ha="center", va="top", fontsize=10.5, color=BLUE)
         ax.add_patch(Rectangle((xs, yc - cs), 2 * cs, 2 * cs, color="#2B3445", ec=INK, zorder=3))
         for k in range(1, 8):                                       # 8 x 8 pixels drawn
-            ax.plot([xs + k * 2 * cs / 8] * 2, [yc - cs, yc + cs], color="#8A94A6", lw=0.6, zorder=4)
-            ax.plot([xs, xs + 2 * cs], [yc - cs + k * 2 * cs / 8] * 2, color="#8A94A6", lw=0.6, zorder=4)
+            ax.plot([xs + k * 2 * cs / 8] * 2, [yc - cs, yc + cs], color="#8A938A", lw=0.6, zorder=4)
+            ax.plot([xs, xs + 2 * cs], [yc - cs + k * 2 * cs / 8] * 2, color="#8A938A", lw=0.6, zorder=4)
         for k, line in enumerate(notes):
             ax.text(xs + 2 * cs + 0.3, yc + 0.45 - k * 0.42, line, ha="left", va="center", fontsize=10.5,
                     color=INK, fontweight="bold" if k == 2 else "normal")
@@ -575,7 +575,7 @@ def odin_cameras():
     fig.text(x_tab, y_head, "Timepix3 camera (event mode): one line per neutron", fontsize=12, fontweight="bold",
              color=INK, va="top")
     fig.text(x_int, y_head, "Integrating camera", fontsize=12, fontweight="bold", color=INK, va="top")
-    fig.add_artist(plt.Line2D([x_sep, x_sep], [0.04, 0.95], color="#D9DDE5", lw=1.5))
+    fig.add_artist(plt.Line2D([x_sep, x_sep], [0.04, 0.95], color="#D5D9D1", lw=1.5))
 
     # the list of events, from the top to the bottom of the pictures
     rows = [("x (mm)", "y (mm)", "t (ms)", "→ λ (Å)")]
@@ -630,7 +630,7 @@ def loki_beamline():
         ax.text(z, -0.88, name, ha="center", va="top", fontsize=9.5, color=INK)
     ax.text(L - 5.3, -1.38, "collimation: an aperture 3, 5 or 8 m before the sample", ha="center", va="top", fontsize=10,
             color=INK)
-    ax.plot([L - 8, L], [0, 0], color=TEAL, lw=3)
+    ax.plot([L - 8, L], [0, 0], color=GREEN, lw=3)
     ax.add_patch(Rectangle((L - 0.07, 0.1), 0.14, 0.45, color=INK)); ax.add_patch(Rectangle((L - 0.07, -0.55), 0.14, 0.45, color=INK))
     ax.add_patch(Rectangle((L + 0.15, -0.35), 0.3, 0.7, color=GREY, ec=INK))
     ax.text(L + 0.2, 1.0, "sample\n(23.5 m)", ha="center", va="bottom", fontsize=10.5, color=INK)
@@ -640,7 +640,7 @@ def loki_beamline():
     ax2 = fig.add_axes([0.62, 0.2, 0.36, 0.72])                # sample -> detectors
     ax2.add_patch(Rectangle((-0.12, -0.12), 0.24, 0.24, color=GREY, ec=INK))
     ax2.text(0, -0.2, "sample", ha="center", va="top", fontsize=10, color=INK)
-    cols = (BLUE, ORANGE, TEAL)
+    cols = (BLUE, ORANGE, GREEN)
     for (name, z, half), c in zip(LOKI_BANKS, cols):
         inner = {"front banks": 0.36, "middle banks": 0.2, "rear bank": 0.035}[name]
         for sgn in (1, -1):
@@ -648,7 +648,7 @@ def loki_beamline():
             ax2.plot([0, z], [0, sgn * (inner + half) / 2], color=c, lw=0.9, ls="--")
         ax2.text(z, half + 0.07, f"{name}\n{'1 to 2' if name.startswith('front') else '3' if name.startswith('mid') else '5 or 10'} m",
                  ha="center", va="bottom", fontsize=10, color=c)
-    ax2.plot([0, 5.0], [0, 0], color=TEAL, lw=1.2)
+    ax2.plot([0, 5.0], [0, 0], color=GREEN, lw=1.2)
     ax2.add_patch(Rectangle((4.9, -0.035), 0.08, 0.07, color="k"))
     ax2.text(5.12, 0, "beam\nstop", ha="left", va="center", fontsize=9.5, color=INK)
     ax2.set_xlim(-0.4, 5.9); ax2.set_ylim(-1.0, 1.3)
@@ -661,9 +661,9 @@ def loki_beamline():
 def loki_q():
     fig = plt.figure(figsize=(13, 4.2))
     ax = fig.add_axes([0.02, 0.06, 0.5, 0.86])
-    ax.plot([0, 3.0], [0, 0], color=TEAL, lw=4, solid_capstyle="butt")
+    ax.plot([0, 3.0], [0, 0], color=GREEN, lw=4, solid_capstyle="butt")
     ax.add_patch(Rectangle((3.0, -0.45), 0.3, 0.9, color=GREY, ec=INK))
-    ax.plot([3.15, 9.4], [0, 0], color=TEAL, lw=1.2, ls=":")
+    ax.plot([3.15, 9.4], [0, 0], color=GREEN, lw=1.2, ls=":")
     ang = 0.2
     ax.plot([3.15, 9.4], [0, (9.4 - 3.15) * np.tan(ang)], color=ORANGE, lw=2)
     ax.plot([9.5, 9.5], [-1.6, 1.9], color=INK, lw=4)
@@ -675,7 +675,7 @@ def loki_q():
     ax.text(10.0, r / 2, "r", color=RED, fontsize=13, va="center", fontweight="bold")
     ax.annotate("", (9.4, -1.95), (3.15, -1.95), arrowprops=dict(arrowstyle="<->", color=INK))
     ax.text(6.3, -2.05, "distance sample to detector", ha="center", va="top", fontsize=10.5, color=INK)
-    ax.text(1.5, 0.28, "neutrons, wavelength λ", ha="center", fontsize=10.5, color=TEAL)
+    ax.text(1.5, 0.28, "neutrons, wavelength λ", ha="center", fontsize=10.5, color=GREEN)
     ax.text(3.15, -0.62, "sample", ha="center", va="top", fontsize=10.5, color=INK)
     ax.text(9.5, 2.05, "detector", ha="center", fontsize=10.5, color=INK)
     ax.text(6.9, 1.35, "scattered\nneutron", ha="right", fontsize=10.5, color=ORANGE)
@@ -684,7 +684,7 @@ def loki_q():
     ax2 = fig.add_axes([0.6, 0.2, 0.37, 0.66])
     q = np.logspace(-2.3, -0.2, 200)
     ax2.loglog(q, 2 * np.pi / q / 10, color=INK, lw=2)
-    for d_nm, name, c in ((50, "50 nm", RED), (10, "10 nm", ORANGE), (2, "2 nm", TEAL)):
+    for d_nm, name, c in ((50, "50 nm", RED), (10, "10 nm", ORANGE), (2, "2 nm", GREEN)):
         qq = 2 * np.pi / (d_nm * 10)
         ax2.plot(qq, d_nm, "o", color=c, ms=8, zorder=4)
         left = qq > 0.2                                        # the last label on the left of its point
@@ -719,11 +719,11 @@ def loki_tof():
         t2 = per + band[0] * L / H_OVER_M * 1e3
         ax.plot([per, t2], [0, L], color="#7A3FB0", lw=1.6, ls="--")
         ax.text(t2 + 1, L - 1.2, f"3 Å of pulse 2\n{t2:.0f} ms", ha="left", va="top", fontsize=9.5, color="#7A3FB0")
-        ax.fill_between(times, L - 0.5, L + 0.5, color=TEAL, alpha=0.35, lw=0)
+        ax.fill_between(times, L - 0.5, L + 0.5, color=GREEN, alpha=0.35, lw=0)
         ok = times[1] < t2
         ax.text(124, 3, f"pulse 1 arrives over {times[1] - times[0]:.0f} ms:\n"
                 + ("all of it before pulse 2" if ok else f"its slowest neutrons arrive after\nthe fastest of pulse 2: they mix"),
-                fontsize=10, color=TEAL if ok else RED, va="bottom", ha="right",
+                fontsize=10, color=GREEN if ok else RED, va="bottom", ha="right",
                 bbox=dict(facecolor="white", edgecolor="none", alpha=0.9))
         ax.axhline(L, color=INK, lw=1)
         ax.set_xlim(-3, 125); ax.set_ylim(-5, 40)

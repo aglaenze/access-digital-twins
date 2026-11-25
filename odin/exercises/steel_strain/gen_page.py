@@ -129,7 +129,7 @@ although the specimen is pulled.
 cells.append(figure_cell(
     "steel_lattice.png", "The atoms of the steel seen from above, without load and under load (simplified to a square "
     "grid; the deformation is drawn about 65 times larger than at 600 MPa). Along the force (x) the atoms move apart, "
-    "across it they move closer (Poisson). The neutrons come along z: the planes facing them (teal) set the Bragg edge, "
+    "across it they move closer (Poisson). The neutrons come along z: the planes facing them (green) set the Bragg edge, "
     "λ = 2d; their spacing d shrinks, so the edge moves to a shorter wavelength."))
 
 md(r"""

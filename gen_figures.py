@@ -24,9 +24,9 @@ from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "figures")
-INK, TEAL, ORANGE, GREY, RED = "#142033", "#0E7C70", "#C7711A", "#8A94A6", "#B4562B"
-plt.rcParams.update({"font.family": "DejaVu Sans", "font.size": 11, "axes.edgecolor": "#5B6779",
-                     "axes.labelcolor": INK, "xtick.color": INK, "ytick.color": INK})
+INK, GREEN, ORANGE, GREY, RED = "#1B1F24", "#1E7B4E", "#C7711A", "#8A938A", "#B4562B"
+import plot_style  # noqa: E402
+plot_style.use()                     # the font and palette of the app
 
 A_ALPHA, A_GAMMA = 2.8665, 3.59           # lattice parameters [Å] (alpha-iron at room temperature; gamma-iron)
 
@@ -57,7 +57,7 @@ def cube(ax, atoms, plane, title, sub, color, view=(18, -58)):
     on = lambda p: abs(np.dot(np.cross(np.subtract(plane[1], plane[0]), np.subtract(plane[2], plane[0])),
                               np.subtract(p, plane[0]))) < 1e-9
     for p in atoms:
-        ax.scatter(*p, s=170, color=color if on(p) else "#C9CFDA", edgecolor=INK, linewidth=0.8, depthshade=False)
+        ax.scatter(*p, s=170, color=color if on(p) else "#D5D9D1", edgecolor=INK, linewidth=0.8, depthshade=False)
     ax.set_title(title, color=INK, fontsize=13, fontweight="bold", pad=0)
     ax.text2D(0.5, -0.02, sub, transform=ax.transAxes, ha="center", va="top", fontsize=10.5, color=INK)
     ax.set_box_aspect((1, 1, 1))
@@ -73,7 +73,7 @@ def iron():
     fig = plt.figure(figsize=(13, 4.9))
     ax1 = fig.add_subplot(1, 3, 1, projection="3d")
     cube(ax1, bcc, [(0, 0, 0), (1, 1, 0), (1, 1, 1), (0, 0, 1)], "α-iron (ferritic steel)",
-         f"body-centered cubic, a = {A_ALPHA:.2f} Å\nplanes (110): d = a/√2 = {A_ALPHA / np.sqrt(2):.2f} Å", TEAL)
+         f"body-centered cubic, a = {A_ALPHA:.2f} Å\nplanes (110): d = a/√2 = {A_ALPHA / np.sqrt(2):.2f} Å", GREEN)
     ax2 = fig.add_subplot(1, 3, 2, projection="3d")
     cube(ax2, fcc, [(1, 0, 0), (0, 1, 0), (0, 0, 1)], "γ-iron (austenitic steel)",
          f"face-centered cubic, a = {A_GAMMA:.2f} Å\nplanes (111): d = a/√3 = {A_GAMMA / np.sqrt(3):.2f} Å", ORANGE,
@@ -86,9 +86,9 @@ def iron():
         for k, (_, le) in enumerate(ed):
             t += 0.12 / (k + 1) * 0.5 * (1 + np.tanh((lam - le) / 0.012))
         return t
-    ax3.plot(lam, sketch(ALPHA, 0.42), color=TEAL, lw=2.2, label="α-iron")
+    ax3.plot(lam, sketch(ALPHA, 0.42), color=GREEN, lw=2.2, label="α-iron")
     ax3.plot(lam, sketch(GAMMA, 0.30), color=ORANGE, lw=2.2, label="γ-iron")
-    for (h, le), c, xy, txt in [(ALPHA[0], TEAL, (ALPHA[0][1], 0.62), (3.05, 0.76)),
+    for (h, le), c, xy, txt in [(ALPHA[0], GREEN, (ALPHA[0][1], 0.62), (3.05, 0.76)),
                                 (GAMMA[0], ORANGE, (GAMMA[0][1], 0.52), (4.35, 0.36))]:
         ax3.annotate(f"({''.join(map(str, h))}) edge\n{le:.2f} Å", xy, xytext=txt,
                      color=c, fontsize=10, arrowprops=dict(arrowstyle="->", color=c, lw=1))
@@ -103,7 +103,7 @@ def iron():
         ax3.spines[s].set_visible(False)
     fig.text(0.01, 0.02, "Highlighted: one family of atomic planes. Neutrons longer than 2d cannot be diffracted by "
              "these planes: they go through,\nand the transmission jumps up. The last edge tells d, hence the structure.",
-             fontsize=10, color="#5B6779")
+             fontsize=10, color="#566057")
     _save(fig, "iron_structures.png")
     plt.close(fig)
 
@@ -136,14 +136,14 @@ def sans():
     ax.text(5, -0.6, "billions of particles: R ≈ 5 nm = 50 Å?", ha="center", va="top", fontsize=10.5, color=INK)
     # 2. the measurement
     ax = fig.add_axes([0.31, 0.12, 0.33, 0.76])
-    ax.plot([0, 3.2], [0, 0], color=TEAL, lw=5, solid_capstyle="butt")
+    ax.plot([0, 3.2], [0, 0], color=GREEN, lw=5, solid_capstyle="butt")
     ax.add_patch(plt.Rectangle((3.2, -0.6), 0.35, 1.2, color="#B9C2CF", ec=INK))
     for ang in (-0.16, -0.08, 0.08, 0.16):
         ax.plot([3.4, 9.4], [0, 6 * np.tan(ang)], color=ORANGE, lw=1.2, ls="--")
     ax.plot([9.5, 9.5], [-1.7, 1.7], color=INK, lw=4)
     ax.annotate("", (9.4, 6 * np.tan(0.16)), (9.4, 0), arrowprops=dict(arrowstyle="<->", color=INK))
     ax.text(5.6, 1.45, "2θ: a few degrees", fontsize=10, color=INK)
-    ax.text(1.5, 0.3, "neutrons", color=TEAL, fontsize=10, ha="center")
+    ax.text(1.5, 0.3, "neutrons", color=GREEN, fontsize=10, ha="center")
     ax.text(3.37, -0.95, "sample", fontsize=10, ha="center", color=INK)
     ax.text(9.5, -2.0, "detector", fontsize=10, ha="center", color=INK)
     ax.set_xlim(-0.2, 10.3); ax.set_ylim(-2.4, 2.2); ax.axis("off")
@@ -152,7 +152,7 @@ def sans():
     # 3. I(Q) for two sizes
     ax = fig.add_axes([0.71, 0.2, 0.27, 0.66])
     q = np.logspace(-2.3, -0.5, 500)
-    for r, c in [(30, TEAL), (70, ORANGE)]:
+    for r, c in [(30, GREEN), (70, ORANGE)]:
         ax.loglog(q, sphere_ff(q, r), color=c, lw=2, label=f"R = {r / 10:g} nm")
         ax.axvline(4.493 / r, color=c, lw=0.8, ls=":")
     ax.set_ylim(1e-6, 2)
@@ -161,7 +161,7 @@ def sans():
     ax.legend(frameon=False, loc="lower left")
     ax.set_title("The size sets the curve", color=INK, fontsize=13, fontweight="bold")
     ax.text(0.03, 0.62, "larger R:\ncurve at\nsmaller Q\n(minimum at\nQR = 4.49)", transform=ax.transAxes,
-            ha="left", va="top", fontsize=9.5, color="#5B6779")
+            ha="left", va="top", fontsize=9.5, color="#566057")
     for s in ("top", "right"):
         ax.spines[s].set_visible(False)
     _save(fig, "sans_particles.png")
@@ -192,7 +192,7 @@ def steel_strain():
     ax.text(-0.3, 0, "6.4 mm", fontsize=11, color=INK, va="center", ha="right")
     ax.annotate("", xy=(5.3, 4.9), xytext=(5.3, -4.9), arrowprops=dict(arrowstyle="<->", color=INK, lw=1.2))
     ax.text(5.55, 0, "9.8 mm", fontsize=11, color=INK, va="center", ha="left")
-    ax.text(0, -8.5, "dashed: field of view, 14 mm", ha="center", fontsize=11, color="#5B6779")
+    ax.text(0, -8.5, "dashed: field of view, 14 mm", ha="center", fontsize=11, color="#566057")
     ax.set(xlim=(-12, 12), ylim=(-9.6, 8.6), aspect="equal")
     ax.axis("off")
     ax.set_title("Seen by the camera", color=INK, fontsize=14, fontweight="bold")
@@ -208,7 +208,7 @@ def steel_strain():
     ax.annotate("", xy=(e0 - shift, 0.735), xytext=(e0, 0.735), arrowprops=dict(arrowstyle="-|>", color=INK, lw=1.5))
     ax.text(e0 - shift / 2, 0.744, "the edge moves", ha="center", va="bottom", fontsize=11, color=INK)
     ax.text(0.97, 0.05, "ε = (λ − λ₀) / λ₀\nshift drawn 7× larger", transform=ax.transAxes,
-            ha="right", va="bottom", fontsize=11, color="#5B6779")
+            ha="right", va="bottom", fontsize=11, color="#566057")
     ax.set(xlabel="neutron wavelength λ (Å)", ylabel="transmission", ylim=(0.6, 0.85), xlim=(4.0, 4.3))
     ax.xaxis.label.set_size(12); ax.yaxis.label.set_size(12)
     ax.tick_params(labelsize=11)
@@ -233,14 +233,14 @@ def steel_lattice():
         xs = (np.arange(n) - (n - 1) / 2) * sx
         zs = (np.arange(n) - (n - 1) / 2) * sz
         for z in zs:                                         # the planes facing the beam (perpendicular to z)
-            ax.plot([xs[0] - 0.35, xs[-1] + 0.35], [z, z], color=TEAL, lw=1.6, alpha=0.7, zorder=1)
+            ax.plot([xs[0] - 0.35, xs[-1] + 0.35], [z, z], color=GREEN, lw=1.6, alpha=0.7, zorder=1)
         X, Z = np.meshgrid(xs, zs)
         ax.scatter(X, Z, s=260, color="#9FB3CC", edgecolor=INK, linewidth=1.0, zorder=3)
         # the spacing along the beam (z): d
         xa = xs[-1] + 0.75
         ax.annotate("", xy=(xa, zs[3]), xytext=(xa, zs[2]),
-                    arrowprops=dict(arrowstyle="<->", color=TEAL, lw=1.6, shrinkA=0, shrinkB=0))
-        ax.text(xa + 0.15, 0.5 * (zs[2] + zs[3]), "d" if sz == 1.0 else "d\nsmaller", color=TEAL, fontsize=13,
+                    arrowprops=dict(arrowstyle="<->", color=GREEN, lw=1.6, shrinkA=0, shrinkB=0))
+        ax.text(xa + 0.15, 0.5 * (zs[2] + zs[3]), "d" if sz == 1.0 else "d\nsmaller", color=GREEN, fontsize=13,
                 fontweight="bold", va="center", ha="left")
         # the spacing along the force (x)
         za = zs[0] - 0.75
@@ -264,11 +264,11 @@ def steel_lattice():
         ax.set_title(title, color=INK, fontsize=14, fontweight="bold")
         ax.set(xlim=(-4.9, 5.0), ylim=(-3.9, 3.3), aspect="equal")
         ax.axis("off")
-    axs[0].text(-0.2, -3.75, "teal lines: the planes facing the beam", ha="center", fontsize=11, color=TEAL)
+    axs[0].text(-0.2, -3.75, "green lines: the planes facing the beam", ha="center", fontsize=11, color=GREEN)
     axs[1].text(0, -3.75, "longer along the force, thinner across it", ha="center", fontsize=11, color=INK)
     fig.text(0.5, 0.025, "Seen from above, the force along x, the beam along z. The edge λ = 2d is set by the planes "
              "facing the beam:\ntheir spacing d shrinks, the edge moves to a shorter wavelength. Deformation drawn "
-             "about 65 times larger than at 600 MPa.", ha="center", va="bottom", fontsize=11, color="#5B6779")
+             "about 65 times larger than at 600 MPa.", ha="center", va="bottom", fontsize=11, color="#566057")
     fig.subplots_adjust(left=0.01, right=0.99, top=0.92, bottom=0.14, wspace=0.05)
     _save(fig, "steel_lattice.png")
     plt.close(fig)
@@ -295,7 +295,7 @@ def bragg_edge_explained():
         ax.plot(np.linspace(-2, 2, 9), np.full(9, y), "o", color=INK, ms=5)
     ax.annotate("", (2.45, -0.9), (2.45, 0.0), arrowprops=dict(arrowstyle="<->", color=INK))
     ax.text(2.55, -0.45, "d", fontsize=13, color=INK, va="center", fontweight="bold")
-    for th, c, lab in ((25, TEAL, "short λ: small θ"), (60, ORANGE, "longer λ: larger θ"),
+    for th, c, lab in ((25, GREEN, "short λ: small θ"), (60, ORANGE, "longer λ: larger θ"),
                        (88, RED, "λ = 2d: θ = 90°,\nstraight back")):
         t = np.radians(th)
         x0, y0 = -1.9 * np.cos(t), 1.9 * np.sin(t)
@@ -312,7 +312,7 @@ def bragg_edge_explained():
     ax.set_title("A family of planes reflects up to λ = 2d", fontsize=12.5, fontweight="bold", color=INK)
     # right: transmission of α-iron
     b = fig.add_axes([0.53, 0.15, 0.44, 0.72])
-    b.plot(lam, T, color=TEAL, lw=2)
+    b.plot(lam, T, color=GREEN, lw=2)
     b.axvline(4.054, color=RED, lw=1.2, ls="--")
     b.annotate("Bragg edge of the (110) planes:\nλ = 2d = 2 × 2.027 Å = 4.05 Å", (4.054, 0.45), (1.15, 0.66),
                fontsize=11, color=RED, arrowprops=dict(arrowstyle="->", color=RED))
@@ -368,11 +368,11 @@ def meteorite_tomography():
         ax = axs[k]
         sample(ax, deg)
         for x in np.linspace(-6, 6, 9):
-            ax.annotate("", xy=(x, 5.0), xytext=(x, -7.0), arrowprops=dict(arrowstyle="-|>", color=TEAL, lw=0.8,
+            ax.annotate("", xy=(x, 5.0), xytext=(x, -7.0), arrowprops=dict(arrowstyle="-|>", color=GREEN, lw=0.8,
                                                                          alpha=0.6))
         profile(ax, deg, 5.4, RED)
         ax.text(0, -8.3, "neutron beam" if k == 0 else "the stage turns", ha="center",
-                color=TEAL if k == 0 else ORANGE, fontsize=10)
+                color=GREEN if k == 0 else ORANGE, fontsize=10)
     axs[0].text(-6.6, 7.4, "camera:\nattenuation", ha="left", va="bottom", fontsize=9.5, color=INK)
     axs[0].text(4.6, 7.4, "two clasts one behind\nthe other: one peak", ha="center", fontsize=9.5, color=RED)
     axs[0].set_title("A radiograph adds up\neverything along the beam", color=INK, fontsize=12.5, fontweight="bold")
@@ -400,7 +400,7 @@ def meteorite_tomography():
     fig.tight_layout(rect=(0, 0.07, 1, 1))
     fig.text(0.5, 0.03, "Tomography, seen from above: one horizontal slice of the piece of NWA 7034 (8 mm × 2 mm). "
              "H-rich clasts (about 0.3 mm) drawn 3 times larger; attenuation as measured at ICON.",
-             ha="center", fontsize=11.5, color="#5B6779")
+             ha="center", fontsize=11.5, color="#566057")
     _save(fig, "meteorite_tomography.png")
     plt.close(fig)
 

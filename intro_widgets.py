@@ -21,7 +21,9 @@ import numpy as np
 from IPython.display import display
 from matplotlib.patches import Rectangle
 
-INK, TEAL, ORANGE, GREY, RED, BLUE = "#142033", "#0E7C70", "#C7711A", "#8A94A6", "#B4562B", "#2F5FB3"
+import plot_style  # noqa: E402
+plot_style.use()                     # the font and palette of the app
+INK, GREEN, ORANGE, GREY, RED, BLUE = "#1B1F24", "#1E7B4E", "#C7711A", "#8A938A", "#B4562B", "#2F5FB3"
 H_OVER_M = 3956.034            # m·Å/s
 PERIOD_MS = 1000 / 14          # ms between two ESS pulses
 ODIN_L = 60.55                 # m, source to camera (sample at 60.5 m, camera 5 cm behind)
@@ -104,8 +106,8 @@ def odin_time_of_flight():
             ax.add_patch(Rectangle((k * PERIOD_MS, -2.5), 2.86, 2.5, color=RED if k == 0 else "#D9A7A0"))
             ax.axvline(k * PERIOD_MS, color="#D9A7A0", lw=0.8, ls=":")
             ax.text(k * PERIOD_MS + 1.4, -5, f"pulse {k + 1}", ha="center", va="top", fontsize=9, color=INK)
-        ax.plot([0, t], [0, ODIN_L], color=TEAL, lw=2.5)
-        ax.plot(t, ODIN_L, "o", color=TEAL, ms=8)
+        ax.plot([0, t], [0, ODIN_L], color=GREEN, lw=2.5)
+        ax.plot(t, ODIN_L, "o", color=GREEN, ms=8)
         ax.axhline(ODIN_L, color=INK, lw=1)
         ax.text(158, ODIN_L - 2, "camera", ha="right", va="top", fontsize=9.5, color=INK)
         ax.set_xlim(-3, 160); ax.set_ylim(-13, 70)
@@ -156,7 +158,7 @@ def odin_band_choppers():
             ax.text(212, ODIN_FIRST_BAND_CHOPPER + 1, "band-pass chopper BP 1", ha="right", va="bottom", fontsize=8.5, color=BLUE)
         ax.axhline(ODIN_L, color=INK, lw=1)
         ax.text(212, ODIN_L + 1.5, "camera", ha="right", va="bottom", fontsize=9.5, color=INK)
-        ax.axvline(t_cam.value, color=TEAL, lw=2)
+        ax.axvline(t_cam.value, color=GREEN, lw=2)
         # which wavelengths can reach the camera at that time
         found = []
         for k in range(4):
@@ -213,15 +215,15 @@ def odin_wfm():
         for t0 in np.linspace(0, tau_pulse, 15):
             passes = (not d) or abs(t0 - t_mid) <= tau / 2
             z_end = 10.0 if passes else ODIN_WFM_Z - d / 2
-            a.plot([t0, t0 + z_end / v * 1e3], [0, z_end], color=TEAL if passes else GREY, lw=1.6 if passes else 1.0,
+            a.plot([t0, t0 + z_end / v * 1e3], [0, z_end], color=GREEN if passes else GREY, lw=1.6 if passes else 1.0,
                    alpha=1 if passes else 0.6)
         # fixed axes for every λ: wide enough for the slowest neutrons of the slider
         t_max = 10.0 / (H_OVER_M / lam.max) * 1e3 + tau_pulse          # ms: the slowest reach 10 m
         if d:
             for z in (ODIN_WFM_Z - d / 2, ODIN_WFM_Z + d / 2):
-                a.axhline(z, color=TEAL, lw=1.2, ls="--")
-            a.text(t_max + 0.6, ODIN_WFM_Z - 1.6, "two WFM discs\n(dashed): open only\nfor the neutrons\nin teal",
-                   va="top", fontsize=8.5, color=TEAL)
+                a.axhline(z, color=GREEN, lw=1.2, ls="--")
+            a.text(t_max + 0.6, ODIN_WFM_Z - 1.6, "two WFM discs\n(dashed): open only\nfor the neutrons\nin green",
+                   va="top", fontsize=8.5, color=GREEN)
         a.set_xlim(-0.5, t_max + 7.5); a.set_ylim(-2.2, 10.5)
         a.set_xlabel("time (ms)"); a.set_ylabel("distance from the source (m)")
         a.set_title(f"Neutrons of {l:.1f} Å leaving during the pulse", fontsize=10.5)
@@ -231,8 +233,8 @@ def odin_wfm():
         b.add_patch(Rectangle((-tau_pulse / 2, 0.55), tau_pulse, 0.3, color=GREY, alpha=0.6))
         b.text(0, 0.92, "without WFM: 2.86 ms", ha="center", va="bottom", fontsize=9, color=INK)
         if d:
-            b.add_patch(Rectangle((-tau / 2, 0.15), tau, 0.3, color=TEAL))
-            b.text(0, 0.08, f"with WFM: {tau:.2f} ms", ha="center", va="top", fontsize=9, color=TEAL)
+            b.add_patch(Rectangle((-tau / 2, 0.15), tau, 0.3, color=GREEN))
+            b.text(0, 0.08, f"with WFM: {tau:.2f} ms", ha="center", va="top", fontsize=9, color=GREEN)
         b.set_xlim(-3, 3); b.set_ylim(-0.15, 1.15); b.set_yticks([])
         b.set_xlabel(f"arrival time − {t_cam:.1f} ms (ms)")
         b.set_title(f"When they reach the camera (around {t_cam:.1f} ms)", fontsize=10.5)
@@ -381,9 +383,9 @@ def loki_q():
         size = 2 * np.pi / q
         fig, ax = plt.subplots(figsize=(8.2, 2.9))
         z = dist.value
-        ax.plot([-1.5, 0], [0, 0], color=TEAL, lw=4, solid_capstyle="butt")
+        ax.plot([-1.5, 0], [0, 0], color=GREEN, lw=4, solid_capstyle="butt")
         ax.add_patch(Rectangle((-0.08, -0.07), 0.16, 0.14, color=GREY, ec=INK))
-        ax.plot([0, 10.3], [0, 0], color=TEAL, lw=1, ls=":")
+        ax.plot([0, 10.3], [0, 0], color=GREEN, lw=1, ls=":")
         ax.plot([z, z], [-0.8, 0.8], color=INK, lw=4)
         ax.plot([0, z], [0, r.value / 100], color=ORANGE, lw=2)
         ax.plot(z, r.value / 100, "o", color=ORANGE, ms=8)
@@ -410,7 +412,7 @@ def loki_collimation():
         for ax, k, title, unit in ((axs[0], 0, "neutrons per second on the sample", "×10⁸ n/s"),
                                    (axs[1], 1, "divergence of the beam (rms)", "degrees")):
             vals = [LOKI_BEAMS[n][k] / (1e8 if k == 0 else 1) for n in names]
-            bars = ax.bar(names, vals, color=[TEAL if n == col.value else "#C9D3DE" for n in names])
+            bars = ax.bar(names, vals, color=[GREEN if n == col.value else "#D5D9D1" for n in names])
             for b, v in zip(bars, vals):
                 ax.text(b.get_x() + b.get_width() / 2, v, f"{v:.2g}", ha="center", va="bottom", fontsize=9.5, color=INK)
             ax.set_title(title, fontsize=10.5, color=INK); ax.set_ylabel(unit)

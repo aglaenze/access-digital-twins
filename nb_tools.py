@@ -251,14 +251,6 @@ def imported_samples(instr, proposal):
                  f'</div>'))
 
 
-def beamtime_tools(instr, proposal=None):
-    """Your proposal (folded), then the sample builder and NICOS (older notebooks)."""
-    if proposal:
-        globals()["proposal"](proposal)
-    sample_builder(instr)
-    nicos(instr)
-
-
 def proposal(path):
     """The proposal sheet (beamtime.md of the exercise), folded."""
     if path:
@@ -266,7 +258,7 @@ def proposal(path):
             import mistune
             with open(os.path.join(ROOT, path), encoding="utf-8") as f:
                 sheet = mistune.html(f.read())
-            display(HTML('<details style="margin-top:8px; border:1px solid #D5D9D1; border-radius:10px; padding:8px 14px">'
+            display(HTML('<details style="margin-top:8px; border:1px solid #D5D9D1; border-radius:6px; padding:8px 14px">'
                          '<summary style="cursor:pointer; font-weight:600">Your proposal (click to open)</summary>'
                          f'{sheet}</details>'))
         except OSError:

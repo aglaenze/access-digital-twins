@@ -458,7 +458,10 @@ async function saveModel() {
   } catch (e) { m.className = "msg err"; m.textContent = e.message; }
 }
 async function download() {
-  const d = await api("yaml", { obj: { title: $("f-title").value, description: $("f-desc").value, holder: S.holder, recipe: S.recipe } });
+  // the holder of step 2 with the sample (the box checked), or the sample alone
+  const obj = { title: $("f-title").value, description: $("f-desc").value, recipe: S.recipe };
+  if ($("dl-holder").checked) obj.holder = S.holder;
+  const d = await api("yaml", { obj });
   const a = el("a", { href: URL.createObjectURL(new Blob([d.text], { type: "text/yaml" })), download: `${$("f-name").value.trim() || "sample"}_recipe.yml` });
   document.body.append(a); a.click(); a.remove();
 }

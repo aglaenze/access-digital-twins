@@ -513,6 +513,7 @@ class BuilderApi(Base):
             raise web.HTTPError(404)
         a = lambda k, d="": self.get_argument(k, d)
         try:
+            await self._run(B.warm)                    # the heavy modules once, before the threads compute
             if a("instrument", "odin") == "loki":
                 import builder_loki as L
                 png = await self._run(L.thumb, a("kind"), a("ref"), a("proposal"))
@@ -530,6 +531,7 @@ class BuilderApi(Base):
         import builder_api as B
         d = self.body()
         ins, prop = d.get("instrument", "odin"), str(d.get("proposal", "") or "")
+        await self._run(B.warm)                        # the heavy modules once, before the threads compute
         if ins == "loki":
             await self._loki(what, d, prop)
             return
