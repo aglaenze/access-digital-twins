@@ -40,12 +40,16 @@ function startBackend() {
 // The title bar of the system is hidden: the header of the app is the title bar (it moves the window), and the
 // buttons to minimize, maximize and close are drawn over it (Windows, Linux), in the colors of the screen shown: the
 // sign-in screen (light) or the app (dark, as tall as its header). macOS: its three buttons on the left of the header.
+// the buttons of the window drawn over the top of each screen, on its color: the opening screen, the sign-in screen,
+// the header of the app in its light and its dark view
 const OVERLAY = {
-  light: { color: "#F5F7FA", symbolColor: "#142033", height: 40 },
-  dark: { color: "#0B1626", symbolColor: "#E8EEF6", height: 60 },
+  splash: { color: "#0B0F14", symbolColor: "#97A2B3", height: 40 },
+  light: { color: "#ECEEE8", symbolColor: "#1B1F24", height: 40 },
+  dark: { color: "#1B1F24", symbolColor: "#ECEEE8", height: 60 },
+  night: { color: "#0B0F14", symbolColor: "#E3E8EF", height: 60 },
 };
 const FRAME = process.platform === "darwin" ? { titleBarStyle: "hiddenInset" }
-  : { titleBarStyle: "hidden", titleBarOverlay: OVERLAY.light };
+  : { titleBarStyle: "hidden", titleBarOverlay: OVERLAY.splash };
 
 function createWindow() {
   win = new BrowserWindow({
@@ -199,20 +203,32 @@ async function selftest(out) {
     await shot("1c_recovery");
     await js(`document.querySelector("#recovery form button").click(); true`);
     const t0 = Date.now();
-    await wait(`(!document.querySelector("#app").classList.contains("hidden") && document.querySelectorAll(".ex").length > 0)
+    await wait(`(!document.querySelector("#app").classList.contains("hidden") && document.querySelectorAll("#hall .hut").length > 0)
       || document.querySelector("#auth-error").textContent !== ""`, 3000);   // (container: the first start downloads GB)
     const err = await js(`document.querySelector("#auth-error").textContent`);
     if (err) log("error shown: " + err);
     check("signed in", await js(`!document.querySelector("#app").classList.contains("hidden")`), t0);
     await new Promise((r) => setTimeout(r, 1500));
     await shot("2_catalogue");
-    check("the introduction of the instrument is the first card of the catalogue",
-      await js(`(() => { const c = document.querySelector(".ex"); return !!c && c.classList.contains("intro-card")
-        && !!c.querySelector('[data-act="open"][data-mode="all"]'); })()`), Date.now());
-    // a new student chooses a role first (the level): no request before
-    check("no request before a role is chosen", await js(`!document.querySelector('[data-act="open"][data-mode="bsc"]') && !!document.querySelector(".pick-role")`), Date.now());
-    await js(`document.querySelector('.role[data-level="bsc"]').click(); true`);
-    check("the trainee (BSc) role shows the requests by thread", await wait(`document.querySelectorAll(".lane .node").length > 0 && !!document.querySelector("#brief [data-act]") && !document.querySelector('[data-mode="msc"]')`, 20), Date.now());
+    check("the catalogue: the instruments on the hall, the introduction of the chosen one above its requests",
+      await js(`document.querySelectorAll("#hall .hut").length > 0 && !!document.querySelector('#intro .ib-open[data-act="open"][data-mode="all"]')`), Date.now());
+    // a new student chooses a grade first (the level): no request before
+    check("no request before a grade is chosen", await js(`!document.querySelector('[data-act="open"][data-mode="bsc"]') && !!document.querySelector(".grade-pick")`), Date.now());
+    await js(`document.querySelector('.grade-pick [data-level="bsc"]').click(); true`);
+    check("the trainee (BSc) grade shows the table of requests, the next one open", await wait(`document.querySelectorAll("#requests .r-row").length > 0 && !!document.querySelector(".r-detail [data-act]") && !document.querySelector('[data-mode="msc"]')`, 20), Date.now());
+    await js(`document.querySelector("#me").click(); true`);
+    await new Promise((r) => setTimeout(r, 500));
+    await shot("2a_menu");
+    await js(`document.querySelector('#menu-theme [data-theme="dark"]').click(); true`);
+    await new Promise((r) => setTimeout(r, 800));
+    check("the dark view, chosen in the menu", await js(`document.documentElement.dataset.theme === "dark"`), Date.now());
+    await shot("2c_catalogue_dark");
+    await js(`document.querySelector('#menu-theme [data-theme="light"]').click(); document.body.click(); true`);
+    await js(`document.querySelector(".team").click(); true`);
+    await new Promise((r) => setTimeout(r, 600));
+    check("a client of the story, its card opened", await js(`document.querySelector("#team").open && document.querySelector("#team-life").textContent.length > 40`), Date.now());
+    await shot("2d_team");
+    await js(`document.querySelector("#team").close(); true`);
     await shot("2b_catalogue_bsc");
     const t1 = Date.now();
     await js(`document.querySelector('[data-act="open"][data-mode="bsc"]').click(); true`);
@@ -248,7 +264,7 @@ async function selftest(out) {
     check(`Submit my work: the file to save is offered at once (${zips.join(", ") || "nothing downloaded"})`, zips.length > 0, Date.now());
     await js(`document.querySelector("#tab-cat").click(); true`);
     await new Promise((r) => setTimeout(r, 1500));
-    await js(`document.querySelector('.role[data-level="msc"]').click(); true`);
+    await js(`document.querySelector('#menu-grades [data-level="msc"]').click(); true`);
     await wait(`!!document.querySelector('[data-act="open"][data-mode="msc"]')`, 20);
     const t2 = Date.now();
     await js(`document.querySelector('[data-act="open"][data-mode="msc"]').click(); true`);
@@ -329,23 +345,26 @@ async function selftest(out) {
     await js(`document.querySelector("#tab-cat").click(); true`);
     await new Promise((r) => setTimeout(r, 2500));
     await shot("4_catalogue_again");
-    log("progress: " + await js(`[...document.querySelectorAll(".prog .row span")].slice(0, 3).map(s => s.textContent).join(" | ")`));
+    log("progress: " + await js(`[...document.querySelectorAll(".r-st")].slice(0, 3).map(s => s.textContent).join(" | ")`));
     // Start again: the MSc (a notebook copy) and the BSc (submitted), each in its role: back to "Not started"
     // (the briefing shows the chapter opened last at that level)
     await js(`window.confirm = () => true; true`);
     const states = [];
     for (const mode of ["msc", "bsc"]) {
-      await js(`document.querySelector('.role[data-level="${mode}"]').click(); true`);
-      await wait(`!!document.querySelector("#brief [data-act]")`, 20);
-      const ok = await js(`(() => { const b = document.querySelector('.again[data-mode="${mode}"]'); if (b) b.click(); return !!b; })()`);
+      await js(`document.querySelector('#menu-grades [data-level="${mode}"]').click(); true`);
+      await wait(`!!document.querySelector(".r-detail [data-act]")`, 20);
+      const ok = await js(`(() => { const b = document.querySelector('.r-detail [data-act="reset"][data-mode="${mode}"]'); if (b) b.click(); return !!b; })()`);
       await new Promise((r) => setTimeout(r, 4000));
       log(`start again ${mode}: button ${ok}`);
-      states.push(await js(`(document.querySelector("#brief .prog .row span") || {}).textContent || ""`));
+      states.push(await js(`document.querySelector(".r-detail") && !document.querySelector(".r-detail .b-where") ? "Not started" : (document.querySelector(".r-detail .b-where") || {}).textContent || "?"`));
     }
     const after = states.join(" | ");
     check("started again (" + after + ")", after === "Not started | Not started", Date.now());
     await shot("7_started_again");
-    // the free beamtime: a new proposal each time (user office of the twin), then an imported proposal
+    // the free beamtime: a new proposal each time (user office of the twin), then an imported proposal (the lead
+    // scientist's grade: the free beamtime is shown at the end of the list of requests)
+    await js(`document.querySelector('#menu-grades [data-level="beamtime"]').click(); true`);
+    await wait(`!!document.querySelector('#free [data-act="newfree"]')`, 20);
     const t5 = Date.now();
     const newProposal = async (act, title, id, samples) => {
       await js(`document.querySelector('#free [data-act="${act}"]').click(); true`);

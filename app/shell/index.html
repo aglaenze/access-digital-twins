@@ -4,10 +4,44 @@
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data:; script-src 'self'">
 <title>ESS digital twins</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&amp;family=IBM+Plex+Sans+Condensed:wght@500;600;700&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+
+<!-- 0. The opening screen: the instruments are loading (the status of app/backend.js), then sign in or the app -->
+<div id="splash" class="splash" aria-live="polite"><div class="dragbar" aria-hidden="true"></div>
+  <div class="sp-hall" aria-hidden="true">
+    <svg viewBox="0 0 100 100">
+      <circle cx="50" cy="52" r="16" fill="#11161D" stroke="#283240" stroke-width="1.5" stroke-dasharray="3 4" vector-effect="non-scaling-stroke"></circle>
+      <g stroke="#1C2430" stroke-width="7" stroke-linecap="round">
+        <path d="M50 52 L50 96" vector-effect="non-scaling-stroke"></path><path d="M50 52 L20 92" vector-effect="non-scaling-stroke"></path>
+        <path d="M50 52 L82 93" vector-effect="non-scaling-stroke"></path><path d="M50 52 L97 68" vector-effect="non-scaling-stroke"></path>
+        <path d="M50 52 L3 66" vector-effect="non-scaling-stroke"></path><path d="M50 52 L62 4" vector-effect="non-scaling-stroke"></path>
+        <path d="M50 52 L16 14" vector-effect="non-scaling-stroke"></path><path d="M50 52 L88 32" vector-effect="non-scaling-stroke"></path>
+      </g>
+      <path class="sp-line odin" d="M50 52 L16 14" stroke-width="9" stroke-linecap="round" vector-effect="non-scaling-stroke"></path>
+      <path class="sp-line loki" d="M50 52 L88 32" stroke-width="9" stroke-linecap="round" vector-effect="non-scaling-stroke"></path>
+    </svg>
+    <div class="sp-target"><b>TARGET</b><span id="sp-beam">waiting</span></div>
+    <span class="sp-name odin">ODIN</span><span class="sp-name loki">LoKI</span>
+  </div>
+  <div class="sp-side">
+    <div class="sp-brand"><img src="../icon.png" width="56" height="56" alt="">
+      <div><b>ESS DIGITAL TWINS</b><span>Neutron Solutions Team · Lund</span></div></div>
+    <h1 id="sp-title">Loading the instruments</h1>
+    <ol class="sp-steps">
+      <li data-step="0"><i></i>The container engine</li>
+      <li data-step="1"><i></i>The instruments: ODIN and LoKI</li>
+      <li data-step="2"><i></i>Ready</li>
+    </ol>
+    <div class="sp-bar"><div id="sp-bar"></div></div>
+    <div class="sp-row"><span id="sp-text">Starting…</span><span id="sp-pct"></span></div>
+    <div class="sp-acts"><a href="#" id="sp-link" class="hidden">Get Podman Desktop</a>
+      <button type="button" id="sp-skip" class="hidden">Continue to sign in</button></div>
+    <div class="sp-fact"><span>DID YOU KNOW</span><p id="sp-fact"></p></div>
+  </div>
+</div>
 
 <!-- 1. Sign in / create an account -->
 <div id="login" class="view"><div class="dragbar" aria-hidden="true"></div>
@@ -75,11 +109,15 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="8" r="3"></circle><circle cx="16" cy="8" r="3"></circle><path d="M2 20c0-3.3 2.7-6 6-6s6 2.7 6 6M10 20c0-3.3 2.7-6 6-6s6 2.7 6 6"></path></svg>Classes</button>
     </nav>
     <div class="right">
+      <button id="src" class="src" title="Beam status of the ESS source"><i class="src-dot"></i><span id="src-txt">Beam</span></button>
       <span id="saved" class="saved"></span>
       <button id="save" class="ghost hidden">Save</button>
       <button id="me" class="me" aria-haspopup="true"><span id="avatar" class="avatar"></span><span id="me-name"></span></button>
       <div id="menu" class="menu hidden" role="menu">
-        <div id="menu-email" class="menu-email"></div>
+        <div class="menu-who"><b id="menu-name"></b><div id="menu-email" class="menu-email"></div></div>
+        <div class="menu-sec"><span class="menu-k">Your grade</span><div id="menu-grades" class="menu-grades"></div>
+          <div id="menu-mscview" class="menu-seg hidden"></div></div>
+        <div class="menu-sec"><span class="menu-k">Appearance</span><div id="menu-theme" class="menu-seg"></div></div>
         <button id="teach" role="menuitem">Teacher view…</button>
         <button id="handin" role="menuitem">Export all my work (zip)</button>
         <button id="signout" role="menuitem">Sign out</button>
@@ -88,18 +126,26 @@
   </header>
   <div id="stage">
     <section id="pane-cat" class="pane on">
+      <!-- the catalogue: the instruments on the target and its beamlines (left), the requests of the chosen one (right) -->
       <main class="cat">
-        <div class="head">
-          <h1>Welcome to the Neutron Solutions Team</h1>
-          <p>Companies and research teams bring us their problems; we answer them with neutrons. Choose an instrument and
-            your role: the requests that wait for you follow. Your progress is saved as you go.</p>
-        </div>
-        <div id="instruments" class="instruments"></div>
-        <div id="intro"></div>
-        <div id="roles" class="roles"></div>
-        <h2 id="ex-title"></h2>
-        <div id="exercises"></div>
-        <div id="free"></div>
+        <section class="c-col">
+          <div class="kick">1 · Choose an instrument: the neutrons start at the target</div>
+          <div id="hall" class="hall"></div>
+          <button id="beamrow" class="beamrow" type="button" title="The beam status screen"></button>
+          <div class="c-teams">
+            <div class="kick">Who sends us requests · click to meet them</div>
+            <div id="teams" class="teams"></div>
+          </div>
+        </section>
+        <section class="c-col">
+          <div class="c-head"><div class="kick">2 · Your instrument</div><div id="inst-head" class="inst-head"></div></div>
+          <div id="mentor" class="mentor"></div>
+          <div id="intro"></div>
+          <div class="reqbox">
+            <div class="req-top"><span id="req-title" class="kick"></span><span id="req-count" class="kick"></span></div>
+            <div id="requests" class="requests"></div>
+          </div>
+        </section>
       </main>
     </section>
     <!-- the teacher's classes (classes.py): prepare, open (a link for the students), follow live -->
@@ -110,10 +156,6 @@
           <p class="hint">A class gives the students one link: they see only the pages you chose. It runs on this
             computer (keep it on and awake); the link goes through a free tunnel.</p>
           <div id="cls-list" class="cls-list"></div>
-          <div class="cls-power"><label for="sp-power"><b>Source power of the twin</b></label>
-            <select id="sp-power"></select>
-            <p class="hint">Used by every page and by NICOS on this computer, unless the class fixes it. The students
-              read it but do not choose it, as at ESS where the accelerator delivers it.</p></div>
         </aside>
         <section id="cls-detail" class="cls-detail"><p class="hint">Choose a class, or make a new one.</p></section>
       </main>
@@ -121,6 +163,11 @@
   </div>
 </div>
 
+<dialog id="team" class="team-dlg"><div id="team-band" class="team-band"></div><div class="team-body">
+  <p id="team-life"></p>
+  <div class="team-help"><span class="kick">How ESS helps them</span><p id="team-help"></p></div>
+  <div id="team-counts" class="team-counts"></div></div>
+  <form method="dialog"><button class="primary">Close</button></form></dialog>
 <dialog id="recovery"><div class="sheet-body"><h2>Your recovery code</h2>
   <p>Write it down (or take a photo). If you forget your password, it lets you choose a new one: <i>Forgot your
   password?</i> on the sign-in screen. It is shown only now.</p>
@@ -144,6 +191,32 @@
     <input id="t-code" type="password" autocomplete="off" spellcheck="false"></div>
   <p id="t-error" class="error"></p></div>
   <div class="prop-acts"><button type="button" class="btn" id="t-cancel">Cancel</button><button class="primary">Open the teacher view</button></div></form></dialog>
+<dialog id="beam" class="beam" aria-label="Beam status"><div class="beam-screen">
+  <div class="beam-top"><img src="../icon.png" width="28" height="28" alt=""><span class="beam-title">ESS · BEAM STATUS</span><span id="beam-clock" class="beam-clock"></span>
+    <button type="button" class="beam-x" id="beam-close" aria-label="Close">✕</button></div>
+  <div class="beam-state"><i class="src-dot"></i> BEAM ON TARGET</div>
+  <div class="beam-big"><div><b id="beam-power">–</b><span>MW beam power</span></div>
+    <div><b id="beam-current">–</b><span>mA average proton current</span></div>
+    <div><b id="beam-pulses">–</b><span>pulses on target today</span></div></div>
+  <div class="beam-grid">
+    <div><span>Proton energy</span><b>2.0 GeV</b></div>
+    <div><span>Repetition rate</span><b>14 Hz</b></div>
+    <div><span>Pulse length</span><b>2.86 ms</b></div>
+    <div><span>Protons per pulse</span><b id="beam-charge">–</b></div>
+    <div><span>Peak current in the pulse</span><b id="beam-peak">–</b></div>
+    <div><span>Target</span><b>tungsten wheel, 23.3 rpm</b></div>
+  </div>
+  <svg id="beam-pulse" class="beam-pulse" viewBox="0 0 600 70" aria-label="Time structure of the beam"></svg>
+  <div class="beam-set">
+    <b>Power of the source</b>
+    <div id="beam-opts" class="beam-opts"></div>
+    <p id="beam-note" class="beam-note"></p>
+  </div>
+  <p class="beam-foot">The neutrons, and so the counts of every measurement, are proportional to the power; each file
+    records the proton charge it received, and the reductions divide by it. It is not a setting of a measurement: the
+    source delivers it to all the instruments. In the twin the protons have their design energy, 2 GeV, at both powers:
+    the protons per pulse follow the power. The wheel turns one sector of 36 per pulse.</p>
+</div></dialog>
 <dialog id="newclass" class="wide"><form id="nc-form" class="prop-form"><div class="sheet-body"><h2 id="nc-head">New class</h2>
   <p id="nc-locked" class="hint hidden"></p>
   <div class="field"><label for="nc-title">Title (shown to the students)</label>
@@ -154,9 +227,9 @@
       <label><input type="radio" name="nc-id" value="named"> Named: each student types a name (e.g. a graded session)</label>
     </fieldset>
     <fieldset class="nc-box"><legend>Power of the source</legend>
-      <select id="nc-power"><option value="">Not fixed: the source power of the twin (side panel)</option>
-        <option value="2">2 MW (ESS at the start of its user programme)</option><option value="5">5 MW (ESS design power)</option></select>
-      <p class="hint">The students read it on their pages; they do not choose it.</p>
+      <select id="nc-power" required><option value="5">5 MW (ESS design power)</option><option value="2">2 MW (ESS at the start of its user programme)</option></select>
+      <p class="hint">All the students of the class measure with this power: they read it on their pages and on the
+        beam status screen, and nobody can change it while the class is open.</p>
     </fieldset>
   </div>
   <fieldset class="nc-box"><legend>Pages the students may open (in this order)</legend>

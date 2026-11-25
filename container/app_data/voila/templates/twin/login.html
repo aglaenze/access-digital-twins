@@ -6,23 +6,23 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ESS digital twins</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
   <style>
     * { box-sizing: border-box; }
-    body { margin: 0; font-family: "Segoe UI", system-ui, -apple-system, sans-serif; color: #EAF0F8; min-height: 100vh;
-           background: radial-gradient(1000px 500px at 80% -10%, #16365A 0%, transparent 60%),
-                       radial-gradient(800px 450px at -10% 110%, #123A3A 0%, transparent 55%), #08111F; }
-    header { display: flex; align-items: center; gap: 12px; padding: 16px 28px; border-bottom: 1px solid #22344F;
+    body { margin: 0; font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif; color: #E3E8EF; min-height: 100vh;
+           background: #0B0F14; }
+    header { display: flex; align-items: center; gap: 12px; padding: 16px 28px; border-bottom: 1px solid #252E3A;
              font-weight: 700; }
-    header .dot { width: 10px; height: 10px; border-radius: 50%; background: #2BB3A3; box-shadow: 0 0 12px #2BB3A3; }
+    header .dot { width: 10px; height: 10px; border-radius: 50%; background: #4ADE80; box-shadow: 0 0 12px #4ADE80; }
     main { max-width: 460px; margin: 72px auto; padding: 0 16px; }
-    .card { background: #0F1D31; border: 1px solid #22344F; border-radius: 18px; padding: 30px; }
-    h1 { margin: 0 0 6px; font-size: 24px; }
-    p { line-height: 1.55; color: #9FB0C7; }
+    .card { background: #161C25; border: 1px solid #252E3A; border-radius: 10px; padding: 30px; }
+    h1 { margin: 0 0 6px; font-size: 26px; font-family: "IBM Plex Sans Condensed", "Segoe UI", system-ui, sans-serif; }
+    p { line-height: 1.55; color: #97A2B3; }
     label { display: block; font-weight: 600; margin: 18px 0 6px; }
-    input[type=password] { width: 100%; padding: 12px; font-size: 16px; color: #EAF0F8; background: #0B1626;
-                           border: 1px solid #35527A; border-radius: 12px; }
-    input[type=password]:focus { outline: 2px solid #2BB3A3; border-color: #2BB3A3; }
-    button { margin-top: 20px; background: #2BB3A3; color: #06141A; border: 0; border-radius: 12px; padding: 12px 22px;
+    input[type=password] { width: 100%; padding: 12px; font-size: 16px; color: #E3E8EF; background: #11161D;
+                           border: 1px solid #3A4656; border-radius: 6px; }
+    input[type=password]:focus { outline: 2px solid #4ADE80; border-color: #4ADE80; }
+    button { margin-top: 20px; background: #4ADE80; color: #0B0F14; border: 0; border-radius: 6px; padding: 12px 22px;
              font-size: 16px; font-weight: 700; cursor: pointer; }
     button:hover { filter: brightness(1.1); }
     .err { color: #F28B7A; font-weight: 600; }

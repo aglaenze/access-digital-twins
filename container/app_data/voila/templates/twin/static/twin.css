@@ -1,57 +1,60 @@
 /* The look of the app (twin/app/shell/style.css) on the Voila pages: fonts, colors, cards, buttons, questions. */
 :root {
-  --tw-text: #142033; --tw-muted: #5B6779; --tw-line: #E2E7EE; --tw-line2: #CBD3DE; --tw-soft: #EEF2F6;
-  --tw-teal: #0E7C70; --tw-teal-d: #0A5F56; --tw-teal-l: #E7F5F3; --tw-ink: #0B1626; --tw-ink2: #22354F;
-  --tw-red: #9B2C1C; --tw-red-bg: #FDF0EE; --tw-amber-bg: #FFF6E8;
-  --jp-ui-font-family: Inter, "Segoe UI", system-ui, sans-serif;
-  --jp-content-font-family: Inter, "Segoe UI", system-ui, sans-serif;
-  --jp-content-font-color1: #142033;
+  /* the palette of the catalogue (2026-11-25): ink and paper, yellow for what to do, green for the beam and what is
+     right (the names --tw-teal... are kept: "teal" is now the ink of the actions) */
+  --tw-text: #1B1F24; --tw-muted: #566057; --tw-line: #D5D9D1; --tw-line2: #BFC5BC; --tw-soft: #ECEEE8;
+  --tw-teal: #1B1F24; --tw-teal-d: #000000; --tw-teal-l: #FFF4D6; --tw-ink: #1B1F24; --tw-ink2: #3A423B;
+  --tw-red: #B3261E; --tw-red-bg: #FDF0EE; --tw-amber-bg: #FFF4D6; --tw-accent: #F2C230; --tw-green: #2FB862;
+  --tw-green-l: #E3F2E9; --jp-code-font-family: "IBM Plex Mono", Consolas, monospace;
+  --jp-ui-font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --jp-content-font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --jp-content-font-color1: #1B1F24;
   --jp-widgets-font-size: 15px;      /* = --tw-text-size below (the widgets read this variable) */
   /* ONE size for the text of every page (text, tables, questions and their answers): JupyterLab's own rules read
      this variable too, so whichever style sheet comes last, the text has this size */
   --tw-text-size: 15px;
   --jp-content-font-size1: var(--tw-text-size);
 }
-/* the theme of JupyterLab: its main color becomes the teal of the app (buttons, focus, progress) */
+/* the theme of JupyterLab: its main color becomes the ink of the app, success the green of the beam */
 body {
-  --jp-brand-color0: #0A5F56; --jp-brand-color1: #0E7C70; --jp-brand-color2: #5FB3A8; --jp-brand-color3: #E7F5F3;
-  --jp-accept-color-normal: #0E7C70; --jp-accept-color-hover: #0A5F56; --jp-accept-color-active: #0A5F56;
-  --jp-info-color1: #22354F; --jp-success-color1: #0E7C70; --jp-warn-color1: #B4562B;
+  --jp-brand-color0: #000000; --jp-brand-color1: #1B1F24; --jp-brand-color2: #566057; --jp-brand-color3: #ECEEE8;
+  --jp-accept-color-normal: #1B1F24; --jp-accept-color-hover: #000000; --jp-accept-color-active: #000000;
+  --jp-info-color1: #3A423B; --jp-success-color1: #2FB862; --jp-warn-color1: #B4562B;
 }
-body, body.jp-Notebook, .jp-Notebook { background: #F5F7FA !important; color: var(--tw-text); }
-body { font-family: Inter, "Segoe UI", system-ui, sans-serif; }
+body, body.jp-Notebook, .jp-Notebook { background: #ECEEE8 !important; color: var(--tw-text); }
+body { font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif; }
 #rendered_cells, .jp-Notebook { max-width: 1120px; margin: 0 auto !important; padding: 18px 28px 64px !important; }
 .jp-Cell { padding: 0 !important; }
 .jp-RenderedHTMLCommon { font-size: var(--tw-text-size) !important; line-height: 1.6; color: var(--tw-text); }
 .jp-RenderedHTMLCommon h1, .jp-RenderedHTMLCommon h2, .jp-RenderedHTMLCommon h3 {
-  font-family: "Space Grotesk", "Segoe UI", system-ui, sans-serif; font-weight: 600; color: var(--tw-text); }
+  font-family: "IBM Plex Sans Condensed", "Segoe UI", system-ui, sans-serif; font-weight: 700; color: var(--tw-text); }
 .jp-RenderedHTMLCommon h1 { font-size: 30px; margin: 18px 0 10px; }
 /* a little space under the title of a section */
 .jp-RenderedHTMLCommon h2 { font-size: 23px; margin: 34px 0 16px; padding-top: 22px; border-top: 1px solid var(--tw-line); }
 .jp-RenderedHTMLCommon h3 { font-size: 18px; margin: 24px 0 12px; }
-.jp-RenderedHTMLCommon strong { color: #0B1626; }
+.jp-RenderedHTMLCommon strong { color: #1B1F24; }
 .jp-RenderedHTMLCommon code { background: var(--tw-soft); border-radius: 5px; padding: 1px 5px; }
-.jp-RenderedHTMLCommon a { color: var(--tw-teal); }
+.jp-RenderedHTMLCommon a { color: #1E7B4E; }
 /* tables: the size of the text around them (JupyterLab draws them smaller) */
 .jp-RenderedHTMLCommon table { border-collapse: collapse; font-size: inherit !important; line-height: 1.5; }
 /* paragraphs, lists and table cells: exactly the same size, whatever the other style sheets say */
 .jp-RenderedHTMLCommon p, .jp-RenderedHTMLCommon li, .jp-RenderedHTMLCommon td, .jp-RenderedHTMLCommon th {
   font-size: var(--tw-text-size) !important; }
 .jp-RenderedHTMLCommon td, .jp-RenderedHTMLCommon th { border: 1px solid var(--tw-line); padding: 6px 10px; }
-.jp-OutputArea-output pre { font-size: 13px; line-height: 1.45; color: #2B3648; }
+.jp-OutputArea-output pre { font-size: 13px; line-height: 1.45; color: #2A302B; font-family: var(--jp-code-font-family); }
 .jp-OutputArea-output img { max-width: 100%; height: auto; }
 
 /* widgets */
 .jupyter-widgets.widget-button, .jupyter-button {
-  height: 38px; border-radius: 9px; font-family: inherit; font-size: var(--tw-text-size); font-weight: 600; padding: 0 16px;
+  height: 38px; border-radius: 6px; font-family: inherit; font-size: var(--tw-text-size); font-weight: 600; padding: 0 16px;
   background: #fff; color: var(--tw-text); border: 1px solid var(--tw-line2); box-shadow: none; }
 .jupyter-button:hover:enabled { background: var(--tw-soft); box-shadow: none; }
 .jupyter-button.mod-primary, .jupyter-button.mod-success { background: var(--tw-teal) !important; color: #fff !important; border-color: var(--tw-teal) !important; }
 .jupyter-button.mod-primary:hover:enabled, .jupyter-button.mod-success:hover:enabled { background: var(--tw-teal-d); }
 .jupyter-button.mod-info { background: var(--tw-ink2) !important; color: #fff !important; border-color: var(--tw-ink2) !important; }
 .jupyter-button.mod-warning { background: #B4562B; color: #fff; border-color: #B4562B; }
-.jupyter-button.mod-active, .widget-toggle-button.mod-active { background: var(--tw-teal-l); color: var(--tw-teal-d); border-color: var(--tw-teal); }
-.widget-toggle-buttons .widget-toggle-button { border-radius: 8px; margin-right: 6px; }
+.jupyter-button.mod-active, .widget-toggle-button.mod-active { background: #1B1F24; color: #fff; border-color: #1B1F24; }
+.widget-toggle-buttons .widget-toggle-button { border-radius: 6px; margin-right: 6px; }
 .widget-dropdown select, .widget-text input, .widget-textarea textarea {
   height: 36px; border-radius: 8px; border: 1px solid var(--tw-line2); font-family: inherit; font-size: var(--tw-text-size); padding: 0 10px; background: #fff; }
 .widget-dropdown select:focus, .widget-text input:focus { outline: 2px solid var(--tw-teal); outline-offset: 1px; }
@@ -64,27 +67,27 @@ body { font-family: Inter, "Segoe UI", system-ui, sans-serif; }
   overflow: visible !important; text-overflow: clip !important; flex-shrink: 0 !important; }
 .widget-radio-box label { font-size: 14.5px; line-height: 1.5; }
 .widget-radio-box input, .widget-checkbox input { accent-color: var(--tw-teal); }
-.progress-bar { background: var(--tw-teal) !important; }
+.progress-bar { background: var(--tw-green) !important; }
 
 /* questions (quiz.py) */
-body .twq { background: #fff; border: 1px solid var(--tw-line); border-radius: 14px; padding: 16px 20px; margin: 14px 0; }
-body .twq-q { font-family: "Space Grotesk", "Segoe UI", system-ui, sans-serif; font-size: var(--tw-text-size); font-weight: 700; color: #fff;
-  background: var(--tw-teal); display: inline-block; border-radius: 6px; padding: 2px 8px; margin-bottom: 8px; }
+body .twq { background: #fff; border: 1px solid var(--tw-line); border-radius: 8px; padding: 16px 20px; margin: 14px 0; }
+body .twq-q { font-family: "IBM Plex Sans Condensed", "Segoe UI", system-ui, sans-serif; font-size: var(--tw-text-size); font-weight: 700; color: #1B1F24;
+  background: var(--tw-accent); display: inline-block; border-radius: 4px; padding: 2px 8px; margin-bottom: 8px; }
 body .twq-fb { border-radius: 10px; border-left: 0; padding: 10px 14px; font-size: 14.5px; }
-body .twq-ok { background: var(--tw-teal-l); color: #0B3B35; }
+body .twq-ok { background: var(--tw-green-l); color: #14432B; }
 body .twq-no { background: var(--tw-red-bg); color: #5A1E14; }
 body .twq-no strong { color: var(--tw-red); }
 body .twq-ans { background: var(--tw-soft); color: var(--tw-text); }
 
 /* the controls of an interactive picture (intro_widgets.py): a card, one aligned row per control */
-.tw-controls { background: #fff; border: 1px solid var(--tw-line); border-radius: 12px; padding: 12px 18px;
+.tw-controls { background: #fff; border: 1px solid var(--tw-line); border-radius: 8px; padding: 12px 18px;
   margin: 6px 0 12px; max-width: 780px; box-sizing: border-box; gap: 8px; }
 .tw-controls .tw-ctl-row { gap: 12px; min-height: 40px; }
 .tw-controls .widget-toggle-buttons .widget-toggle-button { margin: 0 8px 0 0; }
 .tw-controls .widget-inline-hbox > .widget-label:empty { display: none; }
 
 /* the messages of a measurement (measure_control.py) and the content of a file (analysis_chain.py) */
-.tw-status { font-family: Consolas, "Courier New", monospace; font-size: 13.5px; line-height: 1.45; white-space: pre-wrap;
+.tw-status { font-family: "IBM Plex Mono", Consolas, monospace; font-size: 13.5px; line-height: 1.45; white-space: pre-wrap;
   background: var(--tw-soft); border-radius: 8px; padding: 8px 12px; margin: 6px 0; color: var(--tw-text); }
 
 /* a barrier (page_output.gate): while it is in a cell, the cells after it are hidden, until the step is done */
@@ -97,7 +100,7 @@ div:has(> .jp-Cell .twin-gate) ~ div:has(> .jp-Cell) { display: none !important;
 /* a folded section (page_output.collapsed: the bonus rounds), opened by a click on its title */
 .twin-collapsed .jupyter-widget-Collapse-header, .twin-collapsed .p-Collapse-header, .twin-collapsed .lm-Collapse-header {
   font-size: var(--tw-text-size); font-weight: 700; color: var(--tw-teal-d); background: var(--tw-teal-l);
-  border: 1px solid var(--tw-teal); border-radius: 10px; padding: 10px 14px; cursor: pointer; }
+  border: 1px solid var(--tw-teal); border-radius: 6px; padding: 10px 14px; cursor: pointer; }
 .twin-collapsed .jupyter-widget-Collapse-contents, .twin-collapsed .p-Collapse-contents, .twin-collapsed .lm-Collapse-contents {
   border: 0; padding: 6px 0 0 0; background: transparent; }
 /* open: the title and the content in one frame (ipywidgets removes the bottom border of an open title: the rounded
@@ -120,16 +123,16 @@ div:has(> .jp-Cell .twin-gate) ~ div:has(> .jp-Cell) { display: none !important;
 
 /* the online version: the bar at the top of a page, "Catalogue" button at the top left (as the tab of the app) */
 .twin-webbar { position: sticky; top: 0; z-index: 1000; display: flex; align-items: center; gap: 16px;
-  padding: 10px 24px; background: #0F1D31; color: #9FB0C7; font-family: Inter, "Segoe UI", system-ui, sans-serif;
+  padding: 10px 24px; background: #1B1F24; color: #A4ADA4; font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
   font-size: 14px; box-shadow: 0 1px 6px rgba(0,0,0,.25); }
-.twin-webbar a { display: inline-flex; align-items: center; gap: 8px; color: #fff; background: #0E7C70; text-decoration: none; font-weight: 600; padding: 6px 14px;
-  border-radius: 8px; }
-.twin-webbar a:hover { background: #12988A; }
+.twin-webbar a { display: inline-flex; align-items: center; gap: 8px; color: #1B1F24; background: #F2C230; text-decoration: none; font-weight: 600; padding: 6px 14px;
+  border-radius: 6px; }
+.twin-webbar a:hover { filter: brightness(1.08); }
 .twin-webbar a svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; }
 .twin-webbar span { margin-left: auto; }
 
 /* the loading spinner of Voila */
-#loading { font-family: Inter, "Segoe UI", system-ui, sans-serif; color: var(--tw-muted); }
+#loading { font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif; color: var(--tw-muted); }
 .twq .jupyter-button, .twq .widget-button { width: auto !important; min-width: 110px; margin-right: 8px; }
 /* questions: the text box grows with its text (a long question overlapped its options) */
 .twq .widget-htmlmath, .twq .widget-html { height: auto !important; line-height: 1.5 !important; }

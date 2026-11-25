@@ -57,7 +57,56 @@ $("#tab-new").onclick = () => setMode(true);
 $("#forgot").onclick = (e) => { e.preventDefault(); setMode(false, true); };
 $("#back-in").onclick = (e) => { e.preventDefault(); setMode(false); };
 
+// The opening screen (#splash): the steps of the start of the instruments (app/backend.js), the target whose beamlines
+// light up, a fact about ESS; it fades out when the instruments are ready (or the student skips it after an error)
+const FACTS = [
+  "ESS sends 14 pulses of protons per second onto its tungsten target: each pulse makes the neutrons of all the instruments at once.",
+  "A neutron that reaches ODIN\u2019s camera has flown about 60 m from the target; its time of flight tells its wavelength.",
+  "Neutrons go through centimeters of steel but are stopped by a few millimeters of water: they see what X-rays miss.",
+  "The target wheel of ESS turns one sector of 36 for each pulse, so that the heat of the protons is shared out.",
+];
+const splash = { t0: Date.now(), gone: false, fact: 0 };
+if (T.titlebar) T.titlebar("splash");
+function splashFact() { $("#sp-fact").textContent = FACTS[splash.fact++ % FACTS.length]; }
+splashFact();
+const factTimer = setInterval(() => { if (splash.gone) clearInterval(factTimer); else splashFact(); }, 7000);
+setTimeout(() => { if (!splash.gone) $("#sp-skip").classList.remove("hidden"); }, 25000);
+function hideSplash() {
+  if (splash.gone) return;
+  splash.gone = true;
+  if (T.titlebar && $("#app").classList.contains("hidden")) T.titlebar("light");
+  $("#splash").classList.add("out");
+  setTimeout(() => $("#splash").classList.add("hidden"), 500);
+}
+$("#sp-skip").onclick = hideSplash;
+function splashStatus(s) {
+  if (splash.gone) return;
+  const f = s.fraction || 0;
+  const step = f >= 1 ? 3 : f >= 0.7 ? 2 : f >= 0.2 ? 1 : 0;
+  const sp = $("#splash");
+  sp.dataset.step = step;
+  sp.classList.toggle("err", !!s.error);
+  sp.querySelectorAll(".sp-steps li").forEach((li) => {
+    const k = +li.dataset.step;                   // 0 engine, 1 instruments, 2 ready
+    const done = k === 0 ? step >= 1 : k === 1 ? step >= 3 : step >= 3;
+    const now = !s.error && !done && (k === 0 ? step === 0 : k === 1 ? step === 1 || step === 2 : false);
+    li.classList.toggle("done", done); li.classList.toggle("now", now);
+  });
+  $("#sp-beam").textContent = step >= 1 ? "beam on" : "waiting";
+  $("#sp-text").textContent = s.text || "";
+  $("#sp-pct").textContent = s.error ? "" : Math.round(f * 100) + " %";
+  $("#sp-bar").style.width = (s.error ? 100 : Math.round(f * 100)) + "%";
+  $("#sp-link").classList.toggle("hidden", !s.url);
+  $("#sp-link").onclick = (e) => { e.preventDefault(); T.openExternal(s.url); };
+  if (s.error) $("#sp-skip").classList.remove("hidden");
+  if (step >= 3) {
+    $("#sp-title").textContent = "The beam is on. Welcome!";
+    setTimeout(hideSplash, Math.max(900, 1600 - (Date.now() - splash.t0)));
+  }
+}
+
 function showStatus(s) {
+  splashStatus(s);
   const pct = Math.round((s.fraction || 0) * 100);
   $("#boot-text").textContent = s.error ? s.text : s.text;
   $("#boot-pct").textContent = s.error ? "" : (pct >= 100 ? "Ready" : pct + " %");
@@ -115,24 +164,90 @@ function enterApp() {
   // straight into the app (no fade: its timers and animation frames could hold the sign-in screen, 2026-11-10)
   $("#login").classList.add("hidden");
   $("#app").classList.remove("hidden");
-  if (T.titlebar) T.titlebar("dark");
   const initials = user.name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join("");
   $("#avatar").textContent = initials;
-  $("#me-name").textContent = user.name;
+  $("#menu-name").textContent = user.name;
   $("#menu-email").textContent = user.email;
+  applyTheme(pref("theme"));
+  hideSplash();
   teacherMenu();
+  renderMenu();
   activate("cat");
   loadCatalogue();
+  if (Source) Source.load();
 }
 
+// ------------------------------------------------------------------ the beam status of the source (source_power.py)
+// A chip of the top bar ("Beam 2 MW") opens the beam status screen, as the screens in the halls of ESS: the power and
+// what follows from it (current, protons per pulse, pulses), for every user. The power can be changed there outside a
+// class; while a class is open on this computer, its power (always fixed by the teacher) is shown, locked.
+var Source = (() => {
+  const HZ = 14, Q2 = 2e6 / 2e9 / 14 * 1e6, PULSE_MS = 2.857;           // twin: 2 GeV protons, 71.4 µC per pulse at 2 MW (odin_nexus.py)
+  let st = null, timer = null;
+  const esc = (x) => String(x == null ? "" : x).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  function pulseSvg(q) {            // two periods of the time structure: 2.86 ms pulses every 71.4 ms (to scale)
+    const W = 600, x0 = 20, per = 260, w = Math.max(per * PULSE_MS / (1000 / HZ), 3), h = 14 + 34 * q / (Q2 * 2.5);
+    let s = `<line x1="${x0}" y1="52" x2="${W - 10}" y2="52" stroke="#2C3644"/>`;
+    for (let k = 0; k < 3; k++) {
+      const x = x0 + k * per;
+      if (x + w > W - 10) break;
+      s += `<rect x="${x}" y="${52 - h}" width="${w}" height="${h}" fill="#4ADE80"/>`;
+    }
+    s += `<text x="${x0 + per / 2}" y="66" fill="#97A2B3" font-size="11" font-family="IBM Plex Mono, monospace" text-anchor="middle">71.4 ms between pulses (14 Hz)</text>`;
+    s += `<text x="${x0 + w + 6}" y="${52 - h + 10}" fill="#97A2B3" font-size="11" font-family="IBM Plex Mono, monospace">pulse of 2.86 ms, ${q.toFixed(0)} µC</text>`;
+    return s;
+  }
+  function tick() {
+    const now = new Date(), midnight = new Date(now); midnight.setHours(0, 0, 0, 0);
+    $("#beam-pulses").textContent = Math.floor((now - midnight) / 1000 * HZ).toLocaleString("en-US");
+    $("#beam-clock").textContent = now.toLocaleTimeString("en-GB");
+  }
+  function render() {
+    if (!st) return;
+    const p = st.power_mw, q = Q2 * p / 2;
+    $("#src-txt").textContent = `Beam ${p} MW`;
+    $("#beam-power").textContent = p.toFixed(1);
+    $("#beam-current").textContent = (q * HZ / 1000).toFixed(2);
+    $("#beam-charge").textContent = `${q.toFixed(1)} µC`;
+    $("#beam-peak").textContent = `${(q / PULSE_MS).toFixed(1)} mA`;
+    $("#beam-pulse").innerHTML = pulseSvg(q);
+    $("#beam-opts").innerHTML = st.choices.map(([label, v]) =>
+      `<label class="${v === p ? "on" : ""}"><input type="radio" name="beam-p" value="${v}"${v === p ? " checked" : ""}${st.fixed_by ? " disabled" : ""}> <span>${esc(label)}</span></label>`).join("");
+    $("#beam-note").textContent = st.fixed_by
+      ? `Fixed by the class "${st.fixed_by}", open on this computer: it can be changed again when the class is closed.`
+      : "Applies to the next measurements of every page and of NICOS on this computer; the open pages show it within a few seconds.";
+    for (const r of document.querySelectorAll('input[name="beam-p"]')) r.onchange = () => set(Number(r.value));
+  }
+  async function load() {
+    try { st = await T.api("GET", "/twin/source_power"); render(); } catch (err) { /* older server */ }
+    if (typeof renderBeamRow === "function" && catalogue) { renderBeamRow(); const hb = $("#hall-beam"); if (hb) hb.textContent = beamText(); }
+  }
+  function open() { load(); tick(); clearInterval(timer); timer = setInterval(tick, 250); $("#beam").showModal(); }
+  async function set(mw) {
+    try {
+      const r = await T.api("POST", "/twin/source_power", { power_mw: mw });
+      if (r && r.error) throw new Error(r.error);
+      toast(`Beam power: ${mw} MW for the next measurements.`);
+    } catch (err) { toast(err.message || String(err)); }
+    load();
+  }
+  $("#src").onclick = open;
+  $("#beam-close").onclick = () => $("#beam").close();
+  $("#beam").addEventListener("close", () => { clearInterval(timer); timer = null; });
+  $("#beam").addEventListener("click", (e) => { if (e.target === $("#beam")) $("#beam").close(); });
+  return { load, open, get: () => st };
+})();
+if (!$("#app").classList.contains("hidden")) Source.load();     // (app entered before this script part ran)
+
 $("#me").onclick = (e) => { e.stopPropagation(); $("#menu").classList.toggle("hidden"); };
+$("#menu").onclick = (e) => { if (!e.target.closest("#teach, #handin, #signout")) e.stopPropagation(); };
 document.addEventListener("click", () => $("#menu").classList.add("hidden"));
 // the teacher view: entered with the teacher code (menu of the account), left from the same menu
 $("#teach").onclick = async () => {
   if (user.teacher) {
     const r = await T.teacher("", false);
     if (r.user) { user = r.user; if (pref("level") === "all") pref("level", "bsc"); }
-    teacherMenu(); renderCatalogue(); toast("You see the catalogue as a student again.");
+    teacherMenu(); renderMenu(); renderCatalogue(); toast("You see the catalogue as a student again.");
     return;
   }
   $("#t-code").value = ""; $("#t-error").textContent = "";
@@ -146,8 +261,8 @@ $("#t-form").onsubmit = async (ev) => {
   user = r.user;
   pref("level", "all");
   $("#teacher").close();
-  teacherMenu(); renderCatalogue();
-  toast("Teacher view: every exercise at every level. Choose a role to see the catalogue as a student does.", 8000);
+  teacherMenu(); renderMenu(); renderCatalogue();
+  toast("Teacher view: every exercise at every level. Choose another grade in this menu to see the catalogue as a student does.", 8000);
 };
 // the expected durations: for the teacher only (class of 2026-11-23: a duration on the page puts the students under
 // pressure, and they rarely match; the teacher needs them to plan)
@@ -166,6 +281,7 @@ $("#signout").onclick = async () => {
   user = null;
   $("#app").classList.add("hidden");
   $("#login").classList.remove("hidden");
+  applyTheme("light");
   if (T.titlebar) T.titlebar("light");
   $("#auth").reset();
   $("#auth").classList.remove("hidden");
@@ -187,7 +303,7 @@ async function loadCatalogue() {
   try {
     catalogue = await T.api("GET", "/twin/catalogue");
   } catch (e) {
-    $("#exercises").innerHTML = `<p class="error">The catalogue could not be read: ${esc(e.message)}</p>`;
+    $("#requests").innerHTML = `<p class="error" style="padding:16px">The catalogue could not be read: ${esc(e.message)}</p>`;
     return;
   }
   renderCatalogue();
@@ -200,7 +316,7 @@ function byPlace(a, b) {
          ((a.status === "planned") - (b.status === "planned"));
 }
 
-// The level of the student = their grade in the team of the story (STORY.md), chosen with the instrument and kept
+// The level of the student = their grade in the team of the story (STORY.md), chosen in the menu of the account and kept
 // (per account, on this computer). A teacher (teacher code) also has "All levels": every exercise at every level.
 const ROLES = {
   bsc: { grade: "Trainee", chip: "BSc", text: "The instrument is set up for you: measure, then answer the client. Guided pages, no code." },
@@ -222,194 +338,300 @@ function currentLevel() {
   return ROLES[l] ? l : null;
 }
 
-function renderCatalogue() {
-  const c = catalogue;
-  // the introduction of an instrument (kind: introduction) is shown first and is not counted as an exercise
-  const count = (k) => c.exercises.filter((e) => e.instrument === k && e.status !== "planned" && e.kind !== "introduction").length;
-  if (!count(instr)) instr = Object.keys(c.instruments).find((k) => count(k)) || "odin";
-  $("#instruments").innerHTML = Object.entries(c.instruments).map(([k, i]) => {
-    const n = count(k);
-    return `<button class="instr ${k === instr ? "on" : ""}" data-k="${k}" ${n ? "" : "disabled"}>
-      <span class="top"><span class="name">${esc(i.name)}</span><span class="badge">${n ? n + (n > 1 ? " exercises" : " exercise") : "Later"}</span></span>
-      <span class="kind">${esc(i.kind)}</span><span class="text">${esc(i.text)}</span></button>`;
-  }).join("");
-  $("#instruments").querySelectorAll(".instr").forEach((b) => b.onclick = () => {
-    instr = b.dataset.k; localStorage.setItem("instr", instr); renderCatalogue();
-  });
-  const lvl = currentLevel();
-  const I = c.instruments[instr];
-  const ex = c.exercises.filter((e) => e.instrument === instr);
-  ex.sort(byPlace);
-  // the introduction of the instrument comes first, before the role: it is the same for every level
-  $("#intro").innerHTML = ex.filter((e) => e.kind === "introduction").map((e, i) => introCard(e, i)).join("");
-  renderRoles();
-  const rest = ex.filter((e) => e.kind !== "introduction");
-  $("#ex-title").textContent = lvl === "all" ? `Exercises on ${I.name}` : "";
-  $("#ex-title").classList.toggle("hidden", lvl !== "all");
-  if (lvl === "all") renderAll(rest);
-  else renderStory(rest, lvl);
-  for (const box of ["#intro", "#exercises"]) {
-    $(box).querySelectorAll("[data-act]").forEach((b) => b.onclick = () => {
-      const pick = b.closest(".level, .ex") && b.closest(".level, .ex").querySelector(".variant-pick");
-      act(pick ? { ...b.dataset, variant: pick.value } : b.dataset);
-    });
-  }
-  renderFree(lvl);
+// ---- the menu of the account: the grade (the only place it is chosen; MSc: notebooks with or without code), light or dark
+function applyTheme(th) {
+  document.documentElement.dataset.theme = th === "dark" ? "dark" : "light";
+  if (T.titlebar && !$("#app").classList.contains("hidden")) T.titlebar(th === "dark" ? "night" : "dark");
 }
-
-// the choice of the role (the level), after the introduction; MSc: with or without code
-function renderRoles() {
+function renderMenu() {
   const lvl = currentLevel();
   const keys = ["bsc", "msc", "beamtime"].concat(user && user.teacher ? ["all"] : []);
+  $("#menu-grades").innerHTML = keys.map((k) => `<button type="button" data-level="${k}" class="${k === lvl ? "on" : ""}"
+    title="${esc(ROLES[k].text)}">${esc(ROLES[k].grade)}</button>`).join("");
   const view = pref("mscview") === "clean" ? "clean" : "code";
-  $("#roles").innerHTML = `<div class="roles-head"><h2>Your role in the team</h2>
-      <p>${lvl ? "You can change it at any time: your work at each level is kept." :
-        "Choose it first: the requests, and the way you work on them, follow from it."}</p></div>
-    <div class="role-grid n${keys.length}">${keys.map((k) => `<button class="role ${k}${k === lvl ? " on" : ""}" data-level="${k}">
-      <span class="top"><span class="grade">${ROLES[k].grade}</span><span class="chip ${k}">${ROLES[k].chip}</span></span>
-      <span class="text">${ROLES[k].text}</span>
-      ${k === "msc" ? `<span class="seg view" role="group" aria-label="Notebooks">
-        <span role="button" data-view="code" class="${view === "code" ? "on" : ""}" title="The code of each step is shown (and locked)">With code</span>
-        <span role="button" data-view="clean" class="${view === "clean" ? "on" : ""}" title="As a guided page: text, widgets and plots, no code">Without code</span></span>` : ""}
-      </button>`).join("")}</div>`;
-  $("#roles").querySelectorAll(".role").forEach((b) => b.onclick = (ev) => {
-    const v = ev.target.closest("[data-view]");
-    if (v) pref("mscview", v.dataset.view);
-    pref("level", b.dataset.level);
-    renderCatalogue();
-  });
+  $("#menu-mscview").classList.toggle("hidden", lvl !== "msc");
+  $("#menu-mscview").innerHTML = [["code", "Notebooks with code"], ["clean", "Without code"]].map(([v, l]) =>
+    `<button type="button" data-view="${v}" class="${v === view ? "on" : ""}">${l}</button>`).join("");
+  const th = pref("theme") === "dark" ? "dark" : "light";
+  $("#menu-theme").innerHTML = [["light", "Light", "#ECEEE8"], ["dark", "Dark", "#11161D"]].map(([v, l, c]) =>
+    `<button type="button" data-theme="${v}" class="${v === th ? "on" : ""}"><i style="background:${c}"></i>${l}</button>`).join("");
+  $("#menu-grades").querySelectorAll("button").forEach((b) => b.onclick = () => { pref("level", b.dataset.level); renderMenu(); renderCatalogue(); });
+  $("#menu-mscview").querySelectorAll("button").forEach((b) => b.onclick = () => { pref("mscview", b.dataset.view); renderMenu(); renderCatalogue(); });
+  $("#menu-theme").querySelectorAll("button").forEach((b) => b.onclick = () => { pref("theme", b.dataset.theme); applyTheme(b.dataset.theme); renderMenu(); });
+  $("#me-name").textContent = user ? user.name + (lvl ? " · " + ROLES[lvl].grade : "") : "";
 }
 
-// the progress of one chapter: of its sample when the chapter is one sample of an exercise (exercise 7)
+// ---- the world of the story (STORY.md): the clients, the scientists of the instruments, the hall
+const TEAM_ICON = {
+  energy: "M12 12v9 M12 12 7 4.5 M12 12l8.5 1.5 M12 12 4.5 16 M10 21h4",
+  planets: "M12 5a7 7 0 1 0 0 14 7 7 0 0 0 0-14z M3 14c3 2 15 0 18-4",
+  instrument: "M14.5 6.5a3.5 3.5 0 0 0-4.6 4.4L4 16.8 7.2 20l5.9-5.9a3.5 3.5 0 0 0 4.4-4.6l-2.2 2.2-2.4-.6-.6-2.4z",
+};
+const vig = (t, small) => `<span class="vig ${small ? "s " : ""}${t}-bg"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${TEAM_ICON[t] || ""}"/></svg></span>`;
+const TEAMS = {
+  energy: { kind: "Energy consortium", short: "Wind, hydrogen, batteries and recycling, on an island in the Kattegat.",
+    life: "Fyrø is an artificial island in the Kattegat. Around it turn the turbines of an offshore wind farm; on the island, part of the power becomes hydrogen, part is stored in batteries, and the old blades and towers are taken apart for recycling. Four departments run it, Structures, Hydrogen plant, Storage and Circularity, and each has a problem it cannot see into: steel that must last decades at sea, electrodes that age inside a closed cell, resins full of nanoparticles.",
+    help: "Neutrons cross centimeters of steel and see light elements such as lithium and hydrogen. ODIN maps the strain inside a loaded steel part and follows the lithium inside a working battery; LoKI measures the nanoparticles of the blade resin." },
+  planets: { kind: "Planetary scientists", short: "Meteorites that tell about the water and the magnetic field of early Mars.",
+    life: "A small group of planetary scientists and paleomagnetists who keep a collection of Martian meteorites. They want to know what early Mars was like: was there water, where did it go, and did the planet have a magnetic field? Their pieces are rare and precious: they cannot be cut, ground or dissolved to find out.",
+    help: "Neutrons see hydrogen, so water, through a rock without harming it, and a tomography shows where it is held inside. Polarized neutrons see the magnetic field inside a sample." },
+  instrument: { kind: "Inside ESS", short: "Maja, Tomas and the workshop: the instruments themselves.",
+    life: "Maja Holm runs ODIN and Tomas Berg runs LoKI: they are instrument scientists, and your mentors. With them works the workshop, which builds sample holders, load frames and coils. Before each user arrives the instruments must be ready, tested and understood.",
+    help: "Their requests are the everyday work of an instrument scientist: check a new coil before it goes on ODIN, find a fault in the data before the next user comes." },
+};
+const PREFIX = { energy: "E", planets: "M", instrument: "I" };
+const SCIENTIST = {
+  odin: { name: "Maja Holm", initials: "MH", role: "instrument scientist, ODIN" },
+  loki: { name: "Tomas Berg", initials: "TB", role: "instrument scientist, LoKI" },
+};
+const PARTS = {
+  odin: [["source", 0], ["choppers", 24], ["pinhole", 56], ["sample", 82], ["camera", 100]],
+  loki: [["source", 0], ["choppers", 20], ["collimation", 50], ["sample", 76], ["detectors", 100]],
+};
+// the hall (schematic, % of its box): the target, the instruments at the end of their beamline, other beamlines in grey
+const TARGET = [50, 56];
+const HALL = { odin: [20, 18], loki: [83, 36], dream: [24, 90], bifrost: [80, 92] };
+const GREY = [[50, 98], [97, 72], [3, 74], [60, 3]];
+const Q2 = 2e6 / 2e9 / 14 * 1e6;               // µC per pulse at 2 MW (2 GeV protons, 14 Hz)
+function beamPower() { const st = Source.get(); return st ? st.power_mw : 5; }
+function beamText() { return `${beamPower()} MW · 14 Hz`; }
+function pulsesToday() {
+  const now = new Date(), midnight = new Date(now); midnight.setHours(0, 0, 0, 0);
+  return Math.floor((now - midnight) / 1000 * 14).toLocaleString("en-US");
+}
+
 function chapterProgress(s, m) {
   return (s.variant !== undefined && m.variants ? (m.variants[s.variant] || {}).progress : m.progress) ||
          { status: "new", text: "Not started", pct: 0 };
 }
-
-// emblems of the threads (the clients of the story) and of the grades
-const EMBLEM = {
-  energy: '<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M24 22v20M19 42h10"/><circle cx="24" cy="20" r="2.6"/><path d="M24 17.4C23 11 23.5 7 24 4c1.6 3.4 2 8 .9 13.6M26.3 21.4c5.6 2.6 8.8 5.2 10.8 7.6-3.8.3-8.2-.7-12.6-4.4M21.6 21.6c-4.9 3.7-8.7 5.1-11.7 5.6 1.7-3.4 5-6.6 10.4-8.4"/></svg>',
-  planets: '<svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="10"/><path d="M14.6 27.6C7.4 31.3 4 34.6 5.2 36.2c2 2.7 12.6-.9 23.6-8.1S44.9 14.5 42.9 11.8c-1.1-1.5-5.3-.6-10.6 1.9"/><circle cx="38" cy="36" r="1.6"/><circle cx="9" cy="12" r="1.2"/></svg>',
-  instrument: '<svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="6"/><path d="M24 6v6M24 36v6M6 24h6M36 24h6M11.3 11.3l4.2 4.2M32.5 32.5l4.2 4.2M11.3 36.7l4.2-4.2M32.5 15.5l4.2-4.2"/></svg>',
-};
-const ICON_CHECK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.2 4.2L19 7"/></svg>';
 const ICON_PLAY = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg>';
 
-let mapCards = [];        // the chapters of the map now shown (for the briefing)
-
-// the student's view: the map of the requests of the chosen level, one lane per thread of the story (STORY.md), and
-// the briefing of the chapter chosen on the map (its mission, its progress, the buttons)
-function renderStory(ex, lvl) {
-  const c = catalogue;
-  if (!lvl) {
-    $("#exercises").innerHTML = `<div class="pick-role">Choose your role above: the requests that wait for you appear here.</div>`;
-    return;
-  }
-  // the chapters: one per exercise, or one per sample when its samples belong to two threads (exercise 7)
+// the requests of one instrument at one level: one per exercise, or one per sample when its samples belong to two
+// threads (exercise 7); numbered along their thread; the next one is marked
+function requestCards(ex, lvl) {
   const cards = [];
-  const loose = [];
   for (const e of ex) {
     const m = (e.modes || {})[lvl];
     let st = Array.isArray(e.story) ? e.story : e.story ? [e.story] : [];
-    // no choice of sample at this level (the beamtime has both samples): one chapter, with the mission of the exercise
     if (!(m && m.variants)) st = st.filter((x, n) => x.variant === undefined || n === 0)
       .map((x) => x.variant === undefined ? x : { thread: x.thread, client: x.client });
-    if (!st.length) { loose.push(e); continue; }
+    if (!st.length) st = [{ thread: "instrument", client: "" }];
     for (const s of st) {
       const key = e.dir ? e.dir + (s.variant !== undefined ? "#" + s.variant : "") : "planned:" + e.title;
       const live = !!m && e.status !== "planned";
       cards.push({ e, s, m, key, live, p: live ? chapterProgress(s, m) : null });
     }
   }
-  mapCards = cards;
-  const threads = Object.keys(c.threads || {}).filter((t) => cards.some((x) => x.s.thread === t));
-  // the chapters are numbered along their thread (1, 2, 3...), in the order of the catalogue; the numbers of the
-  // exercises (the themes of ODIN) are only in the teacher's view
-  for (const t of threads) cards.filter((x) => x.s.thread === t).forEach((x, i) => { x.num = String(i + 1); });
-  // the next request: the one the student opened or started again last, while it is not finished; else the first
-  // started (not submitted), else the first not started
+  for (const t of Object.keys(PREFIX)) cards.filter((x) => (x.s.thread || "instrument") === t).forEach((x, i) => { x.num = i + 1; });
   const playable = cards.filter((x) => x.live);
   const open = (x) => !(x.p.submitted || x.p.status === "done");
   const last = playable.find((x) => x.key === pref(`last:${instr}:${lvl}`));
   const next = (last && open(last) ? last : null) || playable.find((x) => x.p.status === "started") ||
                playable.find((x) => x.p.status === "new");
-  let sel = pref(`sel:${instr}:${lvl}`);
-  if (!cards.some((x) => x.key === sel)) sel = (next || playable[0] || cards[0] || {}).key;
-  // the record of the student at this level: requests answered (submitted), questions right at the first try
-  const live = playable.map((x) => x.p);
-  const sum = (k) => live.reduce((a, p) => a + (p[k] || 0), 0);
-  const answered = live.filter((p) => p.submitted).length;
-  const done = sum("right") + sum("revealed");
-  const hud = `<div class="hud"><div class="rank"><span class="rank-badge ${lvl}">${esc(ROLES[lvl].chip)}</span>
-      <span class="rank-txt"><b>${esc(ROLES[lvl].grade)}</b><span>Neutron Solutions Team · ${esc(c.instruments[instr].name)}</span></span></div>
-    <div class="stats"><div class="stat"><span class="v">${answered}<small> / ${live.length}</small></span><span class="k">requests answered</span>
-        <span class="mini"><i style="width:${live.length ? 100 * answered / live.length : 0}%"></i></span></div>
-      ${lvl !== "beamtime" && done ? `<div class="stat"><span class="v">${sum("first")}<small> / ${done}</small></span><span class="k">right at the first try</span>
-        <span class="mini"><i style="width:${done ? 100 * sum("first") / done : 0}%"></i></span></div>` : ""}</div></div>`;
-  const lanes = threads.map((t) => {
-    const T = c.threads[t];
-    const mine = cards.filter((x) => x.s.thread === t);
-    const ok = mine.filter((x) => x.live && x.p.submitted).length;
-    const n = mine.filter((x) => x.live).length;
-    return `<section class="lane ${t}"><div class="lane-head"><span class="emblem">${EMBLEM[t] || ""}</span>
-        <span class="lane-txt"><span class="tname">${esc(T.name)}</span><b>${esc(T.client)}</b>
-        <span class="lane-n">${ok} of ${n} answered</span></span></div>
-      <div class="nodes">${mine.map((x) => node(x, x.key === sel, next && x.key === next.key)).join("")}</div></section>`;
-  }).join("");
-  $("#exercises").innerHTML = `<div class="campaign">${hud}<div class="camp-body"><div class="map">${lanes}
-      ${loose.length ? `<div class="loose"><span class="tech">Also in preparation</span>${loose.map((e) =>
-        `<span>${esc(e.title)}</span>`).join("")}</div>` : ""}</div>
-    <aside class="brief" id="brief"></aside></div></div>`;
-  $("#exercises").querySelectorAll(".node").forEach((b) => b.onclick = () => {
-    pref(`sel:${instr}:${lvl}`, b.dataset.key);
-    $("#exercises").querySelectorAll(".node").forEach((x) => x.classList.toggle("sel", x === b));
-    brief(b.dataset.key, lvl);
-    $("#brief").classList.add("anim");       // (animated when the student picks a chapter, not at each refresh)
+  if (next) next.next = true;
+  return cards;
+}
+
+let cards = [];          // the requests of the table now shown
+function renderCatalogue() {
+  if (!catalogue) return;
+  const c = catalogue;
+  const lvl = currentLevel();
+  const count = (k) => c.exercises.filter((e) => e.instrument === k && e.status !== "planned" && e.kind !== "introduction").length;
+  if (!count(instr)) instr = Object.keys(c.instruments).find((k) => count(k)) || "odin";
+  const I = c.instruments[instr];
+  const ex = c.exercises.filter((e) => e.instrument === instr).sort(byPlace);
+  const intro = ex.find((e) => e.kind === "introduction");
+  const rest = ex.filter((e) => e.kind !== "introduction");
+  cards = lvl && lvl !== "all" ? requestCards(rest, lvl) : [];
+  renderHall(count, lvl);
+  renderBeamRow();
+  renderTeams();
+  $("#inst-head").innerHTML = `<h1>${esc(I.name)}</h1><span>${esc(I.text)}</span>`;
+  renderMentor(intro, lvl);
+  $("#intro").innerHTML = intro ? introBar(intro) : "";
+  const live = cards.filter((x) => x.live);
+  $("#req-title").textContent = lvl === "all" ? `Every exercise on ${I.name}, at every level` : `Requests for ${I.name}`;
+  $("#req-count").textContent = lvl && lvl !== "all" ? `${live.filter((x) => x.p.submitted || x.p.status === "done").length} / ${live.length} answered` : "";
+  if (!lvl) gradePicker();
+  else if (lvl === "all") {
+    $("#requests").innerHTML = `<div class="r-scroll" id="r-scroll"></div>`;
+    renderAll(rest);
+    $("#r-scroll").querySelectorAll("[data-act]").forEach((b) => b.onclick = () => {
+      const pick = b.closest(".level, .ex") && b.closest(".level, .ex").querySelector(".variant-pick");
+      act(pick ? { ...b.dataset, variant: pick.value } : b.dataset);
+    });
+  } else renderTable(lvl);
+  if ($("#free")) renderFree(lvl);
+  $("#intro").querySelectorAll("[data-act]").forEach((b) => b.onclick = () => act(b.dataset));
+}
+
+// the hall: the target, the beamlines; the instruments of the twin are buttons at the end of theirs
+function renderHall(count, lvl) {
+  const c = catalogue;
+  const keys = Object.keys(c.instruments).filter((k) => HALL[k]);
+  const avail = keys.filter((k) => count(k)), later = keys.filter((k) => !count(k));
+  const line = (p, cls) => `<path class="${cls}" d="M${TARGET[0]} ${TARGET[1]} L${p[0]} ${p[1]}" vector-effect="non-scaling-stroke"/>`;
+  const svg = `<svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+    ${GREY.concat(later.map((k) => HALL[k])).map((p) => line(p, "gl")).join("")}
+    ${avail.map((k) => line(HALL[k], "il")).join("")}${avail.includes(instr) ? line(HALL[instr], "fl") : ""}</svg>`;
+  const progress = (k) => {
+    if (!lvl || lvl === "all") return `${count(k)} requests`;
+    const ex = c.exercises.filter((e) => e.instrument === k && e.kind !== "introduction");
+    const saved = instr; instr = k;                      // (the next request is found per instrument)
+    const live = requestCards(ex, lvl).filter((x) => x.live);
+    instr = saved;
+    return `${live.filter((x) => x.p.submitted || x.p.status === "done").length} of ${live.length} answered`;
+  };
+  $("#hall").innerHTML = `${svg}<div class="monolith"></div><div class="target"><b>TARGET</b><span id="hall-beam">${esc(beamText())}</span></div>
+    ${avail.map((k) => `<button type="button" class="hut ${k === instr ? "on" : ""}" data-k="${k}" style="left:${HALL[k][0]}%;top:${HALL[k][1]}%"
+      aria-pressed="${k === instr}"><b>${esc(c.instruments[k].name)}</b><span>${esc(c.instruments[k].kind.toLowerCase())}</span>
+      <span>${esc(progress(k))}</span></button>`).join("")}
+    ${later.map((k) => `<span class="later" style="left:${HALL[k][0]}%;top:${HALL[k][1]}%">${esc(c.instruments[k].name)} · later</span>`).join("")}
+    <span class="legend">grey: the other instruments of ESS, not in the twin yet · schematic</span>`;
+  $("#hall").querySelectorAll(".hut").forEach((b) => b.onclick = () => {
+    instr = b.dataset.k; localStorage.setItem("instr", instr); renderCatalogue();
   });
-  brief(sel, lvl);
 }
 
-// one chapter on the map: a ring that fills with the progress, a check when the work is submitted
-function node(x, sel, next) {
-  const { e, s, p } = x;
-  const name = s.short || e.short || e.title;
-  const st = !x.live ? (e.status === "planned" ? "planned" : "off") : p.submitted || p.status === "done" ? "done" : p.status;
-  const inner = st === "done" ? ICON_CHECK : `<span class="n">${esc(x.num)}</span>`;
-  return `<button class="node ${st}${sel ? " sel" : ""}${next ? " next" : ""}" data-key="${esc(x.key)}" style="--p:${x.live ? p.pct || 0 : 0}"
-      title="${esc(e.title)}"><span class="orb">${inner}</span>${next ? `<span class="flag">Next</span>` : ""}
-    <span class="nt">${esc(name)}</span><span class="nsub">${st === "planned" ? (e.later ? "Later" : "In preparation")
-      : st === "off" ? "Guided page only" : st === "done" ? "Answered" : st === "started" ? `${p.pct || 0} %` : "New"}</span></button>`;
+// the beam status under the hall (the beam status screen when clicked)
+function renderBeamRow() {
+  const p = beamPower(), q = Q2 * p / 2;
+  $("#beamrow").innerHTML = `<span class="on"><i></i>BEAM ON TARGET</span>
+    <span class="v"><b>${p.toFixed(1)}</b><span>MW</span></span><span class="v"><b>${(q * 14 / 1000).toFixed(2)}</b><span>mA</span></span>
+    <span class="v"><b>${q.toFixed(0)}</b><span>µC / pulse</span></span><span class="v"><b id="br-pulses">${pulsesToday()}</b><span>pulses today</span></span>
+    <span class="clock" id="br-clock">${new Date().toLocaleTimeString("en-GB")} ›</span>`;
+}
+$("#beamrow").onclick = () => Source.open();
+setInterval(() => {
+  const a = $("#br-pulses");
+  if (a && activeKey === "cat") { a.textContent = pulsesToday(); $("#br-clock").textContent = new Date().toLocaleTimeString("en-GB") + " ›"; }
+}, 1000);
+
+// the clients of the story: a card each, their story in a dialog
+function renderTeams() {
+  const c = catalogue;
+  $("#teams").innerHTML = Object.entries(c.threads || {}).map(([k, t]) => `<button type="button" class="team" data-t="${k}">
+      <span class="t-top">${vig(k)}<b>${esc(t.client)}</b></span><span class="t-what">${esc((TEAMS[k] || {}).short || t.text)}</span>
+      <span class="t-go">Meet them ›</span></button>`).join("");
+  $("#teams").querySelectorAll(".team").forEach((b) => b.onclick = () => openTeam(b.dataset.t));
+}
+function openTeam(k) {
+  const c = catalogue, t = c.threads[k], T2 = TEAMS[k] || {};
+  $("#team-band").className = `team-band ${k}-bg`;
+  $("#team-band").innerHTML = `${vig(k)}<div><small>${esc((T2.kind || "").toUpperCase())}</small><b>${esc(t.client)}</b></div>`;
+  $("#team-life").textContent = T2.life || t.text;
+  $("#team-help").textContent = T2.help || "";
+  const n = (i) => c.exercises.filter((e) => e.instrument === i && e.kind !== "introduction" && e.status !== "planned" &&
+    (Array.isArray(e.story) ? e.story : e.story ? [e.story] : []).some((x) => x.thread === k)).length;
+  $("#team-counts").innerHTML = Object.entries(c.instruments).filter(([i]) => n(i)).map(([i, I]) =>
+    `<span>${n(i)} request${n(i) > 1 ? "s" : ""} on ${esc(I.name)}</span>`).join("");
+  $("#team").showModal();
 }
 
-// the briefing of the chosen chapter: who asks, what, how far the student is, and the buttons
-function brief(key, lvl) {
-  const x = mapCards.find((y) => y.key === key);
-  const box = $("#brief");
-  if (!x) { box.innerHTML = ""; return; }
+// the scientist of the instrument writes to the student: what to do now
+function renderMentor(intro, lvl) {
+  const S = SCIENTIST[instr];
+  if (!S) { $("#mentor").innerHTML = ""; return; }
+  const I = catalogue.instruments[instr];
+  const ip = intro ? (((intro.modes || {}).all || {}).progress || { status: "new" }) : { status: "done" };
+  const next = cards.find((x) => x.next), live = cards.filter((x) => x.live);
+  let msg;
+  if (ip.status === "new") msg = `Welcome on ${I.name}! Start with the introduction just below: it shows how the instrument works. Then the requests are yours.`;
+  else if (!lvl) msg = "Choose your grade in the team: the requests, and the way you work on them, follow from it.";
+  else if (lvl === "all") msg = `Teacher view: every exercise on ${I.name}, at every level.`;
+  else if (next) msg = `${next.s.client || "A client"} is waiting for your answer: \u201c${next.e.title}\u201d ` +
+    (lvl === "bsc" ? "I have set up the instrument for you." : lvl === "msc" ? "They need a method they can trust and repeat." :
+     "Your proposal was accepted: the beamtime is yours.");
+  else if (live.length) msg = `Every request on ${I.name} is answered at this grade. Well done!`;
+  else msg = `No request on ${I.name} at this grade yet.`;
+  $("#mentor").innerHTML = `<div class="av">${esc(S.initials)}<i aria-label="new message"></i></div><div class="m-txt">
+    <div class="who"><b>${esc(S.name)}</b> <span>${esc(S.role)} · message</span></div><div class="bub">${esc(msg)}</div></div>`;
+}
+
+// the introduction of the instrument: a bar, its parts drawn as a line that a neutron runs along
+function introBar(e) {
+  const m = (e.modes || {}).all || {};
+  const p = m.progress || { status: "new", text: "Not started", pct: 0 };
+  const label = `${catalogue.instruments[e.instrument].name} · Introduction`;
+  const d = `data-dir="${esc(e.dir)}" data-mode="all" data-label="${esc(label)}"`;
+  const badge = p.status === "new" ? ["start", "START HERE ›"] : p.status === "done" ? ["cont", "OPEN AGAIN ›"] : ["cont", "CONTINUE ›"];
+  const parts = (PARTS[e.instrument] || []).map(([n, x]) => `<span class="part" style="left:${x}%"></span><span class="lab" style="left:${x}%">${n}</span>`).join("");
+  const again = p.status === "new" ? "" :
+    `<button type="button" class="ib-badge again2" data-act="reset" ${d} data-file="${esc(m.file || "")}" data-page="${m.open === "voila" ? 1 : 0}"
+       title="Your answers and the state of this introduction are put aside: you start from the beginning.">START AGAIN</button>`;
+  const state = p.status === "done" ? "done ✓" : p.status === "started" ? `started · ${p.pct || 0} %` : "";
+  return `<div class="ib-main"><button type="button" class="ib-open" data-act="open" ${d}>
+      <span class="ib-txt"><b>Introduction${durOf(m) ? " · " + esc(durOf(m)) : ""}${state ? ` <em>${state}</em>` : ""}</b><span>how the instrument works</span></span>
+      <span class="ib-line" aria-hidden="true"><span class="rail"></span>${parts}<span class="dot"></span></span></button>
+      <span class="ib-acts"><button type="button" class="ib-badge ${badge[0]}" data-act="open" ${d}>${badge[1]}</button>${again}</span></div>`;
+}
+
+// no grade yet: choose it (then it is in the menu of the account)
+function gradePicker() {
+  $("#requests").innerHTML = `<div class="req-empty"><h3>Choose your grade in the team</h3>
+    <p>The requests, and the way you work on them, follow from it. You can change it at any time in the menu of your
+      account (top right): your work at each grade is kept.</p>
+    <div class="grade-pick">${["bsc", "msc", "beamtime"].map((k) => `<button type="button" data-level="${k}"><b>${esc(ROLES[k].grade)}</b>
+      <span>${esc(ROLES[k].text)}</span></button>`).join("")}</div></div>`;
+  $("#requests").querySelectorAll("[data-level]").forEach((b) => b.onclick = () => { pref("level", b.dataset.level); renderMenu(); renderCatalogue(); });
+}
+
+// the table of the requests (REF, FROM, REQUEST, STATUS); a click opens the briefing under the row
+function renderTable(lvl) {
+  const c = catalogue;
+  const sel = pref(`sel:${instr}:${lvl}`);
+  const openKey = sel === "none" ? null : cards.some((x) => x.key === sel) ? sel : (cards.find((x) => x.next) || {}).key;
+  const row = (x) => {
+    const { e, s, p } = x;
+    const t = s.thread || "instrument";
+    const st = !x.live ? (e.status === "planned" ? "planned" : "off") : (p.submitted || p.status === "done") ? "done" : x.next ? "next" : p.status;
+    const label = { planned: e.later ? "LATER" : "IN PREPARATION", off: "OTHER LEVEL", done: "ANSWERED", next: "NEXT",
+                    started: `STARTED · ${p ? p.pct || 0 : 0} %` }[st] || "NEW";
+    const vl = s.variant !== undefined && x.m && x.m.variants ? (x.m.variants[s.variant] || {}).label : "";
+    const open = x.key === openKey;
+    return `<button type="button" class="r-row${st === "done" ? " done" : ""}${st === "planned" ? " dim" : ""}${open ? " open" : ""}"
+        data-key="${esc(x.key)}" aria-expanded="${open}">
+      <span class="r-ref ${t}-fg">${PREFIX[t] || "X"}-${String(x.num).padStart(2, "0")}</span>
+      <span class="r-from">${vig(t, true)}<span>${esc((c.threads[t] || {}).client || String(s.client || "").split(" · ")[0])}</span></span>
+      <span class="r-title">${esc(e.title)}${vl ? `<small>${esc(vl)}</small>` : ""}</span>
+      <span class="r-st ${st}">${label}</span></button>${open ? `<div class="r-detail" data-key="${esc(x.key)}">${detail(x, lvl)}</div>` : ""}`;
+  };
+  const prev = $("#r-scroll") ? $("#r-scroll").scrollTop : 0;
+  $("#requests").innerHTML = `<div class="r-head"><span>REF</span><span>FROM</span><span>REQUEST</span><span>STATUS</span></div>
+    <div class="r-scroll" id="r-scroll">${cards.map(row).join("") || `<div class="req-empty"><p>No request on this instrument at this grade yet.</p></div>`}
+      <div id="free"></div></div>`;
+  $("#r-scroll").scrollTop = prev;
+  $("#requests").querySelectorAll(".r-row").forEach((b) => b.onclick = () => {
+    pref(`sel:${instr}:${lvl}`, b.dataset.key === openKey ? "none" : b.dataset.key);
+    renderTable(lvl);
+    if ($("#free")) renderFree(lvl);
+  });
+  const box = $("#requests").querySelector(".r-detail");
+  if (box) box.querySelectorAll("[data-act]").forEach((b) => b.onclick = () => {
+    // a request opened or started again: it stays open in the table, and becomes the next one (until submitted)
+    if (b.dataset.act === "open" || b.dataset.act === "reset") { pref(`sel:${instr}:${lvl}`, box.dataset.key); pref(`last:${instr}:${lvl}`, box.dataset.key); }
+    act(b.dataset);
+  });
+}
+
+// the briefing of one request: its mission, where the student is, the buttons
+function detail(x, lvl) {
   const { e, s, m } = x;
-  box.className = `brief ${s.thread || ""}`;
-  const num = `${esc((catalogue.threads[s.thread] || {}).name || "")} · Chapter ${esc(x.num)}`;
-  const vlabel = s.variant !== undefined && m && m.variants ? (m.variants[s.variant] || {}).label : "";
-  const head = `<div class="b-kicker"><span>${num}</span><span>${esc(s.client || "")}</span></div>
-    <h3>${esc(e.title)}</h3>${vlabel ? `<span class="b-sample">${esc(vlabel)}</span>` : ""}`;
   const mission = (m && m.mission) || s.mission || e.mission || e.question;
-  if (e.status === "planned") {
-    box.innerHTML = `${head}<p class="b-mission">${esc(e.question)}</p>
-      <div class="b-intel"><span><i>Technique</i>${esc(e.technique || "")}</span><span><i>Status</i>${e.later ? "Later" : "In preparation"}</span></div>`;
-    return;
-  }
-  if (!m) {          // this request has no version at this level (a game: a guided page only)
+  if (e.status === "planned") return `<p class="b-mission">${esc(e.question)}</p>
+    <div class="b-intel"><span><i>Technique</i>${esc(e.technique || "")}</span><span><i>Status</i>${e.later ? "Later" : "In preparation"}</span></div>`;
+  if (!m) {          // no version at this level (a game: a guided page only)
     const other = Object.keys(e.modes || {})[0];
     const om = (e.modes || {})[other] || {};
     const label = `${catalogue.instruments[e.instrument].name} · ${short(e.title)} · ${LEVEL[other] || other}`;
-    box.innerHTML = `${head}<p class="b-mission">${esc(mission)}</p>
+    return `<p class="b-mission">${esc(mission)}</p>
       <div class="b-intel"><span><i>Format</i>${esc(om.label || "Guided page")}</span>${durSpan(om)}
         <span><i>Level</i>Only as a ${esc(LEVEL[other] || other)} page</span></div>
       <div class="b-acts"><button class="btn go" data-act="open" data-dir="${esc(e.dir)}" data-mode="${other}" data-label="${esc(label)}">${ICON_PLAY}Open</button></div>`;
-    wire(box, key, lvl);
-    return;
   }
   const p = x.p;
+  const vlabel = s.variant !== undefined && m.variants ? (m.variants[s.variant] || {}).label : "";
   const short2 = vlabel ? " · " + vlabel.split(" (")[0].replace(/^The /, "") : "";
   const label = `${catalogue.instruments[e.instrument].name} · ${short(e.title)}${short2} · ${LEVEL[lvl] || lvl}`;
   const d = `data-dir="${esc(e.dir)}" data-mode="${lvl}" data-label="${esc(label)}"` +
@@ -419,44 +641,30 @@ function brief(key, lvl) {
   if (lvl === "bsc") acts = `<button class="btn go" data-act="open" ${d}>${ICON_PLAY}${go}</button>`;
   else if (lvl === "msc") {
     const view = pref("mscview") === "clean" ? "clean" : "code";
-    // (with or without code: chosen once on the role card, not repeated on the button)
     acts = `<button class="btn go" data-act="open" data-view="${view}" ${d}>${ICON_PLAY}${go}</button>`;
   } else acts = `<button class="btn go" data-act="open" data-what="analysis" ${d}>${ICON_PLAY}Starter notebook</button>
       <button class="btn" data-act="sheet" data-dir="${esc(e.dir)}" data-k="${lvl}">Your proposal</button>`;
   const again = p.status === "new" ? "" :
-    `<button class="again" data-act="reset" ${d} data-file="${esc(lvl === "beamtime" ? m.analysis || "" : m.file || "")}"
+    `<button class="btn" data-act="reset" ${d} data-file="${esc(lvl === "beamtime" ? m.analysis || "" : m.file || "")}"
        data-page="${m.open === "voila" ? 1 : 0}" title="Your notebook, your answers and the state of this exercise are put aside: you start from the beginning. Your measurements stay.">Start again</button>`;
-  const first = p.total && (p.right || p.revealed) ? `<span><i>First try</i>${p.first || 0} of ${p.total} questions</span>` : "";
-  box.innerHTML = `${head}<p class="b-mission">${esc(mission)}</p>
-    <div class="b-intel"><span><i>Format</i>${esc(m.label || "")}</span>${durSpan(m)}
-      ${first}${p.submitted ? `<span><i>Submitted</i>${esc(p.submitted)}</span>` : ""}</div>
-    <div class="prog"><div class="row"><span>${esc(p.text)}</span>${again}</div>
-      <div class="track"><div class="fill" style="width:${p.pct}%"></div></div></div>
-    <div class="b-acts">${acts}</div>`;
-  wire(box, key, lvl);
-}
-// the buttons of the briefing; a chapter opened stays the chosen one on the map (when the student comes back)
-function wire(box, key, lvl) {
-  box.querySelectorAll("[data-act]").forEach((b) => b.onclick = () => {
-    // a chapter opened or started again: it stays chosen on the map, and becomes the next request (until submitted)
-    if (b.dataset.act === "open" || b.dataset.act === "reset") { pref(`sel:${instr}:${lvl}`, key); pref(`last:${instr}:${lvl}`, key); }
-    act(b.dataset);
-  });
+  const where = p.submitted ? `Submitted on ${esc(p.submitted)}` : p.status === "new" ? "" :
+    esc(String(p.text || "").replace(/^Started /, "Started on "));
+  return `<p class="b-mission">${esc(mission)}</p>${durSpan(m) ? `<div class="b-intel">${durSpan(m)}</div>` : ""}
+    ${where ? `<span class="b-where">${where}</span>` : ""}
+    <div class="b-acts">${acts}${again}</div>`;
 }
 
-// the teacher's view: every exercise with all its levels (the catalogue as it was before the roles)
 function renderAll(ex) {
   const num = (e) => e.number !== undefined ? `Exercise ${esc(e.number)} · ` : "";
-  $("#exercises").innerHTML = ex.map((e, i) => e.status === "planned"
+  $("#r-scroll").innerHTML = ex.map((e, i) => e.status === "planned"
     ? `<article class="ex planned${e.later ? " later" : ""}"><div><span class="tech">${num(e)}${esc(e.technique)} · ${e.later ? "later" : "in preparation"}</span><h3>${esc(e.title)}</h3></div>
        ${e.sample ? `<p class="smp">${esc(e.sample)}</p>` : ""}<p class="q">${esc(e.question)}</p></article>`
-    : e.kind === "introduction" ? introCard(e, i)
+    : e.kind === "introduction" ? ""
     : `<article class="ex"><div><span class="tech">${num(e)}${esc(e.technique)}</span><h3>${esc(e.title)}</h3></div>
        ${e.mission ? `<div class="mission">${ICON_TARGET}<span><b>Your mission.</b> ${esc(e.mission)}</span></div>` : ""}
-       <div class="levels">${Object.entries(e.modes || {}).map(([k, m]) => level(e, k, m, i)).join("")}</div></article>`).join("");
+       <div class="levels">${Object.entries(e.modes || {}).map(([k, m]) => level(e, k, m, i)).join("")}</div></article>`).join("") + `<div id="free"></div>`;
 }
 
-// the free beamtime: for the students on their own (and in the teacher's view)
 function renderFree(lvl) {
   const c = catalogue;
   const I = c.instruments[instr];
@@ -513,21 +721,6 @@ function level(e, k, m, i) {
     <div class="acts">${acts}</div></div>`;
 }
 
-// the introduction of an instrument: one block (title, one line, progress and the button on the right)
-function introCard(e, i) {
-  const m = (e.modes || {}).all || {};
-  const p = m.progress || { status: "new", text: "Not started", pct: 0 };
-  const label = `${catalogue.instruments[e.instrument].name} · ${short(e.title)}`;
-  const d = `data-dir="${esc(e.dir)}" data-mode="all" data-label="${esc(label)}"`;
-  const go = p.status === "new" ? "Start" : (p.status === "done" ? "Open again" : "Continue");
-  const again = p.status === "new" ? "" :
-    `<button class="again" data-act="reset" ${d} data-file="${esc(m.file || "")}" data-page="${m.open === "voila" ? 1 : 0}"
-       title="Your answers and the state of this introduction are put aside: you start from the beginning.">Start again</button>`;
-  return `<article class="ex intro-card"><div class="intro-txt"><span class="tech">${esc(e.technique)}${durOf(m, "40 min") ? " · " + esc(durOf(m, "40 min")) : ""}</span>
-      <h3>${esc(e.title)}</h3><p class="q">${esc(m.what || e.question)}</p></div>
-    <div class="intro-act"><span class="st">${esc(p.text)}${p.pct ? " · " + p.pct + " %" : ""} ${again}</span>
-      <button class="btn go" data-act="open" ${d}>${go}</button></div></article>`;
-}
 
 async function act(d) {
   try {
@@ -720,6 +913,14 @@ function openTab(url, kind, label, { clean = false } = {}) {
         window.addEventListener("keydown", (e) => { const n = nb(); if (!n || e.key !== "Enter" || n.mode !== "command") return;
           if (locked(n.activeCell)) { e.stopPropagation(); e.preventDefault(); } }, true); })()`).catch(() => {});
       // locked code cells look locked: gray, no blinking cursor, a "locked" mark (they cannot be changed anyway)
+      // the fonts and the ink of the app (the catalogue); the theme of JupyterLab otherwise
+      view.insertCSS(`@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap");
+        :root, body { --jp-ui-font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+          --jp-content-font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+          --jp-code-font-family: "IBM Plex Mono", Consolas, monospace; --jp-content-font-color1: #1B1F24;
+          --jp-brand-color1: #1B1F24; --jp-brand-color0: #000; --jp-brand-color2: #566057; }
+        .jp-RenderedHTMLCommon h1, .jp-RenderedHTMLCommon h2, .jp-RenderedHTMLCommon h3 {
+          font-family: "IBM Plex Sans Condensed", "Segoe UI", system-ui, sans-serif; font-weight: 700; }`).catch(() => {});
       view.insertCSS(`.jp-InputArea-editor.jp-mod-readOnly { background: #EEF0F3 !important; position: relative; }
         .jp-InputArea-editor.jp-mod-readOnly .cm-content { caret-color: transparent; cursor: default; }
         .jp-Cell-inputWrapper:has(.jp-InputPlaceholder) { display: none !important; }   /* hidden code (questions, buttons): not even its folded bar */
@@ -873,19 +1074,8 @@ var Classes = (() => {
     if (r && r.error) throw new Error(r.error);
     return r;
   }
-  async function loadPower() {        // the source power of the twin on this computer (source_power.py)
-    try {
-      const r = await api("GET", "/twin/source_power"), sel = $("#sp-power");
-      sel.innerHTML = r.choices.map(([label, v]) => `<option value="${v}">${esc(label)}</option>`).join("");
-      sel.value = String(r.power_mw);
-      sel.onchange = async () => {
-        try { await api("POST", "/twin/source_power", { power_mw: Number(sel.value) }); toast(`Source power: ${sel.value} MW (next measurements).`); }
-        catch (err) { toast(err.message || String(err)); }
-      };
-    } catch (err) { /* older server: no setting */ }
-  }
   async function load() {
-    loadPower();
+    Source.load();
     try { data = await api("GET", "/twin/classes"); } catch (err) { toast("Classes: " + (err.message || err)); return; }
     if (!selected && data.classes.length) selected = (data.open && data.open.code) || data.classes[0].code;
     renderList(); renderDetail(); poll();
@@ -912,7 +1102,7 @@ var Classes = (() => {
     if (!c) { box.innerHTML = '<p class="hint">Choose a class, or make a new one.</p>'; return; }
     const byId = Object.fromEntries(data.offer.map((p) => [p.id, p]));
     const open = data.open && data.open.code === c.code ? data.open : null;
-    const power = c.settings && c.settings.power_mw ? `${c.settings.power_mw} MW (fixed)` : "not fixed (side panel)";
+    const power = c.settings && c.settings.power_mw ? `${c.settings.power_mw} MW` : "not fixed (older class)";
     let openHtml;
     if (!open) {
       openHtml = `<div class="cls-acts"><button class="primary" id="cls-open">Open the class</button>
@@ -1017,7 +1207,7 @@ var Classes = (() => {
         <span>· ${esc(p.level_name)}${p.duration ? " · " + esc(p.duration) : ""}</span></div></label>`);
     }
     $("#nc-title").value = c ? c.title : "";
-    $("#nc-power").value = c && c.settings && c.settings.power_mw ? String(c.settings.power_mw) : "";
+    $("#nc-power").value = c && c.settings && c.settings.power_mw ? String(c.settings.power_mw) : "5";
     document.querySelector(`input[name="nc-id"][value="${c ? c.identity : "anonymous"}"]`).checked = true;
     for (const e of [$("#nc-title"), $("#nc-power"), ...document.querySelectorAll('input[name="nc-id"]')]) e.disabled = locked;
     $("#nc-head").textContent = !c ? "New class" : locked ? "Add pages to the class" : "Edit the class";
@@ -1037,7 +1227,7 @@ var Classes = (() => {
     if (!pages.length) { $("#nc-error").textContent = "Choose at least one page."; return; }
     try {
       const c = await api("POST", "/twin/classes", { code: editing ? editing.code : undefined, title: $("#nc-title").value, pages,
-        identity: document.querySelector('input[name="nc-id"]:checked').value, power_mw: $("#nc-power").value || null });
+        identity: document.querySelector('input[name="nc-id"]:checked').value, power_mw: Number($("#nc-power").value) });
       selected = c.code; $("#newclass").close();
       toast(editing ? "Class saved." + (data.open && data.open.code === c.code ? " The students see the new pages when they reload the start page." : "")
                     : "Class created. Open it when the students are ready.");

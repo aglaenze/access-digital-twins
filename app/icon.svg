@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="1024" height="1024">
+  <!-- ESS digital twins: a proton pulse (yellow) hits the target (white); the neutrons leave it in every direction
+       (green). Source of icon.png and ../container/app_icon.png/.ico (app/make_icons.py). -->
+  <rect x="2" y="2" width="60" height="60" rx="13" fill="#1B1F24"/>
+  <g stroke="#4ADE80" stroke-width="3.5" stroke-linecap="round">
+    <path d="M38 34 L55 17"/><path d="M38 34 L58 36"/><path d="M38 34 L53 52"/>
+    <path d="M38 34 L34 57"/><path d="M38 34 L40 9"/><path d="M38 34 L19 53"/>
+  </g>
+  <path d="M7 34 H26" stroke="#F2C230" stroke-width="7" stroke-linecap="round"/>
+  <circle cx="36" cy="34" r="9" fill="#F7F8F4"/>
+</svg>

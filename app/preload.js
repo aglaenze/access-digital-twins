@@ -10,7 +10,7 @@ contextBridge.exposeInMainWorld("twins", {
   signIn: (form) => ipcRenderer.invoke("sign-in", form),
   resetPassword: (form) => ipcRenderer.invoke("reset-password", form),
   teacher: (code, on = true) => ipcRenderer.invoke("teacher", code, on),
-  titlebar: (theme) => ipcRenderer.invoke("titlebar", theme),      // "light" (sign-in screen) or "dark" (the app)
+  titlebar: (theme) => ipcRenderer.invoke("titlebar", theme),      // "splash", "light" (sign in), "dark"/"night" (the app)
   platform: process.platform,
   signOut: () => ipcRenderer.invoke("sign-out"),
   api: (method, path, body) => ipcRenderer.invoke("api", method, path, body),

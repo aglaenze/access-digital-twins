@@ -9,13 +9,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ESS digital twins</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
   <style>
-    :root { --bg: #08111F; --panel: #0F1D31; --line: #22344F; --ink: #EAF0F8; --mute: #9FB0C7; --teal: #2BB3A3;
-            --amber: #F2B544; --rust: #E07B4F; }
+    :root { --bg: #0B0F14; --panel: #161C25; --line: #252E3A; --ink: #E3E8EF; --mute: #97A2B3; --teal: #4ADE80;
+            --amber: #FFC94A; --rust: #E07B4F; }
     * { box-sizing: border-box; }
-    body { margin: 0; font-family: "Segoe UI", system-ui, -apple-system, sans-serif; color: var(--ink);
-           background: radial-gradient(1200px 600px at 80% -10%, #16365A 0%, transparent 60%),
-                       radial-gradient(900px 500px at -10% 110%, #123A3A 0%, transparent 55%), var(--bg);
+    body { margin: 0; font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif; color: var(--ink);
+           background: var(--bg);
            min-height: 100vh; }
     header { display: flex; align-items: center; gap: 12px; padding: 16px 28px; border-bottom: 1px solid var(--line);
              font-weight: 700; letter-spacing: .3px; }
@@ -24,9 +24,9 @@
     main { max-width: 1060px; margin: 0 auto; padding: 36px 20px 60px; }
     .hero { display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: center; margin-bottom: 30px; }
     .badge { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px;
-             background: rgba(242,181,68,.12); color: var(--amber); font-weight: 600; font-size: 13px;
-             border: 1px solid rgba(242,181,68,.35); }
-    h1 { font-size: clamp(26px, 4vw, 38px); margin: 14px 0 10px; line-height: 1.15; }
+             background: rgba(255,201,74,.12); color: var(--amber); font-weight: 600; font-size: 13px;
+             border: 1px solid rgba(255,201,74,.35); }
+    h1 { font-family: "IBM Plex Sans Condensed", "Segoe UI", system-ui, sans-serif; font-size: clamp(26px, 4vw, 40px); margin: 14px 0 10px; line-height: 1.15; }
     .hero p { color: var(--mute); line-height: 1.6; max-width: 640px; margin: 0; font-size: 16px; }
     .emblem { width: 150px; height: 150px; }
     .step { display: flex; align-items: center; gap: 12px; margin: 34px 0 14px; color: var(--mute);
@@ -36,9 +36,9 @@
     .step .bar { flex: 1; height: 1px; background: var(--line); }
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; }
     .card { position: relative; background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,0)), var(--panel);
-            border: 1px solid var(--line); border-radius: 18px; padding: 22px; display: flex; flex-direction: column;
+            border: 1px solid var(--line); border-radius: 10px; padding: 22px; display: flex; flex-direction: column;
             gap: 12px; transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease; }
-    .card:hover { transform: translateY(-3px); border-color: #35527A; box-shadow: 0 14px 34px rgba(0,0,0,.35); }
+    .card:hover { transform: translateY(-3px); border-color: #3A4656; box-shadow: 0 14px 34px rgba(0,0,0,.35); }
     .card.brief { border-color: rgba(43,179,163,.45); }
     .top { display: flex; align-items: center; gap: 14px; }
     .icon { width: 52px; height: 52px; border-radius: 14px; display: grid; place-items: center; flex: none; }
@@ -49,8 +49,8 @@
     .tag { font-size: 12.5px; padding: 4px 10px; border-radius: 999px; background: #15263D; color: #C6D3E4;
            border: 1px solid var(--line); }
     .foot { margin-top: auto; display: flex; align-items: center; gap: 12px; padding-top: 6px; }
-    .go { appearance: none; border: 0; cursor: pointer; border-radius: 12px; padding: 12px 18px; font-weight: 700;
-          font-size: 15px; color: #06141A; background: var(--teal); display: inline-flex; align-items: center; gap: 8px; }
+    .go { appearance: none; border: 0; cursor: pointer; border-radius: 6px; padding: 12px 18px; font-weight: 700;
+          font-size: 15px; color: #0B0F14; background: var(--teal); display: inline-flex; align-items: center; gap: 8px; }
     .go:hover { filter: brightness(1.1); }
     .card.mission .go { background: var(--amber); }
     .seen { display: none; font-size: 13px; color: var(--teal); font-weight: 600; }
@@ -73,7 +73,7 @@
     .who label { display: block; margin-bottom: 10px; color: var(--mute); }
     .who .row { display: flex; gap: 10px; flex-wrap: wrap; }
     .who input { flex: 1; min-width: 220px; padding: 11px 12px; border-radius: 10px; border: 1px solid var(--line);
-                 background: #0B1626; color: var(--ink); font-size: 15px; }
+                 background: #11161D; color: var(--ink); font-size: 15px; }
     .who [hidden], .who[hidden] { display: none !important; }
     .who .hello { color: var(--mute); }
     .who .hello a { color: var(--teal); }
@@ -93,13 +93,13 @@
           and analyze your own data, in this browser. Nothing to install.</p>
       </div>
       <svg class="emblem" viewBox="0 0 120 120" aria-hidden="true">
-        <defs><radialGradient id="g" cx="50%" cy="45%" r="60%"><stop offset="0" stop-color="#2BB3A3" stop-opacity=".55"/>
-          <stop offset="1" stop-color="#2BB3A3" stop-opacity="0"/></radialGradient></defs>
+        <defs><radialGradient id="g" cx="50%" cy="45%" r="60%"><stop offset="0" stop-color="#4ADE80" stop-opacity=".55"/>
+          <stop offset="1" stop-color="#4ADE80" stop-opacity="0"/></radialGradient></defs>
         <circle cx="60" cy="60" r="56" fill="url(#g)"/>
-        <circle cx="60" cy="60" r="40" fill="none" stroke="#2BB3A3" stroke-width="2" stroke-dasharray="4 6"/>
-        <ellipse cx="60" cy="60" rx="46" ry="16" fill="none" stroke="#F2B544" stroke-width="2" transform="rotate(30 60 60)"/>
-        <ellipse cx="60" cy="60" rx="46" ry="16" fill="none" stroke="#9FB0C7" stroke-width="1.5" transform="rotate(-30 60 60)"/>
-        <circle cx="60" cy="60" r="9" fill="#EAF0F8"/>
+        <circle cx="60" cy="60" r="40" fill="none" stroke="#4ADE80" stroke-width="2" stroke-dasharray="4 6"/>
+        <ellipse cx="60" cy="60" rx="46" ry="16" fill="none" stroke="#FFC94A" stroke-width="2" transform="rotate(30 60 60)"/>
+        <ellipse cx="60" cy="60" rx="46" ry="16" fill="none" stroke="#97A2B3" stroke-width="1.5" transform="rotate(-30 60 60)"/>
+        <circle cx="60" cy="60" r="9" fill="#E3E8EF"/>
       </svg>
     </section>
 

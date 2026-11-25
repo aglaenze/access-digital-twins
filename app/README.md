@@ -126,18 +126,30 @@ Linux; light on the sign-in screen, dark in the app; macOS: its three buttons on
 - The students' copies (`work/<account>/...`) find the twin through `TWIN_ROOT` (set by the server of the app): no path
   of one computer in them.
 
-## The catalogue: roles, the story, the teacher view
+## The catalogue: the hall, the requests, the story, the teacher view
 
-A student first chooses an instrument, sees its introduction, then chooses a **role in the team** (the level):
-*Trainee* (BSc), *Method scientist* (MSc, with or without code) or *Lead scientist* (on their own: beamtime with NICOS,
-free beamtime). The choice is kept for the account. The requests of that level are then shown as a **map**, as in the
-level screen of a game: a bar with the grade and the record (requests answered, questions right at the first try), one
-lane per thread of the story of `../STORY.md` (`story:` in each `exercise.yml`; the threads are `THREADS` in
-`container/twin_app.py`) with its chapters as nodes on a path (a ring that fills with the progress, a check once
-submitted, the next request marked), and the **briefing** of the chosen chapter (client, mission of this level, format,
-progress, buttons). A node's name is `short:` in `exercise.yml`; the chapters are numbered along their thread (1, 2, 3...), the numbers
-of the exercises (`number:`, the themes of ODIN) appear only in the teacher view. The content of the catalogue follows the width of the
-window.
+One screen, no scrolling of the page (designed 2026-11-25; mockups on claude.ai, "Catalogue mockups"):
+
+- **left**: the **hall**, a schematic of the target and its beamlines: the instruments of the twin are buttons at the
+  end of their line (the beam runs along the chosen one), the others grey ("later"); under it the **beam status**
+  (power, current, protons per pulse, pulses today; a click opens the beam status screen), then the **clients** of the
+  story (`../STORY.md`, `THREADS` in `container/twin_app.py`): a card each, their story and how ESS helps them in a dialog;
+- **right**: the chosen instrument, a **message** of its scientist (Maja Holm for ODIN, Tomas Berg for LoKI: what to do
+  now, from the progress), its **introduction** (a bar where a neutron runs along the parts of the instrument), then the
+  **table of the requests** of the grade (REF from the thread and its order, FROM with the vignette of the client,
+  REQUEST, STATUS: next, started, answered, later), in its own scrolling box; a click on a row opens its briefing under
+  it (mission of this level, format, progress, Start / Continue / Start again; beamtime: starter notebook and proposal).
+  The lead scientist and the teacher also find the free beamtime at the end of the list.
+
+The **grade** (the level: *Trainee* BSc, *Method scientist* MSc with or without code, *Lead scientist* beamtime) is
+chosen once in the menu of the account (a new student chooses it in the box of the requests), and kept for the account,
+with the **appearance**: light (paper and ink) or dark (control room). On a narrow or low window the two columns stack
+and the page scrolls. The numbers of the exercises (`number:`, the themes of ODIN) appear only in the teacher view.
+
+**Opening screen**: while the instruments start (`backend.js` status), the target and its beamlines, the steps, a bar and
+a fact about ESS; it fades out when they are ready (or *Continue to sign in* after an error or 25 s). **Icon**: `icon.svg`
+(a proton pulse hits the target, the neutrons leave in every direction), made into `icon.png` and
+`../container/app_icon.png/.ico` by `python make_icons.py`.
 
 **Teacher view** (every exercise at every level on one page): menu of the account, *Teacher view…*, then the teacher
 code. Only a salted hash of the code is shipped (`teacher_code.json`); change it with `node set_teacher_code.js <code>`
