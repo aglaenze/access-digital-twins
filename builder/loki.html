@@ -17,7 +17,9 @@
     <button data-step="1" class="on"><span class="n">1</span>Sample</button>
     <button data-step="2"><span class="n">2</span>Holder</button>
     <button data-step="3"><span class="n">3</span>Check &amp; save</button>
-    <button data-step="4" title="Fit sizes and amounts to your measurements"><span class="n">4</span>Fit to my data</button>
+    <!-- step 4 (fit to my data) hidden on 2026-11-25: beyond the scope of the tool for now (in the twin the measured
+         sample is the one built here); kept as an idea, FEUILLE_DE_ROUTE.md -->
+    <button data-step="4" class="hidden" title="Fit sizes and amounts to your measurements"><span class="n">4</span>Fit to my data</button>
   </nav>
 </header>
 
@@ -101,7 +103,7 @@
           <div class="msg" id="model-msg"></div>
         </details>
       </div>
-      <div class="next"><button data-go="2">← The holder</button><button data-go="4">Fit it to my data →</button></div>
+      <div class="next"><button data-go="2">← The holder</button></div>
     </div>
 
     <!-- ============ step 4: fit the sample to the measurements ============ -->

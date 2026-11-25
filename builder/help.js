@@ -89,9 +89,6 @@ const HOW = `
     <li><b>Advanced: the whole sample as text</b>, in three boxes that do not overlap: its materials, its components,
       and its parts with the rest (also what has no button: combined shapes, meshes, rotations about any axis, the
       sources of the numbers). Each box has its own <i>Apply</i>; <i>Copy the whole recipe</i> gives it as one text.</li>
-    <li><b>4. Fit to my data</b>: numbers of the sample (a density, a fraction, a thickness) adjusted to the
-      transmission you measured, wavelength by wavelength, in a region of the image (files of your proposal, Timepix3
-      with the choppers). The values come with their uncertainties; <i>Put these values in my sample</i> keeps them.</li>
   </ul>
 </section>`;
 
@@ -113,7 +110,7 @@ function openHow() {
 
 // ------------------------------------------------------------------ "Tour"
 const STOPS = [
-  ["#steps", "The steps", "Make your sample: 1. the sample, 2. what holds it, 3. check and save; 4. fit it to your measurements, once you have some. You can go back and forth."],
+  ["#steps", "The steps", "Make your sample: 1. the sample, 2. what holds it, 3. check and save. You can go back and forth."],
   ["#gallery-box", "Start from", "Start from the closest example or sample, from the simplest to the most complex, then change it."],
   [".box:has(#tree)", "The parts", "Your sample is a tree of parts, each one shape of one material. Click a part to change it; + Inside puts a new part inside it (an inclusion, a hole)."],
   ["#part-box", "The selected part", "Its material (Change: the materials with their Σ), its shape (the icons), its size and position in mm; at the bottom, the grains placed at random in it."],

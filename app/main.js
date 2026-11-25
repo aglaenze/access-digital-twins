@@ -354,10 +354,8 @@ async function selftest(out) {
     check("builder: checks computed", await until(`document.querySelectorAll('#checks li').length > 0 && !document.querySelector('#checks li.wait')`, 180), t4);
     await new Promise((r) => setTimeout(r, 2000));
     await shot("6_sample_builder");
-    // step 4, fit to the measurements: this proposal has none yet, the page says what to measure first
-    await sb(`document.querySelector('#steps [data-step="4"]').click(); true`);
-    check("builder: step 4 (fit to my data) shown, no measurement yet", await until(`!!document.querySelector('#fit-files .note-box')`, 60), t4);
-    await shot("6a_sample_builder_fit");
+    // step 4 (fit to my data) is hidden for now (FEUILLE_DE_ROUTE.md): three steps only
+    check("builder: three steps (fit to my data hidden)", await sb(`[...document.querySelectorAll('#steps [data-step]')].filter(b => b.offsetParent).length === 3`), t4);
     const tLoki = Date.now();
     await js(`openTab("/twin/builder?instrument=loki&proposal=3001", "page", "Sample builder"); true`);
     check("LoKI builder: gallery filled", await until(`document.querySelectorAll('#gallery .card').length > 1`, 90), tLoki);
