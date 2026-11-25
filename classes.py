@@ -121,6 +121,53 @@ def new(title, pages, identity="anonymous", settings=None, note=""):
     return c
 
 
+def students(code):
+    """The students who have opened the class (ids anon_...): once there is one, the class has data."""
+    out = []
+    for wj in glob.glob(os.path.join(run_root(), "progress", "anon_*", "web.json")):
+        try:
+            with open(wj, encoding="utf-8") as f:
+                if json.load(f).get("class") == code:
+                    out.append(os.path.basename(os.path.dirname(wj)))
+        except (OSError, ValueError):
+            pass
+    return out
+
+
+def update(code, title, pages, identity="anonymous", settings=None, note=""):
+    """Changes a class. Before any student opened it: everything (title, students, power, pages). Once students have
+    worked in it: pages can only be added (their work, the results and the live follow-up refer to the rest)."""
+    c = load(code)
+    known = {p["id"] for p in offer()}
+    bad = [p for p in pages if p not in known and p not in c["pages"]]
+    if bad:
+        raise ValueError(f"pages not offered: {bad}")
+    if not pages:
+        raise ValueError("a class needs at least one page")
+    if identity not in IDENTITIES:
+        raise ValueError(f"identity: one of {IDENTITIES}")
+    settings = {"power_mw": None, **(settings or {})}
+    if students(code):
+        changed = [k for k, old, new in (("title", c["title"], title.strip() or "Class"), ("students", c["identity"], identity),
+                                         ("power of the source", c["settings"].get("power_mw"), settings["power_mw"]))
+                   if old != new]
+        removed = [p for p in c["pages"] if p not in pages]
+        if changed or removed:
+            raise ValueError("students have already worked in this class: you can only add pages "
+                             f"(not change: {', '.join(changed + (['the pages already given'] if removed else []))})")
+        c["pages"] = c["pages"] + [p for p in pages if p not in c["pages"]]
+    else:
+        c.update(title=title.strip() or "Class", identity=identity, pages=list(pages), settings=settings, note=note)
+    c["modified"] = datetime.datetime.now().isoformat(timespec="seconds")
+    save(c)
+    st = open_status()
+    if st and st.get("code") == code:            # the open class: its start page shows the new pages at once
+        class_json = os.path.join(HERE, "container", "app_data", "voila", "templates", "twin", "static", "class.json")
+        with open(class_json, "w", encoding="utf-8") as f:
+            json.dump(student_view(c), f, indent=1, ensure_ascii=False)
+    return c
+
+
 def save(c):
     os.makedirs(folder(), exist_ok=True)
     with open(_path(c["code"]), "w", encoding="utf-8") as f:

@@ -140,7 +140,8 @@
     <input id="t-code" type="password" autocomplete="off" spellcheck="false"></div>
   <p id="t-error" class="error"></p></div>
   <div class="prop-acts"><button type="button" class="btn" id="t-cancel">Cancel</button><button class="primary">Open the teacher view</button></div></form></dialog>
-<dialog id="newclass" class="wide"><form id="nc-form" class="prop-form"><div class="sheet-body"><h2>New class</h2>
+<dialog id="newclass" class="wide"><form id="nc-form" class="prop-form"><div class="sheet-body"><h2 id="nc-head">New class</h2>
+  <p id="nc-locked" class="hint hidden"></p>
   <div class="field"><label for="nc-title">Title (shown to the students)</label>
     <input id="nc-title" type="text" autocomplete="off" required placeholder="e.g. Advanced X-ray imaging, 23 November"></div>
   <div class="nc-row">
@@ -159,7 +160,7 @@
       class pages. The notebooks (MSc) and the beamtimes (NICOS) need a server per student: later.</p>
   </fieldset>
   <p id="nc-error" class="error"></p></div>
-  <div class="prop-acts"><button type="button" class="btn" id="nc-cancel">Cancel</button><button class="primary">Create the class</button></div></form></dialog>
+  <div class="prop-acts"><button type="button" class="btn" id="nc-cancel">Cancel</button><button class="primary" id="nc-submit">Create the class</button></div></form></dialog>
 <div id="toast" role="status"></div>
 <script src="vendor/qrcode.js"></script>
 <script src="clean_view.js"></script>

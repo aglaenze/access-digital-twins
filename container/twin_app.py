@@ -24,6 +24,8 @@ All requests need the token of the server (header "Authorization: token ...").
                                    room of the container (returns the address of the remote screen)
     GET  /twin/classes             the classes of the teacher (classes.py), the pages that can be given, the open one
     POST /twin/classes {title, pages, identity, power_mw}   a new class
+    POST /twin/classes {code, title, pages, identity, power_mw}   changes a class (classes.update: everything before
+                                   any student opened it, then only new pages)
     DELETE /twin/classes?code=C    removes a class (the work of its students stays)
     POST /twin/classes/open {code, tunnel}   opens a class: web_class.py --class (Voila, and the tunnel)
     POST /twin/classes/close       closes the open class
@@ -611,7 +613,10 @@ class Classes(Base):
         if what == "live":
             self.finish(json.dumps(dict(rows=C.live(self.get_argument("code")), open=C.open_status())))
             return
-        self.finish(json.dumps(dict(classes=C.classes(), offer=C.offer(), open=C.open_status())))
+        cls = C.classes()
+        for c in cls:                              # students already in it: then only pages can be added
+            c["n_students"] = len(C.students(c["code"]))
+        self.finish(json.dumps(dict(classes=cls, offer=C.offer(), open=C.open_status())))
 
     @web.authenticated
     def post(self, what=""):
@@ -623,9 +628,10 @@ class Classes(Base):
                 out = dict(closed=C.close_class())
             else:
                 power = d.get("power_mw")
-                out = C.new(d.get("title", ""), d.get("pages", []), identity=d.get("identity", "anonymous"),
-                            settings=dict(power_mw=float(power) if power not in (None, "") else None),
-                            note=d.get("note", ""))
+                make = (lambda *a, **k: C.update(d["code"], *a, **k)) if d.get("code") else C.new
+                out = make(d.get("title", ""), d.get("pages", []), identity=d.get("identity", "anonymous"),
+                           settings=dict(power_mw=float(power) if power not in (None, "") else None),
+                           note=d.get("note", ""))
         except (ValueError, KeyError, OSError) as e:
             self.set_status(400)
             out = dict(error=str(e))

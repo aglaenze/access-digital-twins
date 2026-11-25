@@ -929,6 +929,9 @@ var Classes = (() => {
                  : `<li>${esc(id)} <span>(no longer offered)</span></li>`;
       }).join("")}</ol></div>
       <div class="cls-card"><h3>Live</h3><div id="cls-live"><p class="hint">Reading…</p></div></div>
+      <div class="cls-acts"><button class="btn" id="cls-edit">${c.n_students ? "Add pages" : "Edit this class"}</button>
+        <span class="hint">${c.n_students ? `${c.n_students} student(s) already worked in it: you can add pages, not change the rest.`
+                                          : "No student has opened it yet: everything can be changed."}</span></div>
       <div class="cls-acts"><button class="btn danger" id="cls-delete">Delete this class</button>
         <span class="hint">Deleting removes the class only: the work of its students stays on this computer.</span></div>`;
     const on = (id, f) => { const e = document.getElementById(id); if (e) e.onclick = f; };
@@ -943,6 +946,7 @@ var Classes = (() => {
     });
     on("cls-copy", () => { navigator.clipboard.writeText(open.link); toast("Link copied."); });
     on("cls-try", () => T.openExternal(open.link));
+    on("cls-edit", () => form(c));
     on("cls-delete", async () => {
       if (!confirm(`Delete the class "${c.title}"? The work of its students stays on this computer.`)) return;
       try { await api("DELETE", "/twin/classes?code=" + c.code); } catch (err) { toast(err.message || err); return; }
@@ -987,28 +991,45 @@ var Classes = (() => {
       if ((data.open && data.open.link) !== was) { renderList(); renderDetail(); } else renderLive();
     } catch (err) { /* the next poll tries again */ }
   }
-  // the form of a new class: the pages offered, grouped by instrument
-  $("#cls-new").onclick = () => {
+  // the form of a class: new (c null) or changed (c: everything if no student opened it yet, otherwise new pages only)
+  let editing = null;
+  function form(c) {
+    editing = c;
+    const locked = !!(c && c.n_students);
     const box = $("#nc-pages"); box.innerHTML = "";
     let instr = "";
     for (const p of data.offer) {
       if (p.instrument !== instr) { instr = p.instrument; box.insertAdjacentHTML("beforeend", `<h4>${esc(instr.toUpperCase())}</h4>`); }
-      box.insertAdjacentHTML("beforeend", `<label><input type="checkbox" value="${esc(p.id)}"> <div>${esc(p.title)}
+      const has = c && c.pages.includes(p.id);
+      box.insertAdjacentHTML("beforeend", `<label><input type="checkbox" value="${esc(p.id)}"${has ? " checked" : ""}${has && locked ? " disabled" : ""}> <div>${esc(p.title)}
         <span>· ${esc(p.level_name)}${p.duration ? " · " + esc(p.duration) : ""}</span></div></label>`);
     }
-    $("#nc-title").value = ""; $("#nc-power").value = ""; $("#nc-error").textContent = "";
-    document.querySelector('input[name="nc-id"][value="anonymous"]').checked = true;
+    $("#nc-title").value = c ? c.title : "";
+    $("#nc-power").value = c && c.settings && c.settings.power_mw ? String(c.settings.power_mw) : "";
+    document.querySelector(`input[name="nc-id"][value="${c ? c.identity : "anonymous"}"]`).checked = true;
+    for (const e of [$("#nc-title"), $("#nc-power"), ...document.querySelectorAll('input[name="nc-id"]')]) e.disabled = locked;
+    $("#nc-head").textContent = !c ? "New class" : locked ? "Add pages to the class" : "Edit the class";
+    $("#nc-submit").textContent = !c ? "Create the class" : "Save";
+    $("#nc-locked").textContent = locked ? `${c.n_students} student(s) already worked in this class: you can add pages; ` +
+      "the title, the students, the power and the pages already given stay (the results refer to them)." : "";
+    $("#nc-locked").classList.toggle("hidden", !locked);
+    $("#nc-error").textContent = "";
     $("#newclass").showModal();
-  };
+  }
+  $("#cls-new").onclick = () => form(null);
   $("#nc-cancel").onclick = () => $("#newclass").close();
   $("#nc-form").onsubmit = async (ev) => {
     ev.preventDefault();
-    const pages = [...document.querySelectorAll("#nc-pages input:checked")].map((i) => i.value);
+    let pages = [...document.querySelectorAll("#nc-pages input:checked")].map((i) => i.value);
+    if (editing) pages = [...editing.pages.filter((id) => pages.includes(id)), ...pages.filter((id) => !editing.pages.includes(id))];
     if (!pages.length) { $("#nc-error").textContent = "Choose at least one page."; return; }
     try {
-      const c = await api("POST", "/twin/classes", { title: $("#nc-title").value, pages,
+      const c = await api("POST", "/twin/classes", { code: editing ? editing.code : undefined, title: $("#nc-title").value, pages,
         identity: document.querySelector('input[name="nc-id"]:checked').value, power_mw: $("#nc-power").value || null });
-      selected = c.code; $("#newclass").close(); toast("Class created. Open it when the students are ready."); load();
+      selected = c.code; $("#newclass").close();
+      toast(editing ? "Class saved." + (data.open && data.open.code === c.code ? " The students see the new pages when they reload the start page." : "")
+                    : "Class created. Open it when the students are ready.");
+      load();
     } catch (err) { $("#nc-error").textContent = err.message || String(err); }
   };
   return {

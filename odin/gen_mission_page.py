@@ -63,6 +63,8 @@ shut = w.ToggleButtons(options=["closed", "open"], value="closed", description="
 smp = w.Dropdown(options=list(games.CODES), value=games.CODES[0], description="Sample")
 stage = w.Dropdown(options=[("in the beam (0 mm)", 0.0), ("out of the beam (500 mm)", 0.5)], value=0.0, description="Stage")
 ttime = w.Dropdown(options=[5, 10, 20, 30, 60, 90], value=30, description="Time (s)")
+import source_power                          # the power of the source (fixed by the teacher, or chosen here)
+power = source_power.control(odin)
 title = w.Text(placeholder="e.g. open beam", description="Title")
 budget = w.FloatProgress(min=0, max=mission.data["budget_s"], description="Beamtime", bar_style="success")
 budget_txt = w.Label()
@@ -78,6 +80,8 @@ def refresh_budget():
 
 def do_count(_):
     button.disabled = True
+    for d in source_power.lockable(power):      # not changed during a count
+        d.disabled = True
     with out:
         clear_output()
         try:
@@ -90,6 +94,8 @@ def do_count(_):
             print("Refused:", e)
     refresh_budget(); refresh_files()
     button.disabled = False
+    for d in source_power.lockable(power):
+        d.disabled = False
 
 def show_diagram(_):
     with diag_out:
@@ -99,7 +105,7 @@ def show_diagram(_):
 
 button.on_click(do_count); diag_button.on_click(show_diagram)
 refresh_budget()
-display(w.VBox([chop, shut, smp, stage, ttime, title, w.HBox([budget, budget_txt]), w.HBox([button, diag_button]), out, diag_out]))
+display(w.VBox([chop, shut, smp, stage, ttime, power, title, w.HBox([budget, budget_txt]), w.HBox([button, diag_button]), out, diag_out]))
 """)
 
 md(r"""
