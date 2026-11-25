@@ -151,15 +151,15 @@ md(r"""
 """ + beam_tof_md("wfm") + r"""""" + transmission_md("stage at 500 mm: the specimen and its load frame out of the field", per_wavelength=True) + r"""
 **The measurements to take.** Set the controls, then click *Count*: the detector image and the spectrum of arrival
 times fill up during the count, as on the instrument. A strain of $10^{-3}$ moves the edge by only 0.004 Å, so you need
-many neutrons: **repeat** each measurement of the specimen and of the open beam **4 times** (60 s each); the analysis
-adds up the repeated counts.
+many neutrons: **repeat** each measurement of the specimen and of the open beam **4 times** (30 s each, at 5 MW); the
+analysis adds up the repeated counts.
 
 | Measurement | Shutter | Stage x (mm) | Load | Time (s) | Repeat |
 |---|---|---|---|---|---|
-| 1. dark | **closed** | 0 | 0 | 60 | 1 |
-| 2. open beam | **open** | **500** | 0 | 60 | **4** |
-| 3. reference | open | **0** | **0 kN** | 60 | **4** |
-| 4. under load | open | 0 | **10.75 kN** (600 MPa) | 60 | **4** |
+| 1. dark | **closed** | 0 | 0 | 30 | 1 |
+| 2. open beam | **open** | **500** | 0 | 30 | **4** |
+| 3. reference | open | **0** | **0 kN** | 30 | **4** |
+| 4. under load | open | 0 | **10.75 kN** (600 MPa) | 30 | **4** |
 
 Why these settings:
 - the **choppers** are in WFM mode (wavelength frame multiplication, discs 0.30 m apart) and the **pinhole** is
@@ -169,7 +169,7 @@ Why these settings:
 - the **reference at 0 kN** is measured on the specimen itself, in the same position: the strain is the *change* of
   the edge, and everything else must stay the same;
 - each count lasts as long as on the instrument, plus the time to compute it (about a minute): the 13 counts take
-  about 25 minutes. Meanwhile, read the next parts.
+  about 20 minutes. Meanwhile, read the next parts.
 """)
 
 code(r"""
@@ -179,7 +179,7 @@ stage = w.BoundedFloatText(value=st["stage_x"] * 1000, min=-500, max=500, step=1
 load = w.Dropdown(options=[("0 kN (no load)", 0.0), ("5.38 kN (300 MPa in the middle)", 5.38),
                            ("10.75 kN (600 MPa in the middle)", F600)], value=0.0, description="Load",
                   layout=w.Layout(width="420px"))
-ttime = w.Dropdown(options=[30, 60], value=60, description="Time (s)")
+ttime = w.Dropdown(options=[15, 30], value=30, description="Time (s)")
 title = w.Text(value="", placeholder="e.g. steel 0 kN", description="Title")
 button = w.Button(description="Count", button_style="primary", icon="play", layout=w.Layout(width="auto"))
 live_label = w.Label()
@@ -582,7 +582,7 @@ q.number("Which strain **along the beam** did you measure in the middle at 10.75
                    (30.8, "the strain along the force (Q4); the measurement gives the strain along the beam")],
          hints=["Part 3 prints it for the middle.", "It is negative, about −9 × 10⁻⁴."],
          explanation="Expected −ν σ/E = −0.29 × 594 / 195 000 = −8.8 × 10⁻⁴ in the middle region (594 MPa on average). "
-                     "With 4 × 60 s per measurement your value has an uncertainty of about ± 3 × 10⁻⁴: yours is right "
+                     "With 4 × 30 s per measurement at 5 MW your value has an uncertainty of about ± 3 × 10⁻⁴: yours is right "
                      "if it agrees within about twice this uncertainty. V20 measured −7.6 ± 3.0 × 10⁻⁴.",
          title="Q5. Your measurement")
 q.choice("Why measure the specimen **without load** rather than use the textbook value of the edge?",
@@ -613,10 +613,10 @@ q.choice("The edge is about 0.02 Å wide and moves by 0.004 Å. How can such a s
          hints=["How many points of the spectrum does the fit use?",
                 "The mean of N values is known √N times better than one value."],
          title="Q7. Smaller than the resolution")
-q.number("V20 needed 25 + 48 hours of measurement for an uncertainty of ± 3 × 10⁻⁴; you needed 8 minutes (4 × 60 s at "
-         "each load). How many times faster is ODIN here?", value=550, tol=60,
-         hints=["73 hours in minutes, divided by 8."],
-         explanation="73 h = 4380 min, / 8 min ≈ 550. V20 imitated the ESS pulse on a research reactor, keeping only "
+q.number("V20 needed 25 + 48 hours of measurement for an uncertainty of ± 3 × 10⁻⁴; you needed 4 minutes (4 × 30 s at "
+         "each load, at 5 MW). How many times faster is ODIN here?", value=1100, tol=120,
+         hints=["73 hours in minutes, divided by 4."],
+         explanation="73 h = 4380 min, / 4 min ≈ 1100. V20 imitated the ESS pulse on a research reactor, keeping only "
                      "about 4 % of its neutrons (2.86 ms every 71 ms); ODIN gets the full pulses of the spallation "
                      "source of ESS (here at its design power of 5 MW): hundreds of times more neutrons, with the same "
                      "WFM resolution.", title="Q8. ODIN and V20")

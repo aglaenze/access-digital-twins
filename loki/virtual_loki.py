@@ -277,7 +277,7 @@ class VirtualLoki:
             import source_power
             return source_power.current()
         except ImportError:
-            return 2.0
+            return 5.0
 
     @power_mw.setter
     def power_mw(self, v):

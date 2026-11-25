@@ -351,9 +351,9 @@ move(stage_x, 500)
 moves the sample stage 500 mm to the side: the plate is out of the beam, the camera sees the beam alone.
 
 ```
-with nexusfile_open('open beam'): count(t=60)
+with nexusfile_open('open beam'): count(t=30)
 ```
-counts for 60 s: a file titled *open beam*. The *Detector image* fills up evenly.
+counts for 30 s: a file titled *open beam*. The *Detector image* fills up evenly.
 """), md(r"""
 ### Step 5. The iron plate
 
@@ -363,9 +363,9 @@ move(stage_x, 0)
 brings the plate back in the beam, at the center of the camera.
 
 ```
-with nexusfile_open('iron plate'): count(t=60)
+with nexusfile_open('iron plate'): count(t=30)
 ```
-counts for 60 s, as long as the open beam, so that both have the same statistics. The *Detector image* now shows the
+counts for 30 s, as long as the open beam, so that both have the same statistics. The *Detector image* now shows the
 plate: a darker square, because the iron stops some of the neutrons.
 
 ```

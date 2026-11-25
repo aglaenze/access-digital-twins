@@ -11,8 +11,8 @@ A class is one file, TWIN_RUN_ROOT/classes/<code>.json:
     title      shown on the start page of the students
     identity   "anonymous" (no name asked) or "named" (each student types a name before starting: a graded class)
     pages      the pages the students may open, each an id of offer(): "<instrument>/<exercise>/<level>"
-    settings   what the teacher fixes for the whole class: power_mw (power of the source, MW; None = the student
-               chooses where the page lets them)
+    settings   what the teacher fixes for the whole class: power_mw (power of the source, MW, 2 or 5: always fixed,
+               so that all the students of the class measure with the same source; source_power.py)
     created, note
 
 Only the pages that a browser can show alone are offered (Voila: the guided pages, the introductions, the class
@@ -102,8 +102,23 @@ def _path(code):
     return os.path.join(folder(), f"{code}.json")
 
 
+def _power(settings):
+    """settings with power_mw checked: a class always fixes the power of the source (2 or 5 MW)."""
+    import source_power
+    settings = dict(settings or {})
+    allowed = [v for _, v in source_power.CHOICES]
+    try:
+        settings["power_mw"] = float(settings.get("power_mw"))
+    except (TypeError, ValueError):
+        raise ValueError(f"a class fixes the power of the source: one of {allowed} MW") from None
+    if settings["power_mw"] not in allowed:
+        raise ValueError(f"power of the source: one of {allowed} MW")
+    return settings
+
+
 def new(title, pages, identity="anonymous", settings=None, note=""):
     """Makes a class and returns it (its file is written). pages: ids of offer()."""
+    settings = _power(settings)
     known = {p["id"] for p in offer()}
     bad = [p for p in pages if p not in known]
     if bad:
@@ -115,7 +130,7 @@ def new(title, pages, identity="anonymous", settings=None, note=""):
     alphabet = "abcdefghijkmnpqrstuvwxyz23456789"          # no 0/o, 1/l: read aloud or copied by hand
     code = "".join(secrets.choice(alphabet) for _ in range(8))
     c = dict(code=code, title=title.strip() or "Class", identity=identity, pages=list(pages),
-             settings={"power_mw": None, **(settings or {})}, note=note,
+             settings=settings, note=note,
              created=datetime.datetime.now().isoformat(timespec="seconds"))
     save(c)
     return c
@@ -146,18 +161,18 @@ def update(code, title, pages, identity="anonymous", settings=None, note=""):
         raise ValueError("a class needs at least one page")
     if identity not in IDENTITIES:
         raise ValueError(f"identity: one of {IDENTITIES}")
-    settings = {"power_mw": None, **(settings or {})}
     if students(code):
+        settings = {"power_mw": c["settings"].get("power_mw"), **{k: v for k, v in (settings or {}).items() if v is not None}}
         changed = [k for k, old, new in (("title", c["title"], title.strip() or "Class"), ("students", c["identity"], identity),
                                          ("power of the source", c["settings"].get("power_mw"), settings["power_mw"]))
-                   if old != new]
+                   if old != new and not (k == "power of the source" and old is None)]     # (older class: no power)
         removed = [p for p in c["pages"] if p not in pages]
         if changed or removed:
             raise ValueError("students have already worked in this class: you can only add pages "
                              f"(not change: {', '.join(changed + (['the pages already given'] if removed else []))})")
         c["pages"] = c["pages"] + [p for p in pages if p not in c["pages"]]
     else:
-        c.update(title=title.strip() or "Class", identity=identity, pages=list(pages), settings=settings, note=note)
+        c.update(title=title.strip() or "Class", identity=identity, pages=list(pages), settings=_power(settings), note=note)
     c["modified"] = datetime.datetime.now().isoformat(timespec="seconds")
     save(c)
     st = open_status()
@@ -412,7 +427,7 @@ def _main(argv):
     n.add_argument("title")
     n.add_argument("pages", nargs="+")
     n.add_argument("--named", action="store_true", help="each student types a name (otherwise anonymous)")
-    n.add_argument("--power", type=float, default=None, help="power of the source fixed for the class (MW)")
+    n.add_argument("--power", type=float, default=5.0, help="power of the source fixed for the class (MW: 5 or 2)")
     sub.add_parser("list")
     lv = sub.add_parser("live")
     lv.add_argument("code")

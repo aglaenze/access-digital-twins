@@ -5,23 +5,23 @@ ESS starts its user programme at 2 MW and is designed for 5 MW. The power sets t
 Every measurement writes the proton charge it received, and the reductions divide by it: measurements at different
 powers compare.
 
-As at ESS, the user of the instrument does not choose it (the accelerator delivers it). Who sets it:
-  * in a class, the teacher (classes.py, settings.power_mw);
-  * otherwise the setting of the twin on this computer (the teacher view of the app: /twin/source_power, written in
-    TWIN_RUN_ROOT/source_power.json);
-  * 2 MW by default.
+It is not a setting of a measurement (as at ESS, where the accelerator delivers it), but of the source as a whole:
+  * in a class, the teacher fixes it (always: classes.py, settings.power_mw): the students read it;
+  * otherwise the user of the app chooses it on the beam status screen (chip "Beam" of the top bar of the app,
+    /twin/source_power, written in TWIN_RUN_ROOT/source_power.json, for the twin on this computer);
+  * 5 MW by default (the design power of ESS).
 current() is read again at each measurement (VirtualOdin.power_mw and VirtualLoki.power_mw follow it, in the pages and
 in the twin server driven by NICOS, where source_power is a read-only value), so a change applies to the next
 measurement.
 
     import source_power
-    power = source_power.control(odin)          # a read-only line: the power today and what it means
+    power = source_power.control(odin)          # a read-only line: the power now and what it means, kept up to date
 """
 import json
 import os
 
-CHOICES = [("2 MW (ESS at the start of its user programme)", 2.0), ("5 MW (ESS design power)", 5.0)]
-DEFAULT_MW = 2.0
+CHOICES = [("5 MW (ESS design power)", 5.0), ("2 MW (ESS at the start of its user programme)", 2.0)]
+DEFAULT_MW = 5.0                 # the design power of ESS: the default everywhere (her choice, 2026-11-25)
 
 
 def _file():
@@ -35,6 +35,20 @@ def fixed():
         import classes
         v = classes.setting("power_mw")
         return float(v) if v else None
+    except Exception:
+        return None
+
+
+def fixed_by():
+    """The title of the class that fixes the power (the class of this server, or the class open on this computer), or
+    None."""
+    try:
+        import classes
+        c = classes.current()
+        if not (c and c.get("settings", {}).get("power_mw")):
+            st = classes.open_status()
+            c = classes.load(st["code"]) if st else None
+        return c["title"] if c and c.get("settings", {}).get("power_mw") else None
     except Exception:
         return None
 
@@ -88,17 +102,35 @@ def describe(mw=None):
     """What the student reads: the power, who set it, what it means."""
     mw = current() if mw is None else mw
     what = {2.0: "ESS at the start of its user programme", 5.0: "the design power of ESS"}.get(mw, "")
-    who = "set by your teacher" if fixed_here() else "the power of the source today"
-    return (f"<b>{mw:g} MW</b>{' (' + what + ')' if what else ''}: {who}. The protons hit the target in 14 pulses "
+    in_class = bool(os.environ.get("TWIN_CLASS"))
+    who = ("set by your teacher for the class" if fixed_here()
+           else "the power of the source today" if in_class
+           else "chosen on the beam status screen of the app (Beam, top bar)")
+    return (f"<b>{mw:g} MW</b>{' (' + what + ')' if what else ''}, {who}. The protons hit the target in 14 pulses "
             f"per second of {71.4 * mw / 2:.0f} µC each; the neutrons, and so your counts, are proportional to the "
-            "power. As at ESS, you do not choose it: the accelerator delivers it.")
+            "power. It is not a setting of the measurement: as at ESS, the source delivers it to every instrument.")
 
 
 def control(instrument, description="Source power", width="100%"):
-    """A read-only line: the power of the source today and what it means (instrument.power_mw follows current())."""
+    """A read-only line: the power of the source and what it means. It follows a change made in the app while the page
+    is open (read again every 2 s, as instrument.power_mw at each measurement)."""
+    import threading
+    import time
     import ipywidgets as w
-    return w.HTML(value=describe(), description=description, style={"description_width": "initial"},
+    line = w.HTML(value=describe(), description=description, style={"description_width": "initial"},
                   layout=w.Layout(width=width))
+
+    def follow():
+        while True:
+            time.sleep(2)
+            try:
+                v = describe()
+                if v != line.value:
+                    line.value = v
+            except Exception:                    # noqa: BLE001 (kernel shutting down)
+                return
+    threading.Thread(target=follow, daemon=True).start()
+    return line
 
 
 def lockable(widget):

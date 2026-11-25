@@ -30,8 +30,8 @@ All requests need the token of the server (header "Authorization: token ...").
     POST /twin/classes/open {code, tunnel}   opens a class: web_class.py --class (Voila, and the tunnel)
     POST /twin/classes/close       closes the open class
     GET  /twin/classes/live?code=C where each student of the class is (classes.live)
-    GET|POST /twin/source_power {power_mw}   the power of the source of the twin on this computer, outside a class that
-                                   fixes it (source_power.py: read-only for the students, as at ESS)
+    GET|POST /twin/source_power {power_mw}   the power of the source of the twin on this computer (beam status screen,
+                                   chip of the top bar, any user), locked while a class is open (source_power.py)
     GET  /twin/handin              the work of the student as a zip file (logbooks, notebooks, measurements logbook)
     GET  /twin/builder?instrument=odin|loki&proposal=N[&start=<sample>&name=..&title=..]   the sample builder (a page
                                    of the app: builder/index.html for ODIN, builder/loki.html for LoKI, their files
@@ -632,7 +632,7 @@ class Classes(Base):
                 power = d.get("power_mw")
                 make = (lambda *a, **k: C.update(d["code"], *a, **k)) if d.get("code") else C.new
                 out = make(d.get("title", ""), d.get("pages", []), identity=d.get("identity", "anonymous"),
-                           settings=dict(power_mw=float(power) if power not in (None, "") else None),
+                           settings=dict(power_mw=power),
                            note=d.get("note", ""))
         except (ValueError, KeyError, OSError) as e:
             self.set_status(400)
@@ -650,17 +650,19 @@ class Classes(Base):
 
 
 class SourcePower(Base):
-    """The power of the source of the twin on this computer (teacher view): every page and NICOS read it at each
-    measurement, unless the class fixes another one."""
+    """The power of the source of the twin on this computer (chip "Source" of the top bar): every page and NICOS read
+    it at each measurement, unless the class open on this computer fixes another one."""
     @web.authenticated
     def get(self):
         import source_power as sp
-        self.finish(json.dumps(dict(power_mw=sp.machine() or sp.DEFAULT_MW, choices=sp.CHOICES)))
+        self.finish(json.dumps(dict(power_mw=sp.current(), fixed_by=sp.fixed_by(), choices=sp.CHOICES)))
 
     @web.authenticated
     def post(self):
         import source_power as sp
         try:
+            if sp.fixed_by():
+                raise ValueError(f"the class \"{sp.fixed_by()}\" fixes the power ({sp.fixed_here():g} MW) while it is open")
             self.finish(json.dumps(dict(power_mw=sp.set_machine(self.body().get("power_mw")))))
         except (ValueError, TypeError, OSError) as e:
             self.set_status(400)

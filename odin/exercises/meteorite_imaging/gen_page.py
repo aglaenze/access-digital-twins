@@ -142,10 +142,13 @@ md(r"""
 ODIN is set for **white-beam imaging**: the choppers are stopped (all the wavelengths, the highest flux), and the images
 are taken with a camera that integrates the light of a scintillator screen. Two setups:
 
-| Setup | Camera | Pinhole D | Blur | Neutrons per pixel and second |
+| Setup | Camera | Pinhole D | Blur | Neutrons per pixel and second (at 5 MW) |
 |---|---|---|---|---|
-| **standard** | 128 × 128 pixels of 110 µm, thick bright scintillator | 3 cm | about 0.17 mm | about 900 |
-| **high resolution** | 512 × 512 pixels of 27.5 µm, thin scintillator | 1 cm | about 0.05 mm | about 10 |
+| **standard** | 128 × 128 pixels of 110 µm, thick bright scintillator | 3 cm | about 0.17 mm | about 2200 |
+| **high resolution** | 512 × 512 pixels of 27.5 µm, thin scintillator | 1 cm | about 0.05 mm | about 24 |
+
+At the design power of ESS, 5 MW (the line *Source power* above the controls says which power you have); at 2 MW,
+2.5 times fewer.
 """ + BEAM_WHITE + r"""
 The blur comes mostly from the pinhole (the scintillator adds its own, 0.1 mm or 0.02 mm): seen from the camera, 5 cm behind the sample, the pinhole 10.5 m away makes
 each point of the sample a spot of size $l \cdot D / L$ (part 3 of the introduction to ODIN). The clasts you are
@@ -537,17 +540,17 @@ from page_output import collapsed
 from IPython.display import Markdown
 with collapsed("Going further: harder questions (click to open)"):
     display(Markdown("**Going further (harder, optional).** Three questions that go beyond the page: the noise of an image, the reduction of ESS, the number of angles of a tomography. They count in your score like the others."))
-    q.number("**Noise.** In one image of the tomography, a pixel of the open beam collects about 9.5 neutrons per second; "
+    q.number("**Noise.** In one image of the tomography, a pixel of the open beam collects about 24 neutrons per second (5 MW); "
              "the rock lets 90 % of them through. Each image lasts 300 s and the open beam 1500 s. Counting noise: "
              "N counted neutrons fluctuate by √N. What is the relative noise of T = S / O in one pixel (%)? (Neglect the dark.)",
-             value=2.1, tol=0.1, unit="%",
-             mistakes=[(2.0, "that is the noise of the sample image alone; the open beam is counted too, and its noise adds"),
-                       (1.9, "the rock lets only 90 % through: the sample image has 0.9 × 9.5 × 300 neutrons"),
-                       (0.8, "that is the open beam alone; the sample image is noisier")],
+             value=1.35, tol=0.03, unit="%",
+             mistakes=[(1.24, "that is the noise of the sample image alone; the open beam is counted too, and its noise adds"),
+                       (1.18, "the rock lets only 90 % through: the sample image has 0.9 × 24 × 300 neutrons"),
+                       (0.53, "that is the open beam alone; the sample image is noisier")],
              hints=["The relative noise of N counts is 1/√N. For a ratio, the relative noises add in quadrature.",
-                    "√(1/N_S + 1/N_O), with N_S = 0.9 × 9.5 × 300 and N_O = 9.5 × 1500."],
-             explanation="N_S = 2565, N_O = 14250: √(1/2565 + 1/14250) = 2.1 %. A clast of 0.3 mm lowers T by "
-                         "about 6 % in ODIN's white beam: only 2.8 times the noise of one pixel, hardly visible. But it covers about 100 pixels: the "
+                    "√(1/N_S + 1/N_O), with N_S = 0.9 × 24 × 300 and N_O = 24 × 1500. Give two decimals."],
+             explanation="N_S = 6480, N_O = 36000: √(1/6480 + 1/36000) = 1.35 %. A clast of 0.3 mm lowers T by "
+                         "about 6 % in ODIN's white beam: 4.4 times the noise of one pixel, visible but grainy. It covers about 100 pixels: the "
                          "tomography, which combines all the pixels and all the angles, lowers the noise about 10 times. "
                          "This is why a long open beam matters: its noise is in every image.",
              title="X7. The noise of one pixel")

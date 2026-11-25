@@ -65,7 +65,7 @@ with the model builder, without writing code.
 4. the specimen at **10.75 kN**: 600 MPa in the narrowest section (6.4 × 2.8 mm²), as at V20.
 
 All with the **same beam**: choppers in WFM mode with the discs 0.30 m apart (sharp edges: the resolution a shift of
-$10^{-3}$ needs) and the 3 cm pinhole; **4 counts of 60 s** for the open beam and for the specimen at each load
+$10^{-3}$ needs) and the 3 cm pinhole; **4 counts of 30 s** (at 5 MW) for the open beam and for the specimen at each load
 (the analysis adds them up: the strain to about ± 3 × 10⁻⁴, the precision V20 reached in 25 + 48 hours).
 """), code(r'''
 q.choice("Why must the open beam, the reference and the loaded measurements all use the same choppers and pinhole?",
@@ -112,11 +112,11 @@ move(choppers, 'wfm', wfm_delta, 0.3, pinhole, 0.03, diffuser, 'in')
 ```
 move(shutter, 'closed')
 with nexusfile_open('dark'):
-    count(t=60)
+    count(t=30)
 move(shutter, 'open', stage_x, 500)
 for i in range(4):
     with nexusfile_open('open beam'):
-        count(t=60)
+        count(t=30)
 ```
 """)), nicos_step(md(r"""
 ### Step 4. The specimen, without load and under load
@@ -128,11 +128,11 @@ NICOS, or line by line in the command line (NICOS waits for the end of the block
 move(stage_x, 0, load, 0)
 for i in range(4):
     with nexusfile_open('steel 0 kN'):
-        count(t=60)
+        count(t=30)
 move(load, 10.75)
 for i in range(4):
     with nexusfile_open('steel 10.75 kN'):
-        count(t=60)
+        count(t=30)
 move(load, 0)
 ```
 """)),

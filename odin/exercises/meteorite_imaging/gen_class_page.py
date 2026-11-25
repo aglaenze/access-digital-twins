@@ -144,7 +144,7 @@ fig("odin_pinhole.png", "The pinhole camera: a point of the sample sees the whol
 
 md(r"""
 **4. Few particles.** Even at ESS there are far fewer neutrons than photons from an X-ray tube. A pixel of the camera
-receives about 55 neutrons per second with the 3 cm pinhole. An image of a rock takes tens of seconds; a tomography
+receives about 140 neutrons per second with the 3 cm pinhole (at 5 MW, the design power of ESS). An image of a rock takes tens of seconds; a tomography
 takes about half an hour of beam.
 
 **5. The detector.** A scintillator containing lithium-6 turns each neutron into a flash of light, filmed by a camera
@@ -209,15 +209,22 @@ after each pulse (the time of flight: the slow neutrons, of long wavelength, arr
 | 2 | open beam | open | out | 2 s |
 | 3 | sample | open | in | 2 s |
 
-Two seconds are enough: some 5 million neutrons reach the camera. A count takes 10 to 25 s here: the twin draws the
-neutrons one by one and writes each of them to the file. *Stop* cancels a count: nothing of it is recorded.
+Two seconds are enough: some 12 million neutrons reach the camera at 5 MW (5 million at 2 MW). A count takes 10 to
+30 s here: the twin draws the neutrons one by one and writes each of them to the file. *Stop* cancels a count: nothing
+of it is recorded.
 
-**The power of the source.** ESS starts at **2 MW** and is designed for **5 MW**. The power sets the number of
-protons per pulse (71 µC at 2 MW), and the number of neutrons is proportional to it: at 5 MW, more neutrons in the
-same time, so less noise. As at ESS you do not choose it: your teacher does (the line *Source power* below says
-which). The reduction (part 2) divides each file by its own proton charge, so files taken at different powers can be
-combined. At 5 MW the twin warns you: about 6 million neutrons per second reach the camera, more than a real Timepix3
-can record without losses. On the instrument you would then close the pinhole a little.
+**The power of the source.** ESS is designed for **5 MW** and starts at **2 MW**. The power sets the number of
+protons per pulse (179 µC at 5 MW, 71 µC at 2 MW), and the number of neutrons is proportional to it: at 5 MW, more
+neutrons in the same time, so less noise. As at ESS you do not choose it: your teacher does (the line *Source power*
+below says which). The reduction (part 2) divides each file by its own proton charge, so files taken at different
+powers can be combined.
+
+**A warning at 5 MW.** At 5 MW about 6 million neutrons per second reach the camera, even through the smallest
+pinhole: more than a real Timepix3 records without losses (each neutron lights a cluster of pixels, and the chip reads
+about 80 million pixel hits per second). The twin prints a warning at each count, but it keeps all the neutrons: your
+images are not affected. On the real instrument the white beam of the full source is too strong for this camera:
+ODIN would use the choppers (fewer neutrons, but the wavelength of each) or the integrating camera, which has no such
+limit (part 3).
 
 **See a measurement again.** The menu *Show again* lists your files: choose one to see its image and its arrival
 times again, without measuring again.
@@ -301,7 +308,7 @@ the real data of ODIN), in five steps:
    written in the file: it sets how many neutrons were made) and subtract the dark, scaled to its duration;
 5. **divide** by the open beam: $T = (S - D)/(O - D)$, with its uncertainty from the counting noise.
 
-Reading some 10 million neutrons one by one takes time, so, as the live reduction of ESS does during a measurement,
+Reading some 25 million neutrons one by one takes time, so, as the live reduction of ESS does during a measurement,
 each file started to be reduced in the background as soon as it was written: *Reduce* then takes a few seconds (up
 to half a minute if you click right after your last count). The rest of the page appears when it is done.
 """)
@@ -634,17 +641,17 @@ from page_output import collapsed
 from IPython.display import Markdown
 with collapsed("Going further: harder questions (click to open)"):
     display(Markdown("**Going further (harder, optional).** Three questions that go beyond the page: the noise of an image, the reduction of ESS, the number of angles of a tomography. They count in your score like the others."))
-    q.number("**Noise.** In one image of the tomography, a pixel of the open beam collects about 56 neutrons per second; "
+    q.number("**Noise.** In one image of the tomography, a pixel of the open beam collects about 140 neutrons per second (5 MW); "
              "the rock lets 90 % of them through. Each image lasts 30 s and the open beam 150 s. Counting noise: "
              "N counted neutrons fluctuate by √N. What is the relative noise of T = S / O in one pixel (%)? (Neglect the dark.)",
-             value=2.8, tol=0.1, unit="%",
-             mistakes=[(2.6, "that is the noise of the sample image alone; the open beam is counted too, and its noise adds"),
-                       (2.4, "the rock lets only 90 % through: the sample image has 0.9 × 56 × 30 neutrons"),
-                       (1.1, "that is the open beam alone; the sample image is noisier")],
+             value=1.77, tol=0.03, unit="%",
+             mistakes=[(1.63, "that is the noise of the sample image alone; the open beam is counted too, and its noise adds"),
+                       (1.54, "the rock lets only 90 % through: the sample image has 0.9 × 140 × 30 neutrons"),
+                       (0.69, "that is the open beam alone; the sample image is noisier")],
              hints=["The relative noise of N counts is 1/√N. For a ratio, the relative noises add in quadrature.",
-                    "√(1/N_S + 1/N_O), with N_S = 0.9 × 56 × 30 and N_O = 56 × 150."],
-             explanation="N_S = 1512, N_O = 8400: √(1/1512 + 1/8400) = 2.8 %. A clast of 0.3 mm lowers T by "
-                         "about 6 % in ODIN's white beam: only 2.1 times the noise of one pixel, hardly visible. But it covers about 100 pixels: the "
+                    "√(1/N_S + 1/N_O), with N_S = 0.9 × 140 × 30 and N_O = 140 × 150. Give two decimals."],
+             explanation="N_S = 3780, N_O = 21000: √(1/3780 + 1/21000) = 1.77 %. A clast of 0.3 mm lowers T by "
+                         "about 6 % in ODIN's white beam: 3.4 times the noise of one pixel, visible but grainy. It covers about 100 pixels: the "
                          "tomography, which combines all the pixels and all the angles, lowers the noise about 10 times. "
                          "This is why a long open beam matters: its noise is in every image.",
              title="X1. The noise of one pixel")
