@@ -215,7 +215,9 @@ async function selftest(out) {
     // a new student chooses a grade first (the level): no request before
     check("no request before a grade is chosen", await js(`!document.querySelector('[data-act="open"][data-mode="bsc"]') && !!document.querySelector(".grade-pick")`), Date.now());
     await js(`document.querySelector('.grade-pick [data-level="bsc"]').click(); true`);
-    check("the trainee (BSc) grade shows the table of requests, the next one open", await wait(`document.querySelectorAll("#requests .r-row").length > 0 && !!document.querySelector(".r-detail [data-act]") && !document.querySelector('[data-mode="msc"]')`, 20), Date.now());
+    check("the trainee (BSc) grade shows the table of requests, all closed", await wait(`document.querySelectorAll("#requests .r-row").length > 0 && !document.querySelector(".r-detail")`, 20), Date.now());
+    await js(`if (!document.querySelector(".r-detail")) { const n = document.querySelector("#requests .r-st.next"); const r = n ? n.closest(".r-row") : document.querySelector("#requests .r-row:not(.dim)"); if (r) r.click(); } true`);
+    check("a click on a request opens its briefing", await wait(`!!document.querySelector(".r-detail [data-act]") && !document.querySelector('[data-mode="msc"]')`, 20), Date.now());
     await js(`document.querySelector("#me").click(); true`);
     await new Promise((r) => setTimeout(r, 500));
     await shot("2a_menu");
@@ -278,6 +280,8 @@ async function selftest(out) {
     await js(`document.querySelector("#tab-cat").click(); true`);
     await new Promise((r) => setTimeout(r, 1500));
     await js(`document.querySelector('#menu-grades [data-level="msc"]').click(); true`);
+    await wait(`document.querySelectorAll("#requests .r-row").length > 0`, 20);
+    await js(`if (!document.querySelector(".r-detail")) { const n = document.querySelector("#requests .r-st.next"); const r = n ? n.closest(".r-row") : document.querySelector("#requests .r-row:not(.dim)"); if (r) r.click(); } true`);
     await wait(`!!document.querySelector('[data-act="open"][data-mode="msc"]')`, 20);
     const t2 = Date.now();
     await js(`document.querySelector('[data-act="open"][data-mode="msc"]').click(); true`);
@@ -369,6 +373,8 @@ async function selftest(out) {
     const states = [];
     for (const mode of ["msc", "bsc"]) {
       await js(`document.querySelector('#menu-grades [data-level="${mode}"]').click(); true`);
+      await wait(`document.querySelectorAll("#requests .r-row").length > 0`, 20);
+      await js(`if (!document.querySelector(".r-detail")) { const n = document.querySelector("#requests .r-st.next"); const r = n ? n.closest(".r-row") : document.querySelector("#requests .r-row:not(.dim)"); if (r) r.click(); } true`);
       await wait(`!!document.querySelector(".r-detail [data-act]")`, 20);
       const ok = await js(`(() => { const b = document.querySelector('.r-detail [data-act="reset"][data-mode="${mode}"]'); if (b) b.click(); return !!b; })()`);
       await new Promise((r) => setTimeout(r, 4000));

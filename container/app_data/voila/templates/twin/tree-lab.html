@@ -254,7 +254,9 @@
       { instrument: "odin", level: "class", level_name: "Class session", thread: "planets", client: "The Mars team",
         title: "What is hidden inside a Martian meteorite?", page: "odin/exercises/meteorite_imaging/ODIN_meteorite_class.ipynb",
         mission: "ODIN in five points for those who know X-ray imaging, then the piece of NWA 7034 of Naver et al. (2026): a radiograph, a tomography, the clasts that hold hydrogen and their water." }] };
+    // the instrument chosen last is remembered in the browser: back from a page, the same one is shown
     var instr = "odin", openKey = null;
+    try { instr = localStorage.getItem("twin-instr") || "odin"; } catch (e) { /* no storage */ }
 
     function $(id) { return document.getElementById(id); }
     function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
@@ -322,7 +324,7 @@
             (instruments.length < 2 ? " disabled" : "") + "><b>" + INSTR[k].name + "</b><span>" + INSTR[k].kind + "</span><span>" +
             (instruments.length < 2 ? "today's instrument" : cardsOf(k).length + " pages") + "</span></button>";
         }).join("");
-      Array.prototype.forEach.call(document.querySelectorAll(".hut[data-k]"), function (b) { b.onclick = function () { instr = b.dataset.k; openKey = null; render(); }; });
+      Array.prototype.forEach.call(document.querySelectorAll(".hut[data-k]"), function (b) { b.onclick = function () { instr = b.dataset.k; openKey = null; try { localStorage.setItem("twin-instr", instr); } catch (e) { } render(); }; });
       // the clients of the day
       var threads = [];
       CLASS.cards.forEach(function (c) { if (c.thread && threads.indexOf(c.thread) < 0) threads.push(c.thread); });
@@ -355,7 +357,6 @@
       } else $("intro").innerHTML = "";
       // the requests: REF, FROM, REQUEST, STATUS; a click opens the briefing under the row
       var num = {};
-      if (openKey === null && next) openKey = next.page;
       $("req-count").textContent = reqs.filter(function (c) { return opened(c.page); }).length + " / " + reqs.length + " OPENED";
       $("requests").innerHTML = '<div class="r-head"><span>REF</span><span>FROM</span><span>REQUEST</span><span>STATUS</span></div>' +
         (reqs.length ? reqs.map(function (c) {

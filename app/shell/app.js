@@ -91,10 +91,30 @@ function hideSplash() {
   setTimeout(() => $("#splash").classList.add("hidden"), 500);
 }
 $("#sp-skip").onclick = hideSplash;
+// the instruments are ready: the end of the opening screen is played (the beamline of ODIN lights up, then that of
+// LoKI, the steps are ticked, "The beam is on"), then it fades out; the same when the app opens at once (a student
+// still signed in). Both instruments start together on one server: the order is only shown.
+function finishSplash() {
+  if (splash.gone || splash.finishing) return;
+  splash.finishing = true;
+  const sp = $("#splash"), li = sp.querySelectorAll(".sp-steps li");
+  const mark = (k, done, now) => { li[k].classList.toggle("done", done); li[k].classList.toggle("now", now); };
+  sp.classList.remove("err");
+  sp.dataset.step = 2; mark(0, true, false); mark(1, false, true); mark(2, false, false);
+  $("#sp-beam").textContent = "beam on"; $("#sp-bar").style.width = "80%"; $("#sp-pct").textContent = "";
+  $("#sp-text").textContent = "ODIN is ready…";
+  setTimeout(() => {
+    sp.dataset.step = 3; mark(1, true, false); mark(2, true, false);
+    $("#sp-bar").style.width = "100%"; $("#sp-text").textContent = "ODIN and LoKI are ready";
+    $("#sp-title").textContent = "The beam is on. Welcome!";
+    setTimeout(hideSplash, 1100);
+  }, 700);
+}
 function splashStatus(s) {
-  if (splash.gone) return;
+  if (splash.gone || splash.finishing) return;
   const f = s.fraction || 0;
-  const step = f >= 1 ? 3 : f >= 0.7 ? 2 : f >= 0.2 ? 1 : 0;
+  if (f >= 1 && !s.error) { finishSplash(); return; }
+  const step = f >= 0.2 ? 1 : 0;
   const sp = $("#splash");
   sp.dataset.step = step;
   sp.classList.toggle("err", !!s.error);
@@ -111,10 +131,6 @@ function splashStatus(s) {
   $("#sp-link").classList.toggle("hidden", !s.url);
   $("#sp-link").onclick = (e) => { e.preventDefault(); T.openExternal(s.url); };
   if (s.error) $("#sp-skip").classList.remove("hidden");
-  if (step >= 3) {
-    $("#sp-title").textContent = "The beam is on. Welcome!";
-    setTimeout(hideSplash, Math.max(900, 1600 - (Date.now() - splash.t0)));
-  }
 }
 
 function showStatus(s) {
@@ -181,7 +197,7 @@ function enterApp() {
   $("#menu-name").textContent = user.name;
   $("#menu-email").textContent = user.email;
   applyTheme(pref("theme"));
-  hideSplash();
+  finishSplash();
   teacherMenu();
   renderMenu();
   activate("cat");
@@ -591,11 +607,13 @@ function gradePicker() {
   $("#requests").querySelectorAll("[data-level]").forEach((b) => b.onclick = () => { pref("level", b.dataset.level); renderMenu(); renderCatalogue(); });
 }
 
-// the table of the requests (REF, FROM, REQUEST, STATUS); a click opens the briefing under the row
+// the table of the requests (REF, FROM, REQUEST, STATUS); a click opens the briefing under the row. All are closed
+// when the app opens: the one opened stays open while the app runs (not kept on this computer)
+const openReq = {};
 function renderTable(lvl) {
   const c = catalogue;
-  const sel = pref(`sel:${instr}:${lvl}`);
-  const openKey = sel === "none" ? null : cards.some((x) => x.key === sel) ? sel : (cards.find((x) => x.next) || {}).key;
+  const sel = openReq[`${instr}:${lvl}`];
+  const openKey = cards.some((x) => x.key === sel) ? sel : null;
   const row = (x) => {
     const { e, s, p } = x;
     const t = s.thread || "instrument";
@@ -617,13 +635,13 @@ function renderTable(lvl) {
       </div>`;
   $("#r-scroll").scrollTop = prev;
   $("#requests").querySelectorAll(".r-row").forEach((b) => b.onclick = () => {
-    pref(`sel:${instr}:${lvl}`, b.dataset.key === openKey ? "none" : b.dataset.key);
+    openReq[`${instr}:${lvl}`] = b.dataset.key === openKey ? null : b.dataset.key;
     renderTable(lvl);
   });
   const box = $("#requests").querySelector(".r-detail");
   if (box) box.querySelectorAll("[data-act]").forEach((b) => b.onclick = () => {
     // a request opened or started again: it stays open in the table, and becomes the next one (until submitted)
-    if (b.dataset.act === "open" || b.dataset.act === "reset") { pref(`sel:${instr}:${lvl}`, box.dataset.key); pref(`last:${instr}:${lvl}`, box.dataset.key); }
+    if (b.dataset.act === "open" || b.dataset.act === "reset") { openReq[`${instr}:${lvl}`] = box.dataset.key; pref(`last:${instr}:${lvl}`, box.dataset.key); }
     act(b.dataset);
   });
 }
