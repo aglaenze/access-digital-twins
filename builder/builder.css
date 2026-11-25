@@ -8,7 +8,7 @@
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; background: var(--bg); }
-button { font: inherit; border: 1px solid #BFC5BC; background: #fff; color: var(--ink); border-radius: 5px;
+button { font: inherit; border: 1px solid #BFC5BC; background: var(--card); color: var(--ink); border-radius: 5px;
   padding: 6px 12px; cursor: pointer; }
 button:hover { border-color: var(--teal); }
 button.primary { background: var(--teal); border-color: var(--teal); color: #fff; font-weight: 600; }
@@ -22,7 +22,7 @@ h2 { font-family: var(--head); font-weight: 700; font-size: 16px; margin: 0 0 6p
 .hint { color: var(--mute); font-size: 12px; margin-left: 8px; }
 
 /* top bar */
-.top { display: flex; align-items: center; gap: 24px; padding: 10px 18px; background: #fff; border-bottom: 1px solid var(--line);
+.top { display: flex; align-items: center; gap: 24px; padding: 10px 18px; background: var(--card); border-bottom: 1px solid var(--line);
   height: 58px; }
 .brand .title { font-family: var(--head); font-weight: 700; font-size: 19px; }
 .brand .sub { color: var(--mute); font-family: var(--mono); font-size: 11.5px; letter-spacing: .06em; }
@@ -36,7 +36,7 @@ h2 { font-family: var(--head); font-weight: 700; font-size: 16px; margin: 0 0 6p
 /* two columns: the panel and the view */
 .layout { display: grid; grid-template-columns: minmax(380px, 46%) 1fr; height: calc(100% - 58px); }
 .panel { overflow-y: auto; padding: 14px 16px 40px; }
-.viewer { display: flex; flex-direction: column; border-left: 1px solid var(--line); background: #fff; min-width: 0; }
+.viewer { display: flex; flex-direction: column; border-left: 1px solid var(--line); background: var(--card); min-width: 0; }
 @media (max-width: 900px) {
   .layout { grid-template-columns: 1fr; height: auto; }
   .viewer { height: 70vh; border-left: 0; border-top: 1px solid var(--line); order: -1; position: sticky; top: 0; z-index: 2; }
@@ -56,7 +56,7 @@ details.box[open] > summary { margin-bottom: 8px; }
 .search { width: 100%; margin-bottom: 8px; }
 .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; max-height: 330px; overflow-y: auto; padding: 2px; }
 .glevel { grid-column: 1 / -1; font-family: var(--mono); font-size: 11.5px; font-weight: 600; color: var(--mute); text-transform: uppercase; letter-spacing: .08em; margin: 8px 0 0; }
-.card { border: 1px solid var(--line); border-radius: 6px; background: #fff; cursor: pointer; padding: 6px; text-align: left; display: flex; flex-direction: column; gap: 4px; }
+.card { border: 1px solid var(--line); border-radius: 6px; background: var(--card); cursor: pointer; padding: 6px; text-align: left; display: flex; flex-direction: column; gap: 4px; }
 .card:hover { border-color: var(--teal); box-shadow: 0 1px 6px rgba(20, 32, 51, .08); }
 .card.on { border-color: var(--teal); background: var(--teal-soft); }
 .card img, .card .ph { width: 100%; aspect-ratio: 1; object-fit: contain; background: #FBFCFD; border-radius: 6px; display: block; }
@@ -157,7 +157,7 @@ textarea.code { width: 100%; font-family: var(--mono); font-size: 12px; min-heig
 
 /* material picker */
 .modal { position: fixed; inset: 0; background: rgba(27, 31, 36, .45); display: grid; place-items: center; z-index: 10; }
-.sheet { background: #fff; border-radius: 8px; width: min(760px, 94vw); max-height: 86vh; display: flex; flex-direction: column; }
+.sheet { background: var(--card); border-radius: 8px; width: min(760px, 94vw); max-height: 86vh; display: flex; flex-direction: column; }
 .sheet-head { display: flex; gap: 10px; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--line); }
 .sheet-head h2 { margin: 0; white-space: nowrap; }
 .sheet-head .search { margin: 0; flex: 1; }
@@ -234,7 +234,7 @@ body.loki .viewer { overflow: hidden; }
 @media (max-width: 760px) { .how-body .row { flex-direction: column; } }
 #tour-hole { position: fixed; z-index: 30; border-radius: 6px; box-shadow: 0 0 0 9999px rgba(20, 32, 51, .45);
   outline: 3px solid var(--sel); pointer-events: none; transition: all .25s ease; }
-#tour-tip { position: fixed; z-index: 31; width: 340px; background: #fff; border-radius: 12px; padding: 12px 14px;
+#tour-tip { position: fixed; z-index: 31; width: 340px; background: var(--card); border-radius: 12px; padding: 12px 14px;
   box-shadow: 0 6px 24px rgba(20, 32, 51, .25); }
 #tour-tip .k { font-size: 11px; color: var(--mute); }
 #tour-tip h4 { margin: 2px 0 6px; font-size: 15px; }
@@ -264,3 +264,32 @@ button:hover { border-color: var(--ink); }
 .fit-tick span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fit-plot { width: 100%; border: 1px solid var(--line); border-radius: 6px; display: block; }
 .fit-report { font-family: var(--mono); font-size: 12px; background: #F4F5F1; border-radius: 6px; padding: 10px 12px; white-space: pre-wrap; margin: 10px 0; }
+
+/* undo / redo in the top bar */
+.undo { display: flex; gap: 6px; }
+.undo button { padding: 5px 10px; font-size: 13px; }
+
+/* the dark view of the app (given by the app: html[data-theme="dark"]) */
+:root[data-theme="dark"] {
+  --ink: #E3E8EF; --mute: #97A2B3; --line: #2A3442; --bg: #11161D; --card: #1A212B;
+  --teal: #FFC94A; --teal-soft: rgba(255, 201, 74, .12); --red: #FF8A80; --green: #4ADE80; color-scheme: dark;
+}
+:root[data-theme="dark"] button, :root[data-theme="dark"] input, :root[data-theme="dark"] textarea, :root[data-theme="dark"] select {
+  background: #161C25; color: var(--ink); border-color: #3A4656; }
+:root[data-theme="dark"] button.primary { background: var(--teal); border-color: var(--teal); color: #11161D; }
+:root[data-theme="dark"] .top, :root[data-theme="dark"] .viewer, :root[data-theme="dark"] .sheet, :root[data-theme="dark"] #tour-tip { background: #161C25; }
+:root[data-theme="dark"] .tree li:hover { background: #232C38; }
+:root[data-theme="dark"] .tree li { border-bottom-color: #232C38; }
+:root[data-theme="dark"] .note-box { background: #2A2410; border-color: #5A4A1A; color: #FFC94A; }
+:root[data-theme="dark"] .fit-report, :root[data-theme="dark"] .msg code, :root[data-theme="dark"] .how-body code { background: #232C38; }
+:root[data-theme="dark"] .status { background: rgba(22, 28, 37, .92); }
+:root[data-theme="dark"] .steps button.on .n { color: #11161D; }
+:root[data-theme="dark"] .fit-param { border-bottom-color: #232C38; }
+
+/* step 4: the measured and the predicted pictures, the region drawn on them */
+.fit-images { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.fit-images > p { grid-column: 1 / -1; margin: 0; }
+.fit-pic { margin: 0; display: flex; flex-direction: column; gap: 4px; }
+.fit-frame { position: relative; cursor: crosshair; user-select: none; touch-action: none; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+.fit-frame img { display: block; width: 100%; aspect-ratio: 1; image-rendering: pixelated; }
+.fit-roi-box { position: absolute; border: 2px solid var(--sel); background: rgba(242, 194, 48, .15); pointer-events: none; }

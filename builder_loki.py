@@ -16,6 +16,7 @@ as in builder_api: the page gets {"sealed": <id>} instead of the value; the valu
 comes back when the sample is saved (its "hidden" list kept, so NICOS still shows "?"). The views, the checks, the
 models and the downloads leave out every kind of particles with a sealed value (its curve would give the answer away).
 """
+import base64
 import copy
 import datetime
 import glob
@@ -544,3 +545,129 @@ def info(proposal="", start=""):
                 for m, (lab, ps) in MODELS.items()],
         cell=dict(window_mm=sl.CELL_WINDOWS_MM / 2, gap_min=GAP[0], gap_max=GAP[1]),
         max_fraction=0.1, colors=list(COLORS), starts=starts(proposal))
+
+
+# --------------------------------------------------------------------------- step 4: fit the sample to the measurements
+# The sizes and volume fractions of the kinds of particles are fitted to the I(Q) measured with LoKI (the sample, the
+# solvent as background, the empty beam: files of the proposal, reduced as at ESS by loki_reduction / esssans): the
+# model is the cross section of the sample (sample_library.loki_cross_section) minus its flat background, plus a
+# flat background fitted with it (what the subtraction of the solvent leaves).
+def _lr():
+    import sys
+    p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "loki")
+    if p not in sys.path:
+        sys.path.insert(0, p)
+    import loki_reduction
+    return loki_reduction
+
+
+def fit_files(proposal):
+    """The measurements of the proposal, with their kind (sample, solvent, empty beam)."""
+    folder = B.data_folder("loki", proposal)
+    if not folder or not os.path.isdir(folder):
+        return dict(folder=folder, rows=[])
+    rows = [r for r in _lr().measurements(folder) if r.get("kind") in ("sample", "solvent", "empty beam")]
+    return dict(folder=folder, rows=rows)
+
+
+def fit_params(state):
+    """The numbers a fit can change: the sizes [Å] and the volume fraction of each kind of particles (not the hidden
+    ones), with bounds to start from."""
+    out = []
+    for i, k in enumerate((state or {}).get("kinds") or []):
+        if kind_sealed(k) or k.get("model") not in MODELS:
+            continue
+        who = f"kind {i + 1} ({k.get('particle')})"
+        for p, label, _, lo, hi in MODELS[k["model"]][1]:
+            v = float((k.get("parameters") or {}).get(p, 0))
+            out.append(dict(key=f"{i}.parameters.{p}", label=f"{who}: {label} (Å)", value=v,
+                            min=round(max(lo, v / 3), 3), max=round(min(hi, v * 3), 3)))
+        vf = float(k.get("volume_fraction", 0))
+        out.append(dict(key=f"{i}.volume_fraction", label=f"{who}: volume fraction", value=vf, min=0.0,
+                        max=round(min(0.5, max(vf * 5, 0.01)), 4)))
+    return out
+
+
+def _set(state, key, v):
+    i, *rest = key.split(".")
+    node = state["kinds"][int(i)]
+    for r in rest[:-1]:
+        node = node[r]
+    node[rest[-1]] = float(v)
+
+
+def fit_run(proposal, state, sample, solvent, empty_beam, params):
+    """Fits the chosen numbers to the measured I(Q) (rear and middle banks): values, errors, χ²/dof, a picture."""
+    import matplotlib.pyplot as plt
+    from scipy.optimize import least_squares
+    folder = B.data_folder("loki", proposal)
+    if not folder:
+        raise ValueError("no proposal: open the builder from a beamtime notebook (or give its number)")
+
+    def path(f, what):
+        if not f:
+            raise ValueError(f"choose the {what}")
+        p = os.path.join(folder, os.path.basename(str(f)))
+        if not os.path.isfile(p):
+            raise ValueError(f"{f}: not in the folder of proposal {proposal}")
+        return p
+    if not params:
+        raise ValueError("choose at least one number to fit")
+    lr = _lr()
+    groups = {g: lr.BANK_GROUPS[g] for g in ("rear", "middle")}
+    banks = tuple(b for g in groups.values() for b in g)
+    res = lr.reduce(path(sample, "sample"), background=path(solvent, "solvent (background)"),
+                    empty_beam=path(empty_beam, "empty beam"), banks=banks)
+    gap_cm = float(((state or {}).get("holder") or {}).get("gap_mm", 1.0)) / 10
+    data = lr.combine(res, gap_cm, groups)
+    q = np.concatenate([data[g][0] for g in data]); I = np.concatenate([data[g][1] for g in data])
+    dI = np.concatenate([data[g][2] for g in data])
+    o = np.argsort(q); q, I, dI = q[o], I[o], dI[o]
+    ok = np.isfinite(I) & np.isfinite(dI) & (dI > 0)
+    q, I, dI = q[ok], I[ok], dI[ok]
+    if len(q) < 8:
+        raise ValueError("too few points in I(Q): longer counts, or check the files")
+    base = copy.deepcopy(state)                        # (the hidden kinds stay out of the model, as in the views)
+    keys = [p["key"] for p in params]
+    x0 = [min(max(float(next(q_["value"] for q_ in fit_params(base) if q_["key"] == k)), p["min"]), p["max"])
+          for k, p in zip(keys, params)]
+    lo = [float(p["min"]) for p in params] + [-abs(I).max()]
+    hi = [float(p["max"]) for p in params] + [abs(I).max()]
+
+    def model(x):
+        st = copy.deepcopy(base)
+        for k, v in zip(keys, x[:-1]):
+            _set(st, k, v)
+        spec = spec_of(st, "open")
+        r = sl.loki_cross_section(spec, q)
+        return r[1] - float(r[2].get("background", 0.0)) + x[-1]
+
+    # (the page rounds the sizes to 0.001 Å: the steps of the derivatives must be larger, 0.1 %)
+    fit = least_squares(lambda x: (model(x) - I) / dI, x0 + [0.0], bounds=(lo, hi), x_scale="jac", diff_step=1e-3)
+    try:
+        cov = np.linalg.inv(fit.jac.T @ fit.jac)
+        err = np.sqrt(np.diag(cov))
+    except np.linalg.LinAlgError:
+        err = np.full(len(fit.x), np.nan)
+    chi2 = float((fit.fun ** 2).sum()); dof = max(1, len(q) - len(fit.x))
+    lines = [f"χ² = {chi2:.4g} for {len(q)} points, {dof} degrees of freedom: χ²/dof = {chi2 / dof:.3f}"]
+    for p, v, e in zip(params, fit.x, err):
+        lines.append(f"  {p['label']:44s} {v:.5g} ± {e:.2g}   [{p['min']:g}, {p['max']:g}]")
+    lines.append(f"  {'flat background left by the subtraction':44s} {fit.x[-1]:.3g} ± {err[-1]:.2g} cm⁻¹")
+    if not fit.success:
+        lines.append(f"  the fit did not converge: {fit.message}")
+    fig, ax = plt.subplots(figsize=(6.2, 3.6), dpi=110)
+    ax.errorbar(q, I, yerr=dI, fmt="o", ms=3, color="#1B1F24", ecolor="#9AA39A", label="measured (sample − solvent)")
+    m = model(fit.x)
+    ax.plot(q, np.clip(m, 1e-6, None), color="#D9480F", lw=2, label="fitted sample")
+    ax.set(xscale="log", yscale="log", xlabel="Q [Å⁻¹]", ylabel="I(Q) [cm⁻¹]")
+    pos = I > 0
+    if pos.any():
+        ax.set_ylim(max(I[pos].min() * 0.3, 1e-4), I.max() * 3)
+    ax.set_title(f"χ²/dof = {chi2 / dof:.2f}", fontsize=9)
+    ax.legend(fontsize=8)
+    fig.tight_layout()
+    buf = io.BytesIO(); fig.savefig(buf, format="png"); plt.close(fig)
+    return dict(png=base64.b64encode(buf.getvalue()).decode(), report="\n".join(lines), chi2_red=chi2 / dof,
+                success=bool(fit.success),
+                values=[dict(key=k, label=p["label"], value=float(v), error=float(e)) for k, p, v, e in zip(keys, params, fit.x, err)])

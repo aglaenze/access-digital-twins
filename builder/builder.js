@@ -362,6 +362,7 @@ async function startFrom(s) {
     $("start-now").textContent = `· now: ${s.title}`;
     $("gallery-box").open = false;
     S.dirty = false; S.grains = true; $("grains").checked = true;
+    histReset();
     renderAll(); refreshViews(true); refreshSigmas();
   } catch (e) { status(e.message, true); }
 }
@@ -492,6 +493,8 @@ async function renderFit() {
   };
   box.innerHTML = "";
   box.append(pick("sample", "fit-sample"), pick("open beam", "fit-open"), pick("dark", "fit-dark", true));
+  ["fit-sample", "fit-open", "fit-dark"].forEach((k) => $(k).addEventListener("change", () => showFitImages()));
+  showFitImages();
   // the numbers of the sample that can be fitted
   const pbox = $("fit-params");
   pbox.innerHTML = "<p class='small'>Reading the numbers of your sample…</p>";
@@ -512,6 +515,53 @@ async function renderFit() {
     }
   }
 }
+// the measured and the predicted pictures, the region of the fit drawn on them (a rectangle dragged with the mouse)
+async function showFitImages(recipe) {
+  const box = $("fit-images");
+  if (!$("fit-sample")) return;
+  box.innerHTML = "<p class='small'>Computing the pictures (a few seconds)…</p>";
+  try {
+    const d = await api("fit_image", { recipe: recipe || S.recipe, holder: S.holder, sample: $("fit-sample").value,
+      open_beam: $("fit-open").value, dark: $("fit-dark").value });
+    FIT.extent = d.extent;
+    const pane = (src, title) => el("figure", { class: "fit-pic" }, el("div", { class: "fit-frame" },
+      el("img", { src: "data:image/png;base64," + src, alt: title, draggable: "false" }), el("div", { class: "fit-roi-box" })),
+      el("figcaption", { class: "small" }, title));
+    box.innerHTML = "";
+    box.append(pane(d.measured, "Measured"), pane(d.predicted, `${recipe ? "Fitted sample" : "Your sample"}, predicted (with its holder)`));
+    box.append(el("p", { class: "small" }, `Field: x ${d.extent[0].toFixed(1)} to ${d.extent[1].toFixed(1)} mm, y ${d.extent[2].toFixed(1)} to ${d.extent[3].toFixed(1)} mm (up). `
+      + "If the two pictures are mirrored, the part is on the other side: change its position (x) in step 1."));
+    box.querySelectorAll(".fit-frame").forEach(dragRoi);
+    drawRoi();
+  } catch (e) { box.innerHTML = ""; box.append(el("p", { class: "msg err" }, e.message)); }
+}
+function roiNow() { return ["fit-x0", "fit-x1", "fit-y0", "fit-y1"].map((k) => Number($(k).value)); }
+function drawRoi() {
+  if (!FIT.extent) return;
+  const [ex0, ex1, ey0, ey1] = FIT.extent, [x0, x1, y0, y1] = roiNow();
+  document.querySelectorAll(".fit-roi-box").forEach((r) => {
+    r.style.left = `${100 * (x0 - ex0) / (ex1 - ex0)}%`; r.style.width = `${100 * (x1 - x0) / (ex1 - ex0)}%`;
+    r.style.top = `${100 * (ey1 - y1) / (ey1 - ey0)}%`; r.style.height = `${100 * (y1 - y0) / (ey1 - ey0)}%`;
+  });
+}
+function dragRoi(frame) {
+  let start = null;
+  const mm = (e) => {
+    const b = frame.getBoundingClientRect(), [ex0, ex1, ey0, ey1] = FIT.extent;
+    const fx = Math.min(Math.max((e.clientX - b.left) / b.width, 0), 1), fy = Math.min(Math.max((e.clientY - b.top) / b.height, 0), 1);
+    return [ex0 + fx * (ex1 - ex0), ey1 - fy * (ey1 - ey0)];
+  };
+  const set = (a, b) => {
+    const r = (v) => Math.round(v * 10) / 10;
+    $("fit-x0").value = r(Math.min(a[0], b[0])); $("fit-x1").value = r(Math.max(a[0], b[0]));
+    $("fit-y0").value = r(Math.min(a[1], b[1])); $("fit-y1").value = r(Math.max(a[1], b[1]));
+    drawRoi();
+  };
+  frame.addEventListener("pointerdown", (e) => { start = mm(e); frame.setPointerCapture(e.pointerId); e.preventDefault(); });
+  frame.addEventListener("pointermove", (e) => { if (start) set(start, mm(e)); });
+  frame.addEventListener("pointerup", (e) => { if (start) { const p = mm(e); if (Math.abs(p[0] - start[0]) > 0.2 && Math.abs(p[1] - start[1]) > 0.2) set(start, p); } start = null; });
+}
+
 async function runFit() {
   const params = [...document.querySelectorAll("#fit-params .fit-param")].filter((r) => r.querySelector("input[type=checkbox]").checked)
     .map((r) => ({ path: r.dataset.path, label: r.dataset.label, min: Number(r.querySelector(".fit-min").value), max: Number(r.querySelector(".fit-max").value) }));
@@ -531,6 +581,10 @@ async function runFit() {
       + " their errors (another material, a part not fitted, a region not uniform?)." : "");
     $("fit-result").classList.remove("hidden");
     $("fit-apply-msg").textContent = "";
+    // the pictures again, with the fitted values: the geometry compared once more
+    const fitted = clone(S.recipe);
+    for (const v of d.values) setPath(fitted, v.path, Number(v.value.toPrecision(6)));
+    showFitImages(fitted);
     msg.className = "msg ok"; msg.textContent = d.success ? "Done." : "The fit stopped before converging: see the result.";
   } catch (e) { msg.className = "msg err"; msg.textContent = e.message; }
   $("fit-run").disabled = false;
@@ -561,7 +615,11 @@ function init3d() {
     return;
   }
   V.renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
-  V.renderer.setClearColor(0xffffff);
+  // the background of the 3D view follows the theme of the app (html[data-theme], set by the app)
+  const bg = () => V.renderer.setClearColor(document.documentElement.dataset.theme === "dark" ? 0x161c25 : 0xffffff);
+  bg();
+  new MutationObserver(() => { bg(); if (V.renderer && V.scene && V.camera) V.renderer.render(V.scene, V.camera); })
+    .observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
   host.append(V.renderer.domElement);
   V.controls = new OrbitControls(V.camera, V.renderer.domElement);
   V.controls.enableDamping = true;
@@ -632,7 +690,38 @@ function highlight() {
 
 // ------------------------------------------------------------------ refreshing
 let timer = null, beamTimer = null, busy = 0;
+// ------------------------------------------------------------------ undo / redo
+// a state (sample and holder) is kept half a second after the last change: a slider moved is one step, not hundreds
+const H = { stack: [], at: -1, timer: null };
+const snap = () => JSON.stringify({ recipe: S.recipe, holder: S.holder });
+function histButtons() { $("undo").disabled = H.at <= 0; $("redo").disabled = H.at >= H.stack.length - 1; }
+function histReset() { clearTimeout(H.timer); H.timer = null; H.stack = [snap()]; H.at = 0; histButtons(); }
+function histNow() {
+  clearTimeout(H.timer); H.timer = null;
+  const s = snap();
+  if (s === H.stack[H.at]) return;
+  H.stack = H.stack.slice(0, H.at + 1); H.stack.push(s);
+  if (H.stack.length > 80) H.stack.shift();
+  H.at = H.stack.length - 1; histButtons();
+}
+function histRecord() { clearTimeout(H.timer); H.timer = setTimeout(histNow, 500); }
+function histGo(k) {
+  if (H.timer) histNow();
+  const i = H.at + k;
+  if (i < 0 || i >= H.stack.length) return;
+  H.at = i;
+  const st = JSON.parse(H.stack[i]);
+  S.recipe = st.recipe; S.holder = st.holder;
+  if (!S.recipe.bodies.length) S.sel = [0];
+  else { try { if (!body(S.sel)) S.sel = [0]; } catch { S.sel = [0]; } }
+  S.dirty = true; saveDraft(); renderAll(true); if (S.step === 2) renderHolders();
+  clearTimeout(timer); timer = setTimeout(() => { refreshViews(); refreshSigmas(); }, 300);
+  histButtons();
+  status(k < 0 ? "Undone." : "Redone."); setTimeout(() => status(""), 1200);
+}
+
 function changed() {
+  histRecord();
   S.dirty = true; saveDraft(); renderTree(); clearTimeout(timer);
   timer = setTimeout(() => { refreshViews(); refreshSigmas(); }, 650);
 }
@@ -697,6 +786,17 @@ async function main() {
   $("advanced").addEventListener("toggle", () => { if ($("advanced").open) renderAdvanced(); });
   $("save").addEventListener("click", save);
   $("fit-run").addEventListener("click", runFit);
+  $("fit-show").addEventListener("click", () => showFitImages());
+  ["fit-x0", "fit-x1", "fit-y0", "fit-y1"].forEach((k) => $(k).addEventListener("input", drawRoi));
+  $("undo").addEventListener("click", () => histGo(-1));
+  $("redo").addEventListener("click", () => histGo(1));
+  // Ctrl+Z / Ctrl+Y (Ctrl+Shift+Z): not while typing in a field (there they undo the typing)
+  document.addEventListener("keydown", (e) => {
+    if (!(e.ctrlKey || e.metaKey) || e.target.closest("input, textarea, select")) return;
+    const k = e.key.toLowerCase();
+    if (k === "z" && !e.shiftKey) { e.preventDefault(); histGo(-1); }
+    else if (k === "y" || (k === "z" && e.shiftKey)) { e.preventDefault(); histGo(1); }
+  });
   $("fit-apply").addEventListener("click", applyFit);
   $("save-model").addEventListener("click", saveModel);
   $("download").addEventListener("click", download);

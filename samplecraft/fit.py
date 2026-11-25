@@ -128,10 +128,32 @@ def image_rays(nx, ny, extent, z0, rays_per_pixel=16, seed=0):
     return o, d
 
 
-def fit(recipe, params, o, d, wavelength_A, T, dT, ties=None, base_dir=None, diff_step=None):
+def _smear_points(lam, bins, resolution, n_sub=5, n_res=5):
+    """The wavelengths where the model is computed for each measured point, and their weights: averaged over the
+    width of its bin (bins = (lower edges, upper edges)) and over the wavelength resolution of the instrument
+    (resolution: relative standard deviation of a Gaussian, e.g. 0.001 for WFM). Returns (n, m) arrays."""
+    lam = np.asarray(lam, float)
+    if bins is not None:
+        lo, hi = (np.asarray(b, float) for b in bins)
+        u = (np.arange(n_sub) + 0.5) / n_sub
+        pts = lo[:, None] + (hi - lo)[:, None] * u[None, :]
+    else:
+        pts = lam[:, None]
+    w = np.full(pts.shape, 1.0 / pts.shape[1])
+    if resolution and resolution > 0:
+        z, wz = np.polynomial.hermite_e.hermegauss(n_res)          # Gauss-Hermite nodes for a standard Gaussian
+        wz = wz / wz.sum()
+        pts = (pts[:, :, None] * (1 + resolution * z[None, None, :])).reshape(len(lam), -1)
+        w = (w[:, :, None] * wz[None, None, :]).reshape(len(lam), -1)
+    return pts, w
+
+
+def fit(recipe, params, o, d, wavelength_A, T, dT, ties=None, base_dir=None, diff_step=None, bins=None, resolution=0.0):
     """Fits the free parameters of `recipe` (not changed: a copy is fitted) so that the scene's transmission along the
     rays o + t d at the wavelengths matches T ± dT. ties: {path: expression of the parameter names} (e.g. "1 - f").
-    diff_step: relative step of the derivatives (default 1e-3 for materials, 1e-2 when the geometry changes)."""
+    diff_step: relative step of the derivatives (default 1e-3 for materials, 1e-2 when the geometry changes).
+    bins = (lower edges, upper edges) of the measured wavelength bins: the model is averaged over each bin (a sharp
+    Bragg edge falls inside one); resolution: relative standard deviation of the wavelength resolution (Gaussian)."""
     from scipy.optimize import least_squares
     base = copy.deepcopy(_unwrap(recipe))
     ties = dict(ties or {})
@@ -172,6 +194,9 @@ def fit(recipe, params, o, d, wavelength_A, T, dT, ties=None, base_dir=None, dif
 
     lengths = Scene.from_dict(base, base_dir).material_lengths(o, d) if geometry_fixed else None
 
+    pts, wts = _smear_points(lam, bins, resolution)
+    flat = pts.ravel()
+
     def model(x):
         r = recipe_of(x)
         if geometry_fixed:
@@ -179,10 +204,11 @@ def fit(recipe, params, o, d, wavelength_A, T, dT, ties=None, base_dir=None, dif
         else:
             s = Scene.from_dict(r, base_dir)
             cfg, L = s.cfg(), s.material_lengths(o, d)
-        mu = np.zeros((n * k, len(lam)))
+        mu = np.zeros((n * k, flat.size))
         for m, Lm in L.items():
-            mu += np.asarray(Lm)[:, None] * 0.1 * mats.sigma(cfg[m], lam)[None, :]
-        return np.exp(-mu).reshape(n, k, len(lam)).mean(axis=1)
+            mu += np.asarray(Lm)[:, None] * 0.1 * mats.sigma(cfg[m], flat)[None, :]
+        t = (np.exp(-mu).reshape(n * k, len(lam), -1) * wts[None]).sum(axis=2)
+        return t.reshape(n, k, len(lam)).mean(axis=1)
 
     res = least_squares(lambda x: ((model(x) - T) / dT).ravel(), [p.value for p in free],
                         bounds=([p.min for p in free], [p.max for p in free]), diff_step=diff_step, x_scale="jac")

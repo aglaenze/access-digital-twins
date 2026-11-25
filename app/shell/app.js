@@ -52,6 +52,18 @@ function setMode(c, reset = false) {
   $("#f-pw").autocomplete = creating || resetting ? "new-password" : "off";
   $("#auth-error").textContent = "";
 }
+// an eye in each password field shows what was typed (and hides it again)
+const EYE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+const EYE_OFF = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18M10.6 5.1A9.9 9.9 0 0 1 12 5c6.4 0 10 7 10 7a17.6 17.6 0 0 1-3.2 4.1M6.6 6.6C3.9 8.3 2 12 2 12s3.6 7 10 7a9.6 9.6 0 0 0 4.4-1.1M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
+function hidePasswords() { document.querySelectorAll(".pw input").forEach((i) => { i.type = "password"; const b = i.parentElement.querySelector(".eye"); b.innerHTML = EYE; b.setAttribute("aria-label", "Show the password"); }); }
+document.querySelectorAll('.field input[type="password"]').forEach((inp) => {
+  const w = document.createElement("div"); w.className = "pw"; inp.replaceWith(w); w.append(inp);
+  const b = document.createElement("button"); b.type = "button"; b.className = "eye"; b.innerHTML = EYE;
+  b.setAttribute("aria-label", "Show the password"); b.title = "Show or hide what you typed";
+  b.onclick = () => { const show = inp.type === "password"; inp.type = show ? "text" : "password";
+    b.innerHTML = show ? EYE_OFF : EYE; b.setAttribute("aria-label", show ? "Hide the password" : "Show the password"); inp.focus(); };
+  w.append(b);
+});
 $("#tab-in").onclick = () => setMode(false);
 $("#tab-new").onclick = () => setMode(true);
 $("#forgot").onclick = (e) => { e.preventDefault(); setMode(false, true); };
@@ -250,7 +262,7 @@ $("#teach").onclick = async () => {
     teacherMenu(); renderMenu(); renderCatalogue(); toast("You see the catalogue as a student again.");
     return;
   }
-  $("#t-code").value = ""; $("#t-error").textContent = "";
+  $("#t-code").value = ""; $("#t-error").textContent = ""; hidePasswords();
   $("#teacher").showModal();
 };
 $("#t-cancel").onclick = () => $("#teacher").close();
@@ -339,8 +351,11 @@ function currentLevel() {
 }
 
 // ---- the menu of the account: the grade (the only place it is chosen; MSc: notebooks with or without code), light or dark
+// the theme of the app, also given to the sample builder (its tabs: at opening, and when it changes)
+const themeJs = () => `document.documentElement.dataset.theme = ${JSON.stringify(document.documentElement.dataset.theme || "light")}`;
 function applyTheme(th) {
   document.documentElement.dataset.theme = th === "dark" ? "dark" : "light";
+  for (const [k, t] of tabs) if (k.includes("/twin/builder") && t.view) t.view.executeJavaScript(themeJs()).catch(() => {});
   if (T.titlebar && !$("#app").classList.contains("hidden")) T.titlebar(th === "dark" ? "night" : "dark");
 }
 function renderMenu() {
@@ -462,7 +477,7 @@ function renderCatalogue() {
       act(pick ? { ...b.dataset, variant: pick.value } : b.dataset);
     });
   } else renderTable(lvl);
-  if ($("#free")) renderFree(lvl);
+  renderFree(lvl);
   $("#intro").querySelectorAll("[data-act]").forEach((b) => b.onclick = () => act(b.dataset));
 }
 
@@ -599,12 +614,11 @@ function renderTable(lvl) {
   const prev = $("#r-scroll") ? $("#r-scroll").scrollTop : 0;
   $("#requests").innerHTML = `<div class="r-head"><span>REF</span><span>FROM</span><span>REQUEST</span><span>STATUS</span></div>
     <div class="r-scroll" id="r-scroll">${cards.map(row).join("") || `<div class="req-empty"><p>No request on this instrument at this grade yet.</p></div>`}
-      <div id="free"></div></div>`;
+      </div>`;
   $("#r-scroll").scrollTop = prev;
   $("#requests").querySelectorAll(".r-row").forEach((b) => b.onclick = () => {
     pref(`sel:${instr}:${lvl}`, b.dataset.key === openKey ? "none" : b.dataset.key);
     renderTable(lvl);
-    if ($("#free")) renderFree(lvl);
   });
   const box = $("#requests").querySelector(".r-detail");
   if (box) box.querySelectorAll("[data-act]").forEach((b) => b.onclick = () => {
@@ -661,7 +675,7 @@ function renderAll(ex) {
     : e.kind === "introduction" ? ""
     : `<article class="ex"><div><span class="tech">${num(e)}${esc(e.technique)}</span><h3>${esc(e.title)}</h3></div>
        ${e.mission ? `<div class="mission">${ICON_TARGET}<span><b>Your mission.</b> ${esc(e.mission)}</span></div>` : ""}
-       <div class="levels">${Object.entries(e.modes || {}).map(([k, m]) => level(e, k, m, i)).join("")}</div></article>`).join("") + `<div id="free"></div>`;
+       <div class="levels">${Object.entries(e.modes || {}).map(([k, m]) => level(e, k, m, i)).join("")}</div></article>`).join("");
 }
 
 function renderFree(lvl) {
@@ -672,17 +686,16 @@ function renderFree(lvl) {
   const mine = (c.proposals || {})[instr] || [];
   const rows = mine.map((p) => `<li><span class="pid">${esc(p.id)}</span><span class="pt">${esc(p.title)}</span>
       <span class="pk">${p.kind === "imported" ? "imported" : "free"} · ${esc((p.created || "").slice(0, 10))}</span>
-      <button class="btn" data-act="file" data-file="${esc(free)}" data-kind="notebook" data-proposal="${esc(p.id)}"
-        data-label="${esc(I.name)} · ${esc(p.id)}">Continue</button>
-      <button class="btn del" data-act="delprop" data-proposal="${esc(p.id)}" data-title="${esc(p.title)}"
-        title="Delete this proposal">Delete</button></li>`).join("");
-  $("#free").innerHTML = free ? `<article class="free"><div class="txt"><span class="tech">No exercise · your own project</span>
-      <h3>Free beamtime on ${esc(I.name)}</h3><p>Your own question, your own samples, your own measurements: as in a real beamtime at ESS.
-      Each free beamtime is a new proposal (its own number and data folder), found in NICOS with <i>Find my proposal</i>; no sample
-      is imposed. Preparing a real beamtime? Import your proposal and try it on the twin.</p>
-      ${rows ? `<ul class="props">${rows}</ul>` : ""}</div>
-      <div class="acts"><button class="btn go" data-act="newfree">New free beamtime</button>
-        <button class="btn" data-act="import">Import a proposal</button></div></article>` : "";
+      <button class="ib-badge cont" data-act="file" data-file="${esc(free)}" data-kind="notebook" data-proposal="${esc(p.id)}"
+        data-label="${esc(I.name)} · ${esc(p.id)}">CONTINUE ›</button>
+      <button class="ib-badge again2 del" data-act="delprop" data-proposal="${esc(p.id)}" data-title="${esc(p.title)}"
+        title="Delete this proposal">DELETE</button></li>`).join("");
+  $("#free").classList.toggle("hidden", !free);
+  $("#free").innerHTML = free ? `<div class="fb-head"><span class="ib-txt"><b>Free beamtime</b>
+        <span>your own question and samples, as in a real beamtime at ESS</span></span>
+      <span class="ib-acts"><button class="ib-badge cont" data-act="newfree" title="A new proposal of the twin's user office: its own number and data folder, found in NICOS with Find my proposal">NEW FREE BEAMTIME ›</button>
+        <button class="ib-badge again2" data-act="import" title="Your real proposal (e.g. at ESS), to try it on the twin: same number, same data folder">IMPORT A PROPOSAL</button></span></div>
+    ${rows ? `<ul class="props">${rows}</ul>` : ""}` : "";
   $("#free").querySelectorAll("[data-act]").forEach((b) => b.onclick = () => act(b.dataset));
 }
 
@@ -868,6 +881,7 @@ function openTab(url, kind, label, { clean = false } = {}) {
   pane.append(view, cover);
   // "Submit my work" (submit.py): its download link is clicked at once, so the window to save the file opens by itself
   view.addEventListener("dom-ready", () => {
+    if (url.includes("/twin/builder")) view.executeJavaScript(themeJs()).catch(() => {});
     view.executeJavaScript(`(() => {
       if (window.__twinAutoDownload) return;
       window.__twinAutoDownload = true;

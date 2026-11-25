@@ -349,11 +349,83 @@ async function download() {
 // ------------------------------------------------------------------ steps
 function go(n) {
   S.step = n;
-  for (const k of [1, 2, 3]) $(`step${k}`).classList.toggle("hidden", k !== n);
+  for (const k of [1, 2, 3, 4]) $(`step${k}`).classList.toggle("hidden", k !== n);
   document.querySelectorAll("#steps button").forEach((b) => b.classList.toggle("on", Number(b.dataset.step) === n));
   $("panel").scrollTop = 0;
   if (n === 2) renderHolders();
   if (n === 3) { if (!$("f-proposal").value) $("f-proposal").value = S.proposal; renderChecks(); }
+  if (n === 4) renderFit();
+}
+
+// ------------------------------------------------------------------ step 4: fit the sample to the measurements
+// builder_loki.fit_files / fit_params / fit_run: I(Q) of the sample minus the solvent (esssans), against the cross
+// section of the kinds of particles
+let FIT = null;
+async function renderFit() {
+  const box = $("fit-files");
+  $("fit-result").classList.add("hidden");
+  if (!S.proposal) { box.innerHTML = "<p class='note-box'>Open the builder from a beamtime notebook: the fit uses the files measured for your proposal.</p>"; return; }
+  box.innerHTML = "<p class='small'>Reading the files of your proposal…</p>";
+  let rows;
+  try { rows = (await api("fit_files")).rows; } catch (e) { box.innerHTML = ""; box.append(el("p", { class: "msg err" }, e.message)); return; }
+  const has = (k) => rows.some((r) => r.kind === k);
+  if (!has("sample") || !has("solvent") || !has("empty beam")) {
+    box.innerHTML = "";
+    box.append(el("p", { class: "note-box" }, `Not everything is measured yet in proposal ${S.proposal}: the fit needs your sample, the`
+      + " solvent alone (the same cell) and the empty beam, measured in NICOS with the same settings."));
+    return;
+  }
+  const pick = (kind, id, label) => {
+    const opts = rows.filter((r) => r.kind === kind);
+    const sel = el("select", { id }, ...opts.map((r) => el("option", { value: r.file }, `${r.file} · ${r.title} · ${r.collimation || ""} · ${r.t_s} s`)));
+    sel.value = opts[opts.length - 1].file;
+    return el("label", { class: "fit-file" }, el("span", {}, label), sel);
+  };
+  box.innerHTML = "";
+  box.append(pick("sample", "fit-sample", "Sample"), pick("solvent", "fit-solvent", "Solvent"), pick("empty beam", "fit-empty", "Empty beam"));
+  const pbox = $("fit-params");
+  let params;
+  try { params = (await api("fit_params", { state: S.state })).params; } catch (e) { pbox.innerHTML = ""; pbox.append(el("p", { class: "msg err" }, e.message)); return; }
+  pbox.innerHTML = "";
+  if (!params.length) { pbox.append(el("p", { class: "note-box" }, "No particles to fit: add a kind of particles in step 1.")); return; }
+  for (const p of params) {
+    pbox.append(el("div", { class: "fit-param", "data-key": p.key, "data-label": p.label },
+      el("label", { class: "fit-tick" }, el("input", { type: "checkbox" }), el("span", {}, p.label)),
+      el("span", { class: "small" }, `now ${+p.value.toPrecision(4)}`),
+      el("label", { class: "small" }, "from ", el("input", { type: "number", class: "fit-min", value: p.min, step: "any" })),
+      el("label", { class: "small" }, "to ", el("input", { type: "number", class: "fit-max", value: p.max, step: "any" }))));
+  }
+}
+async function runFit() {
+  const params = [...document.querySelectorAll("#fit-params .fit-param")].filter((r) => r.querySelector("input[type=checkbox]").checked)
+    .map((r) => ({ key: r.dataset.key, label: r.dataset.label, min: Number(r.querySelector(".fit-min").value), max: Number(r.querySelector(".fit-max").value) }));
+  const msg = $("fit-msg");
+  if (!$("fit-sample")) { msg.className = "msg err"; msg.textContent = "Nothing measured to fit (above)."; return; }
+  if (!params.length) { msg.className = "msg err"; msg.textContent = "Tick at least one number to fit."; return; }
+  $("fit-run").disabled = true; msg.className = "msg"; msg.textContent = "Reducing your files and fitting… up to a minute.";
+  try {
+    const d = await api("fit_run", { state: S.state, sample: $("fit-sample").value, solvent: $("fit-solvent").value,
+      empty_beam: $("fit-empty").value, params });
+    FIT = d;
+    $("fit-plot").src = "data:image/png;base64," + d.png;
+    $("fit-report").textContent = d.report + (d.chi2_red > 3 ? "\n\nχ²/dof well above 1: the model does not describe the data within"
+      + " their errors (another shape, a second kind of particles, polydispersity?)." : "");
+    $("fit-result").classList.remove("hidden"); $("fit-apply-msg").textContent = "";
+    msg.className = "msg ok"; msg.textContent = d.success ? "Done." : "The fit stopped before converging: see the result.";
+  } catch (e) { msg.className = "msg err"; msg.textContent = e.message; }
+  $("fit-run").disabled = false;
+}
+function applyFit() {
+  if (!FIT) return;
+  for (const v of FIT.values) {
+    const [i, ...rest] = v.key.split(".");
+    let node = S.state.kinds[Number(i)];
+    for (const r of rest.slice(0, -1)) node = node[r];
+    node[rest[rest.length - 1]] = Number(v.value.toPrecision(5));
+  }
+  changed(true);
+  const m = $("fit-apply-msg"); m.className = "msg ok";
+  m.textContent = "Done: your sample has the fitted values. Look at it (step 1), then save it (step 3).";
 }
 
 // ------------------------------------------------------------------ the live view
@@ -550,6 +622,8 @@ async function main() {
   $("picker-close").addEventListener("click", closePicker);
   $("picker").addEventListener("click", (e) => { if (e.target.id === "picker") closePicker(); });
   $("save").addEventListener("click", save);
+  $("fit-run").addEventListener("click", runFit);
+  $("fit-apply").addEventListener("click", applyFit);
   $("save-model").addEventListener("click", saveModel);
   $("download").addEventListener("click", download);
   $("plot").addEventListener("mousemove", hover);

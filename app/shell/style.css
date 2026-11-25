@@ -633,3 +633,41 @@ dialog.beam::backdrop { background: rgba(5, 8, 12, .6); }
 .ib-lw { flex: 1; min-width: 0; display: flex; justify-content: center; padding: 0 40px; container-type: inline-size; }
 .ib-lw .ib-line { width: min(240px, 100%); margin: 0; justify-self: auto; }
 @container (max-width: 150px) { .ib-line { display: none; } }
+
+/* the password fields: an eye shows what was typed; the labels of a dialog large enough */
+.field label { font-size: 14.5px; }
+#teacher .field label { font-size: 15.5px; }
+.pw { position: relative; }
+.pw input { width: 100%; padding-right: 46px; }
+.eye { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 36px; height: 36px; border: 0; border-radius: 6px;
+  background: transparent; color: var(--muted); display: flex; align-items: center; justify-content: center; }
+.eye:hover { background: var(--soft); color: var(--text); }
+.eye svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+/* the introduction bar in the colors of the cards (a white card with a rule; in the dark view, the card color) */
+.ib-main, :root[data-theme="dark"] .ib-main { background: var(--card); color: var(--text); border: 1.5px solid var(--strong); }
+.ib-txt > span, .ib-txt em { color: var(--muted); }
+.ib-line .rail { background: var(--line2); }
+.ib-line .part { background: var(--text); }
+.ib-line .lab { color: var(--muted); }
+.ib-badge.cont { background: var(--go); color: var(--go-ink); }
+.ib-badge.done { color: var(--muted); border: 1px solid var(--line2); }
+.ib-badge.again2 { background: transparent; color: var(--text); border: 1px solid var(--strong); }
+
+/* the free beamtime: its own block under the requests, in the style of the introduction bar */
+.freebox { flex: none; background: var(--card); border: 1.5px solid var(--strong); border-radius: 8px; padding: 10px 14px;
+  display: flex; flex-direction: column; gap: 8px; }
+.fb-head { display: flex; align-items: center; gap: 12px; }
+.fb-head .ib-txt { flex: 1; min-width: 0; white-space: normal; }
+.freebox .props { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; max-height: 128px; overflow-y: auto; }
+.freebox .props li { display: grid; grid-template-columns: 70px minmax(0, 1fr) auto auto auto; align-items: center; gap: 10px;
+  padding: 6px 0; border-top: 1px solid var(--line); }
+.freebox .pid { font-family: var(--mono); font-size: 12.5px; font-weight: 600; }
+.freebox .pt { font-family: var(--head); font-weight: 700; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.freebox .pk { font-family: var(--mono); font-size: 11px; color: var(--muted); white-space: nowrap; }
+.freebox .ib-badge.del:hover { color: var(--red); border-color: var(--red); }
+
+/* the briefing: when the buttons do not fit beside the text, they go under it, still on the right */
+.b-row { flex-wrap: wrap; row-gap: 10px; }
+.b-text { flex: 1 1 320px; }
+.b-row > .b-acts { margin-left: auto; }

@@ -927,13 +927,7 @@ def fit_params(recipe):
     return out
 
 
-def fit_run(instrument, proposal, recipe, holder, sample, open_beam, dark, roi, params):
-    """Fits the chosen numbers to the spectrum measured in roi = (x0, x1, y0, y1) [mm]: values, errors, χ²/dof, a
-    picture of the data and of the model, and the fitted values to put in the recipe."""
-    import scipp as sc
-    import matplotlib.pyplot as plt
-    import odin_reduction as red
-    from samplecraft import fit as F
+def _fit_paths(instrument, proposal, sample, open_beam, dark):
     folder = data_folder(instrument, proposal)
     if not folder:
         raise ValueError("no proposal: open the builder from a beamtime notebook (or give its number)")
@@ -947,13 +941,67 @@ def fit_run(instrument, proposal, recipe, holder, sample, open_beam, dark, roi, 
         if not os.path.isfile(p):
             raise ValueError(f"{f}: not in the folder of proposal {proposal}")
         return p
+    return path(sample, "sample"), path(open_beam, "open beam"), path(dark, "dark")
+
+
+def _gray_png(a, vmin, vmax):
+    """A 2D array as a gray PNG (base64), row 0 at the bottom (y up), no axes: the page draws on it."""
+    import matplotlib.pyplot as plt
+    buf = io.BytesIO()
+    plt.imsave(buf, np.flipud(np.clip(np.nan_to_num(a, nan=0.0), vmin, vmax)), cmap="gray", vmin=vmin, vmax=vmax, format="png")
+    return base64.b64encode(buf.getvalue()).decode()
+
+
+def fit_image(instrument, proposal, recipe, holder, sample, open_beam, dark):
+    """The measured transmission image (all the wavelengths) and the one the sample predicts over the same field,
+    averaged over the spectrum of the open beam as the measured one: side by side, the geometry is compared at once.
+    Returns the two PNG and the field (x0, x1, y0, y1) in mm."""
+    import scipp as sc
+    import odin_reduction as red
+    fs, fo, fd = _fit_paths(instrument, proposal, sample, open_beam, dark)
+    lam = sc.linspace("wavelength", FIT_LAM[0], FIT_LAM[1], 13, unit="angstrom")
+    r = red.reduce(fs, fo, fd, lam=lam, n_pixels=96)
+    img = r["image"]
+    x, y = img.coords["x"].values, img.coords["y"].values
+    ext = [float(x[0]), float(x[-1]), float(y[0]), float(y[-1])]
+    meas = np.asarray(img.values, float)
+    # the predicted image: T(x, y, λ) weighted by the open beam (its counts per wavelength bin)
+    w = np.asarray(red.histograms(fo, lam, (ext[0], ext[1], ext[2], ext[3]), 8)["spectrum"].values, float)
+    lc = 0.5 * (lam.values[1:] + lam.values[:-1])
+    half = max(abs(v) for v in ext)
+    n = 160
+    pred, tot = 0.0, 0.0
+    for l, wl in zip(lc, w):
+        if wl <= 0:
+            continue
+        t, g = _transmission(recipe, holder, float(l), n=n, half=half)
+        pred, tot = pred + wl * t, tot + wl
+    pred = pred / tot
+    # the predicted image on the measured field
+    gx = np.linspace(-half, half, n)
+    ix = (gx >= ext[0]) & (gx <= ext[1]); iy = (gx >= ext[2]) & (gx <= ext[3])
+    pred = pred[np.ix_(iy, ix)]
+    vmax = 1.05
+    vmin = max(0.0, float(np.nanpercentile(meas, 1)) - 0.05)
+    return dict(measured=_gray_png(meas, vmin, vmax), predicted=_gray_png(pred, vmin, vmax), extent=ext,
+                t_measured=float(np.nanmedian(meas)), t_predicted=float(np.median(pred)))
+
+
+def fit_run(instrument, proposal, recipe, holder, sample, open_beam, dark, roi, params):
+    """Fits the chosen numbers to the spectrum measured in roi = (x0, x1, y0, y1) [mm]: values, errors, χ²/dof, a
+    picture of the data and of the model, and the fitted values to put in the recipe."""
+    import scipp as sc
+    import matplotlib.pyplot as plt
+    import odin_reduction as red
+    from samplecraft import fit as F
+    fs, fo, fd = _fit_paths(instrument, proposal, sample, open_beam, dark)
     if not params:
         raise ValueError("choose at least one number to fit")
     x0, x1, y0, y1 = (float(v) for v in roi)
     if not (x1 > x0 and y1 > y0):
         raise ValueError("the region: x from < x to, y from < y to")
     lam = sc.linspace("wavelength", FIT_LAM[0], FIT_LAM[1], FIT_LAM[2], unit="angstrom")
-    r = red.reduce(path(sample, "sample"), path(open_beam, "open beam"), path(dark, "dark"), lam=lam, roi=(x0, x1, y0, y1))
+    r = red.reduce(fs, fo, fd, lam=lam, roi=(x0, x1, y0, y1))
     spec = r["spectrum"]
     T, var = np.asarray(spec.values, float), np.asarray(spec.variances, float)
     e = lam.values
@@ -973,7 +1021,13 @@ def fit_run(instrument, proposal, recipe, holder, sample, open_beam, dark, roi, 
         q.value = min(max(q.value, q.min), q.max)
         P.append(q)
     o, d = F.image_rays(1, 1, (x0, x1, y0, y1), z0=-500.0, rays_per_pixel=256)
-    res = F.fit(full, P, o, d, lc[ok], T[ok][None, :], np.sqrt(var[ok])[None, :])
+    # the model averaged over each wavelength bin (a sharp Bragg edge falls inside one) and over the resolution of
+    # the chopper mode (WFM: about 0.2 % for discs 0.30 m apart; natural: about 2 %; relative standard deviations)
+    rows = {r_["file"]: r_ for r_ in fit_files(instrument, proposal)["rows"]}
+    srow = rows.get(os.path.basename(fs), {})
+    res_rel = (0.0019 * float(srow.get("wfm_delta_m") or 0.30) / 0.30 if srow.get("choppers") == "wfm" else 0.02) / 2.355
+    res = F.fit(full, P, o, d, lc[ok], T[ok][None, :], np.sqrt(var[ok])[None, :], bins=(e[:-1][ok], e[1:][ok]),
+                resolution=res_rel)
     fig, ax = plt.subplots(figsize=(6.2, 3.4), dpi=110)
     ax.errorbar(lc[ok], T[ok], yerr=np.sqrt(var[ok]), fmt="o", ms=3, color="#1B1F24", ecolor="#9AA39A", label="measured")
     ax.plot(lc[ok], res.model[0], color="#D9480F", lw=2, label="fitted sample")

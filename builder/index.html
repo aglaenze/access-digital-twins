@@ -20,6 +20,10 @@
     <button data-step="3"><span class="n">3</span>Check &amp; save</button>
     <button data-step="4" title="Fit numbers of the sample to your measurements"><span class="n">4</span>Fit to my data</button>
   </nav>
+  <div class="undo">
+    <button id="undo" title="Undo (Ctrl+Z)" disabled>↶ Undo</button>
+    <button id="redo" title="Redo (Ctrl+Y)" disabled>↷ Redo</button>
+  </div>
 </header>
 
 <main class="layout">
@@ -125,10 +129,17 @@
           the choppers (time of flight).</p>
         <div id="fit-files"></div>
       </div>
+      <div class="box" id="fit-images-box">
+        <h2>Your measurement and your sample</h2>
+        <p class="lead">Left, the transmission you measured (all the wavelengths); right, what your sample predicts over
+          the same field. Draw the region of the fit on either picture (drag a rectangle).</p>
+        <div class="fit-images" id="fit-images"><p class="small">Choose the files above, then
+          <button id="fit-show" class="small-btn">show the pictures</button>.</p></div>
+      </div>
       <div class="box">
         <h2>The region of the image</h2>
         <p class="lead">Where the transmission is measured (mm, the center of the field is 0): a region crossed by the
-          part you fit, the same everywhere inside it.</p>
+          part you fit, the same everywhere inside it. Drawn on the pictures above, or typed here.</p>
         <div class="fit-roi">
           <label>x from <input type="number" id="fit-x0" value="-2" step="0.5"></label>
           <label>to <input type="number" id="fit-x1" value="2" step="0.5"></label>

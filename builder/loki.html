@@ -17,6 +17,7 @@
     <button data-step="1" class="on"><span class="n">1</span>Sample</button>
     <button data-step="2"><span class="n">2</span>Holder</button>
     <button data-step="3"><span class="n">3</span>Check &amp; save</button>
+    <button data-step="4" title="Fit sizes and amounts to your measurements"><span class="n">4</span>Fit to my data</button>
   </nav>
 </header>
 
@@ -100,7 +101,34 @@
           <div class="msg" id="model-msg"></div>
         </details>
       </div>
-      <div class="next"><button data-go="2">← The holder</button><span></span></div>
+      <div class="next"><button data-go="2">← The holder</button><button data-go="4">Fit it to my data →</button></div>
+    </div>
+
+    <!-- ============ step 4: fit the sample to the measurements ============ -->
+    <div class="step hidden" id="step4">
+      <div class="box">
+        <h2>Fit the sample to your measurements</h2>
+        <p class="lead">The sizes and the amount of your particles are adjusted until the curve they predict matches
+          the I(Q) you measured (your sample minus the solvent, in absolute units): the values come with their
+          uncertainties. It uses the files of your proposal: the sample, the solvent alone and the empty beam.</p>
+        <div id="fit-files"></div>
+      </div>
+      <div class="box">
+        <h2>What to fit</h2>
+        <p class="lead">Tick the numbers to fit, between the bounds (a flat background is always fitted with them: what
+          the subtraction of the solvent leaves). A fit takes from a few seconds to a minute.</p>
+        <div id="fit-params"></div>
+        <div class="toolbar"><button class="primary" id="fit-run">Fit</button></div>
+        <div class="msg" id="fit-msg"></div>
+      </div>
+      <div class="box hidden" id="fit-result">
+        <h2>The result</h2>
+        <img id="fit-plot" alt="The measured I(Q) and the curve of the fitted sample" class="fit-plot">
+        <pre id="fit-report" class="fit-report"></pre>
+        <div class="toolbar"><button class="primary" id="fit-apply">Put these values in my sample</button></div>
+        <div class="msg" id="fit-apply-msg"></div>
+      </div>
+      <div class="next"><button data-go="3">← Check and save</button><span></span></div>
     </div>
   </section>
 

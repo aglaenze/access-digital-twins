@@ -498,7 +498,7 @@ class BuilderStatic(web.StaticFileHandler):
 class BuilderApi(Base):
     """What the builder page asks: one function of builder_api.py per name, run in a thread (builds take seconds)."""
     POST = ("info", "load", "preview", "radiograph", "check", "sigmas", "catalogue_sigmas", "yaml", "parse", "save",
-            "save_model", "fit_files", "fit_params", "fit_run")
+            "save_model", "fit_files", "fit_params", "fit_run", "fit_image")
 
     async def _run(self, f, *a, **k):
         import functools
@@ -558,6 +558,8 @@ class BuilderApi(Base):
                                       rec, hol)
             elif what == "fit_files":
                 out = await self._run(B.fit_files, ins, prop)
+            elif what == "fit_image":
+                out = await self._run(B.fit_image, ins, prop, rec, hol, d.get("sample"), d.get("open_beam"), d.get("dark"))
             elif what == "fit_params":
                 out = dict(params=B.fit_params(rec))
             elif what == "fit_run":
@@ -575,7 +577,7 @@ class BuilderApi(Base):
             return
         self.finish(json.dumps(out))
 
-    LOKI = ("info", "load", "view", "check", "save", "save_model", "download")
+    LOKI = ("info", "load", "view", "check", "save", "save_model", "download", "fit_files", "fit_params", "fit_run")
 
     async def _loki(self, what, d, prop):
         """The LoKI page (builder/loki.html): builder_loki.py, the state of the page in d["state"]."""
@@ -597,6 +599,13 @@ class BuilderApi(Base):
             elif what == "save_model":
                 out = await self._run(L.save_model, prop, d.get("model", ""), d.get("title", ""),
                                       d.get("description", ""), st)
+            elif what == "fit_files":
+                out = await self._run(L.fit_files, prop)
+            elif what == "fit_params":
+                out = dict(params=L.fit_params(st))
+            elif what == "fit_run":
+                out = await self._run(L.fit_run, prop, st, d.get("sample"), d.get("solvent"), d.get("empty_beam"),
+                                      d.get("params", []))
             else:
                 out = dict(text=await self._run(L.download, d.get("title", ""), d.get("description", ""), st))
         except (ValueError, KeyError, TypeError, OSError) as e:
