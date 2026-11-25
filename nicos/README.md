@@ -112,6 +112,7 @@ Devices of **ODIN** (`nicos_twin/odin/setups/odin.py`):
 | `shutter` | `'open'`, `'closed'` |
 | `pinhole` | 0.01, 0.02, 0.03, 0.04 (m) |
 | `diffuser` | `'in'`, `'out'` |
+| `source_power` | 1.0, 2.0, 5.0 (MW; default 2, the ESS start; locked at the teacher's value when fixed for the class, the class of the server or the class open on this computer). Twin only: ESS NICOS has no such device, the accelerator sets the power. Neutron rates scale with it; the file holds the proton charge |
 | `stage_x` | −500 to 500 mm (out of the beam: 500) |
 | `stage_rot` | −180 to 180 deg (tomography: `scan(stage_rot, 0, 3, 60, t=10)`) |
 | `sample_holder` | `'iron_plate'` |
@@ -127,6 +128,7 @@ Devices of **LoKI** (`nicos_twin/loki/setups/loki.py`):
 | `collimation` | `'3m'`, `'5m'`, `'8m'` (longer: lower Q, better resolution, less flux) |
 | `pulse_skipping` | `'off'`, `'on'` (choppers at 7 Hz, one pulse in two, band 3–21.4 Å; with `'3m'` only) |
 | `detector_distance` | 5.0, 10.0 (m; rear detector bank) |
+| `source_power` | 1.0, 2.0, 5.0 (MW; default 2, the ESS start; locked at the teacher's value when fixed for the class, the class of the server or the class open on this computer). Twin only: ESS NICOS has no such device, the accelerator sets the power. Neutron rates scale with it; the file holds the proton charge |
 | `sample_holder` | `'silica_spheres'` |
 | `det` | the 9 tube panels; preset `t` (s); image: rear panel (392 × 250 pixels); file: I(Q) per bank |
 | read-only (setup `choppers`) | `ch1_speed`, `ch1a_delay`, `ch1b_delay`, `ch2_speed`, `ch2a_delay`, `ch2b_delay` (Hz, ms; bandwidth and frame-overlap chopper pairs, delays computed as in the official model), `wavelength_band` |

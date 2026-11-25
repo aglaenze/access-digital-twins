@@ -7,6 +7,11 @@ URL = 'http://127.0.0.1:8765'
 
 # Names as in nicos_ess/loki/setups (the NICOS of the real LoKI) where they exist: heavy_shutter, fast_shutter.
 devices = dict(
+    source_power = device('nicos_twin.devices.TwinSwitch',
+        description = 'power of the ESS source for the simulations (twin only: at ESS the accelerator sets it; '
+                      'locked when the teacher fixed it for the class)',
+        twinurl = URL, twindevice = 'source_power', states = [1.0, 2.0, 5.0], unit = 'MW',
+    ),
     heavy_shutter = device('nicos_twin.devices.TwinSwitch',
         description = 'Main shutter',
         twinurl = URL, twindevice = 'heavy_shutter', states = ['Open', 'Closed'],

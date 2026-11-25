@@ -10,6 +10,10 @@ it received, and the reductions divide by it: measurements at different powers c
 
 When the teacher fixed the power for the class (classes.py, settings.power_mw), the menu shows it, locked ("set by your
 teacher"), and the instrument starts with it anyway (default()).
+
+NICOS (twin_server.py): the device source_power (1, 2 or 5 MW) sets the power of the simulations that NICOS starts; the
+teacher's value wins (fixed_here(): the class of the server, or else the class open on this computer), read again
+before each simulation. ESS NICOS has no such device (the accelerator sets the power): it is a device of the twin.
 """
 CHOICES = [("1 MW", 1.0), ("2 MW (ESS at the start)", 2.0), ("5 MW (ESS design)", 5.0)]
 DEFAULT_MW = 2.0
@@ -20,6 +24,21 @@ def fixed():
     try:
         import classes
         v = classes.setting("power_mw")
+        return float(v) if v else None
+    except Exception:
+        return None
+
+
+def fixed_here():
+    """fixed(), or else the power fixed for the class open on this computer (the twin server of NICOS is started
+    outside the class, without TWIN_CLASS)."""
+    f = fixed()
+    if f:
+        return f
+    try:
+        import classes
+        st = classes.open_status()
+        v = classes.load(st["code"]).get("settings", {}).get("power_mw") if st else None
         return float(v) if v else None
     except Exception:
         return None
